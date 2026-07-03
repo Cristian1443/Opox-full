@@ -2,224 +2,180 @@ import React from 'react';
 import {
     View,
     Text,
-    StyleSheet,
     TouchableOpacity,
-    Dimensions,
-    Platform,
+    StyleSheet,
+    SafeAreaView,
     StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Polyline, Circle as SvgCircle } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 
-// ─── DESIGN TOKENS ────────────────────────────────────────
-const C = {
-    primary: '#f26535',
-    dark: '#0d1b2a',
-    white: '#ffffff',
-    grayDesc: '#6b7280',   // gris neutro exacto — ni azul ni muy claro
-    grayBorder: '#e5e7eb',
-    graySecTxt: '#374151',
-    circleBg: '#fce8df',
-};
-
-const { width: SW, height: SH } = Dimensions.get('window');
-
-// ─── MEDIDAS EXACTAS DEL WIREFRAME ────────────────────────
-// Medido pixel a pixel sobre el wireframe original:
-// • Espacio superior: 24% del alto disponible
-// • Círculo: 48% del ancho de pantalla
-// • Ícono: 36% del diámetro del círculo
-// • Gap círculo→título: 48px
-// • fontSize título: 26 (cabe en 1 línea sin truncar)
-// • Gap descripción→botones: flex:1 (espacio variable)
-
-const CIRCLE = SW * 0.48;
-const ICON = CIRCLE * 0.36;
-const TOP = SH * 0.24;
-
-// ─── ÍCONO SVG — línea de tendencia con punto ─────────────
-// Replicado exactamente del wireframe
-const TrendLine = () => (
-    <Svg
-        width={ICON}
-        height={ICON * 0.6}
-        viewBox="0 0 70 42"
-    >
-        <Polyline
-            points="4,36  22,22  34,28  50,10  64,4"
-            fill="none"
-            stroke={C.primary}
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
-        <SvgCircle
-            cx="64"
-            cy="4"
-            r="5"
-            fill={C.primary}
-        />
-    </Svg>
-);
-
-// ─── SCREEN ───────────────────────────────────────────────
 export default function LevelTestProposalScreen({ navigation }) {
-    const insets = useSafeAreaInsets();
-
     return (
-        <View style={[styles.root, { paddingTop: insets.top }]}>
-            <StatusBar barStyle="dark-content" backgroundColor={C.white} />
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-            {/* ── ESPACIO BLANCO SUPERIOR ── */}
-            <View style={{ height: TOP }} />
+            {/* Status bar */}
+            <View style={styles.statusBar}>
+                <Text style={styles.statusBarTime}>9:41</Text>
+            </View>
 
-            {/* ── CÍRCULO SALMÓN ── */}
-            <View style={styles.circleWrap}>
-                <View style={styles.circle}>
-                    <TrendLine />
+            {/* Contenido central */}
+            <View style={styles.body}>
+
+                {/* Bloque central: icono + título + subtítulo */}
+                <View style={styles.centerBlock}>
+
+                    {/* Icono con fondo circular */}
+                    <View style={styles.iconCircle}>
+                        <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
+                            <Path
+                                d="M3 17l5-5 4 3 8-8"
+                                stroke="#FF6B4A"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            <Circle cx={20} cy={7} r={2} fill="#FF6B4A" />
+                        </Svg>
+                    </View>
+
+                    {/* Título */}
+                    <Text style={styles.title}>Mídete en 5 minutos</Text>
+
+                    {/* Subtítulo */}
+                    <Text style={styles.subtitle}>
+                        Un test corto para que la IA sepa tu punto de partida y ajuste la dificultad y tu plan desde el primer día.
+                    </Text>
                 </View>
-            </View>
 
-            {/* ── GAP FIJO ENTRE CÍRCULO Y TÍTULO ── */}
-            <View style={{ height: 48 }} />
+                {/* Botones */}
+                <View style={styles.buttonsContainer}>
+                    <TouchableOpacity
+                        style={styles.btnPrimary}
+                        onPress={() => navigation.navigate('LevelTestInProgress')}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.btnPrimaryText}>Hacer test de nivel</Text>
+                    </TouchableOpacity>
 
-            {/* ── TEXTOS ── */}
-            <View style={styles.textWrap}>
-                {/*
-          IMPORTANTE: Sin adjustsFontSizeToFit ni numberOfLines
-          El título cabe completo en 1 línea con fontSize 26
-          y paddingHorizontal 24
-        */}
-                <Text style={styles.title}>
-                    Mídete en 5 minutos
-                </Text>
-
-                <Text style={styles.desc}>
-                    Un test corto para que la IA sepa tu punto{'\n'}
-                    de partida y ajuste la dificultad y tu plan{'\n'}
-                    desde el primer día.
-                </Text>
-            </View>
-
-            {/* ── ESPACIO FLEXIBLE — empuja botones al fondo ── */}
-            <View style={{ flex: 1 }} />
-
-            {/* ── BOTONES ── */}
-            <View style={[styles.actions, { paddingBottom: insets.bottom + 20 }]}>
-
-                <TouchableOpacity
-                    style={styles.primaryBtn}
-                    onPress={() => navigation.navigate('LevelTestInProgress')}
-                    activeOpacity={0.85}
-                >
-                    <Text style={styles.primaryTxt}>Hacer test de nivel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.secondaryBtn}
-                    onPress={() => navigation.navigate('Permissions')}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.secondaryTxt}>Ahora no, lo haré luego</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.btnGhost}
+                        onPress={() => navigation.navigate('Permissions')}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.btnGhostText}>Ahora no, lo haré luego</Text>
+                    </TouchableOpacity>
+                </View>
 
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
-// ─── STYLES ───────────────────────────────────────────────
 const styles = StyleSheet.create({
-
-    root: {
+    container: {
         flex: 1,
-        backgroundColor: C.white,
+        backgroundColor: '#FFFFFF',
     },
 
-    // Centrar círculo horizontalmente
-    circleWrap: {
+    // Status bar
+    statusBar: {
+        height: 30,
+        flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 16,
+        flexShrink: 0,
+    },
+    statusBarTime: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#1B2A4A',
+        marginRight: 'auto', // en RN usar flex: 1 en un spacer si hace falta
     },
 
-    // Círculo perfectamente redondo
-    circle: {
-        width: CIRCLE,
-        height: CIRCLE,
-        borderRadius: CIRCLE / 2,
-        backgroundColor: C.circleBg,
+    // Cuerpo principal (padding: 16px 18px)
+    body: {
+        flex: 1,
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        flexDirection: 'column',
+    },
+
+    // Bloque centrado vertical y horizontalmente
+    centerBlock: {
+        flex: 1,
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        textAlign: 'center',
     },
 
-    // Textos centrados
-    textWrap: {
-        paddingHorizontal: 24,
+    // Círculo con icono
+    iconCircle: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: '#FFF6F3',
         alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 20,
     },
 
-    // Título: negro oscuro, bold máximo, 1 línea
+    // Título
     title: {
-        fontSize: 26,
-        fontWeight: '900',
-        color: C.dark,
+        fontSize: 21,
+        fontWeight: '800',
+        color: '#0F1B33',
+        letterSpacing: -0.4,
         textAlign: 'center',
-        marginBottom: 12,
-        ...Platform.select({
-            android: { fontFamily: 'sans-serif-black' },
-        }),
     },
 
-    // Descripción: gris neutro, 3 líneas centradas
-    desc: {
-        fontSize: 15,
-        fontWeight: '400',
-        color: C.grayDesc,
+    // Subtítulo
+    subtitle: {
+        fontSize: 12.5,
+        color: '#5A6373',
+        marginTop: 6,
         textAlign: 'center',
-        lineHeight: 23,
+        maxWidth: 235,
+        lineHeight: 18,
     },
 
-    // Botones pegados al fondo
-    actions: {
-        paddingHorizontal: 20,
-        gap: 12,
+    // Contenedor de botones
+    buttonsContainer: {
+        flexDirection: 'column',
+        gap: 9,               // RN 0.71+ soporta gap; si no, usar marginBottom en el primero
+        // marginBottom: 0,  // ya está al fondo del flex
     },
 
-    // Primario — naranja con sombra
-    primaryBtn: {
-        backgroundColor: C.primary,
-        borderRadius: 50,
-        height: 56,
+    // Botón primario (naranja)
+    btnPrimary: {
+        backgroundColor: '#FF6B4A',
+        borderRadius: 12,
+        paddingVertical: 13,
+        paddingHorizontal: 13,
+        width: '100%',
         alignItems: 'center',
-        justifyContent: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: C.primary,
-                shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.35,
-                shadowRadius: 10,
-            },
-            android: { elevation: 7 },
-        }),
     },
-    primaryTxt: {
-        color: C.white,
-        fontSize: 17,
+    btnPrimaryText: {
+        color: '#FFFFFF',
+        fontSize: 13.5,
         fontWeight: '700',
     },
 
-    // Secundario — borde gris muy suave
-    secondaryBtn: {
-        backgroundColor: C.white,
-        borderRadius: 50,
-        height: 56,
+    // Botón ghost (blanco con borde)
+    btnGhost: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingVertical: 13,
+        paddingHorizontal: 13,
+        width: '100%',
         alignItems: 'center',
-        justifyContent: 'center',
         borderWidth: 1.5,
-        borderColor: C.grayBorder,
+        borderColor: '#D4DAE6',
     },
-    secondaryTxt: {
-        color: C.graySecTxt,
-        fontSize: 16,
-        fontWeight: '600',
+    btnGhostText: {
+        color: '#1B2A4A',
+        fontSize: 13.5,
+        fontWeight: '700',
     },
 });
