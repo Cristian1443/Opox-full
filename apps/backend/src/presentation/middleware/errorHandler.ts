@@ -71,6 +71,13 @@ export function errorHandler(
         }
         if (errWithProps.code) errorMeta['code'] = errWithProps.code;
         if (errWithProps.status) errorMeta['status'] = errWithProps.status;
+    } else if (err && typeof err === 'object') {
+        // Errores no-Error (ej. PostgrestError de Supabase): objetos planos.
+        try {
+            errorMeta['raw'] = JSON.stringify(err);
+        } catch {
+            errorMeta['raw'] = Object.keys(err as Record<string, unknown>).join(',');
+        }
     } else {
         errorMeta['raw'] = String(err);
     }

@@ -313,7 +313,16 @@ export class SupabaseAuthRepository implements IAuthRepository {
                 { onConflict: 'device_id' },
             );
 
-        if (error) throw error;
+        if (error) {
+            // eslint-disable-next-line no-console
+            console.error('[supabase linkBiometric] postgrest error:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint,
+            });
+            throw new Error(`linkBiometric: ${error.message} (code ${error.code})`);
+        }
     }
 
     async loginWithBiometric(input: {
