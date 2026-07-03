@@ -1,3 +1,13 @@
+// Polyfill de Web Crypto para React Native. DEBE ir antes que cualquier
+// otro import: React Native 0.86 llama a performance.mark() (que usa
+// crypto.randomUUID) muy temprano, y @noble/curves necesita
+// crypto.getRandomValues para generar keys.
+//
+// Usamos expo-standard-web-crypto (no react-native-get-random-values)
+// porque ese ultimo es modulo nativo que Expo Go NO trae empaquetado.
+import { polyfillWebCrypto } from 'expo-standard-web-crypto';
+polyfillWebCrypto();
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';
