@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "React Native",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-native",
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "types": ["react", "react-native"]
+  }
+}
