@@ -218,8 +218,8 @@ export default function PermissionsScreen({ navigation }) {
         setStatus('denied');
     };
 
-    // Navegar al siguiente bloque
-    const goNext = () => navigation.replace('Home'); // cambia 'Home' por tu ruta real
+    // Navegar al siguiente bloque (1 · Acceso)
+    const goNext = () => navigation.replace('Entrada');
 
     // ── Renderizado condicional de estados ──────
     if (status === 'granted') return <SuccessState onPress={goNext} />;
