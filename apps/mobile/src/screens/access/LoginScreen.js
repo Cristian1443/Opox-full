@@ -112,6 +112,7 @@ export default function LoginScreen({ navigation, route }) {
 
     const [biometricAvailable, setBiometricAvailable] = useState(false);
     const [biometricLabelText, setBiometricLabelText] = useState('Face ID');
+    const [biometricType, setBiometricType] = useState(null);
 
     useEffect(() => {
         (async () => {
@@ -121,6 +122,7 @@ export default function LoginScreen({ navigation, route }) {
             ]);
             setBiometricAvailable(type !== 'none' && linked);
             setBiometricLabelText(biometricLabel(type) || 'biometría');
+            setBiometricType(type);
         })();
     }, []);
 
@@ -223,7 +225,11 @@ export default function LoginScreen({ navigation, route }) {
                                 onPress={handleBiometricLogin}
                                 activeOpacity={0.85}
                             >
-                                <Ionicons name="scan-outline" size={20} color={colors.primary} />
+                                <Ionicons
+                                    name={biometricType === 'finger' ? 'finger-print' : 'scan-outline'}
+                                    size={20}
+                                    color={colors.primary}
+                                />
                                 <Text style={s.biometricText}>Entrar con {biometricLabelText}</Text>
                             </TouchableOpacity>
                         </>

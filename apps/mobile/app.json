@@ -7,6 +7,14 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "platforms": ["ios", "android", "web"],
+    "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permite a OPOX usar Face ID para que puedas acceder de forma rápida y segura."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     },

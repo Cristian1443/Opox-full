@@ -34,8 +34,12 @@ export async function detectBiometricType() {
         const enrolled = await LocalAuthentication.isEnrolledAsync();
         if (!enrolled) return 'none';
         const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        const face = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
         const finger = types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+        // En Android, el reconocimiento facial es biometría débil (Class 2) y no puede
+        // desbloquear claves de SecureStore (que requiere biometría fuerte/Class 3).
+        // Face ID solo se ofrece en iOS donde el hardware garantiza biometría fuerte.
+        const face = Platform.OS === 'ios' &&
+            types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
         if (face && finger) return 'both';
         if (face) return 'face';
         if (finger) return 'finger';
