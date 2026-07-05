@@ -5,6 +5,64 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-05 — Cierre definitivo del bloque 1 · Acceso
+
+### Biometría completada y validada en dispositivo físico Android
+
+- **Huella dactilar en Android**: flujo completo validado en dispositivo físico
+  con Expo Go. Registro de clave Ed25519, vínculo al backend y login biométrico
+  challenge–response funcionando de extremo a extremo.
+- **Face ID en iOS**: código listo y configuración completa. Se añadió el plugin
+  `expo-local-authentication` con `faceIDPermission` en `app.json` para que
+  `NSFaceIDUsageDescription` se inyecte en builds iOS. Requiere development
+  build (EAS) para probarse — Expo Go no expone Face ID en iOS por diseño.
+- **Reconocimiento facial Android excluido**: el face unlock de Android es
+  biometría de clase 2 (débil) e incompatible con `SecureStore requireAuthentication`
+  que exige clase 3 (fuerte). La app solo ofrece huella en Android y Face ID/
+  Touch ID en iOS.
+- **Ícono biométrico dinámico** en LoginScreen: `finger-print` para huella,
+  `scan-outline` para Face ID, según lo que detecte el dispositivo.
+- Se creó `apps/mobile/eas.json` con perfiles `development`, `preview` y
+  `production` listos para el primer EAS Build.
+
+### Correcciones de flujo y navegación
+
+- **Dev Menu eliminado**: `initialRouteName` cambia de `DevMenu` a `Splash`.
+  La app arranca ahora con el flujo natural completo sin bypass de desarrollo.
+- **Logout limpia biometría**: `authApi.logout()` llama a `disableBiometric()`
+  en paralelo con `clearSession()`. Antes, el estado biométrico quedaba en
+  SecureStore indefinidamente y la pantalla de BioLink nunca volvía a aparecer.
+- **DashboardPlaceholder**: el botón "Volver al Dev Menu" pasa a ser
+  "Cerrar sesión" con logout real, para poder reiniciar el flujo desde cualquier
+  sesión de prueba.
+- **SecureStore en web**: `isBiometricLinked()` ahora retorna `false`
+  inmediatamente en web, evitando el crash `getValueWithKeyAsync is not a function`
+  al ejecutar el bundle web.
+
+### Integración de ramas y dependencias
+
+- Se creó la rama `release/bloque-1` fusionando `bloque-1-acceso` con `main`.
+  Conflictos resueltos manteniendo la estructura de monorepo (pnpm/turbo).
+  Archivos de la estructura antigua (`src/hooks/`, `src/navigation/`) reubicados
+  a `apps/mobile/src/`.
+- Instalada dependencia `@react-native-community/netinfo` que faltaba para
+  el hook `useNetworkWatcher` aportado por `main`.
+
+### Estado del bloque 1 · Acceso
+Cerrado por completo desde la perspectiva de usuario y de código. Validado
+en Android físico con Expo Go. La única limitación restante es de entorno de
+prueba: Face ID en iOS necesita un EAS Build para poder probarse.
+
+### Pendientes conocidos
+- Verificar dominio propio en Resend para enviar OTPs a cualquier email
+  (ahora sandbox: solo al email titular de la cuenta Resend).
+- Deep link para consumir el enlace de recuperación de contraseña desde el
+  correo (pantalla 1.5c).
+- EAS Build iOS para validar Face ID en iPhone físico.
+- Hosting definitivo del backend (ahora solo funciona en local).
+
+---
+
 ## 2026-07-03 — Backend en marcha y biometría del bloque 1
 
 ### Infraestructura del backend

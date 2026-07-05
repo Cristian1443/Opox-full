@@ -1,5 +1,6 @@
 import { api } from './client';
 import { API_ROUTES } from '@opox/constants';
+import { disableBiometric } from '../lib/biometric';
 
 /**
  * Wrappers específicos del bloque 1 · Acceso.
@@ -39,7 +40,7 @@ export const authApi = {
         withSession(api.post(API_ROUTES.AUTH.REFRESH, { refreshToken })),
     logout: async () => {
         const res = await api.post(API_ROUTES.AUTH.LOGOUT, {}, { auth: true });
-        await api.clearSession();
+        await Promise.all([api.clearSession(), disableBiometric()]);
         return res;
     },
     acceptTerms: (input) => api.post(API_ROUTES.AUTH.TERMS_ACCEPT, input, { auth: true }),

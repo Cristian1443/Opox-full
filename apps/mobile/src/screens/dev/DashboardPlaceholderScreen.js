@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
+import { authApi } from '../../api';
 
 /**
  * Placeholder mientras no exista el Bloque 2.
@@ -16,6 +17,11 @@ import { colors } from '../../theme';
  */
 export default function DashboardPlaceholderScreen({ navigation, route }) {
     const email = route?.params?.email;
+
+    const handleLogout = async () => {
+        await authApi.logout();
+        navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+    };
 
     return (
         <SafeAreaView style={s.container}>
@@ -31,10 +37,10 @@ export default function DashboardPlaceholderScreen({ navigation, route }) {
 
                 <TouchableOpacity
                     style={s.button}
-                    onPress={() => navigation.reset({ index: 0, routes: [{ name: 'DevMenu' }] })}
+                    onPress={handleLogout}
                     activeOpacity={0.8}
                 >
-                    <Text style={s.buttonText}>Volver al Dev Menu</Text>
+                    <Text style={s.buttonText}>Cerrar sesión</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>

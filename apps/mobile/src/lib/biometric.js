@@ -71,6 +71,7 @@ async function getOrCreateDeviceId() {
 // ─── Estado local del vínculo ─────────────────────
 
 export async function isBiometricLinked() {
+    if (Platform.OS === 'web') return false;
     const val = await SecureStore.getItemAsync(KEY_ENABLED);
     return val === '1';
 }
