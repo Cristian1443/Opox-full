@@ -1,24 +1,44 @@
 import React, { useState } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    SafeAreaView,
+    StatusBar,
 } from 'react-native';
-import { colors } from '../../theme';
 
 const QUESTIONS = [
     {
         id: 1,
-        question: 'Según la Ley 39/2015, el plazo general para resolver un procedimiento es de:',
-        options: ['A · Un mes', 'B · Tres meses', 'C · Seis meses', 'D · Un año'],
+        question:
+            'Según la Ley 39/2015, el plazo general para resolver un procedimiento es de:',
+        options: [
+            { id: 'A', label: 'A · Un mes' },
+            { id: 'B', label: 'B · Tres meses' },
+            { id: 'C', label: 'C · Seis meses' },
+            { id: 'D', label: 'D · Un año' },
+        ],
     },
     {
         id: 2,
         question: '¿Cuántos artículos tiene la Constitución Española de 1978?',
-        options: ['A · 159', 'B · 169', 'C · 179', 'D · 189'],
+        options: [
+            { id: 'A', label: 'A · 159' },
+            { id: 'B', label: 'B · 169' },
+            { id: 'C', label: 'C · 179' },
+            { id: 'D', label: 'D · 189' },
+        ],
     },
     {
         id: 3,
         question: '¿Cuál es el órgano supremo de la Administración General del Estado?',
-        options: ['A · El Congreso', 'B · El Senado', 'C · El Consejo de Ministros', 'D · El Tribunal Supremo'],
+        options: [
+            { id: 'A', label: 'A · El Congreso' },
+            { id: 'B', label: 'B · El Senado' },
+            { id: 'C', label: 'C · El Consejo de Ministros' },
+            { id: 'D', label: 'D · El Tribunal Supremo' },
+        ],
     },
 ];
 
@@ -29,7 +49,7 @@ export default function LevelTestInProgressScreen({ navigation }) {
     const [selected, setSelected] = useState(null);
 
     const question = QUESTIONS[qIndex % QUESTIONS.length];
-    const progress = ((qIndex + 1) / TOTAL) * 100;
+    const progress = (qIndex + 1) / TOTAL;
 
     const handleNext = () => {
         if (qIndex < TOTAL - 1) {
@@ -41,65 +61,191 @@ export default function LevelTestInProgressScreen({ navigation }) {
     };
 
     return (
-        <SafeAreaView style={s.container}>
-            {/* Barra de progreso */}
-            <View style={s.progressRow}>
-                <View style={s.progressBg}>
-                    <View style={[s.progressFill, { width: `${progress}%` }]} />
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+            {/* Status bar */}
+            <View style={styles.statusBar}>
+                <Text style={styles.statusBarTime}>9:41</Text>
+            </View>
+
+            {/* Cuerpo principal */}
+            <View style={styles.body}>
+
+                {/* Barra de progreso + contador */}
+                <View style={styles.progressRow}>
+                    <View style={styles.progressTrack}>
+                        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                    </View>
+                    <Text style={styles.progressLabel}>{qIndex + 1}/{TOTAL}</Text>
                 </View>
-                <Text style={s.progressLabel}>{qIndex + 1}/{TOTAL}</Text>
+
+                {/* Tarjeta de pregunta + opciones */}
+                <View style={styles.questionCard}>
+                    <Text style={styles.questionText}>
+                        {question.question}
+                    </Text>
+
+                    {question.options.map((opt) => (
+                        <TouchableOpacity
+                            key={opt.id}
+                            style={[styles.option, selected === opt.id && styles.optionSelected]}
+                            onPress={() => setSelected(opt.id)}
+                            activeOpacity={0.75}
+                        >
+                            <Text
+                                style={[
+                                    styles.optionText,
+                                    selected === opt.id && styles.optionTextSelected,
+                                ]}
+                            >
+                                {opt.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* Hint */}
+                <Text style={styles.hint}>Sin penalización · responde lo que sepas</Text>
             </View>
 
-            {/* Pregunta */}
-            <Text style={s.questionText}>{question.question}</Text>
-
-            {/* Opciones */}
-            <View style={s.optionsList}>
-                {question.options.map((opt, i) => (
-                    <TouchableOpacity
-                        key={i}
-                        style={[s.option, selected === i && s.optionActive]}
-                        onPress={() => setSelected(i)}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={[s.optionTxt, selected === i && s.optionTxtActive]}>{opt}</Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Botón fijo en la parte inferior */}
+            <View style={styles.bottomRow}>
+                <TouchableOpacity
+                    style={[styles.btnPrimary, selected === null && styles.btnPrimaryOff]}
+                    onPress={handleNext}
+                    disabled={selected === null}
+                    activeOpacity={0.85}
+                >
+                    <Text style={styles.btnPrimaryText}>
+                        {qIndex < TOTAL - 1 ? 'Siguiente pregunta' : 'Ver resultados'}
+                    </Text>
+                </TouchableOpacity>
             </View>
-
-            <Text style={s.hint}>Sin penalización · responde lo que sepas</Text>
-
-            <TouchableOpacity
-                style={[s.nextBtn, selected === null && s.nextBtnOff]}
-                onPress={handleNext}
-                disabled={selected === null}
-            >
-                <Text style={s.nextTxt}>
-                    {qIndex < TOTAL - 1 ? 'Siguiente pregunta' : 'Ver resultados'}
-                </Text>
-            </TouchableOpacity>
         </SafeAreaView>
     );
 }
 
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.white, paddingHorizontal: 24, paddingTop: 16 },
-    progressRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 28 },
-    progressBg: { flex: 1, height: 8, backgroundColor: colors.grayMid, borderRadius: 4, marginRight: 10, overflow: 'hidden' },
-    progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 4 },
-    progressLabel: { fontSize: 13, fontWeight: '700', color: colors.grayText },
-    questionText: { fontSize: 17, fontWeight: '800', color: colors.dark, lineHeight: 26, marginBottom: 28 },
-    optionsList: { gap: 12 },
-    option: { borderWidth: 1.5, borderColor: colors.grayMid, borderRadius: 12, padding: 16 },
-    optionActive: { borderColor: colors.primary, backgroundColor: colors.redSoft },
-    optionTxt: { fontSize: 15, color: colors.dark, fontWeight: '500' },
-    optionTxtActive: { color: colors.primary, fontWeight: '700' },
-    hint: { textAlign: 'center', color: colors.grayText, fontSize: 13, marginTop: 20 },
-    nextBtn: {
-        position: 'absolute', bottom: 32, left: 24, right: 24,
-        backgroundColor: colors.primary, borderRadius: 50,
-        paddingVertical: 18, alignItems: 'center',
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
     },
-    nextBtnOff: { opacity: 0.4 },
-    nextTxt: { color: colors.white, fontSize: 17, fontWeight: '700' },
+
+    // ── Status bar ──────────────────────────────
+    statusBar: {
+        height: 30,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        flexShrink: 0,
+    },
+    statusBarTime: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#1B2A4A',
+    },
+
+    // ── Cuerpo (padding: 16px 18px) ─────────────
+    body: {
+        flex: 1,
+        paddingHorizontal: 18,
+        paddingTop: 16,
+        paddingBottom: 80, // espacio para el botón absoluto
+    },
+
+    // ── Progreso ────────────────────────────────
+    progressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 14,
+    },
+    progressTrack: {
+        flex: 1,
+        height: 7,
+        backgroundColor: '#EEF1F7',
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        backgroundColor: '#FF6B4A',
+    },
+    progressLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#8A92A0',
+    },
+
+    // ── Tarjeta de pregunta ──────────────────────
+    questionCard: {
+        backgroundColor: '#F4F6FA',
+        borderWidth: 1.5,
+        borderColor: '#E4E8F0',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
+    },
+    questionText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#1B2A4A',
+        lineHeight: 17,
+    },
+
+    // ── Opciones ────────────────────────────────
+    option: {
+        borderWidth: 1.5,
+        borderColor: '#E4E8F0',
+        borderRadius: 9,
+        paddingVertical: 9,
+        paddingHorizontal: 11,
+        marginTop: 7,
+    },
+    optionSelected: {
+        borderColor: '#FF6B4A',
+        backgroundColor: '#FFF6F3',
+    },
+    optionText: {
+        fontSize: 11.5,
+        color: '#46506A',
+    },
+    optionTextSelected: {
+        color: '#FF6B4A',
+        fontWeight: '600',
+    },
+
+    // ── Hint ────────────────────────────────────
+    hint: {
+        fontSize: 11,
+        color: '#8A92A0',
+        textAlign: 'center',
+        marginTop: 6,
+    },
+
+    // ── Botón fijo inferior ──────────────────────
+    // Equivale a: position:absolute; bottom:16; left:18; right:18
+    bottomRow: {
+        position: 'absolute',
+        bottom: 16,
+        left: 18,
+        right: 18,
+        flexDirection: 'column',
+        gap: 9,
+    },
+    btnPrimary: {
+        backgroundColor: '#FF6B4A',
+        borderRadius: 12,
+        paddingVertical: 13,
+        alignItems: 'center',
+    },
+    btnPrimaryOff: {
+        opacity: 0.4,
+    },
+    btnPrimaryText: {
+        color: '#FFFFFF',
+        fontSize: 13.5,
+        fontWeight: '700',
+    },
 });

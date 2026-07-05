@@ -23,8 +23,6 @@ import OtpScreen from '../screens/access/OtpScreen';
 import TerminosScreen from '../screens/access/TerminosScreen';
 import SesionIniciadaScreen from '../screens/access/SesionIniciadaScreen';
 
-// Dev
-import DevMenuScreen from '../screens/dev/DevMenuScreen';
 import DashboardPlaceholderScreen from '../screens/dev/DashboardPlaceholderScreen';
 
 const Stack = createNativeStackNavigator();
@@ -32,11 +30,9 @@ const Stack = createNativeStackNavigator();
 export default function OnboardingNavigator() {
     return (
         <Stack.Navigator
-            initialRouteName="DevMenu"
+            initialRouteName="Splash"
             screenOptions={{ headerShown: false, animation: 'fade' }}
         >
-            {/* Dev — quitar cuando el bloque 1 esté validado */}
-            <Stack.Screen name="DevMenu" component={DevMenuScreen} />
             <Stack.Screen name="Dashboard" component={DashboardPlaceholderScreen} />
 
             <Stack.Screen name="Splash" component={SplashScreen} />

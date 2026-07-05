@@ -2,18 +2,28 @@ import React, { useEffect } from 'react';
 import {
     View, Text, StyleSheet, ActivityIndicator, StatusBar,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { colors } from '../../theme';
 
 export default function SplashScreen({ navigation }) {
     useEffect(() => {
-        const timer = setTimeout(() => {
-            const hasConnection = true; // reemplaza con NetInfo real
+        let cancelled = false;
+
+        const timer = setTimeout(async () => {
+            const state = await NetInfo.fetch();
+            const hasConnection = state.isConnected && state.isInternetReachable !== false;
             const isUpdated = true; // reemplaza con tu lógica de versión
+
+            if (cancelled) return;
             if (!hasConnection) return navigation.replace('SplashNoConnection');
             if (!isUpdated) return navigation.replace('SplashUpdate');
             navigation.replace('OnboardingSlider');
         }, 2500);
-        return () => clearTimeout(timer);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, []);
 
     return (
