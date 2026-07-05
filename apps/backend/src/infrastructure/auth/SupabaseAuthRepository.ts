@@ -22,7 +22,19 @@ const CHALLENGE_TTL_SECONDS = 60;
  * los use cases y controllers nunca vean detalles del provider.
  */
 export class SupabaseAuthRepository implements IAuthRepository {
-    constructor(private readonly supabase: SupabaseClient) { }
+    /**
+     * Recibe DOS clientes Supabase (ambos con service_role):
+     *  - supabaseAuth: para todos los `.auth.xxx` de sesión. Su estado queda
+     *    contaminado tras cada login (supabase-js reescribe el Authorization
+     *    con el JWT del usuario), y por eso NO se usa para `.from(...)`.
+     *  - supabaseAdmin: exclusivo para `.from(...)` sobre tablas con RLS y
+     *    para endpoints `.auth.admin.xxx`. No se le llama signIn* jamás,
+     *    así mantiene el Authorization con la service_role y bypasea RLS.
+     */
+    constructor(
+        private readonly supabaseAuth: SupabaseClient,
+        private readonly supabaseAdmin: SupabaseClient,
+    ) { }
 
     // ─── Helpers ──────────────────────────────────
 
@@ -67,7 +79,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         password: string;
         displayName: string;
     }): Promise<Session> {
-        const { data, error } = await this.supabase.auth.signUp({
+        const { data, error } = await this.supabaseAuth.auth.signUp({
             email: input.email,
             password: input.password,
             options: {
@@ -130,7 +142,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
     }
 
     async loginWithEmail(input: { email: string; password: string }): Promise<Session> {
-        const { data, error } = await this.supabase.auth.signInWithPassword({
+        const { data, error } = await this.supabaseAuth.auth.signInWithPassword({
             email: input.email,
             password: input.password,
         });
@@ -167,7 +179,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
             throw new Error('Meta login not implemented yet');
         }
 
-        const { data, error } = await this.supabase.auth.signInWithIdToken({
+        const { data, error } = await this.supabaseAuth.auth.signInWithIdToken({
             provider: input.provider,
             token: input.idToken,
         });
@@ -197,7 +209,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         email: string;
         purpose: 'email_verification' | 'passwordless_login';
     }): Promise<void> {
-        const { error } = await this.supabase.auth.signInWithOtp({
+        const { error } = await this.supabaseAuth.auth.signInWithOtp({
             email: input.email,
             options: {
                 shouldCreateUser: input.purpose === 'passwordless_login',
@@ -212,7 +224,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         purpose: 'email_verification' | 'passwordless_login';
     }): Promise<Session> {
         const token = input.code.trim();
-        const { data, error } = await this.supabase.auth.verifyOtp({
+        const { data, error } = await this.supabaseAuth.auth.verifyOtp({
             email: input.email,
             token,
             type: input.purpose === 'email_verification' ? 'email' : 'magiclink',
@@ -251,7 +263,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
     async requestPasswordReset(email: string): Promise<void> {
         // Anti-enumeración: siempre resolvemos OK aunque el email no exista.
-        await this.supabase.auth.resetPasswordForEmail(email).catch(() => undefined);
+        await this.supabaseAuth.auth.resetPasswordForEmail(email).catch(() => undefined);
     }
 
     async confirmPasswordReset(input: {
@@ -275,7 +287,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         const challenge = generateChallengeBase64();
         const expiresAt = new Date(Date.now() + CHALLENGE_TTL_SECONDS * 1000).toISOString();
 
-        const { data, error } = await this.supabase
+        const { data, error } = await this.supabaseAdmin
             .from('biometric_challenges')
             .insert({
                 device_id: deviceId,
@@ -301,7 +313,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
     }): Promise<void> {
         // upsert: si el device_id ya existe (usuario reactivando o cambiando user),
         // lo sobrescribimos con las nuevas credenciales.
-        const { error } = await this.supabase
+        const { error } = await this.supabaseAdmin
             .from('biometric_devices')
             .upsert(
                 {
@@ -331,7 +343,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         signedChallenge: string;
     }): Promise<Session> {
         // 1. Recuperar challenge, comprobar que no expiró ni se usó.
-        const { data: challenge, error: chErr } = await this.supabase
+        const { data: challenge, error: chErr } = await this.supabaseAdmin
             .from('biometric_challenges')
             .select('id, device_id, challenge, expires_at, used_at')
             .eq('id', input.challengeId)
@@ -345,7 +357,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         }
 
         // 2. Recuperar clave pública del device.
-        const { data: device, error: devErr } = await this.supabase
+        const { data: device, error: devErr } = await this.supabaseAdmin
             .from('biometric_devices')
             .select('user_id, public_key')
             .eq('device_id', input.deviceId)
@@ -362,13 +374,13 @@ export class SupabaseAuthRepository implements IAuthRepository {
         if (!valid) throw new BiometricNotRecognizedError();
 
         // 4. Marcar challenge como usado (previene replay).
-        await this.supabase
+        await this.supabaseAdmin
             .from('biometric_challenges')
             .update({ used_at: new Date().toISOString() })
             .eq('id', input.challengeId);
 
         // 5. Actualizar last_used_at del device (útil para stats/ajustes).
-        await this.supabase
+        await this.supabaseAdmin
             .from('biometric_devices')
             .update({ last_used_at: new Date().toISOString() })
             .eq('device_id', input.deviceId);
@@ -376,13 +388,13 @@ export class SupabaseAuthRepository implements IAuthRepository {
         // 6. Emitir sesión de Supabase para ese user_id. Patrón oficial:
         //    generateLink → devuelve hashed_token → verifyOtp lo intercambia
         //    por una sesión con accessToken + refreshToken reales.
-        const { data: userData, error: userErr } = await this.supabase.auth.admin.getUserById(
+        const { data: userData, error: userErr } = await this.supabaseAdmin.auth.admin.getUserById(
             device.user_id as string,
         );
         if (userErr || !userData.user?.email) throw new BiometricNotRecognizedError();
 
         const email = userData.user.email;
-        const { data: linkData, error: linkErr } = await this.supabase.auth.admin.generateLink({
+        const { data: linkData, error: linkErr } = await this.supabaseAdmin.auth.admin.generateLink({
             type: 'magiclink',
             email,
         });
@@ -390,7 +402,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
             throw new BiometricNotRecognizedError();
         }
 
-        const { data: sessionData, error: verifyErr } = await this.supabase.auth.verifyOtp({
+        const { data: sessionData, error: verifyErr } = await this.supabaseAuth.auth.verifyOtp({
             type: 'magiclink',
             token_hash: linkData.properties.hashed_token,
         });
@@ -416,7 +428,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
     // ─── Sesión ───────────────────────────────────
 
     async getSession(accessToken: string): Promise<Session> {
-        const { data, error } = await this.supabase.auth.getUser(accessToken);
+        const { data, error } = await this.supabaseAuth.auth.getUser(accessToken);
         if (error || !data.user) throw new SessionExpiredError();
 
         // getUser no devuelve tokens; reconstruimos la Session con el que ya tenemos.
@@ -441,7 +453,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
     }
 
     async refreshSession(refreshToken: string): Promise<Session> {
-        const { data, error } = await this.supabase.auth.refreshSession({
+        const { data, error } = await this.supabaseAuth.auth.refreshSession({
             refresh_token: refreshToken,
         });
         if (error || !data.session || !data.user) throw new SessionExpiredError();
@@ -462,7 +474,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
     }
 
     async logout(accessToken: string): Promise<void> {
-        const { error } = await this.supabase.auth.admin.signOut(accessToken);
+        const { error } = await this.supabaseAdmin.auth.admin.signOut(accessToken);
         if (error) throw new UnauthorizedError();
     }
 
@@ -474,7 +486,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         privacyVersion: string;
     }): Promise<User> {
         const now = new Date().toISOString();
-        const { data, error } = await this.supabase.auth.admin.updateUserById(input.userId, {
+        const { data, error } = await this.supabaseAdmin.auth.admin.updateUserById(input.userId, {
             user_metadata: {
                 terms_accepted_at: now,
                 terms_version: input.termsVersion,

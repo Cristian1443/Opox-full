@@ -17,6 +17,7 @@ import {
     AcceptTermsUseCase,
 } from './application';
 import {
+    getSupabaseAuth,
     getSupabaseAdmin,
     SupabaseAuthRepository,
     ClientApiClient,
@@ -36,7 +37,7 @@ import type { IAuthRepository } from './domain';
 export function buildContainer() {
     // ─── Repositorios (infra) ─────────────────────
     const authRepo: IAuthRepository = isSupabaseConfigured
-        ? new SupabaseAuthRepository(getSupabaseAdmin())
+        ? new SupabaseAuthRepository(getSupabaseAuth(), getSupabaseAdmin())
         : createStubAuthRepository();
 
     if (!isSupabaseConfigured) {
