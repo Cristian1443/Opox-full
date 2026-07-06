@@ -10,7 +10,8 @@ import LevelTestProposalScreen from '../screens/onboarding/LevelTestProposalScre
 import LevelTestInProgressScreen from '../screens/onboarding/LevelTestInProgressScreen';
 import LevelTestResultScreen from '../screens/onboarding/LevelTestResultScreen';
 import PermissionsScreen from '../screens/onboarding/PermissionsScreen';
-import HomeScreen from '../screens/HomeScreen';
+import DashboardScreen from '../screens/DashboardScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,7 +27,8 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="LevelTestInProgress" component={LevelTestInProgressScreen} />
             <Stack.Screen name="LevelTestResult" component={LevelTestResultScreen} />
             <Stack.Screen name="Permissions" component={PermissionsScreen} />
-            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Home" component={DashboardScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </Stack.Navigator>
     );
 }
