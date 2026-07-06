@@ -9,6 +9,7 @@ import {
     ScrollView,
 } from 'react-native';
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NudgeModal from '../components/NudgeModal';
 
 // ─── Iconos SVG exactos del wireframe (Bloque 2 · Dashboard) ─────────────────
@@ -247,6 +248,7 @@ const NUDGES = {
 
 // ─── Pantalla principal (2.1 Dashboard + 2.2 Acceso rápido) ─────────────────
 export default function DashboardScreen({ navigation }) {
+    const insets = useSafeAreaInsets();
     const [activeNudge, setActiveNudge] = useState(null); // null | 'fatigue' | 'academic' | 'boe'
     const nudge = activeNudge ? NUDGES[activeNudge] : null;
 
@@ -389,16 +391,16 @@ export default function DashboardScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
 
-                <View style={{ height: 70 }} />
+                <View style={{ height: 70 + insets.bottom }} />
             </ScrollView>
 
             {/* Botón central (+) = Nuevo Test */}
-            <View style={styles.fab}>
+            <View style={[styles.fab, { bottom: 38 + insets.bottom }]}>
                 <IconPlus />
             </View>
 
             {/* Nav inferior */}
-            <View style={styles.nav}>
+            <View style={[styles.nav, { height: 56 + insets.bottom, paddingBottom: insets.bottom }]}>
                 <View style={styles.navItem}>
                     <IconNavHome active />
                     <Text style={[styles.navLabel, styles.navLabelActive]}>Inicio</Text>
