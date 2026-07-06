@@ -1,0 +1,177 @@
+### Uso:
+#   1. Instala la extensión "REST Client" de Huachao Mao en VS Code.
+#   2. Cambia @email por un email real al que tengas acceso.
+#   3. Cambia @password por una contraseña >= 8 caracteres.
+#   4. Pulsa "Send Request" encima de cada bloque.
+#   5. La primera vez ejecuta en orden: register → verifyOtp → login → me → terms.
+#   6. Tras "login", copia el accessToken de la respuesta y pégalo en @token.
+
+@host = http://localhost:3000
+@email = tu-email-real@gmail.com
+@password = MiPass1234!
+@displayName = Usuario Prueba
+@token =
+
+# ────────────────────────────────────────────────
+# 0. Health (sin auth)
+# ────────────────────────────────────────────────
+
+### Health
+GET {{host}}/health
+
+
+# ────────────────────────────────────────────────
+# 1.2 Registro
+# ────────────────────────────────────────────────
+
+### Registrar cuenta nueva
+# Devuelve una sesión y dispara el envío del OTP al email.
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "displayName": "{{displayName}}"
+}
+
+### Registrar el MISMO email (esperado: 409 auth/email-already-registered)
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "displayName": "{{displayName}}"
+}
+
+
+# ────────────────────────────────────────────────
+# 1.6 OTP
+# ────────────────────────────────────────────────
+
+### Reenviar OTP
+POST {{host}}/auth/otp/send
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "purpose": "email_verification"
+}
+
+### Verificar OTP (pega el código de 6 dígitos que llegó al email)
+POST {{host}}/auth/otp/verify
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "code": "123456",
+  "purpose": "email_verification"
+}
+
+### Verificar OTP con código inválido (esperado: 400 auth/otp-invalid)
+POST {{host}}/auth/otp/verify
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "code": "000000",
+  "purpose": "email_verification"
+}
+
+
+# ────────────────────────────────────────────────
+# 1.3 Login
+# ────────────────────────────────────────────────
+
+### Login correcto (copia el accessToken al var @token de arriba)
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Login con password mal (esperado: 401 auth/invalid-credentials)
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "PasswordErronea"
+}
+
+### Login con email inválido (esperado: 400 validation/failed)
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "no-es-email",
+  "password": "{{password}}"
+}
+
+
+# ────────────────────────────────────────────────
+# Rutas protegidas — requieren @token
+# ────────────────────────────────────────────────
+
+### Me (usuario actual)
+GET {{host}}/auth/me
+Authorization: Bearer {{token}}
+
+### Aceptar términos
+POST {{host}}/auth/terms/accept
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "termsVersion": "2026-07-01",
+  "privacyVersion": "2026-07-01"
+}
+
+### Logout
+POST {{host}}/auth/logout
+Authorization: Bearer {{token}}
+
+### Sin token (esperado: 401 common/unauthorized)
+GET {{host}}/auth/me
+
+
+# ────────────────────────────────────────────────
+# 1.5 Recuperar contraseña
+# ────────────────────────────────────────────────
+
+### Pedir enlace de recuperación (siempre responde 202, incluso si el email no existe)
+POST {{host}}/auth/password/reset-request
+Content-Type: application/json
+
+{
+  "email": "{{email}}"
+}
+
+
+# ────────────────────────────────────────────────
+# Refresh de sesión
+# ────────────────────────────────────────────────
+
+### Refresh (pega el refreshToken de la respuesta de login)
+POST {{host}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "PEGAR_REFRESH_TOKEN_AQUI"
+}
+
+
+# ────────────────────────────────────────────────
+# 1.4 Biometría — PENDIENTE de implementación end-to-end
+# ────────────────────────────────────────────────
+
+### Challenge (ahora mismo devuelve 500 con "pendiente de implementar")
+POST {{host}}/auth/biometric/challenge
+Content-Type: application/json
+
+{
+  "deviceId": "test-device-1"
+}

@@ -1,0 +1,33 @@
+/**
+ * Rutas HTTP del backend, compartidas con el mobile para evitar strings
+ * dispersos y drift entre cliente y servidor.
+ */
+
+export const API_ROUTES = {
+    HEALTH: '/health',
+
+    AUTH: {
+        REGISTER: '/auth/register',
+        LOGIN: '/auth/login',
+        OAUTH: '/auth/oauth',
+        LOGOUT: '/auth/logout',
+        REFRESH: '/auth/refresh',
+        ME: '/auth/me',
+
+        OTP_SEND: '/auth/otp/send',
+        OTP_VERIFY: '/auth/otp/verify',
+
+        PASSWORD_RESET_REQUEST: '/auth/password/reset-request',
+        PASSWORD_RESET_CONFIRM: '/auth/password/reset-confirm',
+
+        BIOMETRIC_CHALLENGE: '/auth/biometric/challenge',
+        BIOMETRIC_LINK: '/auth/biometric/link',
+        BIOMETRIC_LOGIN: '/auth/biometric/login',
+
+        TERMS_ACCEPT: '/auth/terms/accept',
+    },
+};
+
+/** Versión actual de los términos de uso — bumpear cuando cambien */
+export const TERMS_VERSION = '2026-07-01';
+export const PRIVACY_VERSION = '2026-07-01';
