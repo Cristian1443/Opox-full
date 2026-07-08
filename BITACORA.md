@@ -5,6 +5,103 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-07 — Bloque 3 · Salud (frontend) cerrado
+
+Rama de trabajo: `bloque-3-salud` (nacida de `main`, ya con el dashboard de
+Cristian). Backend y contratos de IA quedan explícitamente para próxima sesión.
+
+### Pantallas del bloque 3 · Salud
+Se implementaron las 13 pantallas del wireframe con dos rondas de iteración
+(primera pasada + alineación con mockups entregados por el cliente en
+`Lista de observaciones y mejoras bloque 3.docx`):
+
+- **3.1 Home de Salud** — resumen del wearable (energía, cardio, estrés y
+  recuperación, respiración y sueño). Entrada al motor de fatiga y a Consejos.
+- **3.2 Conexión de dispositivo** — lista de wearables compatibles (Apple
+  Watch, Garmin, Fitbit/Pixel, Samsung, Solo smartphone) con estado conectado /
+  disponible.
+- **3.2 · ok · Pop-up "Conectado correctamente"** — modal de éxito reutilizable
+  (parqueado para escenarios de reconexión rápida).
+- **3.2 · err · Pop-up "Error de conexión"** — modal con reintentar naranja y
+  cancelar como link.
+- **3.3 Flujo de emparejamiento** — anillo giratorio con icono del wearable
+  centrado y lista de pasos que se van tickando.
+- **3.4 Detalle de métrica (genérico)** — reutilizable para HRV, ritmo,
+  FC reposo, SpO₂, sueño. Soporta métricas donde "menos = mejor" (FC reposo).
+- **3.4b Motor de fatiga** — desglose de las 5 señales que cruza la app para
+  calcular el estado ("ningún reloj mide fatiga directa").
+- **3.5 Aviso de descanso · Respiración guiada** — círculos concéntricos verdes
+  con animación 4-4, tap sobre el círculo para pausar/reanudar.
+- **3.6 Home de Consejos** — 3 categorías con fondos pastel (estudio azul,
+  alimentación verde, meditación morado).
+- **3.7 Cómo estudiar mejor** — 4 técnicas (Pomodoro, repetición espaciada,
+  active recall, curva del olvido) + CTA navy al Tutor IA.
+- **3.8 Alimentación (home)** — tab Alimentos con alimentos que potencian la
+  memoria; el tab Menús navega al listado completo.
+- **3.8b Menús equilibrados** — listado filtrable con badge de autoría
+  (IA vs Dietista colegiada).
+- **3.8c Detalle de menú / receta** — desglose por comida con ingredientes,
+  preparación, "añadir a lista de la compra" y "añadir al plan".
+- **3.9 Meditación (listado)** — card recomendada del día grande en morado +
+  sesiones estándar.
+- **3.9a Reproductor de sesión** — fondo morado oscuro, barra de progreso
+  lineal, controles de play/pause y skip ±15 s.
+
+### Iteraciones de diseño contra mockup del cliente
+Primera pasada con paleta iOS por defecto; corregida a la paleta OPOX
+(naranja marca) y luego alineada al mockup:
+- Header estandarizado en todo el bloque: chevron naranja + título bold
+  grande, sin barra ni divider. Componente compartido `HealthScreenHeader`.
+- Tarjeta de energía en 3.1 rediseñada a fondo navy oscuro con anillo circular
+  de porcentaje.
+- Layout de métricas de 3.1 pasado a grid de 2 y 3 columnas para casar con
+  el mockup.
+- Botones de acción (Reintentar, Tutor IA, Comenzar a usar) unificados al
+  naranja de marca en pill.
+- CTA "Tutor IA" en 3.7 restilado a card navy + botón pill naranja según el
+  mockup.
+- 3.6 con fondos pastel por categoría (más amigable que el diseño previo).
+- 3.9 y 3.9a rediseñadas al lenguaje morado del mockup (meditación).
+- 3.5 rediseñada con círculos concéntricos verdes sobre navy.
+
+### Placeholder para el Tutor IA
+Se creó una pantalla temporal `AITutorPlaceholder` a la que apuntan todos los
+CTAs "Tutor IA" del bloque. Evita crashes en el flujo mientras el bloque 4 no
+existe. Preserva el `technique` como param para pre-cargar contexto cuando
+llegue la integración real.
+
+### Wiring del bloque
+- Dashboard (bloque 2 de Cristian) → widget "Salud" → 3.1 Home de Salud.
+- 3.1 → gestor del wearable en el header, motor de fatiga en la card de
+  energía, consejos al final.
+- Consejos → cada categoría lleva a su pantalla dedicada.
+- Menús → detalle de menú/receta (con `addedMeals` per-meal, no global).
+
+### Estado del bloque 3 · Salud
+Cerrado en frontend. Todos los flujos navegan sin crashes ni taps huérfanos.
+Datos mock; no hay backend ni IA aún.
+
+### Pendientes conocidos (próxima sesión)
+- **Backend del bloque 3**: contratos de datos (`Metric`, `FatigueState`,
+  `Menu`, `MeditationSession`), endpoints REST y adaptador para datos del
+  wearable (probablemente HealthKit iOS + Health Connect Android en fases
+  posteriores).
+- **Integración de IA**: el responsable IA proporcionará prompts y contratos.
+  Estructura pactada:
+  - `packages/ai/prompts/` — prompts, system messages y ejemplos (versionado,
+    sin secretos).
+  - `packages/types/src/ai.ts` — contratos request/response IA compartidos.
+  - `apps/backend/src/infrastructure/ai/` — cliente/adaptador al proveedor
+    (streaming, retry, etc.). Nunca desde el móvil, para no exponer la key.
+  - `apps/backend/.env` — `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`.
+- La lista de menús de Alimentación distingue autoría IA vs dietista humano;
+  el contrato de datos debe fijar `type: 'AI' | 'Human'` y `authorId?` desde
+  el primer diseño (implicaciones de compliance/etiquetado).
+- El motor de fatiga cruza 5 señales — la salida de la IA debe respetar ese
+  shape (`FatigueSignal[]` + nivel global).
+
+---
+
 ## 2026-07-05 — Cierre definitivo del bloque 1 · Acceso
 
 ### Biometría completada y validada en dispositivo físico Android
