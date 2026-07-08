@@ -16,6 +16,7 @@ import {
     LogoutUseCase,
     AcceptTermsUseCase,
     UpdateProfileUseCase,
+    DeleteAccountUseCase,
     ListNotificationsUseCase,
     GetNextNudgeUseCase,
     MarkNotificationReadUseCase,
@@ -142,6 +143,7 @@ export function buildContainer() {
         logout: new LogoutUseCase(authRepo),
         acceptTerms: new AcceptTermsUseCase(authRepo),
         updateProfile: new UpdateProfileUseCase(authRepo),
+        deleteAccount: new DeleteAccountUseCase(authRepo),
 
         // Bloque 2 · Dashboard
         getDashboardSummary: new GetDashboardSummaryUseCase(authRepo, dashboardRepo),

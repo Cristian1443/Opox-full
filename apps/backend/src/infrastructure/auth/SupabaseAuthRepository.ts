@@ -576,4 +576,9 @@ export class SupabaseAuthRepository implements IAuthRepository {
             console.error('[auth syncProfileMirror] postgrest error:', error.message);
         }
     }
+
+    async deleteAccount(userId: string): Promise<void> {
+        const { error } = await this.supabaseAdmin.auth.admin.deleteUser(userId);
+        if (error) throw new UnauthorizedError();
+    }
 }

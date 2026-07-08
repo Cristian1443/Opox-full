@@ -26,6 +26,7 @@ import SesionIniciadaScreen from '../screens/access/SesionIniciadaScreen';
 // Bloque 2 · Dashboard
 import DashboardScreen from '../screens/DashboardScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 // Bloque 3 · Salud
 import HomeHealthScreen from '../screens/health/HomeHealthScreen';
@@ -72,6 +73,7 @@ export default function OnboardingNavigator() {
         >
             <Stack.Screen name="Dashboard" component={DashboardScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
 
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="SplashNoConnection" component={SplashNoConnectionScreen} />

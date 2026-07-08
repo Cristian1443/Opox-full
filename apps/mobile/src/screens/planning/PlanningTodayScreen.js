@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Modal, TextInput } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import NudgeModal from '../../components/NudgeModal';
@@ -9,6 +9,14 @@ function IconCheck() {
     return (
         <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
             <Path d="M5 12l4 4 10-10" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function IconPlus() {
+    return (
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+            <Path d="M12 5v14M5 12h14" stroke="#FF6B4A" strokeWidth={2} strokeLinecap="round" />
         </Svg>
     );
 }
@@ -42,6 +50,9 @@ export default function PlanningTodayScreen({ navigation }) {
     const [tasks, setTasks] = useState([]);
     const [goalCount, setGoalCount] = useState(3);
     const [completedPopup, setCompletedPopup] = useState(null); // { streak, points } | null
+    const [addVisible, setAddVisible] = useState(false);
+    const [newTitle, setNewTitle] = useState('');
+    const [newSubtitle, setNewSubtitle] = useState('');
 
     const load = useCallback(() => {
         Promise.all([planningApi.listTasks(), planningApi.getPlan()]).then(([t, p]) => {
@@ -61,6 +72,23 @@ export default function PlanningTodayScreen({ navigation }) {
         }
     };
 
+    const handleAddTask = async () => {
+        if (!newTitle.trim()) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const { data } = await planningApi.createTask({
+            taskDate: today,
+            title: newTitle.trim(),
+            subtitle: newSubtitle.trim() || undefined,
+            kind: 'test',
+        });
+        if (data) {
+            setTasks((prev) => [...prev, data]);
+            setNewTitle('');
+            setNewSubtitle('');
+            setAddVisible(false);
+        }
+    };
+
     const completedCount = tasks.filter((t) => t.done).length;
     const percent = goalCount > 0 ? Math.min(Math.round((completedCount / goalCount) * 100), 100) : 0;
     const pending = tasks.find((t) => !t.done);
@@ -69,7 +97,11 @@ export default function PlanningTodayScreen({ navigation }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
             <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
-            <ScreenHeader title="Hoy" onBack={() => navigation.goBack()} />
+            <ScreenHeader
+                title="Hoy"
+                onBack={() => navigation.goBack()}
+                right={<TouchableOpacity onPress={() => setAddVisible(true)}><IconPlus /></TouchableOpacity>}
+            />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <View style={styles.card}>
@@ -109,6 +141,34 @@ export default function PlanningTodayScreen({ navigation }) {
                     onSecondaryPress={() => setCompletedPopup(null)}
                 />
             )}
+
+            <Modal transparent visible={addVisible} animationType="fade" onRequestClose={() => setAddVisible(false)}>
+                <View style={styles.overlay}>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>Nueva tarea de hoy</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Título (ej. Test de Constitución)"
+                            placeholderTextColor="#AEB5C2"
+                            value={newTitle}
+                            onChangeText={setNewTitle}
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Detalle (opcional, ej. 20 preguntas)"
+                            placeholderTextColor="#AEB5C2"
+                            value={newSubtitle}
+                            onChangeText={setNewSubtitle}
+                        />
+                        <TouchableOpacity style={styles.btn} onPress={handleAddTask} activeOpacity={0.85}>
+                            <Text style={styles.btnText}>Añadir</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setAddVisible(false)} style={{ marginTop: 8 }}>
+                            <Text style={styles.cancel}>Cancelar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -132,4 +192,9 @@ const styles = StyleSheet.create({
     taskSubtitle: { fontSize: 10, color: '#8A92A0' },
     btn: { backgroundColor: '#FF6B4A', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 6 },
     btnText: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
+    overlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+    modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 18, width: '100%' },
+    modalTitle: { fontSize: 15, fontWeight: '800', color: '#0F1B33', marginBottom: 12 },
+    input: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: '#1B2A4A', marginBottom: 10 },
+    cancel: { textAlign: 'center', color: '#8A92A0', fontSize: 12, fontWeight: '700' },
 });

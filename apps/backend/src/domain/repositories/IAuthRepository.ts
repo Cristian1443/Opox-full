@@ -87,4 +87,11 @@ export interface IAuthRepository {
         oposicion?: string;
         especialidad?: string;
     }): Promise<User>;
+
+    /**
+     * Borrado definitivo de la cuenta (12.11). Elimina al usuario de
+     * Supabase Auth; las tablas de los Bloques 2/4/5 lo siguen por
+     * ON DELETE CASCADE (notifications, study_plans, clan_members...).
+     */
+    deleteAccount(userId: string): Promise<void>;
 }

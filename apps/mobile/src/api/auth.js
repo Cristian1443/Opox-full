@@ -44,4 +44,10 @@ export const authApi = {
         return res;
     },
     acceptTerms: (input) => api.post(API_ROUTES.AUTH.TERMS_ACCEPT, input, { auth: true }),
+    updateProfile: (input) => api.patch(API_ROUTES.AUTH.PROFILE_UPDATE, input, { auth: true }),
+    deleteAccount: async () => {
+        const res = await api.delete(API_ROUTES.AUTH.DELETE_ACCOUNT, { auth: true });
+        await Promise.all([api.clearSession(), disableBiometric()]);
+        return res;
+    },
 };

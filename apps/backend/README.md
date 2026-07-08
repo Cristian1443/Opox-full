@@ -80,6 +80,7 @@ supabase/
 | POST | `/auth/refresh` | — | Renovar token |
 | GET | `/auth/me` | ✔ | Usuario actual |
 | PATCH | `/auth/profile` | ✔ | Oposición/especialidad (saludo del Bloque 2) |
+| DELETE | `/auth/me` | ✔ | Elimina la cuenta (12.11) — cascada real vía ON DELETE en Supabase |
 | POST | `/auth/logout` | ✔ | Cerrar sesión |
 | POST | `/auth/terms/accept` | ✔ | 1.7 Aceptar términos |
 

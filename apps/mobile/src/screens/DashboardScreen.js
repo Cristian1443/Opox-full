@@ -478,10 +478,10 @@ export default function DashboardScreen({ navigation }) {
                     <IconNavSocial />
                     <Text style={styles.navLabel}>Social</Text>
                 </View>
-                <View style={styles.navItem}>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
                     <IconNavSettings />
                     <Text style={styles.navLabel}>Ajustes</Text>
-                </View>
+                </TouchableOpacity>
             </View>
 
             {nudge && (

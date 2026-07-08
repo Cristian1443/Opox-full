@@ -5,6 +5,53 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-08 (tarde) — Auditoría senior y cierre de huecos en Bloques 0-5
+
+Se leyó el wireframe del Bloque 12 · Configuración (menú completo: perfil,
+suscripción, dispositivos, tono IA, accesibilidad, estadísticas Pro,
+ayuda, feedback, cerrar sesión/eliminar cuenta) para extraer solo lo que
+cierra huecos reales de los Bloques 0-5 sin inventar dependencias de
+bloques que no existen (11 Tienda, 3 Salud backend, 8 Tutor IA, 6/7/9/10
+estadísticas — esos se dejan fuera, documentados como pendientes).
+
+### Hueco crítico cerrado: la oposición del Bloque 0 nunca se guardaba
+`OppositionSelectorScreen` corre ANTES de que exista sesión (Bloque 0 va
+antes que el Bloque 1 · Acceso en el flujo), así que nunca pudo llamar a
+`PATCH /auth/profile`. Se guarda la elección en AsyncStorage y
+`SesionIniciadaScreen` la aplica de verdad en cuanto hay token real, justo
+antes de entrar al Dashboard.
+
+### Nueva pantalla de Ajustes (versión real del Bloque 12, no el wireframe completo)
+- Perfil (nombre, email, oposición/especialidad editable).
+- Cerrar sesión.
+- Eliminar cuenta — requirió un endpoint nuevo, `DELETE /auth/me`, que no
+  existía. Probado en real: borra el usuario de Supabase Auth y confirma
+  por vídeo que las tablas de los Bloques 2/4/5 (notifications,
+  study_plans, profiles...) se limpian solas vía `ON DELETE CASCADE`.
+- El tab "Ajustes" de la barra inferior del Dashboard estaba muerto
+  (ni siquiera era tocable) — ahora navega aquí.
+
+### Otros huecos cerrados
+- Planificación (4.2 Hoy): no había forma de crear una tarea desde la
+  app, solo por API directa. Se añadió un "+" con formulario simple.
+- Motivación (Muro de la Gloria, 5.4): el endpoint para autorreportar
+  "aprobé mi examen" existía desde que se construyó el bloque pero nada
+  lo llamaba. Ahora hay un botón real en la pantalla.
+
+### Pendiente identificado (no abordado hoy, fuera de alcance)
+- `confirmPasswordReset` del Bloque 1 sigue sin implementar (lanza error
+  "pendiente de wiring del deep link") — recuperar contraseña está roto
+  de punta a punta para cualquier usuario que la olvide. Requiere decidir
+  el esquema de deep link antes de tocarlo.
+- Bloque 3 (Salud) sigue sin backend — sus datos en el Dashboard y las
+  tareas tipo `tutor`/`simulacro` de Planificación siguen siendo mock.
+- Todo lo demás del Bloque 12 (suscripción/pagos, dispositivos wearables,
+  tono de la IA, accesibilidad, Estadísticas Pro, ayuda, feedback) depende
+  de bloques que no existen todavía (11, 3, 8, 6/7/9/10) — no se construyó
+  a propósito, para no simular funcionalidad que no puede ser real.
+
+---
+
 ## 2026-07-08 — Bloque 4 · Planificación y Bloque 5 · Motivación (frontend + backend)
 
 Ambos bloques quedan funcionales de punta a punta (Cristian): pantallas

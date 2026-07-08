@@ -11,6 +11,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+/**
+ * Este selector corre en el Bloque 0, ANTES de que exista sesión (el
+ * Bloque 1 · Acceso va después en el flujo). No hay usuario al que
+ * llamarle PATCH /auth/profile todavía, así que la elección se guarda
+ * aquí y se aplica de verdad en SesionIniciadaScreen, justo cuando ya
+ * hay un token real.
+ */
+export const PENDING_OPOSICION_KEY = 'opox.pendingOposicion';
 
 // ─── TOKENS ───────────────────────────────────────────────
 const C = {
@@ -109,8 +119,10 @@ export default function OppositionSelectorScreen({ navigation }) {
         [query]
     );
 
-    const handleContinue = () => {
-        if (selected) navigation.navigate('LevelTestProposal');
+    const handleContinue = async () => {
+        if (!selected) return;
+        await AsyncStorage.setItem(PENDING_OPOSICION_KEY, selected.name);
+        navigation.navigate('LevelTestProposal');
     };
 
     return (

@@ -17,6 +17,7 @@ import type {
     LogoutUseCase,
     AcceptTermsUseCase,
     UpdateProfileUseCase,
+    DeleteAccountUseCase,
 } from '../../application';
 import type { Session, User } from '../../domain';
 
@@ -44,6 +45,7 @@ export class AuthController {
             logout: LogoutUseCase;
             acceptTerms: AcceptTermsUseCase;
             updateProfile: UpdateProfileUseCase;
+            deleteAccount: DeleteAccountUseCase;
         },
     ) { }
 
@@ -194,6 +196,13 @@ export class AuthController {
                 ...req.body,
             });
             this.ok(res, 200, this.serializeUser(user));
+        } catch (err) { next(err); }
+    };
+
+    deleteAccount = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            await this.deps.deleteAccount.execute(req.authUser!.id);
+            this.ok(res, 200, { deleted: true });
         } catch (err) { next(err); }
     };
 }

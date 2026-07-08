@@ -77,6 +77,7 @@ export function createAuthRouter(
         validateBody(updateProfileSchema),
         controller.updateProfile,
     );
+    r.delete(API_ROUTES.AUTH.DELETE_ACCOUNT, authMiddleware, controller.deleteAccount);
 
     return r;
 }

@@ -27,6 +27,7 @@ export const API_ROUTES = {
         TERMS_ACCEPT: '/auth/terms/accept',
 
         PROFILE_UPDATE: '/auth/profile',
+        DELETE_ACCOUNT: '/auth/me',
     },
 
     DASHBOARD: {

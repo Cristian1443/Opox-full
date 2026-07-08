@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
 import ScreenHeader from '../../components/ScreenHeader';
 import { motivationApi } from '../../api';
 
@@ -18,10 +18,21 @@ export default function GloryWallScreen({ navigation, route }) {
     const { clanId } = route.params;
     const [graduates, setGraduates] = useState([]);
     const [loaded, setLoaded] = useState(false);
+    const [justPassed, setJustPassed] = useState(false);
 
-    useEffect(() => {
+    const load = () => {
         motivationApi.listGraduates(clanId).then(({ data }) => { setGraduates(data || []); setLoaded(true); });
-    }, [clanId]);
+    };
+
+    useEffect(load, [clanId]);
+
+    const handleMarkPassed = async () => {
+        const { error } = await motivationApi.markExamPassed();
+        if (!error) {
+            setJustPassed(true);
+            load();
+        }
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -35,6 +46,12 @@ export default function GloryWallScreen({ navigation, route }) {
                     <Text style={styles.heroTitle}>Aprobados de tu clan</Text>
                     <Text style={styles.heroCaption}>Quienes lo consiguieron este año</Text>
                 </View>
+
+                {!justPassed && (
+                    <TouchableOpacity style={styles.passedBtn} onPress={handleMarkPassed} activeOpacity={0.7}>
+                        <Text style={styles.passedBtnText}>🎓 Ya aprobé mi oposición — contárselo al clan</Text>
+                    </TouchableOpacity>
+                )}
 
                 <Text style={styles.groupTitle}>RECIÉN APROBADOS</Text>
                 {!loaded ? null : graduates.length === 0 ? (
@@ -79,4 +96,6 @@ const styles = StyleSheet.create({
     avatarText: { color: '#fff', fontWeight: '800', fontSize: 12 },
     name: { fontSize: 12, fontWeight: '700', color: '#1B2A4A' },
     caption: { fontSize: 10, color: '#8A92A0' },
+    passedBtn: { backgroundColor: '#E3F6EE', borderWidth: 1.5, borderColor: '#2BB673', borderRadius: 12, padding: 12, alignItems: 'center', marginBottom: 14 },
+    passedBtnText: { fontSize: 12, fontWeight: '700', color: '#1f9d6b', textAlign: 'center' },
 });
