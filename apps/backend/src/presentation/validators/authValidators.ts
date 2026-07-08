@@ -63,3 +63,10 @@ export const acceptTermsSchema = z.object({
 export const refreshSchema = z.object({
     refreshToken: z.string().min(1),
 });
+
+export const updateProfileSchema = z.object({
+    oposicion: z.string().min(1).max(120).transform((s) => s.trim()).optional(),
+    especialidad: z.string().min(1).max(120).transform((s) => s.trim()).optional(),
+}).refine((data) => data.oposicion !== undefined || data.especialidad !== undefined, {
+    message: 'Indica al menos un campo a actualizar.',
+});

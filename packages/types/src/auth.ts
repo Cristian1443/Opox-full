@@ -18,6 +18,10 @@ export interface AuthUser {
     /** URL del avatar si se importó desde OAuth */
     avatarUrl?: string;
     createdAt: string;
+    /** Oposición elegida en el onboarding (Bloque 0), ej. "Justicia" */
+    oposicion?: string;
+    /** Especialidad dentro de la oposición, ej. "Tramitación" */
+    especialidad?: string;
 }
 
 export interface Session {
@@ -97,4 +101,11 @@ export interface AcceptTermsRequest {
     termsVersion: string;
     /** Versión de la política de privacidad aceptada */
     privacyVersion: string;
+}
+
+export interface UpdateProfileRequest {
+    /** Oposición elegida en el onboarding (Bloque 0), ej. "Justicia" */
+    oposicion?: string;
+    /** Especialidad dentro de la oposición, ej. "Tramitación" */
+    especialidad?: string;
 }

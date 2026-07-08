@@ -130,6 +130,16 @@ Authorization: Bearer {{token}}
   "privacyVersion": "2026-07-01"
 }
 
+### Actualizar perfil (oposición/especialidad — usado por el saludo del Dashboard)
+PATCH {{host}}/auth/profile
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "oposicion": "Justicia",
+  "especialidad": "Tramitación"
+}
+
 ### Logout
 POST {{host}}/auth/logout
 Authorization: Bearer {{token}}
@@ -175,3 +185,83 @@ Content-Type: application/json
 {
   "deviceId": "test-device-1"
 }
+
+
+# ────────────────────────────────────────────────
+# Bloque 2 · Dashboard — requiere @token
+# ────────────────────────────────────────────────
+
+### Resumen del dashboard (2.1 + 2.2)
+# profile/gamification/notifications son reales; health/plan/quickAccess
+# llegan como { available: false } hasta que existan los Bloques 3/4/10.
+GET {{host}}/dashboard/summary
+Authorization: Bearer {{token}}
+
+### Crear una notificación normal (simula lo que haría el motor de otro bloque)
+POST {{host}}/dashboard/notifications
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "category": "social",
+  "icon": "social",
+  "title": "Tu clan Opo-Justicia",
+  "body": "Ana_G te ha retado a un test."
+}
+
+### Crear un nudge (aparece como bottom-sheet — ver GET next-nudge)
+POST {{host}}/dashboard/notifications
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "category": "general",
+  "icon": "fatigue",
+  "title": "Tu nivel de fatiga es alto",
+  "body": "Tómate 10 minutos de respiración guiada antes de seguir.",
+  "isNudge": true,
+  "nudgeKind": "fatigue",
+  "primaryLabel": "Hacer pausa de 10 min",
+  "secondaryLabel": "Seguir estudiando"
+}
+
+### Listar notificaciones (paginado)
+GET {{host}}/dashboard/notifications?limit=20
+Authorization: Bearer {{token}}
+
+### Listar solo BOE
+GET {{host}}/dashboard/notifications?category=boe
+Authorization: Bearer {{token}}
+
+### Siguiente nudge pendiente (null si no hay ninguno sin leer)
+GET {{host}}/dashboard/notifications/next-nudge
+Authorization: Bearer {{token}}
+
+### Marcar una notificación como leída (pega un id real del listado)
+POST {{host}}/dashboard/notifications/PEGAR_ID_AQUI/read
+Authorization: Bearer {{token}}
+
+### Marcar una notificación inexistente (esperado: 404 dashboard/notification-not-found)
+POST {{host}}/dashboard/notifications/00000000-0000-0000-0000-000000000000/read
+Authorization: Bearer {{token}}
+
+### Marcar todas como leídas
+POST {{host}}/dashboard/notifications/read-all
+Authorization: Bearer {{token}}
+
+### Racha y Opopoints actuales
+GET {{host}}/dashboard/gamification
+Authorization: Bearer {{token}}
+
+### Registrar actividad de hoy (suma racha + Opopoints)
+POST {{host}}/dashboard/gamification/activity
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "reason": "test_completed",
+  "points": 10
+}
+
+### Sin token (esperado: 401 common/unauthorized)
+GET {{host}}/dashboard/summary

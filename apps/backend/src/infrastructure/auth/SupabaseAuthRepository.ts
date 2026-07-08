@@ -62,6 +62,8 @@ export class SupabaseAuthRepository implements IAuthRepository {
                 ? new Date(metadata['terms_accepted_at'] as string)
                 : null,
             createdAt: new Date(payload.user.created_at),
+            oposicion: (metadata['oposicion'] as string) || null,
+            especialidad: (metadata['especialidad'] as string) || null,
         });
 
         return Session.create({
@@ -442,6 +444,8 @@ export class SupabaseAuthRepository implements IAuthRepository {
                 ? new Date(data.user.user_metadata['terms_accepted_at'] as string)
                 : null,
             createdAt: new Date(data.user.created_at),
+            oposicion: (data.user.user_metadata?.['oposicion'] as string) || null,
+            especialidad: (data.user.user_metadata?.['especialidad'] as string) || null,
         });
 
         return Session.create({
@@ -503,6 +507,40 @@ export class SupabaseAuthRepository implements IAuthRepository {
             hasBiometric: Boolean(data.user.user_metadata?.['has_biometric']),
             termsAcceptedAt: new Date(now),
             createdAt: new Date(data.user.created_at),
+            oposicion: (data.user.user_metadata?.['oposicion'] as string) || null,
+            especialidad: (data.user.user_metadata?.['especialidad'] as string) || null,
+        });
+    }
+
+    // ─── Perfil ───────────────────────────────────
+
+    async updateProfile(input: {
+        userId: string;
+        oposicion?: string;
+        especialidad?: string;
+    }): Promise<User> {
+        // updateUserById mergea user_metadata (no lo reemplaza), así que esto
+        // no toca display_name/avatar_url/has_biometric/terms_accepted_at.
+        const { data, error } = await this.supabaseAdmin.auth.admin.updateUserById(input.userId, {
+            user_metadata: {
+                ...(input.oposicion !== undefined && { oposicion: input.oposicion }),
+                ...(input.especialidad !== undefined && { especialidad: input.especialidad }),
+            },
+        });
+        if (error || !data.user) throw new UnauthorizedError();
+
+        return User.create({
+            id: data.user.id,
+            email: data.user.email || '',
+            displayName: (data.user.user_metadata?.['display_name'] as string) || null,
+            avatarUrl: (data.user.user_metadata?.['avatar_url'] as string) || null,
+            hasBiometric: Boolean(data.user.user_metadata?.['has_biometric']),
+            termsAcceptedAt: data.user.user_metadata?.['terms_accepted_at']
+                ? new Date(data.user.user_metadata['terms_accepted_at'] as string)
+                : null,
+            createdAt: new Date(data.user.created_at),
+            oposicion: (data.user.user_metadata?.['oposicion'] as string) || null,
+            especialidad: (data.user.user_metadata?.['especialidad'] as string) || null,
         });
     }
 }

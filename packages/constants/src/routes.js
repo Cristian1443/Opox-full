@@ -25,6 +25,20 @@ export const API_ROUTES = {
         BIOMETRIC_LOGIN: '/auth/biometric/login',
 
         TERMS_ACCEPT: '/auth/terms/accept',
+
+        PROFILE_UPDATE: '/auth/profile',
+    },
+
+    DASHBOARD: {
+        SUMMARY: '/dashboard/summary',
+
+        NOTIFICATIONS: '/dashboard/notifications',
+        NOTIFICATION_READ: '/dashboard/notifications/:id/read',
+        NOTIFICATIONS_READ_ALL: '/dashboard/notifications/read-all',
+        NEXT_NUDGE: '/dashboard/notifications/next-nudge',
+
+        GAMIFICATION: '/dashboard/gamification',
+        GAMIFICATION_ACTIVITY: '/dashboard/gamification/activity',
     },
 };
 

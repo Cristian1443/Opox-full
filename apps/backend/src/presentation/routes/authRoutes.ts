@@ -15,6 +15,7 @@ import {
     biometricLoginSchema,
     acceptTermsSchema,
     refreshSchema,
+    updateProfileSchema,
 } from '../validators';
 
 export function createAuthRouter(
@@ -69,6 +70,12 @@ export function createAuthRouter(
         authMiddleware,
         validateBody(acceptTermsSchema),
         controller.acceptTerms,
+    );
+    r.patch(
+        API_ROUTES.AUTH.PROFILE_UPDATE,
+        authMiddleware,
+        validateBody(updateProfileSchema),
+        controller.updateProfile,
     );
 
     return r;

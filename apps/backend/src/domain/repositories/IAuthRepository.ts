@@ -74,4 +74,17 @@ export interface IAuthRepository {
         termsVersion: string;
         privacyVersion: string;
     }): Promise<User>;
+
+    // ─── Perfil ───────────────────────────────────
+    /**
+     * Actualiza campos de perfil que no son credenciales (oposición,
+     * especialidad). Usado hoy por el Bloque 2 para mostrar el saludo
+     * real en el Dashboard; el Bloque 0 podrá llamarlo tras el
+     * selector de oposición.
+     */
+    updateProfile(input: {
+        userId: string;
+        oposicion?: string;
+        especialidad?: string;
+    }): Promise<User>;
 }

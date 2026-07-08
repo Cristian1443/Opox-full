@@ -16,6 +16,7 @@ import type {
     RefreshSessionUseCase,
     LogoutUseCase,
     AcceptTermsUseCase,
+    UpdateProfileUseCase,
 } from '../../application';
 import type { Session, User } from '../../domain';
 
@@ -42,6 +43,7 @@ export class AuthController {
             refreshSession: RefreshSessionUseCase;
             logout: LogoutUseCase;
             acceptTerms: AcceptTermsUseCase;
+            updateProfile: UpdateProfileUseCase;
         },
     ) { }
 
@@ -56,6 +58,8 @@ export class AuthController {
             hasBiometric: user.hasBiometric,
             ...(user.avatarUrl && { avatarUrl: user.avatarUrl }),
             createdAt: user.createdAt.toISOString(),
+            ...(user.oposicion && { oposicion: user.oposicion }),
+            ...(user.especialidad && { especialidad: user.especialidad }),
         };
     }
 
@@ -178,6 +182,16 @@ export class AuthController {
                 userId: req.authUser!.id,
                 termsVersion: req.body.termsVersion || TERMS_VERSION,
                 privacyVersion: req.body.privacyVersion || PRIVACY_VERSION,
+            });
+            this.ok(res, 200, this.serializeUser(user));
+        } catch (err) { next(err); }
+    };
+
+    updateProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const user = await this.deps.updateProfile.execute({
+                userId: req.authUser!.id,
+                ...req.body,
             });
             this.ok(res, 200, this.serializeUser(user));
         } catch (err) { next(err); }

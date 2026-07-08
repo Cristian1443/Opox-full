@@ -8,3 +8,4 @@ export * from './ConfirmPasswordResetUseCase';
 export * from './BiometricUseCases';
 export * from './SessionUseCases';
 export * from './AcceptTermsUseCase';
+export * from './UpdateProfileUseCase';

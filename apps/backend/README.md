@@ -28,26 +28,31 @@ infrastructure/   Implementaciones concretas: Supabase, HTTP clients, storage, p
 src/
 ├── config/                          # env vars validadas con Zod
 ├── domain/
-│   ├── entities/                    # User, Session
-│   ├── errors/                      # DomainError + AuthError concretos
-│   ├── repositories/                # IAuthRepository
+│   ├── entities/                    # User, Session, Notification, UserGamification
+│   ├── errors/                      # DomainError + AuthError/DashboardError concretos
+│   ├── repositories/                # IAuthRepository, IDashboardRepository
 │   └── index.ts
 ├── application/
-│   └── auth/                        # RegisterUseCase, LoginUseCase, ...
+│   ├── auth/                        # RegisterUseCase, LoginUseCase, ..., UpdateProfileUseCase
+│   └── dashboard/                   # Notification/Gamification use cases, GetDashboardSummaryUseCase
 ├── infrastructure/
 │   ├── auth/                        # SupabaseAuthRepository
+│   ├── dashboard/                   # SupabaseDashboardRepository
 │   ├── clients/                     # ClientApiClient, AiApiClient (TODO contratos)
 │   ├── storage/                     # SupabaseStorage (TODO Foto-Test)
 │   ├── push/                        # ExpoPushService (TODO)
 │   └── payments/                    # RevenueCatWebhookHandler (TODO)
 ├── presentation/
-│   ├── controllers/
+│   ├── controllers/                 # AuthController, DashboardController
 │   ├── routes/
 │   ├── middleware/                  # errorHandler, authMiddleware, validate
 │   └── validators/                  # Zod schemas
 ├── container.ts                     # DI manual — todo se cablea aquí
 ├── server.ts                        # Configuración Express
 └── index.ts                         # Entry point
+
+supabase/
+└── bloque2_dashboard.sql            # Tablas notifications / user_gamification / opopoints_ledger
 ```
 
 ## Rutas del bloque 1 · Acceso
@@ -67,8 +72,29 @@ src/
 | POST | `/auth/biometric/link` | ✔ | 1.4 (setup) |
 | POST | `/auth/refresh` | — | Renovar token |
 | GET | `/auth/me` | ✔ | Usuario actual |
+| PATCH | `/auth/profile` | ✔ | Oposición/especialidad (saludo del Bloque 2) |
 | POST | `/auth/logout` | ✔ | Cerrar sesión |
 | POST | `/auth/terms/accept` | ✔ | 1.7 Aceptar términos |
+
+## Rutas del bloque 2 · Dashboard
+
+Todas requieren sesión (`Authorization: Bearer <token>`).
+
+| Método | Ruta | Uso |
+|--------|------|-----|
+| GET | `/dashboard/summary` | 2.1+2.2 — perfil, racha/Opopoints y notificaciones sin leer reales; `health`/`plan`/`quickAccess` llegan como `{ available: false }` hasta que existan los Bloques 3/4/10 |
+| GET | `/dashboard/notifications` | 2.3 — lista paginada (`?category=boe\|social\|general&cursor=...&limit=...`) |
+| POST | `/dashboard/notifications` | Crea una notificación o nudge (hoy: pruebas manuales; mañana: la llamarán los motores de salud/BOE/estadísticas) |
+| GET | `/dashboard/notifications/next-nudge` | 2.4 — el nudge sin leer más antiguo, o `null` |
+| POST | `/dashboard/notifications/:id/read` | Marca una notificación como leída |
+| POST | `/dashboard/notifications/read-all` | Marca todas como leídas |
+| GET | `/dashboard/gamification` | Racha actual + saldo de Opopoints |
+| POST | `/dashboard/gamification/activity` | Registra actividad de hoy (`{ reason, points }`): actualiza racha y suma Opopoints |
+
+Un nudge es una fila de `notifications` con `isNudge: true` y `nudgeKind`
+(`fatigue` | `academic` | `boe`) — no hay tabla ni endpoint separado. El
+mobile pide `next-nudge` y lo muestra como bottom-sheet en vez de en la
+bandeja.
 
 ## Contratos de respuesta
 
@@ -96,6 +122,10 @@ cp apps/backend/.env.example apps/backend/.env
 pnpm backend dev
 # → http://localhost:3000/health
 ```
+
+Para las rutas de `/dashboard/*`, además pega el contenido de
+`apps/backend/supabase/bloque2_dashboard.sql` en Supabase Dashboard →
+SQL Editor → Run (una sola vez; el script es idempotente).
 
 ## Añadir un nuevo use case
 

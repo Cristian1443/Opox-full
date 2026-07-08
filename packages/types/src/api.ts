@@ -44,6 +44,8 @@ export const ErrorCode = {
     TERMS_NOT_ACCEPTED: 'auth/terms-not-accepted',
     SESSION_EXPIRED: 'auth/session-expired',
     BIOMETRIC_NOT_RECOGNIZED: 'auth/biometric-not-recognized',
+    // Dashboard (Bloque 2)
+    NOTIFICATION_NOT_FOUND: 'dashboard/notification-not-found',
     // Validación
     VALIDATION_FAILED: 'validation/failed',
     // Genéricos

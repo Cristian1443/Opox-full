@@ -12,6 +12,10 @@ export class User {
         public readonly hasBiometric: boolean,
         public readonly avatarUrl: string | null,
         public readonly createdAt: Date,
+        /** Oposición elegida en el onboarding (Bloque 0), ej. "Justicia" */
+        public readonly oposicion: string | null,
+        /** Especialidad dentro de la oposición, ej. "Tramitación" */
+        public readonly especialidad: string | null,
     ) { }
 
     static create(props: {
@@ -22,6 +26,8 @@ export class User {
         hasBiometric?: boolean;
         avatarUrl?: string | null;
         createdAt?: Date;
+        oposicion?: string | null;
+        especialidad?: string | null;
     }): User {
         return new User(
             props.id,
@@ -31,6 +37,8 @@ export class User {
             props.hasBiometric ?? false,
             props.avatarUrl || null,
             props.createdAt || new Date(),
+            props.oposicion?.trim() || null,
+            props.especialidad?.trim() || null,
         );
     }
 
