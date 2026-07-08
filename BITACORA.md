@@ -5,6 +5,54 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-08 — Bloque 4 · Planificación y Bloque 5 · Motivación (frontend + backend)
+
+Ambos bloques quedan funcionales de punta a punta (Cristian): pantallas
+reales conectadas a un backend real en Supabase, no mock.
+
+### Bloque 4 · Planificación
+- 4.1 Home con los tres horizontes (Hoy/Semana/Oposición) de un vistazo.
+- 4.2 Hoy: checklist de tareas del día con objetivo diario; al completarlo
+  suma racha y Opopoints a través del mismo sistema del Bloque 2.
+- 4.3 Semana: estado L-D (completado/parcial/hoy/próximo) y detalle del día
+  seleccionado con bloques de estudio por franja horaria.
+- 4.4 Macro: cuenta atrás al examen y ruta por 4 fases con reparto
+  proporcional fijo (sin IA — pendiente para cuando exista el Bloque 8).
+- 4.5 Agenda: fechas clave (plazos, exámenes, propias).
+- 4.6 Editar plan: tests/día, días de estudio, intensidad y fecha de examen.
+- Pop-ups: objetivo cumplido (con racha/Opopoints reales), días saltados,
+  examen próximo — las dos últimas se calculan en `/planning/summary` y se
+  muestran una vez por sesión desde la Home.
+
+### Bloque 5 · Motivación
+- 5.1 Home: racha, saldo de Opopoints y accesos a rankings/clanes/retos.
+- 5.2 Detalle de racha: calendario de últimos 14 días y próximo hito.
+- 5.3 Rankings semanal/global/por-oposición (vistas SQL para evitar joins
+  manuales); "por tema" queda sin datos hasta que existan estadísticas por
+  tema (Bloque 6/7).
+- 5.5/5.6/5.7 Clanes: crear/unirse (uno por usuario), detalle con miembros y
+  puesto en el ranking de clanes, chat por **polling** (no realtime).
+- 5.8 Retos de clan: autorreportados, otorgan Opopoints una sola vez.
+- Fase 2 (marcada así en el propio wireframe): Muro de la Gloria ya lee
+  datos reales (autorreporte de aprobados) aunque hoy esté vacío para todos;
+  Duelos en vivo 1vs1 es solo una pantalla visual — necesitan matchmaking en
+  tiempo real que no existe.
+
+### Decisión: tabla `profiles`
+Como PostgREST no permite JOIN contra el schema `auth`, se creó
+`public.profiles` como espejo de `auth.users.raw_user_meta_data`,
+sincronizado desde `SupabaseAuthRepository` en registro/`updateProfile`
+(con backfill SQL para cuentas ya existentes). La necesitaban tanto los
+rankings como las listas de miembros de clan.
+
+### Pendiente conocido
+- Backend del Bloque 3 (Salud) sigue sin construir — sus widgets en el
+  Dashboard y las tareas de tipo `tutor`/`simulacro` del Bloque 4 siguen sin
+  fuente de datos real hasta entonces.
+- Sin tests automatizados todavía (mismo estado que bloques anteriores).
+
+---
+
 ## 2026-07-07 — Bloque 3 · Salud (frontend) cerrado
 
 Rama de trabajo: `bloque-3-salud` (nacida de `main`, ya con el dashboard de

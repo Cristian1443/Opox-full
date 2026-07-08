@@ -78,6 +78,7 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
 export const api = {
     get: (path, opts) => request(path, { ...opts, method: 'GET' }),
     post: (path, body, opts) => request(path, { ...opts, method: 'POST', body }),
+    patch: (path, body, opts) => request(path, { ...opts, method: 'PATCH', body }),
     saveSession,
     loadSession,
     clearSession: () => saveSession(null),

@@ -265,3 +265,170 @@ Authorization: Bearer {{token}}
 
 ### Sin token (esperado: 401 common/unauthorized)
 GET {{host}}/dashboard/summary
+
+
+# ────────────────────────────────────────────────
+# Bloque 4 · Planificación — requiere @token
+# ────────────────────────────────────────────────
+
+### Resumen (4.1): objetivo de hoy, semana, macro y alertas
+GET {{host}}/planning/summary
+Authorization: Bearer {{token}}
+
+### Ajustes del plan (4.6)
+GET {{host}}/planning/plan
+Authorization: Bearer {{token}}
+
+### Actualizar ajustes (fecha de examen habilita el horizonte macro 4.4)
+PATCH {{host}}/planning/plan
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "testsPerDay": 3,
+  "studyDays": [1, 2, 3, 4, 5],
+  "intensity": "high",
+  "examDate": "2027-05-15"
+}
+
+### Sembrar una tarea de hoy (aún no hay motor de tests que las genere solo)
+POST {{host}}/planning/tasks
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "taskDate": "2026-07-08",
+  "title": "Test de Constitución",
+  "subtitle": "20 preguntas",
+  "kind": "test"
+}
+
+### Tareas de hoy
+GET {{host}}/planning/tasks
+Authorization: Bearer {{token}}
+
+### Marcar una tarea como hecha (pega un id real del listado)
+# Si con esta se completa el objetivo diario, la respuesta trae `gamification`
+PATCH {{host}}/planning/tasks/PEGAR_ID_AQUI/toggle
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "done": true
+}
+
+### Semana (4.3)
+GET {{host}}/planning/week
+Authorization: Bearer {{token}}
+
+### Macro (4.4) — null si no hay examDate en el plan
+GET {{host}}/planning/macro
+Authorization: Bearer {{token}}
+
+### Agenda (4.5)
+GET {{host}}/planning/agenda
+Authorization: Bearer {{token}}
+
+### Añadir fecha propia
+POST {{host}}/planning/agenda
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "eventDate": "2026-09-22",
+  "title": "Primer ejercicio",
+  "subtitle": "Test · 100 preguntas",
+  "kind": "exam"
+}
+
+
+# ────────────────────────────────────────────────
+# Bloque 5 · Motivación — requiere @token
+# ────────────────────────────────────────────────
+
+### Resumen (5.1): racha/Opopoints + mi clan
+GET {{host}}/motivation/summary
+Authorization: Bearer {{token}}
+
+### Detalle de racha (5.2)
+GET {{host}}/motivation/streak
+Authorization: Bearer {{token}}
+
+### Ranking global (5.3)
+GET {{host}}/motivation/ranking?scope=global
+Authorization: Bearer {{token}}
+
+### Ranking semanal
+GET {{host}}/motivation/ranking?scope=weekly
+Authorization: Bearer {{token}}
+
+### Ranking por mi oposición (vacío si no la tienes configurada — ver PATCH /auth/profile)
+GET {{host}}/motivation/ranking?scope=oposicion
+Authorization: Bearer {{token}}
+
+### Mi clan (null si no perteneces a ninguno)
+GET {{host}}/motivation/clans/mine
+Authorization: Bearer {{token}}
+
+### Explorar clanes
+GET {{host}}/motivation/clans
+Authorization: Bearer {{token}}
+
+### Crear un clan (falla con 409 motivation/already-in-clan si ya tienes uno)
+POST {{host}}/motivation/clans
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Opo-Justicia",
+  "initials": "OJ",
+  "description": "Preparando Justicia · Tramitación juntos"
+}
+
+### Unirse a un clan (pega un id real del listado de arriba)
+POST {{host}}/motivation/clans/PEGAR_ID_AQUI/join
+Authorization: Bearer {{token}}
+
+### Detalle de clan (pega tu clan_id real)
+GET {{host}}/motivation/clans/PEGAR_CLAN_ID_AQUI
+Authorization: Bearer {{token}}
+
+### Chat de clan — listar (polling, no realtime)
+GET {{host}}/motivation/clans/PEGAR_CLAN_ID_AQUI/messages
+Authorization: Bearer {{token}}
+
+### Chat de clan — enviar mensaje
+POST {{host}}/motivation/clans/PEGAR_CLAN_ID_AQUI/messages
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "body": "¿Vamos con el reto de hoy?"
+}
+
+### Crear un reto de clan
+POST {{host}}/motivation/clans/PEGAR_CLAN_ID_AQUI/challenges
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Maratón semanal",
+  "subtitle": "200 preguntas",
+  "questionCount": 200,
+  "rewardPoints": 150
+}
+
+### Listar retos del clan
+GET {{host}}/motivation/clans/PEGAR_CLAN_ID_AQUI/challenges
+Authorization: Bearer {{token}}
+
+### Completar un reto (pega su id del listado; idempotente, no repite puntos)
+POST {{host}}/motivation/clans/PEGAR_CLAN_ID_AQUI/challenges/PEGAR_CHALLENGE_ID_AQUI/complete
+Authorization: Bearer {{token}}
+
+### Muro de la Gloria (5.4 · Fase 2) — vacío hasta que alguien reporte aprobado
+GET {{host}}/motivation/clans/PEGAR_CLAN_ID_AQUI/graduates
+Authorization: Bearer {{token}}
+
+### Sin token (esperado: 401 common/unauthorized)
+GET {{host}}/motivation/summary

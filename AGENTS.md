@@ -4,12 +4,19 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
-## Estado del código (2026-07-07)
+## Estado del código (2026-07-08)
 
-Ver `BITACORA.md` para el diario por fecha en términos de producto. Los bloques
-1 (Acceso) y 3 (Salud) están cerrados a nivel frontend. El bloque 2 (Dashboard)
-lo hizo Cristian. El bloque 4 (Tutor IA) no existe todavía y hay una pantalla
-temporal `AITutorPlaceholder` para no romper los CTAs del bloque 3.
+Ver `BITACORA.md` para el diario por fecha en términos de producto. Bloques
+1 (Acceso) y 3 (Salud) cerrados a nivel frontend. Bloques 2 (Dashboard), 4
+(Planificación) y 5 (Motivación) tienen frontend + backend completos (Cristian).
+
+**Ojo con la numeración**: el wireframe oficial (opox.netlify.app) es la
+fuente de verdad — Bloque 4 = Planificación, Bloque 5 = Motivación, Bloque 8
+= Aula Virtual/Tutor IA. Una nota anterior de este archivo llamaba "bloque 4"
+al Tutor IA por error (numeración de trabajo, no la del wireframe); el CTA
+`navigation.navigate('AITutor', { technique })` del bloque 3 sigue apuntando
+correctamente a la pantalla placeholder — solo cambia el número de bloque
+correcto para cuando se implemente de verdad (Bloque 8).
 
 ## Convenciones del bloque 3 · Salud
 
@@ -72,8 +79,10 @@ Cuando el responsable de IA entregue prompts/contratos:
 El móvil habla con nuestro backend, el backend habla con el proveedor de IA.
 
 Los CTAs del bloque 3 que apuntan a Tutor IA (`navigation.navigate('AITutor',
-{ technique })`) ya pasan contexto por params. Cuando el bloque 4 exista,
-esos params se consumen para pre-cargar el prompt.
+{ technique })`) ya pasan contexto por params. Cuando el Bloque 8 exista,
+esos params se consumen para pre-cargar el prompt. El Bloque 4 (`intensity`
+de `study_plans`) también deja el terreno listo: hoy solo se guarda el
+ajuste, sin lógica de reparto real (ver sección de Planificación abajo).
 
 ## Contratos de datos pendientes (backend del bloque 3)
 
@@ -86,6 +95,36 @@ Antes de escribir endpoints, fijar en `packages/types/`:
   (etiquetado obligatorio de autoría).
 - `MeditationSession` con `title`, `subtitle`, `duration`, `type` — la
   3.9/3.9a ya consumen ese shape.
+
+## Convenciones del bloque 4 · Planificación y bloque 5 · Motivación
+
+Ambos siguen exactamente el patrón de capas del backend descrito en
+`apps/backend/README.md` (domain → application → infrastructure/presentation,
+DI manual en `container.ts`) y el mismo estilo de pantalla que el Bloque 2
+(header con `ScreenHeader` compartido en `apps/mobile/src/components/`,
+`NudgeModal` reutilizado para los pop-ups de ambos bloques).
+
+- Pantallas en `apps/mobile/src/screens/planning/` y `.../motivation/`.
+- Clientes HTTP en `apps/mobile/src/api/planning.js` y `.../motivation.js`,
+  mismo patrón `{ data, error }` que `authApi`/`dashboardApi`.
+- Tablas nuevas en `apps/backend/supabase/bloque4_planificacion.sql` y
+  `bloque5_motivacion.sql` — pégalas en Supabase SQL Editor antes de probar
+  esas rutas (ver README del backend para el orden).
+- **Sin IA todavía**: el reparto de fases del horizonte macro (4.4) y la
+  "intensidad" del plan (4.6) son heurísticas fijas, no llamadas a IA. No
+  añadas lógica de IA aquí hasta que el Bloque 8 exista y defina el contrato.
+- **`profiles` es un espejo, no la fuente de verdad**: el perfil real vive en
+  `auth.users.raw_user_meta_data` (Bloque 1). `public.profiles` solo existe
+  porque PostgREST no puede hacer JOIN contra el schema `auth` — se
+  sincroniza desde `SupabaseAuthRepository` en registro y `updateProfile`.
+  Si añades un campo de perfil nuevo, actualízalo en los dos sitios.
+- **Chat de clan es polling, no realtime** — decisión consciente para el MVP
+  (ver `ClanChatScreen.js` y `listClanMessages`). No asumas websockets.
+- **Fase 2 del Bloque 5** (Muro de la Gloria, Duelos en vivo 1vs1): el propio
+  wireframe las marca como posteriores. Muro de la Gloria ya tiene backend
+  real de solo lectura (`listGraduates`); Duelos es una pantalla puramente
+  visual sin datos (`DuelsPlaceholderScreen.js`) — necesita matchmaking en
+  tiempo real que no existe.
 
 ## Convenciones generales
 

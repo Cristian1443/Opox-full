@@ -11,7 +11,7 @@ import {
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NudgeModal from '../components/NudgeModal';
-import { dashboardApi } from '../api';
+import { dashboardApi, planningApi } from '../api';
 
 // ─── Iconos SVG exactos del wireframe (Bloque 2 · Dashboard) ─────────────────
 
@@ -269,6 +269,7 @@ export default function DashboardScreen({ navigation }) {
     const nudge = activeNudge ? NUDGES[activeNudge] : null;
 
     const [summary, setSummary] = useState(null);
+    const [planSummary, setPlanSummary] = useState(null);
     const [realNudgeVisible, setRealNudgeVisible] = useState(false);
 
     useEffect(() => {
@@ -277,6 +278,9 @@ export default function DashboardScreen({ navigation }) {
             if (cancelled || !data) return;
             setSummary(data);
             if (data.nextNudge) setRealNudgeVisible(true);
+        });
+        planningApi.getSummary().then(({ data }) => {
+            if (!cancelled && data) setPlanSummary(data);
         });
         return () => { cancelled = true; };
     }, []);
@@ -288,6 +292,9 @@ export default function DashboardScreen({ navigation }) {
     const hasUnread = (summary?.notifications.unreadCount ?? 0) > 0;
     const currentStreak = summary?.gamification.currentStreak ?? 0;
     const opopointsBalance = summary?.gamification.opopointsBalance ?? 0;
+    const planPercent = planSummary?.today.percent ?? 0;
+    const planCompleted = planSummary?.today.completedCount ?? 0;
+    const planGoal = planSummary?.today.goalCount ?? 3;
 
     const realNudge = summary?.nextNudge ?? null;
     const realNudgeVisuals = realNudge ? NUDGE_VISUALS[realNudge.nudgeKind] : null;
@@ -391,19 +398,27 @@ export default function DashboardScreen({ navigation }) {
                 </TouchableOpacity>
 
                 <View style={styles.grid2}>
-                    <View style={[styles.widget, styles.widgetHalf, { backgroundColor: '#EAF7F1' }]}>
+                    <TouchableOpacity
+                        style={[styles.widget, styles.widgetHalf, { backgroundColor: '#EAF7F1' }]}
+                        onPress={() => navigation.navigate('PlanningHome')}
+                        activeOpacity={0.85}
+                    >
                         <View style={styles.widgetHead}>
                             <IconPlan />
                             <Text style={[styles.widgetHeadText, { color: '#1f9d6b' }]}>Plan</Text>
                         </View>
                         <View style={styles.ringWrap}>
-                            <PlanProgressRing percent={75} />
-                            <Text style={styles.ringText}>75%</Text>
+                            <PlanProgressRing percent={planPercent} />
+                            <Text style={styles.ringText}>{planPercent}%</Text>
                         </View>
-                        <Text style={styles.ringCaption}>2 de 3 tests hoy</Text>
-                    </View>
+                        <Text style={styles.ringCaption}>{planCompleted} de {planGoal} tests hoy</Text>
+                    </TouchableOpacity>
 
-                    <View style={[styles.widget, styles.widgetHalf, { backgroundColor: '#FFF1EC' }]}>
+                    <TouchableOpacity
+                        style={[styles.widget, styles.widgetHalf, { backgroundColor: '#FFF1EC' }]}
+                        onPress={() => navigation.navigate('MotivationHome')}
+                        activeOpacity={0.85}
+                    >
                         <View style={styles.widgetHead}>
                             <IconStreak />
                             <Text style={[styles.widgetHeadText, { color: '#E0552F' }]}>Racha</Text>
@@ -413,7 +428,7 @@ export default function DashboardScreen({ navigation }) {
                             <Text style={styles.streakCaption}>días seguidos</Text>
                             <Text style={styles.streakPoints}>+{opopointsBalance} Opopoints</Text>
                         </View>
-                    </View>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={[styles.widget, { backgroundColor: '#F1ECFA' }]}>
