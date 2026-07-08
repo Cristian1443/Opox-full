@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,7 @@ import {
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NudgeModal from '../components/NudgeModal';
+import { dashboardApi } from '../api';
 
 // ─── Iconos SVG exactos del wireframe (Bloque 2 · Dashboard) ─────────────────
 
@@ -213,13 +214,20 @@ function IconBoeLarge() {
     );
 }
 
+// Icono + color por tipo de nudge — compartido entre la vista previa local y
+// los nudges reales que devuelva el backend (identificados por nudgeKind).
+const NUDGE_VISUALS = {
+    fatigue: { iconBg: '#EAF3FB', icon: <IconFatigueLarge /> },
+    academic: { iconBg: '#F1ECFA', icon: <IconTutorLarge /> },
+    boe: { iconBg: '#FDEBE9', icon: <IconBoeLarge /> },
+};
+
 // ─── Definición de los 3 nudges (2.4 a/b/c) ──────────────────────────────────
 // Vista previa temporal: en producción cada nudge lo disparará su propio motor
 // (fatiga biométrica, estadísticas de rendimiento, monitor BOE de otros bloques).
 const NUDGES = {
     fatigue: {
-        iconBg: '#EAF3FB',
-        icon: <IconFatigueLarge />,
+        ...NUDGE_VISUALS.fatigue,
         title: 'Tu nivel de fatiga es alto',
         description:
             'Tu HRV ha bajado y el pulso en reposo está elevado. Tómate 10 minutos de respiración guiada antes de seguir: rendirás más.',
@@ -227,8 +235,7 @@ const NUDGES = {
         secondaryLabel: 'Seguir estudiando',
     },
     academic: {
-        iconBg: '#F1ECFA',
-        icon: <IconTutorLarge />,
+        ...NUDGE_VISUALS.academic,
         title: 'La Ley 39/2015 se te resiste',
         description:
             'Has fallado 6 de las últimas 10 preguntas de este tema. ¿Quieres que el Tutor IA te lo explique en el Aula Virtual?',
@@ -236,8 +243,7 @@ const NUDGES = {
         secondaryLabel: 'Ahora no',
     },
     boe: {
-        iconBg: '#FDEBE9',
-        icon: <IconBoeLarge />,
+        ...NUDGE_VISUALS.boe,
         title: '¡Alerta BOE!',
         description:
             'El artículo 14 de tu temario ha sido modificado. Haz un mini-test de actualización para no estudiar nada desfasado.',
@@ -246,11 +252,50 @@ const NUDGES = {
     },
 };
 
+function getInitials(name) {
+    if (!name) return '?';
+    return name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() || '')
+        .join('');
+}
+
 // ─── Pantalla principal (2.1 Dashboard + 2.2 Acceso rápido) ─────────────────
 export default function DashboardScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const [activeNudge, setActiveNudge] = useState(null); // null | 'fatigue' | 'academic' | 'boe'
     const nudge = activeNudge ? NUDGES[activeNudge] : null;
+
+    const [summary, setSummary] = useState(null);
+    const [realNudgeVisible, setRealNudgeVisible] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        dashboardApi.getSummary().then(({ data }) => {
+            if (cancelled || !data) return;
+            setSummary(data);
+            if (data.nextNudge) setRealNudgeVisible(true);
+        });
+        return () => { cancelled = true; };
+    }, []);
+
+    const displayName = summary?.profile.displayName || 'Opositor';
+    const oposicionLine = summary?.profile.oposicion && summary?.profile.especialidad
+        ? `${summary.profile.oposicion} · ${summary.profile.especialidad}`
+        : null;
+    const hasUnread = (summary?.notifications.unreadCount ?? 0) > 0;
+    const currentStreak = summary?.gamification.currentStreak ?? 0;
+    const opopointsBalance = summary?.gamification.opopointsBalance ?? 0;
+
+    const realNudge = summary?.nextNudge ?? null;
+    const realNudgeVisuals = realNudge ? NUDGE_VISUALS[realNudge.nudgeKind] : null;
+
+    const dismissRealNudge = () => {
+        setRealNudgeVisible(false);
+        if (realNudge) dashboardApi.markNotificationRead(realNudge.id);
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -264,18 +309,18 @@ export default function DashboardScreen({ navigation }) {
             {/* Header (dash-head) */}
             <View style={styles.header}>
                 <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>JL</Text>
+                    <Text style={styles.avatarText}>{getInitials(summary?.profile.displayName)}</Text>
                 </View>
                 <View>
-                    <Text style={styles.greeting}>Hola, Juan</Text>
-                    <Text style={styles.greetingSub}>Justicia · Tramitación</Text>
+                    <Text style={styles.greeting}>Hola, {displayName}</Text>
+                    {oposicionLine && <Text style={styles.greetingSub}>{oposicionLine}</Text>}
                 </View>
                 <TouchableOpacity
                     style={styles.bell}
                     onPress={() => navigation.navigate('Notifications')}
                     activeOpacity={0.7}
                 >
-                    <View style={styles.bellBadge} />
+                    {hasUnread && <View style={styles.bellBadge} />}
                     <IconBell />
                 </TouchableOpacity>
             </View>
@@ -364,9 +409,9 @@ export default function DashboardScreen({ navigation }) {
                             <Text style={[styles.widgetHeadText, { color: '#E0552F' }]}>Racha</Text>
                         </View>
                         <View style={{ alignItems: 'center' }}>
-                            <Text style={styles.streakValue}>14</Text>
+                            <Text style={styles.streakValue}>{currentStreak}</Text>
                             <Text style={styles.streakCaption}>días seguidos</Text>
-                            <Text style={styles.streakPoints}>+120 Opopoints</Text>
+                            <Text style={styles.streakPoints}>+{opopointsBalance} Opopoints</Text>
                         </View>
                     </View>
                 </View>
@@ -435,6 +480,21 @@ export default function DashboardScreen({ navigation }) {
                     secondaryLabel={nudge.secondaryLabel}
                     onPrimaryPress={() => setActiveNudge(null)}
                     onSecondaryPress={() => setActiveNudge(null)}
+                />
+            )}
+
+            {/* Nudge real pendiente del backend (2.4) — no se muestra a la vez que la demo */}
+            {!nudge && realNudgeVisible && realNudge && realNudgeVisuals && (
+                <NudgeModal
+                    visible={realNudgeVisible}
+                    iconBg={realNudgeVisuals.iconBg}
+                    icon={realNudgeVisuals.icon}
+                    title={realNudge.title}
+                    description={realNudge.body}
+                    primaryLabel={realNudge.primaryLabel || 'Entendido'}
+                    secondaryLabel={realNudge.secondaryLabel || 'Cerrar'}
+                    onPrimaryPress={dismissRealNudge}
+                    onSecondaryPress={dismissRealNudge}
                 />
             )}
         </SafeAreaView>

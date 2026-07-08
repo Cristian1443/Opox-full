@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,7 @@ import {
     ScrollView,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { dashboardApi } from '../api';
 
 // ─── Iconos SVG exactos del wireframe (18×18, viewBox 0 0 24 24) ─────────────
 
@@ -62,54 +63,15 @@ function IconCheck() {
     );
 }
 
-// ─── Datos (exactos del wireframe) ───────────────────────────────────────────
-const NOTIFICATIONS = [
-    {
-        key: 'boe',
-        category: 'boe',
-        iconBg: '#FDEBE9',
-        icon: <IconBoe />,
-        title: '¡Alerta BOE!',
-        subtitle: 'El art. 14 de tu temario ha sido modificado.',
-        time: 'Hace 20 min',
-    },
-    {
-        key: 'fatigue',
-        category: 'general',
-        iconBg: '#EAF3FB',
-        icon: <IconFatigue />,
-        title: 'Tu nivel de fatiga es alto',
-        subtitle: 'Tómate 10 min antes de seguir.',
-        time: 'Hace 1 h',
-    },
-    {
-        key: 'streak',
-        category: 'general',
-        iconBg: '#FFF1EC',
-        icon: <IconStreak />,
-        title: '¡Racha de 14 días!',
-        subtitle: 'Has ganado 120 Opopoints.',
-        time: 'Hoy, 8:00',
-    },
-    {
-        key: 'social',
-        category: 'social',
-        iconBg: '#F1ECFA',
-        icon: <IconSocial />,
-        title: 'Tu clan Opo-Justicia',
-        subtitle: 'Ana_G te ha retado a un test.',
-        time: 'Ayer',
-    },
-    {
-        key: 'goal',
-        category: 'general',
-        iconBg: '#EAF7F1',
-        icon: <IconCheck />,
-        title: 'Objetivo diario cumplido',
-        subtitle: '3 de 3 tests. ¡Bien hecho!',
-        time: 'Ayer',
-    },
-];
+// ─── Icono + color por clave (item.icon del backend) ─────────────────────────
+const ICONS = {
+    boe: { icon: <IconBoe />, bg: '#FDEBE9' },
+    fatigue: { icon: <IconFatigue />, bg: '#EAF3FB' },
+    streak: { icon: <IconStreak />, bg: '#FFF1EC' },
+    social: { icon: <IconSocial />, bg: '#F1ECFA' },
+    goal: { icon: <IconCheck />, bg: '#EAF7F1' },
+};
+const DEFAULT_ICON = { icon: <IconBoe />, bg: '#EEF1F7' };
 
 const TABS = [
     { key: 'all', label: 'Todas' },
@@ -117,15 +79,28 @@ const TABS = [
     { key: 'social', label: 'Social' },
 ];
 
+function formatRelativeTime(isoDate) {
+    const diffMin = Math.floor((Date.now() - new Date(isoDate).getTime()) / 60000);
+    if (diffMin < 1) return 'Ahora mismo';
+    if (diffMin < 60) return `Hace ${diffMin} min`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `Hace ${diffHours} h`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Ayer';
+    if (diffDays < 7) return `Hace ${diffDays} días`;
+    return new Date(isoDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+}
+
 // ─── Fila de notificación ─────────────────────────────────────────────────────
 function NotificationRow({ item, isLast }) {
+    const visuals = ICONS[item.icon] || DEFAULT_ICON;
     return (
         <View style={[styles.notif, isLast && styles.notifLast]}>
-            <View style={[styles.notifIcon, { backgroundColor: item.iconBg }]}>{item.icon}</View>
+            <View style={[styles.notifIcon, { backgroundColor: visuals.bg }]}>{visuals.icon}</View>
             <View style={{ flex: 1 }}>
                 <Text style={styles.notifTitle}>{item.title}</Text>
-                <Text style={styles.notifSubtitle}>{item.subtitle}</Text>
-                <Text style={styles.notifTime}>{item.time}</Text>
+                <Text style={styles.notifSubtitle}>{item.body}</Text>
+                <Text style={styles.notifTime}>{formatRelativeTime(item.createdAt)}</Text>
             </View>
         </View>
     );
@@ -134,10 +109,20 @@ function NotificationRow({ item, isLast }) {
 // ─── Pantalla principal (2.3) ────────────────────────────────────────────────
 export default function NotificationsScreen({ navigation }) {
     const [activeTab, setActiveTab] = useState('all');
+    const [notifications, setNotifications] = useState([]);
 
-    const visible = NOTIFICATIONS.filter(
-        (n) => activeTab === 'all' || n.category === activeTab
-    );
+    useEffect(() => {
+        let cancelled = false;
+        const category = activeTab === 'all' ? undefined : activeTab;
+        dashboardApi.listNotifications({ category }).then(({ data }) => {
+            if (!cancelled && data) setNotifications(data.items);
+        });
+        return () => { cancelled = true; };
+    }, [activeTab]);
+
+    const handleMarkAllRead = () => {
+        dashboardApi.markAllNotificationsRead();
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -154,7 +139,7 @@ export default function NotificationsScreen({ navigation }) {
                     <Text style={styles.back}>‹</Text>
                 </TouchableOpacity>
                 <Text style={styles.title}>Notificaciones</Text>
-                <TouchableOpacity style={{ marginLeft: 'auto' }}>
+                <TouchableOpacity style={{ marginLeft: 'auto' }} onPress={handleMarkAllRead}>
                     <Text style={styles.markRead}>Marcar leídas</Text>
                 </TouchableOpacity>
             </View>
@@ -177,9 +162,13 @@ export default function NotificationsScreen({ navigation }) {
 
             {/* Lista */}
             <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-                {visible.map((item, i) => (
-                    <NotificationRow key={item.key} item={item} isLast={i === visible.length - 1} />
-                ))}
+                {notifications.length === 0 ? (
+                    <Text style={styles.empty}>No tienes notificaciones.</Text>
+                ) : (
+                    notifications.map((item, i) => (
+                        <NotificationRow key={item.id} item={item} isLast={i === notifications.length - 1} />
+                    ))
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -257,6 +246,12 @@ const styles = StyleSheet.create({
     scroll: {
         flex: 1,
         paddingHorizontal: 16,
+    },
+    empty: {
+        textAlign: 'center',
+        color: '#8A92A0',
+        fontSize: 12.5,
+        marginTop: 40,
     },
 
     notif: {
