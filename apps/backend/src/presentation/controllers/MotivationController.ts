@@ -241,17 +241,12 @@ export class MotivationController {
 
     createClanChallenge = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const challenge = await this.deps.createClanChallenge.execute({
+            const result = await this.deps.createClanChallenge.execute({
                 userId: req.authUser!.id,
                 clanId: req.params['id'] as string,
                 ...req.body,
             });
-            this.ok(res, 201, this.serializeChallenge({
-                challenge,
-                completedCount: 0,
-                memberCount: 0,
-                completedByMe: false,
-            }));
+            this.ok(res, 201, this.serializeChallenge(result));
         } catch (err) { next(err); }
     };
 

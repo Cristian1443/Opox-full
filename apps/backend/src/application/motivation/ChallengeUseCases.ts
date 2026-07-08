@@ -3,7 +3,6 @@ import {
     type IMotivationRepository,
     type IDashboardRepository,
     type ChallengeWithProgress,
-    type ClanChallenge,
     type UserGamification,
 } from '../../domain';
 
@@ -26,7 +25,7 @@ export class CreateClanChallengeUseCase {
         questionCount: number;
         rewardPoints: number;
         expiresAt?: string;
-    }): Promise<ClanChallenge> {
+    }): Promise<ChallengeWithProgress> {
         return this.motivationRepo.createClanChallenge(input);
     }
 }

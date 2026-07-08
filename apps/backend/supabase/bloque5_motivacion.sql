@@ -43,14 +43,24 @@ create policy "profiles: owner update" on public.profiles
     for update using (auth.uid() = id) with check (auth.uid() = id);
 
 -- ─── clans ───────────────────────────────────────
+-- created_by es nullable con ON DELETE SET NULL: si quien creó el clan
+-- borra su cuenta, el clan sigue existiendo para el resto de miembros en
+-- vez de bloquear el borrado de la cuenta (comportamiento por defecto de
+-- Postgres sin ON DELETE explícito).
 create table if not exists public.clans (
     id uuid primary key default gen_random_uuid(),
     name text not null,
     initials text not null,
     description text,
-    created_by uuid not null references auth.users(id),
+    created_by uuid references auth.users(id) on delete set null,
     created_at timestamptz not null default now()
 );
+
+-- Migra instalaciones que ya corrieron este archivo antes de este cambio.
+alter table public.clans alter column created_by drop not null;
+alter table public.clans drop constraint if exists clans_created_by_fkey;
+alter table public.clans add constraint clans_created_by_fkey
+    foreign key (created_by) references auth.users(id) on delete set null;
 
 alter table public.clans enable row level security;
 drop policy if exists "clans: read all" on public.clans;
@@ -103,7 +113,7 @@ create policy "clan_messages: members read" on public.clan_messages
 create table if not exists public.clan_challenges (
     id uuid primary key default gen_random_uuid(),
     clan_id uuid not null references public.clans(id) on delete cascade,
-    created_by uuid not null references auth.users(id),
+    created_by uuid references auth.users(id) on delete set null,
     title text not null,
     subtitle text,
     question_count integer not null default 0,
@@ -111,6 +121,12 @@ create table if not exists public.clan_challenges (
     expires_at timestamptz,
     created_at timestamptz not null default now()
 );
+
+-- Migra instalaciones que ya corrieron este archivo antes de este cambio.
+alter table public.clan_challenges alter column created_by drop not null;
+alter table public.clan_challenges drop constraint if exists clan_challenges_created_by_fkey;
+alter table public.clan_challenges add constraint clan_challenges_created_by_fkey
+    foreign key (created_by) references auth.users(id) on delete set null;
 
 create index if not exists clan_challenges_clan_idx
     on public.clan_challenges (clan_id, created_at desc);

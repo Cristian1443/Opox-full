@@ -2,7 +2,8 @@ export class ClanChallenge {
     private constructor(
         public readonly id: string,
         public readonly clanId: string,
-        public readonly createdBy: string,
+        /** null si quien lo creó borró su cuenta (ON DELETE SET NULL) */
+        public readonly createdBy: string | null,
         public readonly title: string,
         public readonly subtitle: string | null,
         public readonly questionCount: number,
@@ -14,7 +15,7 @@ export class ClanChallenge {
     static create(props: {
         id: string;
         clanId: string;
-        createdBy: string;
+        createdBy: string | null;
         title: string;
         subtitle?: string | null;
         questionCount?: number;

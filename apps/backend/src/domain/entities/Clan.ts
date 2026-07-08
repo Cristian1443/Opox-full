@@ -6,7 +6,8 @@ export class Clan {
         public readonly name: string,
         public readonly initials: string,
         public readonly description: string | null,
-        public readonly createdBy: string,
+        /** null si quien lo creó borró su cuenta (ON DELETE SET NULL) */
+        public readonly createdBy: string | null,
         public readonly createdAt: Date,
     ) { }
 
@@ -15,7 +16,7 @@ export class Clan {
         name: string;
         initials: string;
         description?: string | null;
-        createdBy: string;
+        createdBy: string | null;
         createdAt?: Date;
     }): Clan {
         return new Clan(

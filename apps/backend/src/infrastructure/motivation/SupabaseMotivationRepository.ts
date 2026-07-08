@@ -35,7 +35,7 @@ type ClanRow = {
     name: string;
     initials: string;
     description: string | null;
-    created_by: string;
+    created_by: string | null;
     created_at: string;
 };
 
@@ -50,7 +50,7 @@ type MessageRow = {
 type ChallengeRow = {
     id: string;
     clan_id: string;
-    created_by: string;
+    created_by: string | null;
     title: string;
     subtitle: string | null;
     question_count: number;
@@ -491,7 +491,7 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
         questionCount: number;
         rewardPoints: number;
         expiresAt?: string | null;
-    }): Promise<ClanChallenge> {
+    }): Promise<ChallengeWithProgress> {
         await this.assertMember(input.clanId, input.userId);
 
         const { data, error } = await this.supabaseAdmin
@@ -508,7 +508,18 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
             .select('*')
             .single();
         if (error || !data) throw new Error(`createClanChallenge: ${error?.message}`);
-        return toDomainChallenge(data as ChallengeRow);
+
+        const { count } = await this.supabaseAdmin
+            .from('clan_members')
+            .select('user_id', { count: 'exact', head: true })
+            .eq('clan_id', input.clanId);
+
+        return {
+            challenge: toDomainChallenge(data as ChallengeRow),
+            completedCount: 0,
+            memberCount: count ?? 0,
+            completedByMe: false,
+        };
     }
 
     async completeChallenge(input: { challengeId: string; userId: string }): Promise<void> {

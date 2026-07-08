@@ -84,7 +84,7 @@ export interface IMotivationRepository {
         questionCount: number;
         rewardPoints: number;
         expiresAt?: string | null;
-    }): Promise<ClanChallenge>;
+    }): Promise<ChallengeWithProgress>;
     completeChallenge(input: { challengeId: string; userId: string }): Promise<void>;
 
     // ─── Muro de la Gloria (Fase 2 — solo lectura real) ───
