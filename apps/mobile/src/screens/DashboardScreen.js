@@ -267,7 +267,7 @@ export default function DashboardScreen({ navigation }) {
                     <Text style={styles.avatarText}>JL</Text>
                 </View>
                 <View>
-                    <Text style={styles.greeting}>Listo aqui se termina b, Juan</Text>
+                    <Text style={styles.greeting}>Hola, Juan</Text>
                     <Text style={styles.greetingSub}>Justicia · Tramitación</Text>
                 </View>
                 <TouchableOpacity
