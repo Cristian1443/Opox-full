@@ -24,17 +24,51 @@ import {
     GetGamificationUseCase,
     RegisterActivityUseCase,
     GetDashboardSummaryUseCase,
+    GetPlanUseCase,
+    UpdatePlanUseCase,
+    ListTasksUseCase,
+    CreateTaskUseCase,
+    ToggleTaskUseCase,
+    GetWeekUseCase,
+    GetMacroUseCase,
+    ListAgendaUseCase,
+    CreateAgendaDateUseCase,
+    GetPlanningSummaryUseCase,
+    GetProfileUseCase,
+    MarkExamPassedUseCase,
+    GetRankingUseCase,
+    GetMyClanUseCase,
+    ListClansUseCase,
+    CreateClanUseCase,
+    JoinClanUseCase,
+    GetClanDetailUseCase,
+    ListClanMessagesUseCase,
+    SendClanMessageUseCase,
+    ListClanChallengesUseCase,
+    CreateClanChallengeUseCase,
+    CompleteChallengeUseCase,
+    ListGraduatesUseCase,
+    GetStreakDetailUseCase,
+    GetMotivationSummaryUseCase,
 } from './application';
 import {
     getSupabaseAuth,
     getSupabaseAdmin,
     SupabaseAuthRepository,
     SupabaseDashboardRepository,
+    SupabasePlanningRepository,
+    SupabaseMotivationRepository,
     ClientApiClient,
     AiApiClient,
 } from './infrastructure';
-import { AuthController, DashboardController, createAuthMiddleware } from './presentation';
-import type { IAuthRepository, IDashboardRepository } from './domain';
+import {
+    AuthController,
+    DashboardController,
+    PlanningController,
+    MotivationController,
+    createAuthMiddleware,
+} from './presentation';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -54,10 +88,19 @@ export function buildContainer() {
         ? new SupabaseDashboardRepository(getSupabaseAdmin())
         : createStubDashboardRepository();
 
+    const planningRepo: IPlanningRepository = isSupabaseConfigured
+        ? new SupabasePlanningRepository(getSupabaseAdmin())
+        : createStubPlanningRepository();
+
+    const motivationRepo: IMotivationRepository = isSupabaseConfigured
+        ? new SupabaseMotivationRepository(getSupabaseAdmin())
+        : createStubMotivationRepository();
+
     if (!isSupabaseConfigured) {
         logger.warn(
-            '[container] Supabase no configurado. Todas las rutas /auth y /dashboard devolverán ' +
-            '501 hasta rellenar SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY en .env',
+            '[container] Supabase no configurado. Todas las rutas /auth, /dashboard, /planning y ' +
+            '/motivation devolverán 501 hasta rellenar SUPABASE_URL / SUPABASE_ANON_KEY / ' +
+            'SUPABASE_SERVICE_ROLE_KEY en .env',
         );
     }
 
@@ -80,6 +123,9 @@ export function buildContainer() {
         : null;
 
     // ─── Use cases (application) ──────────────────
+    const getWeek = new GetWeekUseCase(planningRepo);
+    const getMacro = new GetMacroUseCase(planningRepo);
+
     const useCases = {
         register: new RegisterUseCase(authRepo),
         login: new LoginUseCase(authRepo),
@@ -106,6 +152,36 @@ export function buildContainer() {
         createNotification: new CreateNotificationUseCase(dashboardRepo),
         getGamification: new GetGamificationUseCase(dashboardRepo),
         registerActivity: new RegisterActivityUseCase(dashboardRepo),
+
+        // Bloque 4 · Planificación
+        getPlan: new GetPlanUseCase(planningRepo),
+        updatePlan: new UpdatePlanUseCase(planningRepo),
+        listTasks: new ListTasksUseCase(planningRepo),
+        createTask: new CreateTaskUseCase(planningRepo),
+        toggleTask: new ToggleTaskUseCase(planningRepo, dashboardRepo),
+        getWeek,
+        getMacro,
+        listAgenda: new ListAgendaUseCase(planningRepo),
+        createAgendaDate: new CreateAgendaDateUseCase(planningRepo),
+        getPlanningSummary: new GetPlanningSummaryUseCase(planningRepo, getWeek, getMacro),
+
+        // Bloque 5 · Motivación
+        getProfile: new GetProfileUseCase(motivationRepo),
+        markExamPassed: new MarkExamPassedUseCase(motivationRepo),
+        getRanking: new GetRankingUseCase(motivationRepo),
+        getMyClan: new GetMyClanUseCase(motivationRepo),
+        listClans: new ListClansUseCase(motivationRepo),
+        createClan: new CreateClanUseCase(motivationRepo),
+        joinClan: new JoinClanUseCase(motivationRepo),
+        getClanDetail: new GetClanDetailUseCase(motivationRepo),
+        listClanMessages: new ListClanMessagesUseCase(motivationRepo),
+        sendClanMessage: new SendClanMessageUseCase(motivationRepo),
+        listClanChallenges: new ListClanChallengesUseCase(motivationRepo),
+        createClanChallenge: new CreateClanChallengeUseCase(motivationRepo),
+        completeChallenge: new CompleteChallengeUseCase(motivationRepo, dashboardRepo),
+        listGraduates: new ListGraduatesUseCase(motivationRepo),
+        getStreakDetail: new GetStreakDetailUseCase(dashboardRepo, motivationRepo),
+        getMotivationSummary: new GetMotivationSummaryUseCase(dashboardRepo, motivationRepo),
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -121,16 +197,49 @@ export function buildContainer() {
         getGamification: useCases.getGamification,
         registerActivity: useCases.registerActivity,
     });
+    const planningController = new PlanningController({
+        getSummary: useCases.getPlanningSummary,
+        getPlan: useCases.getPlan,
+        updatePlan: useCases.updatePlan,
+        listTasks: useCases.listTasks,
+        createTask: useCases.createTask,
+        toggleTask: useCases.toggleTask,
+        getWeek: useCases.getWeek,
+        getMacro: useCases.getMacro,
+        listAgenda: useCases.listAgenda,
+        createAgendaDate: useCases.createAgendaDate,
+    });
+    const motivationController = new MotivationController({
+        getSummary: useCases.getMotivationSummary,
+        getStreakDetail: useCases.getStreakDetail,
+        getRanking: useCases.getRanking,
+        markExamPassed: useCases.markExamPassed,
+        getMyClan: useCases.getMyClan,
+        listClans: useCases.listClans,
+        createClan: useCases.createClan,
+        joinClan: useCases.joinClan,
+        getClanDetail: useCases.getClanDetail,
+        listClanMessages: useCases.listClanMessages,
+        sendClanMessage: useCases.sendClanMessage,
+        listClanChallenges: useCases.listClanChallenges,
+        createClanChallenge: useCases.createClanChallenge,
+        completeChallenge: useCases.completeChallenge,
+        listGraduates: useCases.listGraduates,
+    });
 
     return {
         authRepo,
         dashboardRepo,
+        planningRepo,
+        motivationRepo,
         clientApi,
         aiApi,
         useCases,
         controllers: {
             auth: authController,
             dashboard: dashboardController,
+            planning: planningController,
+            motivation: motivationController,
         },
         middleware: {
             auth: authMiddleware,
@@ -140,26 +249,32 @@ export function buildContainer() {
 
 export type Container = ReturnType<typeof buildContainer>;
 
-// ─── Stub para arrancar sin Supabase configurado ───
+// ─── Stubs para arrancar sin Supabase configurado ───
 
 function createStubAuthRepository(): IAuthRepository {
     const notConfigured = (): never => {
-        throw new Error(
-            '[auth] Supabase no configurado. Rellena .env y reinicia.',
-        );
+        throw new Error('[auth] Supabase no configurado. Rellena .env y reinicia.');
     };
-    return new Proxy({} as IAuthRepository, {
-        get: () => notConfigured,
-    });
+    return new Proxy({} as IAuthRepository, { get: () => notConfigured });
 }
 
 function createStubDashboardRepository(): IDashboardRepository {
     const notConfigured = (): never => {
-        throw new Error(
-            '[dashboard] Supabase no configurado. Rellena .env y reinicia.',
-        );
+        throw new Error('[dashboard] Supabase no configurado. Rellena .env y reinicia.');
     };
-    return new Proxy({} as IDashboardRepository, {
-        get: () => notConfigured,
-    });
+    return new Proxy({} as IDashboardRepository, { get: () => notConfigured });
+}
+
+function createStubPlanningRepository(): IPlanningRepository {
+    const notConfigured = (): never => {
+        throw new Error('[planning] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IPlanningRepository, { get: () => notConfigured });
+}
+
+function createStubMotivationRepository(): IMotivationRepository {
+    const notConfigured = (): never => {
+        throw new Error('[motivation] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IMotivationRepository, { get: () => notConfigured });
 }

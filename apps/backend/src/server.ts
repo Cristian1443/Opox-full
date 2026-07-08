@@ -3,7 +3,14 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { corsOrigins } from './config';
 import { buildContainer } from './container';
-import { createHealthRouter, createAuthRouter, createDashboardRouter, errorHandler } from './presentation';
+import {
+    createHealthRouter,
+    createAuthRouter,
+    createDashboardRouter,
+    createPlanningRouter,
+    createMotivationRouter,
+    errorHandler,
+} from './presentation';
 
 export function createServer(): Express {
     const app = express();
@@ -18,6 +25,8 @@ export function createServer(): Express {
     app.use(createHealthRouter());
     app.use(createAuthRouter(container.controllers.auth, container.middleware.auth));
     app.use(createDashboardRouter(container.controllers.dashboard, container.middleware.auth));
+    app.use(createPlanningRouter(container.controllers.planning, container.middleware.auth));
+    app.use(createMotivationRouter(container.controllers.motivation, container.middleware.auth));
 
     // 404 catch-all
     app.use((_req, res) => {

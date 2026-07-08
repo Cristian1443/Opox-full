@@ -110,6 +110,10 @@ export class SupabaseAuthRepository implements IAuthRepository {
             throw new EmailAlreadyRegisteredError(input.email);
         }
 
+        // Espejo en `profiles` (Bloque 5): best-effort, no bloquea el registro
+        // si falla — el backfill de bloque5_motivacion.sql cubre huecos.
+        await this.syncProfileMirror(data.user.id, { displayName: input.displayName });
+
         // Con "Confirm email" activado, signUp devuelve user sin session
         // hasta que el OTP se verifique. Devolvemos una sesión vacía; el mobile
         // detecta `accessToken === ''` y pasa a la screen 1.6 (Otp).
@@ -529,6 +533,11 @@ export class SupabaseAuthRepository implements IAuthRepository {
         });
         if (error || !data.user) throw new UnauthorizedError();
 
+        await this.syncProfileMirror(input.userId, {
+            oposicion: input.oposicion,
+            especialidad: input.especialidad,
+        });
+
         return User.create({
             id: data.user.id,
             email: data.user.email || '',
@@ -542,5 +551,29 @@ export class SupabaseAuthRepository implements IAuthRepository {
             oposicion: (data.user.user_metadata?.['oposicion'] as string) || null,
             especialidad: (data.user.user_metadata?.['especialidad'] as string) || null,
         });
+    }
+
+    // ─── Bloque 5 · espejo en `profiles` ───────────
+
+    /**
+     * Mantiene `public.profiles` sincronizado con lo que rankings/clanes
+     * necesitan mostrar de este usuario. Best-effort: si falla, se loguea
+     * pero no rompe el flujo de auth — el backfill de
+     * bloque5_motivacion.sql cubre los huecos en el próximo despliegue.
+     */
+    private async syncProfileMirror(
+        userId: string,
+        fields: { displayName?: string; oposicion?: string; especialidad?: string },
+    ): Promise<void> {
+        const patch: Record<string, unknown> = { id: userId, updated_at: new Date().toISOString() };
+        if (fields.displayName !== undefined) patch['display_name'] = fields.displayName;
+        if (fields.oposicion !== undefined) patch['oposicion'] = fields.oposicion;
+        if (fields.especialidad !== undefined) patch['especialidad'] = fields.especialidad;
+
+        const { error } = await this.supabaseAdmin.from('profiles').upsert(patch, { onConflict: 'id' });
+        if (error) {
+            // eslint-disable-next-line no-console
+            console.error('[auth syncProfileMirror] postgrest error:', error.message);
+        }
     }
 }

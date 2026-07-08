@@ -40,6 +40,32 @@ export const API_ROUTES = {
         GAMIFICATION: '/dashboard/gamification',
         GAMIFICATION_ACTIVITY: '/dashboard/gamification/activity',
     },
+
+    PLANNING: {
+        SUMMARY: '/planning/summary',
+        PLAN: '/planning/plan',
+        TASKS: '/planning/tasks',
+        TASK_TOGGLE: '/planning/tasks/:id/toggle',
+        WEEK: '/planning/week',
+        MACRO: '/planning/macro',
+        AGENDA: '/planning/agenda',
+    },
+
+    MOTIVATION: {
+        SUMMARY: '/motivation/summary',
+        STREAK: '/motivation/streak',
+        RANKING: '/motivation/ranking',
+        PROFILE_PASSED: '/motivation/profile/passed',
+
+        CLANS: '/motivation/clans',
+        CLAN_MINE: '/motivation/clans/mine',
+        CLAN_JOIN: '/motivation/clans/:id/join',
+        CLAN_DETAIL: '/motivation/clans/:id',
+        CLAN_MESSAGES: '/motivation/clans/:id/messages',
+        CLAN_CHALLENGES: '/motivation/clans/:id/challenges',
+        CLAN_CHALLENGE_COMPLETE: '/motivation/clans/:id/challenges/:challengeId/complete',
+        CLAN_GRADUATES: '/motivation/clans/:id/graduates',
+    },
 };
 
 /** Versión actual de los términos de uso — bumpear cuando cambien */
