@@ -45,6 +45,12 @@ const envSchema = z.object({
 
     REVENUECAT_WEBHOOK_SECRET: optionalString,
     EXPO_ACCESS_TOKEN: optionalString,
+
+    // Deep link al que Supabase redirige tras verificar el email de
+    // recuperación de contraseña. Debe estar en la allowlist de
+    // "Redirect URLs" del proyecto Supabase (Authentication → URL
+    // Configuration), y coincidir con el `scheme` de apps/mobile/app.json.
+    PASSWORD_RESET_REDIRECT_URL: z.string().default('opox://reset-password'),
 });
 
 const parsed = envSchema.safeParse(process.env);

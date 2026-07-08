@@ -40,8 +40,11 @@ const evaluarFuerza = (pass) => {
 };
 
 export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
-    // El deep link del email de recuperación debería inyectar aquí el resetToken
-    const resetToken = route?.params?.resetToken || '';
+    // El deep link de recuperación (opox://reset-password?token_hash=...&type=recovery)
+    // llega con `token_hash` en la query — React Navigation lo vuelca tal
+    // cual en route.params. `resetToken` queda como fallback para navegación
+    // manual (ej. DevMenu) pasando el param directamente con ese nombre.
+    const resetToken = route?.params?.token_hash || route?.params?.resetToken || '';
 
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');

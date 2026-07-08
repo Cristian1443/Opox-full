@@ -10,8 +10,10 @@ import {
     SessionExpiredError,
     UnauthorizedError,
     BiometricNotRecognizedError,
+    PasswordResetTokenInvalidError,
 } from '../../domain';
 import { generateChallengeBase64, verifyEd25519Signature } from './biometricCrypto';
+import { env } from '../../config';
 
 const CHALLENGE_TTL_SECONDS = 60;
 
@@ -269,18 +271,49 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
     async requestPasswordReset(email: string): Promise<void> {
         // Anti-enumeración: siempre resolvemos OK aunque el email no exista.
-        await this.supabaseAuth.auth.resetPasswordForEmail(email).catch(() => undefined);
+        // redirectTo debe estar en la allowlist de "Redirect URLs" del
+        // proyecto Supabase, y la plantilla de email "Reset Password" debe
+        // enlazar a `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery`
+        // (no al `{{ .ConfirmationURL }}` por defecto) para que el link abra
+        // la app con el token en la propia URL en vez de depender del
+        // redirect alojado por Supabase — ver apps/backend/README.md.
+        await this.supabaseAuth.auth
+            .resetPasswordForEmail(email, { redirectTo: env.PASSWORD_RESET_REDIRECT_URL })
+            .catch(() => undefined);
     }
 
     async confirmPasswordReset(input: {
         resetToken: string;
         newPassword: string;
     }): Promise<Session> {
-        // TODO: cuando conectemos el deep link real, verificar el token del email
-        // y llamar a updateUser. Por ahora dejamos el flujo listo pero sin session.
-        throw new Error(
-            'confirmPasswordReset: pendiente de wiring del deep link del email de recovery',
-        );
+        // resetToken = token_hash extraído del deep link. Lo canjeamos por
+        // una sesión igual que en verifyOtp (mismo mecanismo, type distinto).
+        const { data, error } = await this.supabaseAuth.auth.verifyOtp({
+            type: 'recovery',
+            token_hash: input.resetToken,
+        });
+        if (error || !data.session || !data.user) {
+            throw new PasswordResetTokenInvalidError();
+        }
+
+        const { error: updateErr } = await this.supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+            password: input.newPassword,
+        });
+        if (updateErr) throw new Error(`confirmPasswordReset: ${updateErr.message}`);
+
+        return this.toDomainSession({
+            session: {
+                access_token: data.session.access_token,
+                refresh_token: data.session.refresh_token,
+                expires_in: data.session.expires_in,
+            },
+            user: {
+                id: data.user.id,
+                email: data.user.email ?? null,
+                user_metadata: data.user.user_metadata ?? {},
+                created_at: data.user.created_at,
+            },
+        });
     }
 
     // ─── Biometría ────────────────────────────────

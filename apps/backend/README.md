@@ -177,6 +177,29 @@ contenido de `apps/backend/supabase/bloque2_dashboard.sql`,
 depende de tablas del 2) en Supabase Dashboard → SQL Editor → Run. Los
 tres scripts son idempotentes.
 
+### Configuración manual requerida: recuperación de contraseña (1.5)
+
+El código de `/auth/password/reset-request` y `/auth/password/reset-confirm`
+está completo y verificado (canjea el `token_hash` del email por una sesión
+vía `verifyOtp({type:'recovery'})`), pero **Supabase necesita dos ajustes
+manuales en el Dashboard** para que el email real lleve al deep link de la
+app en vez de a la página de redirect por defecto de Supabase:
+
+1. **Authentication → URL Configuration → Redirect URLs**: añadir
+   `opox://reset-password` a la allowlist (si no está, `resetPasswordForEmail`
+   funciona pero Supabase rechaza el `redirectTo` al enviar el email).
+2. **Authentication → Email Templates → Reset Password**: cambiar el enlace
+   de la plantilla de `{{ .ConfirmationURL }}` (por defecto) a:
+   ```
+   {{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery
+   ```
+   Esto hace que el email abra directamente `opox://reset-password?token_hash=...`,
+   que React Navigation enruta a `RecuperarPasswordNuevaScreen` (ver
+   `apps/mobile/App.js`, prop `linking`).
+
+`PASSWORD_RESET_REDIRECT_URL` en `.env` (default `opox://reset-password`) debe
+coincidir con el `scheme` de `apps/mobile/app.json` y con la URL del punto 1.
+
 ## Añadir un nuevo use case
 
 Ejemplo: crear `SendMagicLinkUseCase`.

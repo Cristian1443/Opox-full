@@ -40,6 +40,14 @@ export class OtpExpiredError extends DomainError {
     }
 }
 
+export class PasswordResetTokenInvalidError extends DomainError {
+    readonly code = 'auth/password-reset-token-invalid';
+    readonly httpStatus = 400;
+    constructor() {
+        super('Este enlace de recuperación no es válido o ya caducó. Solicita uno nuevo.');
+    }
+}
+
 export class SessionExpiredError extends DomainError {
     readonly code = 'auth/session-expired';
     readonly httpStatus = 401;

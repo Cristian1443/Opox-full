@@ -3,6 +3,7 @@
     "name": "OPOX",
     "slug": "OPOX",
     "version": "1.0.0",
+    "scheme": "opox",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

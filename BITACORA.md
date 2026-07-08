@@ -5,6 +5,34 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-08 (noche) — Recuperación de contraseña (1.5) implementada de punta a punta
+
+Cierra el pendiente dejado en la entrada de la tarde: `confirmPasswordReset`
+ya no lanza el error de "pendiente de wiring", y ahora hay deep link real
+para que el email de recuperación abra la app en la pantalla correcta.
+
+- Backend: `confirmPasswordReset` canjea el `token_hash` del email por una
+  sesión real (`verifyOtp({type:'recovery'})`) y actualiza la contraseña vía
+  Supabase Admin. `requestPasswordReset` ahora manda `redirectTo` hacia el
+  deep link de la app.
+- Móvil: `app.json` tiene `scheme: "opox"`, y `App.js` registra un `linking`
+  de React Navigation que enruta `opox://reset-password?token_hash=...` a
+  `RecuperarPasswordNuevaScreen` (que ya sabía leer ese param, estaba
+  construida para esto desde antes).
+- Probado en real con usuario desechable: link de recovery → cambio de
+  contraseña → login con la nueva funciona → login con la antigua se
+  rechaza → reusar el mismo link una segunda vez se rechaza.
+- **Pendiente manual del usuario, no se puede hacer desde el código**: en
+  el Dashboard de Supabase hay que (1) añadir `opox://reset-password` a
+  Authentication → URL Configuration → Redirect URLs, y (2) cambiar la
+  plantilla de email "Reset Password" para que enlace a
+  `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery` en vez del
+  `{{ .ConfirmationURL }}` por defecto. Sin esto, el código está listo pero
+  el email real seguiría llevando a la página de Supabase, no a la app.
+  Detalle técnico completo en `apps/backend/README.md`.
+
+---
+
 ## 2026-07-08 (tarde) — Auditoría senior y cierre de huecos en Bloques 0-5
 
 Se leyó el wireframe del Bloque 12 · Configuración (menú completo: perfil,
@@ -39,10 +67,8 @@ antes de entrar al Dashboard.
   lo llamaba. Ahora hay un botón real en la pantalla.
 
 ### Pendiente identificado (no abordado hoy, fuera de alcance)
-- `confirmPasswordReset` del Bloque 1 sigue sin implementar (lanza error
-  "pendiente de wiring del deep link") — recuperar contraseña está roto
-  de punta a punta para cualquier usuario que la olvide. Requiere decidir
-  el esquema de deep link antes de tocarlo.
+- ~~`confirmPasswordReset` del Bloque 1 sigue sin implementar...~~ — resuelto
+  esa misma noche, ver entrada de arriba.
 - Bloque 3 (Salud) sigue sin backend — sus datos en el Dashboard y las
   tareas tipo `tutor`/`simulacro` de Planificación siguen siendo mock.
 - Todo lo demás del Bloque 12 (suscripción/pagos, dispositivos wearables,
