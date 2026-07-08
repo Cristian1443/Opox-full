@@ -27,6 +27,22 @@ import SesionIniciadaScreen from '../screens/access/SesionIniciadaScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 
+// Bloque 3 · Salud
+import HomeHealthScreen from '../screens/health/HomeHealthScreen';
+import ConnectDeviceScreen from '../screens/health/ConnectDeviceScreen';
+import PairingScreen from '../screens/health/PairingScreen';
+import MetricDetailScreen from '../screens/health/MetricDetailScreen';
+import FatigueEngineScreen from '../screens/health/FatigueEngineScreen';
+import BreathingExerciseScreen from '../screens/health/BreathingExerciseScreen';
+import AdviceHomeScreen from '../screens/health/AdviceHomeScreen';
+import StudyTipsScreen from '../screens/health/StudyTipsScreen';
+import FoodHomeScreen from '../screens/health/FoodHomeScreen';
+import MenusScreen from '../screens/health/MenusScreen';
+import MenuDetailScreen from '../screens/health/MenuDetailScreen';
+import MeditationListScreen from '../screens/health/MeditationListScreen';
+import MeditationPlayerScreen from '../screens/health/MeditationPlayerScreen';
+import AITutorPlaceholderScreen from '../screens/health/AITutorPlaceholderScreen';
+
 const Stack = createNativeStackNavigator();
 
 export default function OnboardingNavigator() {
@@ -59,6 +75,22 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="Otp" component={OtpScreen} />
             <Stack.Screen name="Terminos" component={TerminosScreen} />
             <Stack.Screen name="SesionIniciada" component={SesionIniciadaScreen} />
+
+            {/* Bloque 3 · Salud */}
+            <Stack.Screen name="HomeHealth" component={HomeHealthScreen} />
+            <Stack.Screen name="ConnectDevice" component={ConnectDeviceScreen} />
+            <Stack.Screen name="Pairing" component={PairingScreen} />
+            <Stack.Screen name="MetricDetail" component={MetricDetailScreen} />
+            <Stack.Screen name="FatigueEngine" component={FatigueEngineScreen} />
+            <Stack.Screen name="BreathingExercise" component={BreathingExerciseScreen} />
+            <Stack.Screen name="AdviceHome" component={AdviceHomeScreen} />
+            <Stack.Screen name="StudyTips" component={StudyTipsScreen} />
+            <Stack.Screen name="FoodHome" component={FoodHomeScreen} />
+            <Stack.Screen name="Menus" component={MenusScreen} />
+            <Stack.Screen name="MenuDetail" component={MenuDetailScreen} />
+            <Stack.Screen name="MeditationList" component={MeditationListScreen} />
+            <Stack.Screen name="MeditationPlayer" component={MeditationPlayerScreen} />
+            <Stack.Screen name="AITutor" component={AITutorPlaceholderScreen} />
         </Stack.Navigator>
     );
 }

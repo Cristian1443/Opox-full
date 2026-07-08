@@ -267,7 +267,7 @@ export default function DashboardScreen({ navigation }) {
                     <Text style={styles.avatarText}>JL</Text>
                 </View>
                 <View>
-                    <Text style={styles.greeting}>Hola, Juan</Text>
+                    <Text style={styles.greeting}>Listo aqui se termina b, Juan</Text>
                     <Text style={styles.greetingSub}>Justicia · Tramitación</Text>
                 </View>
                 <TouchableOpacity
@@ -322,7 +322,11 @@ export default function DashboardScreen({ navigation }) {
                 </View>
 
                 {/* ── 2.1 Widgets vivos ── */}
-                <View style={[styles.widget, { backgroundColor: '#EAF3FB', marginTop: 22 }]}>
+                <TouchableOpacity
+                    style={[styles.widget, { backgroundColor: '#EAF3FB', marginTop: 22 }]}
+                    onPress={() => navigation.navigate('HomeHealth')}
+                    activeOpacity={0.85}
+                >
                     <View style={styles.widgetHead}>
                         <IconHealth />
                         <Text style={[styles.widgetHeadText, { color: '#2D6FB0' }]}>Salud</Text>
@@ -339,7 +343,7 @@ export default function DashboardScreen({ navigation }) {
                             <HealthSparkline />
                         </View>
                     </View>
-                </View>
+                </TouchableOpacity>
 
                 <View style={styles.grid2}>
                     <View style={[styles.widget, styles.widgetHalf, { backgroundColor: '#EAF7F1' }]}>

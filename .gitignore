@@ -50,3 +50,7 @@ logs/
 
 # tooling
 .mockups/
+
+# Materiales de trabajo (entregas del cliente + mockups extraídos)
+Lista de observaciones y mejoras*.docx
+mockups_bloque3/
