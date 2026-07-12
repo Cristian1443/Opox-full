@@ -458,10 +458,14 @@ export default function DashboardScreen({ navigation }) {
                 <View style={{ height: 70 + insets.bottom }} />
             </ScrollView>
 
-            {/* Botón central (+) = Nuevo Test */}
-            <View style={[styles.fab, { bottom: 38 + insets.bottom }]}>
+            {/* Botón central (+) = Nuevo Test → hub de entrenamiento */}
+            <TouchableOpacity
+                style={[styles.fab, { bottom: 38 + insets.bottom }]}
+                onPress={() => navigation.navigate('TrainingHome')}
+                activeOpacity={0.85}
+            >
                 <IconPlus />
-            </View>
+            </TouchableOpacity>
 
             {/* Nav inferior */}
             <View style={[styles.nav, { height: 56 + insets.bottom, paddingBottom: insets.bottom }]}>
@@ -469,10 +473,10 @@ export default function DashboardScreen({ navigation }) {
                     <IconNavHome active />
                     <Text style={[styles.navLabel, styles.navLabelActive]}>Inicio</Text>
                 </View>
-                <View style={styles.navItem}>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('TrainingHome')}>
                     <IconNavTraining />
                     <Text style={styles.navLabel}>Entreno</Text>
-                </View>
+                </TouchableOpacity>
                 <View style={{ width: 40 }} />
                 <View style={styles.navItem}>
                     <IconNavSocial />

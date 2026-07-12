@@ -63,6 +63,17 @@ import ChallengesScreen from '../screens/motivation/ChallengesScreen';
 import GloryWallScreen from '../screens/motivation/GloryWallScreen';
 import DuelsPlaceholderScreen from '../screens/motivation/DuelsPlaceholderScreen';
 
+// Bloque 6 · Entrenamiento
+import TrainingHomeScreen from '../screens/training/TrainingHomeScreen';
+import GeneratorConfigScreen from '../screens/training/GeneratorConfigScreen';
+import PhotoTestCaptureScreen from '../screens/training/PhotoTestCaptureScreen';
+import PhotoTestAnalysisScreen from '../screens/training/PhotoTestAnalysisScreen';
+import PhotoTestResultScreen from '../screens/training/PhotoTestResultScreen';
+import OfficialMocksScreen from '../screens/training/OfficialMocksScreen';
+import MockInstructionsScreen from '../screens/training/MockInstructionsScreen';
+import ErrorLabScreen from '../screens/training/ErrorLabScreen';
+import SurgicalTestPreviewScreen from '../screens/training/SurgicalTestPreviewScreen';
+
 const Stack = createNativeStackNavigator();
 
 export default function OnboardingNavigator() {
@@ -131,6 +142,17 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="Challenges" component={ChallengesScreen} />
             <Stack.Screen name="GloryWall" component={GloryWallScreen} />
             <Stack.Screen name="DuelsPlaceholder" component={DuelsPlaceholderScreen} />
+
+            {/* Bloque 6 · Entrenamiento */}
+            <Stack.Screen name="TrainingHome" component={TrainingHomeScreen} />
+            <Stack.Screen name="GeneratorConfig" component={GeneratorConfigScreen} />
+            <Stack.Screen name="PhotoTestCapture" component={PhotoTestCaptureScreen} />
+            <Stack.Screen name="PhotoTestAnalysis" component={PhotoTestAnalysisScreen} />
+            <Stack.Screen name="PhotoTestResult" component={PhotoTestResultScreen} />
+            <Stack.Screen name="OfficialMocks" component={OfficialMocksScreen} />
+            <Stack.Screen name="MockInstructions" component={MockInstructionsScreen} />
+            <Stack.Screen name="ErrorLab" component={ErrorLabScreen} />
+            <Stack.Screen name="SurgicalTestPreview" component={SurgicalTestPreviewScreen} />
         </Stack.Navigator>
     );
 }
