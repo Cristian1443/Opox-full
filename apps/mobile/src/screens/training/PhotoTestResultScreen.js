@@ -118,13 +118,14 @@ export default function PhotoTestResultScreen({ navigation, route }) {
                                 styles.flashcardFace,
                                 styles.flashcardFront,
                                 {
+                                    zIndex: 1,
                                     opacity: frontOpacity,
                                     transform: [{ perspective: 1000 }, { rotateY: frontRotate }],
                                 },
                             ]}
                         >
                             <IconBulb />
-                            <Text style={styles.cardText}>{question}</Text>
+                            <Text style={styles.cardText} numberOfLines={5}>{question}</Text>
                             <Text style={styles.flipHint}>Toca para ver la respuesta</Text>
                         </Animated.View>
 
@@ -134,13 +135,14 @@ export default function PhotoTestResultScreen({ navigation, route }) {
                                 styles.flashcardFace,
                                 styles.flashcardBack,
                                 {
+                                    zIndex: 2,
                                     opacity: backOpacity,
                                     transform: [{ perspective: 1000 }, { rotateY: backRotate }],
                                 },
                             ]}
                         >
                             <Text style={styles.answerLabel}>RESPUESTA</Text>
-                            <Text style={styles.cardText}>{answer}</Text>
+                            <Text style={styles.cardText} numberOfLines={5}>{answer}</Text>
                             <Text style={styles.flipHint}>Toca para volver</Text>
                         </Animated.View>
                     </TouchableOpacity>
@@ -205,11 +207,14 @@ const styles = StyleSheet.create({
     },
     conceptText: { fontSize: 14, fontWeight: '700', color: '#0F1B33', lineHeight: 20 },
 
-    // Flashcard con flip 3D
+    // Flashcard con flip 3D — altura amplia para preguntas/respuestas de 3-4
+    // líneas + overflow:'hidden' para que en Android la cara girada no
+    // desborde a la zona de los botones (bug visto en test manual).
     flashcardWrap: {
         width: '100%',
-        height: 200,
+        height: 240,
         marginBottom: 20,
+        overflow: 'hidden',
     },
     flashcardFace: {
         ...StyleSheet.absoluteFillObject,
@@ -218,6 +223,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backfaceVisibility: 'hidden',
+        overflow: 'hidden',
     },
     flashcardFront: {
         backgroundColor: '#fff',

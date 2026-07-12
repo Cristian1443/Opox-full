@@ -5,6 +5,12 @@ import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 
+// Alturas aproximadas de header (X close) y controles (shutter + safe area).
+// Se usan para reservar espacio en el overlay y que el marco central llene
+// todo lo demás — el mockup 6.3 muestra el marco ocupando casi toda la pantalla.
+const HEADER_RESERVE = 64;
+const CONTROLS_RESERVE = 130;
+
 // ─── Iconos SVG del bloque 6.3 ───────────────────────────────────────────────
 
 function IconClose({ color = '#FFF' }) {
@@ -42,16 +48,44 @@ function IconFlashOn({ color = '#FFD84A' }) {
     );
 }
 
-// Marco de encuadre con 4 esquinas (crop guide) dibujado en SVG.
+// Marco de encuadre según el mockup 6.3:
+//   - Borde punteado suave alrededor del recuadro entero
+//   - Esquinas naranjas más gruesas encima (accent del bloque)
 function FrameCorners({ w, h }) {
-    const c = 22;
-    const s = 3;
+    const c = 28; // longitud de la esquina
+    const s = 3;  // grosor
+    const CORNER = '#FF6B4A';
     return (
         <Svg width={w} height={h} pointerEvents="none">
-            <Path d={`M0 ${c} L0 0 L${c} 0`} stroke="#FFF" strokeWidth={s} fill="none" strokeLinecap="round" />
-            <Path d={`M${w - c} 0 L${w} 0 L${w} ${c}`} stroke="#FFF" strokeWidth={s} fill="none" strokeLinecap="round" />
-            <Path d={`M0 ${h - c} L0 ${h} L${c} ${h}`} stroke="#FFF" strokeWidth={s} fill="none" strokeLinecap="round" />
-            <Path d={`M${w - c} ${h} L${w} ${h} L${w} ${h - c}`} stroke="#FFF" strokeWidth={s} fill="none" strokeLinecap="round" />
+            <Rect
+                x={1}
+                y={1}
+                width={w - 2}
+                height={h - 2}
+                rx={14}
+                stroke="rgba(255,255,255,0.35)"
+                strokeWidth={1.5}
+                strokeDasharray="6 6"
+                fill="none"
+            />
+            <Path d={`M0 ${c} L0 0 L${c} 0`} stroke={CORNER} strokeWidth={s} fill="none" strokeLinecap="round" />
+            <Path d={`M${w - c} 0 L${w} 0 L${w} ${c}`} stroke={CORNER} strokeWidth={s} fill="none" strokeLinecap="round" />
+            <Path d={`M0 ${h - c} L0 ${h} L${c} ${h}`} stroke={CORNER} strokeWidth={s} fill="none" strokeLinecap="round" />
+            <Path d={`M${w - c} ${h} L${w} ${h} L${w} ${h - c}`} stroke={CORNER} strokeWidth={s} fill="none" strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function IconCameraCenter() {
+    return (
+        <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
+            <Path
+                d="M4 8h3l2-3h6l2 3h3v11H4z"
+                stroke="rgba(255,255,255,0.55)"
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+            />
+            <Circle cx={12} cy={13} r={3.5} stroke="rgba(255,255,255,0.55)" strokeWidth={1.5} />
         </Svg>
     );
 }
@@ -63,6 +97,7 @@ export default function PhotoTestCaptureScreen({ navigation }) {
     const [permission, requestPermission] = useCameraPermissions();
     const [flash, setFlash] = useState('off'); // 'off' | 'on'
     const [busy, setBusy] = useState(false);
+    const [frameSize, setFrameSize] = useState({ w: 0, h: 0 });
 
     // Permiso aún cargando (primer render antes de que Expo resuelva)
     if (!permission) {
@@ -131,18 +166,34 @@ export default function PhotoTestCaptureScreen({ navigation }) {
                 flash={flash}
             />
 
-            {/* Overlay oscuro con hueco central (marco de encuadre) */}
+            {/* Overlay oscuro con hueco central (marco de encuadre)
+                Se reserva altura arriba (header + safe top) y abajo (controles
+                + safe bottom); el frameRow es flex 1 y llena todo el resto.
+                El SVG del marco se dibuja según el tamaño real medido. */}
             <View style={styles.overlay} pointerEvents="none">
-                <View style={styles.overlayTop} />
+                <View style={[styles.overlayBand, { height: insets.top + HEADER_RESERVE }]} />
                 <View style={styles.frameRow}>
                     <View style={styles.overlaySide} />
-                    <View style={styles.frameBox}>
-                        <FrameCorners w={FRAME_W} h={FRAME_H} />
+                    <View
+                        style={styles.frameBox}
+                        onLayout={(e) => {
+                            const { width, height } = e.nativeEvent.layout;
+                            if (width !== frameSize.w || height !== frameSize.h) {
+                                setFrameSize({ w: width, h: height });
+                            }
+                        }}
+                    >
+                        {frameSize.w > 0 && (
+                            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                                <FrameCorners w={frameSize.w} h={frameSize.h} />
+                            </View>
+                        )}
+                        <IconCameraCenter />
                         <Text style={styles.frameHint}>Encuadra tu apunte o pregunta</Text>
                     </View>
                     <View style={styles.overlaySide} />
                 </View>
-                <View style={styles.overlayBottom} />
+                <View style={[styles.overlayBand, { height: insets.bottom + CONTROLS_RESERVE }]} />
             </View>
 
             {/* Botón cerrar */}
@@ -185,32 +236,23 @@ export default function PhotoTestCaptureScreen({ navigation }) {
 }
 
 const OVERLAY_BG = 'rgba(0,0,0,0.55)';
-const FRAME_W = 280;
-const FRAME_H = 280;
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
     center: { alignItems: 'center', justifyContent: 'center', padding: 32 },
 
     overlay: { ...StyleSheet.absoluteFillObject, flexDirection: 'column' },
-    overlayTop: { flex: 1, backgroundColor: OVERLAY_BG },
-    frameRow: { height: FRAME_H, flexDirection: 'row' },
-    overlaySide: { flex: 1, backgroundColor: OVERLAY_BG },
-    frameBox: { width: FRAME_W, height: FRAME_H, alignItems: 'center', justifyContent: 'center' },
+    overlayBand: { backgroundColor: OVERLAY_BG },
+    frameRow: { flex: 1, flexDirection: 'row' },
+    overlaySide: { width: 20, backgroundColor: OVERLAY_BG },
+    frameBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     frameHint: {
-        position: 'absolute',
-        bottom: 10,
-        color: '#FFF',
-        fontSize: 11.5,
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 13,
         fontWeight: '600',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 10,
-        overflow: 'hidden',
+        marginTop: 10,
+        textAlign: 'center',
     },
-    overlayBottom: { flex: 1, backgroundColor: OVERLAY_BG },
-
     closeBtn: {
         position: 'absolute',
         left: 16,
