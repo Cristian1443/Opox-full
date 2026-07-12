@@ -14,6 +14,19 @@
         {
           "faceIDPermission": "Permite a OPOX usar Face ID para que puedas acceder de forma rápida y segura."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "OPOX necesita acceso a la cámara para capturar tus apuntes o preguntas y resolverlas con IA.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "OPOX necesita acceso a tu galería para que puedas elegir una foto de un apunte o pregunta."
+        }
       ]
     ],
     "ios": {
