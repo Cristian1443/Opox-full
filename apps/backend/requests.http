@@ -432,3 +432,126 @@ Authorization: Bearer {{token}}
 
 ### Sin token (esperado: 401 common/unauthorized)
 GET {{host}}/motivation/summary
+
+
+# ────────────────────────────────────────────────
+# 6. Entrenamiento
+# ────────────────────────────────────────────────
+# Orden de prueba recomendado:
+#   1. listMocks         — ver simulacros disponibles (seed SQL)
+#   2. getMock           — detalle de un simulacro
+#   3. getMockQuestions  — preguntas del simulacro (tabla training_questions)
+#   4. generate          — genera preguntas con IA (stub en dev)
+#   5. photoTest         — analiza imagen con IA (stub en dev)
+#   6. surgical          — genera test quirúrgico con IA (stub en dev)
+#   7. saveAttempt       — guarda un intento (crea historial para error-patterns)
+#   8. errorPatterns     — ver patrones de fallo (requiere ≥5 intentos por tema)
+#   9. saveBookmark      — guardar flashcard
+#  10. listBookmarks     — listar flashcards guardadas
+#  11. deleteBookmark    — eliminar una flashcard
+
+### 6.1 · Listar simulacros (cambia oposicion por el valor del seed SQL)
+GET {{host}}/training/mocks?oposicion=justicia-tramitacion
+Authorization: Bearer {{token}}
+
+### 6.2 · Detalle de un simulacro (pega un id del listado anterior)
+GET {{host}}/training/mocks/PEGAR_MOCK_ID_AQUI
+Authorization: Bearer {{token}}
+
+### 6.3 · Preguntas de un simulacro (tabla training_questions, puede estar vacía)
+GET {{host}}/training/mocks/PEGAR_MOCK_ID_AQUI/questions
+Authorization: Bearer {{token}}
+
+### 6.4 · Generar preguntas con IA (stub devuelve preguntas mock)
+POST {{host}}/training/generate
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "oposicion": "justicia-tramitacion",
+  "topicId": "all",
+  "difficulty": "medium",
+  "count": 10
+}
+
+### 6.5 · Foto-Test · Análisis IA (stub devuelve resultado mock)
+# imageBase64 debe ser una imagen real en base64; el stub acepta cualquier valor.
+POST {{host}}/training/photo-test
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "imageBase64": "PEGAR_BASE64_AQUI_O_CUALQUIER_VALOR_PARA_EL_STUB",
+  "mimeType": "image/jpeg",
+  "oposicion": "justicia-tramitacion"
+}
+
+### 6.6 · Test quirúrgico (stub distribuye preguntas según patrones de error)
+POST {{host}}/training/surgical
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "oposicion": "justicia-tramitacion",
+  "count": 20
+}
+
+### 6.7 · Guardar intento (genera historial para el Laboratorio de Errores)
+# Ejecuta este al menos 5 veces con distintos topicId para ver patrones.
+POST {{host}}/training/attempts
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "source": "generator",
+  "oposicion": "justicia-tramitacion",
+  "topicId": "admin",
+  "difficulty": "medium",
+  "responses": [
+    {
+      "topicId": "admin",
+      "topic": "Derecho Administrativo",
+      "questionText": "¿Cuál es el plazo general de resolución?",
+      "optionsSnapshot": ["1 mes", "3 meses", "6 meses", "1 año"],
+      "correctIndex": 1,
+      "userAnswerIndex": 2,
+      "timeSecs": 18
+    },
+    {
+      "topicId": "admin",
+      "topic": "Derecho Administrativo",
+      "questionText": "¿Qué ley regula el procedimiento administrativo?",
+      "optionsSnapshot": ["Ley 39/2015", "Ley 40/2015", "Ley 9/2017", "Ley 50/1997"],
+      "correctIndex": 0,
+      "userAnswerIndex": 0,
+      "timeSecs": 12
+    }
+  ]
+}
+
+### 6.8 · Listar patrones de error (requiere ≥5 respuestas por tema en training_attempt_responses)
+GET {{host}}/training/error-patterns
+Authorization: Bearer {{token}}
+
+### 6.9 · Guardar bookmark / flashcard
+POST {{host}}/training/bookmarks
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "concept": "Plazos en el procedimiento administrativo",
+  "question": "¿Cuál es el plazo general para resolver un procedimiento?",
+  "answer": "3 meses, salvo que una norma con rango de ley establezca uno mayor.",
+  "relatedTopicId": "admin"
+}
+
+### 6.10 · Listar bookmarks
+GET {{host}}/training/bookmarks
+Authorization: Bearer {{token}}
+
+### 6.11 · Eliminar bookmark (pega un id del listado anterior)
+DELETE {{host}}/training/bookmarks/PEGAR_BOOKMARK_ID_AQUI
+Authorization: Bearer {{token}}
+
+### Sin token (esperado: 401 common/unauthorized)
+GET {{host}}/training/mocks

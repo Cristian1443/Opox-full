@@ -1,55 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, FlatList, ActivityIndicator } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
-
-// Mock data (viene del backend cuando exista: /training/mocks?oposicion=X)
-const MOCK_DATA = [
-    {
-        id: '2023',
-        year: '2023',
-        title: 'Examen oficial 2023',
-        category: 'Justicia · Tramitación',
-        questions: 100,
-        minutes: 90,
-        status: 'pending',
-        score: null,
-        progress: null,
-    },
-    {
-        id: '2022',
-        year: '2022',
-        title: 'Examen oficial 2022',
-        category: 'Justicia · Tramitación',
-        questions: 100,
-        minutes: 90,
-        status: 'ongoing',
-        score: null,
-        progress: 45,
-    },
-    {
-        id: '2021',
-        year: '2021',
-        title: 'Examen oficial 2021',
-        category: 'Justicia · Tramitación',
-        questions: 100,
-        minutes: 90,
-        status: 'completed',
-        score: 78,
-        progress: null,
-    },
-    {
-        id: '2020',
-        year: '2020',
-        title: 'Examen oficial 2020',
-        category: 'Justicia · Tramitación',
-        questions: 100,
-        minutes: 90,
-        status: 'completed',
-        score: 65,
-        progress: null,
-    },
-];
+import { api } from '../../api/client';
+import { trainingApi } from '../../api/training';
 
 const FILTERS = [
     { id: 'all', label: 'Todos' },
@@ -223,8 +177,42 @@ function MockCard({ item, onPress }) {
 // ─── Pantalla 6.6 · Simulacros Oficiales · Listado ───────────────────────────
 export default function OfficialMocksScreen({ navigation }) {
     const [filter, setFilter] = useState('all');
+    const [mocks, setMocks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
 
-    const filtered = MOCK_DATA.filter((item) => {
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const session = await api.loadSession();
+            const oposicion =
+                session?.user?.oposicion ??
+                session?.user?.user_metadata?.oposicion ??
+                'justicia-tramitacion';
+            const { data, error } = await trainingApi.listMocks(oposicion);
+            if (cancelled) return;
+            if (error) {
+                setLoadError(error.message);
+            } else {
+                // Mapea MockExamWithStatus → formato de tarjeta
+                setMocks((data ?? []).map((item) => ({
+                    id: item.exam.id,
+                    year: String(item.exam.year),
+                    title: item.exam.title,
+                    category: item.exam.category ?? item.exam.oposicion,
+                    questions: item.exam.questionCount,
+                    minutes: item.exam.durationMinutes,
+                    status: item.status,
+                    score: item.bestScore !== null ? Math.round(item.bestScore * 10) : null,
+                    progress: null,
+                })));
+            }
+            setLoading(false);
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    const filtered = mocks.filter((item) => {
         if (filter === 'all') return true;
         // "Pendientes" agrupa lo que aún no está terminado: sin empezar + en curso.
         if (filter === 'pending') return item.status === 'pending' || item.status === 'ongoing';
@@ -249,24 +237,35 @@ export default function OfficialMocksScreen({ navigation }) {
                 ))}
             </View>
 
-            <FlatList
-                data={filtered}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                    <MockCard
-                        item={item}
-                        onPress={() => navigation.navigate('MockInstructions', { exam: item })}
-                    />
-                )}
-                contentContainerStyle={styles.list}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                    <View style={styles.empty}>
-                        <IconEmpty />
-                        <Text style={styles.emptyText}>{EMPTY_COPY[filter]}</Text>
-                    </View>
-                }
-            />
+            {loading ? (
+                <View style={styles.empty}>
+                    <ActivityIndicator color="#FF6B4A" />
+                </View>
+            ) : loadError ? (
+                <View style={styles.empty}>
+                    <IconEmpty />
+                    <Text style={styles.emptyText}>{loadError}</Text>
+                </View>
+            ) : (
+                <FlatList
+                    data={filtered}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => (
+                        <MockCard
+                            item={item}
+                            onPress={() => navigation.navigate('MockInstructions', { exam: item })}
+                        />
+                    )}
+                    contentContainerStyle={styles.list}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <IconEmpty />
+                            <Text style={styles.emptyText}>{EMPTY_COPY[filter]}</Text>
+                        </View>
+                    }
+                />
+            )}
         </SafeAreaView>
     );
 }

@@ -51,6 +51,17 @@ import {
     ListGraduatesUseCase,
     GetStreakDetailUseCase,
     GetMotivationSummaryUseCase,
+    // Bloque 6 · Entrenamiento
+    ListMockExamsUseCase,
+    GetMockExamUseCase,
+    GenerateQuestionsUseCase,
+    AnalyzePhotoUseCase,
+    GenerateSurgicalTestUseCase,
+    SaveAttemptUseCase,
+    ListErrorPatternsUseCase,
+    ListBookmarksUseCase,
+    SaveBookmarkUseCase,
+    DeleteBookmarkUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -59,17 +70,20 @@ import {
     SupabaseDashboardRepository,
     SupabasePlanningRepository,
     SupabaseMotivationRepository,
+    SupabaseTrainingRepository,
     ClientApiClient,
     AiApiClient,
+    AiApiClientStub,
 } from './infrastructure';
 import {
     AuthController,
     DashboardController,
     PlanningController,
     MotivationController,
+    TrainingController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -97,6 +111,10 @@ export function buildContainer() {
         ? new SupabaseMotivationRepository(getSupabaseAdmin())
         : createStubMotivationRepository();
 
+    const trainingRepo: ITrainingRepository = isSupabaseConfigured
+        ? new SupabaseTrainingRepository(getSupabaseAdmin())
+        : createStubTrainingRepository();
+
     if (!isSupabaseConfigured) {
         logger.warn(
             '[container] Supabase no configurado. Todas las rutas /auth, /dashboard, /planning y ' +
@@ -121,7 +139,14 @@ export function buildContainer() {
             defaultModel: env.AI_API_DEFAULT_MODEL,
             timeoutMs: env.AI_API_TIMEOUT_MS,
         })
-        : null;
+        : new AiApiClientStub();
+
+    if (!(env.AI_API_BASE_URL && env.AI_API_KEY && env.AI_API_DEFAULT_MODEL)) {
+        logger.warn(
+            '[container] IA no configurada — usando AiApiClientStub con datos mock. ' +
+            'Rellena AI_API_BASE_URL / AI_API_KEY / AI_API_DEFAULT_MODEL en .env para usar IA real.',
+        );
+    }
 
     // ─── Use cases (application) ──────────────────
     const getWeek = new GetWeekUseCase(planningRepo);
@@ -169,6 +194,7 @@ export function buildContainer() {
 
         // Bloque 5 · Motivación
         getProfile: new GetProfileUseCase(motivationRepo),
+
         markExamPassed: new MarkExamPassedUseCase(motivationRepo),
         getRanking: new GetRankingUseCase(motivationRepo),
         getMyClan: new GetMyClanUseCase(motivationRepo),
@@ -184,6 +210,18 @@ export function buildContainer() {
         listGraduates: new ListGraduatesUseCase(motivationRepo),
         getStreakDetail: new GetStreakDetailUseCase(dashboardRepo, motivationRepo),
         getMotivationSummary: new GetMotivationSummaryUseCase(dashboardRepo, motivationRepo),
+
+        // Bloque 6 · Entrenamiento
+        listMockExams: new ListMockExamsUseCase(trainingRepo),
+        getMockExam: new GetMockExamUseCase(trainingRepo),
+        generateQuestions: new GenerateQuestionsUseCase(aiApi),
+        analyzePhoto: new AnalyzePhotoUseCase(aiApi),
+        generateSurgicalTest: new GenerateSurgicalTestUseCase(aiApi, trainingRepo),
+        saveAttempt: new SaveAttemptUseCase(trainingRepo),
+        listErrorPatterns: new ListErrorPatternsUseCase(trainingRepo),
+        listBookmarks: new ListBookmarksUseCase(trainingRepo),
+        saveBookmark: new SaveBookmarkUseCase(trainingRepo),
+        deleteBookmark: new DeleteBookmarkUseCase(trainingRepo),
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -211,6 +249,19 @@ export function buildContainer() {
         listAgenda: useCases.listAgenda,
         createAgendaDate: useCases.createAgendaDate,
     });
+    const trainingController = new TrainingController({
+        listMockExams: useCases.listMockExams,
+        getMockExam: useCases.getMockExam,
+        generateQuestions: useCases.generateQuestions,
+        analyzePhoto: useCases.analyzePhoto,
+        generateSurgicalTest: useCases.generateSurgicalTest,
+        saveAttempt: useCases.saveAttempt,
+        listErrorPatterns: useCases.listErrorPatterns,
+        listBookmarks: useCases.listBookmarks,
+        saveBookmark: useCases.saveBookmark,
+        deleteBookmark: useCases.deleteBookmark,
+    });
+
     const motivationController = new MotivationController({
         getSummary: useCases.getMotivationSummary,
         getStreakDetail: useCases.getStreakDetail,
@@ -234,6 +285,7 @@ export function buildContainer() {
         dashboardRepo,
         planningRepo,
         motivationRepo,
+        trainingRepo,
         clientApi,
         aiApi,
         useCases,
@@ -242,6 +294,7 @@ export function buildContainer() {
             dashboard: dashboardController,
             planning: planningController,
             motivation: motivationController,
+            training: trainingController,
         },
         middleware: {
             auth: authMiddleware,
@@ -279,4 +332,11 @@ function createStubMotivationRepository(): IMotivationRepository {
         throw new Error('[motivation] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as IMotivationRepository, { get: () => notConfigured });
+}
+
+function createStubTrainingRepository(): ITrainingRepository {
+    const notConfigured = (): never => {
+        throw new Error('[training] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as ITrainingRepository, { get: () => notConfigured });
 }

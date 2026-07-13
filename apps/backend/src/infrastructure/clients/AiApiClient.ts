@@ -1,12 +1,32 @@
 import axios, { type AxiosInstance } from 'axios';
-import type { AiApiConfig, AiApiContract } from '@opox/types';
+import type {
+    AiApiConfig,
+    AiApiContract,
+    GenerateQuestionsParams,
+    GeneratedQuestion,
+    AnalyzePhotoParams,
+    PhotoTestResult,
+    GenerateSurgicalTestParams,
+    SurgicalTestResult,
+} from '@opox/types';
 import { logger } from '@opox/utils';
 
 /**
- * Cliente HTTP hacia la API de IA (tutor, Foto-Test, quiz generation).
+ * Cliente real de la API de IA.
  *
- * TODO: contratos por definir. Este stub monta el Axios con
- * timeout mayor (los endpoints de IA pueden tardar) y logging.
+ * El responsable de IA implementa los tres métodos de abajo llamando
+ * al proveedor que corresponda (OpenAI, Anthropic, Azure, etc.).
+ *
+ * Ver los prompts y ejemplos de entrada/salida en:
+ *   packages/ai/prompts/generate-questions.md
+ *   packages/ai/prompts/analyze-photo.md
+ *   packages/ai/prompts/generate-surgical-test.md
+ *
+ * Env vars necesarias (apps/backend/.env):
+ *   AI_API_BASE_URL    → URL base del proveedor
+ *   AI_API_KEY         → clave secreta (nunca en el móvil)
+ *   AI_API_DEFAULT_MODEL → ej. "gpt-4o" / "claude-sonnet-4-6"
+ *   AI_API_TIMEOUT_MS  → timeout en ms (default 30000)
  */
 export class AiApiClient implements AiApiContract {
     private readonly http: AxiosInstance;
@@ -17,6 +37,7 @@ export class AiApiClient implements AiApiContract {
             timeout: config.timeoutMs,
             headers: {
                 Authorization: `Bearer ${config.apiKey}`,
+                'Content-Type': 'application/json',
                 Accept: 'application/json',
             },
         });
@@ -34,10 +55,30 @@ export class AiApiClient implements AiApiContract {
         );
     }
 
-    /** Modelo por defecto configurado en env, expuesto para los use cases */
     getDefaultModel(): string {
         return this.config.defaultModel;
     }
 
-    // TODO: añadir métodos concretos — chat, generateQuiz, photoTest, etc.
+    // ─── Métodos a implementar ────────────────────────────────────────────────
+    //
+    // Cada método debe:
+    // 1. Construir el prompt usando las plantillas de packages/ai/prompts/
+    // 2. Llamar al proveedor de IA via this.http (o SDK directo si aplica)
+    // 3. Parsear la respuesta y devolverla con la forma exacta del tipo de retorno
+    // 4. Lanzar un Error descriptivo si la respuesta no tiene la forma esperada
+
+    async generateQuestions(_params: GenerateQuestionsParams): Promise<GeneratedQuestion[]> {
+        // TODO: implementar — ver packages/ai/prompts/generate-questions.md
+        throw new Error('[AiApiClient] generateQuestions no implementado. Ver packages/ai/prompts/generate-questions.md');
+    }
+
+    async analyzePhoto(_params: AnalyzePhotoParams): Promise<PhotoTestResult> {
+        // TODO: implementar — ver packages/ai/prompts/analyze-photo.md
+        throw new Error('[AiApiClient] analyzePhoto no implementado. Ver packages/ai/prompts/analyze-photo.md');
+    }
+
+    async generateSurgicalTest(_params: GenerateSurgicalTestParams): Promise<SurgicalTestResult> {
+        // TODO: implementar — ver packages/ai/prompts/generate-surgical-test.md
+        throw new Error('[AiApiClient] generateSurgicalTest no implementado. Ver packages/ai/prompts/generate-surgical-test.md');
+    }
 }

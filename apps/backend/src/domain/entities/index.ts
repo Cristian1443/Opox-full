@@ -9,3 +9,6 @@ export * from './Profile';
 export * from './Clan';
 export * from './ClanMessage';
 export * from './ClanChallenge';
+export * from './MockExam';
+export * from './TrainingAttempt';
+export * from './TrainingBookmark';

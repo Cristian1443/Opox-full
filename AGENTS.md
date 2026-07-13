@@ -4,11 +4,13 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
-## Estado del código (2026-07-08)
+## Estado del código (2026-07-13)
 
 Ver `BITACORA.md` para el diario por fecha en términos de producto. Bloques
-1 (Acceso) y 3 (Salud) cerrados a nivel frontend. Bloques 2 (Dashboard), 4
-(Planificación) y 5 (Motivación) tienen frontend + backend completos (Cristian).
+1 (Acceso), 3 (Salud) y 6 (Entrenamiento) cerrados a nivel frontend. Bloques
+2 (Dashboard), 4 (Planificación) y 5 (Motivación) tienen frontend + backend
+completos (Cristian). Bloque 6 tiene frontend + backend completo; la única
+pantalla pendiente es `TrainingSession` (sesión activa de test).
 
 **Ojo con la numeración**: el wireframe oficial (opox.netlify.app) es la
 fuente de verdad — Bloque 4 = Planificación, Bloque 5 = Motivación, Bloque 8
@@ -95,6 +97,100 @@ Antes de escribir endpoints, fijar en `packages/types/`:
   (etiquetado obligatorio de autoría).
 - `MeditationSession` con `title`, `subtitle`, `duration`, `type` — la
   3.9/3.9a ya consumen ese shape.
+
+## Convenciones del bloque 6 · Entrenamiento
+
+### Estructura de archivos
+- Pantallas en `apps/mobile/src/screens/training/` (una pantalla por archivo,
+  `PascalCaseScreen.js`).
+- Rutas registradas en `apps/mobile/src/navigation/OnboardingNavigator.js`
+  bajo la sección `// Bloque 6 · Entrenamiento`.
+- Componentes nuevos del bloque en `apps/mobile/src/components/`:
+  `ConfirmExitModal`, `PhotoErrorModal`, `TestReadyModal`.
+
+### Pantallas implementadas (frontend solo, datos mock)
+| Ruta (Stack)          | Archivo                       | Descripción                            |
+|-----------------------|-------------------------------|----------------------------------------|
+| `TrainingHome`        | `TrainingHomeScreen.js`       | 6.1 Hub — 4 modos de entrenamiento     |
+| `GeneratorConfig`     | `GeneratorConfigScreen.js`    | 6.2 Configurar generador infinito      |
+| `PhotoTestCapture`    | `PhotoTestCaptureScreen.js`   | 6.3 Cámara / galería                   |
+| `PhotoTestAnalysis`   | `PhotoTestAnalysisScreen.js`  | 6.4 Análisis IA (pantalla inmersiva)   |
+| `PhotoTestResult`     | `PhotoTestResultScreen.js`    | 6.5 Resultado + flashcard              |
+| `OfficialMocks`       | `OfficialMocksScreen.js`      | 6.6 Listado de simulacros oficiales    |
+| `MockInstructions`    | `MockInstructionsScreen.js`   | 6.7 Instrucciones antes del simulacro  |
+| `ErrorLab`            | `ErrorLabScreen.js`           | 6.8 Laboratorio de errores             |
+| `SurgicalTestPreview` | `SurgicalTestPreviewScreen.js`| 6.9 Preview del test quirúrgico IA     |
+
+### Ruta pendiente
+`TrainingSession` — sesión activa de test (preguntas una a una, timer,
+resultado final). Todos los flujos terminales navegan a ella con params:
+- Generador: `{ source: 'generator', difficulty, questionCount, timedMode, topicId }`
+- Simulacro: `{ source: 'official', mockId, year }`
+- Quirúrgico: `{ source: 'surgical', errorPatternId, topic }`
+- Foto-Test: `{ source: 'photo', concept, questionsCount }`
+
+No registrar `TrainingSession` hasta que exista la pantalla real — si se
+registra un componente vacío romperá el flujo de test de los tres modos.
+
+### Header estándar
+Todas las pantallas del bloque 6 usan `ScreenHeader` compartido (mismo que
+Bloques 2/4/5), con `title` y `onBack`. Las pantallas inmersivas (6.3
+cámara y 6.4 análisis) tienen header propio en overlay oscuro — no usan
+`ScreenHeader`.
+
+### Paleta de colores
+Cada modo tiene su acento propio; el flujo IA interno (6.4–6.5 y 6.9) usa
+morado aunque la card de entrada sea de otro color:
+- Generador infinito: `#F26C4F` (naranja); bg card `#FFF1EC`
+- Foto-Test (hub): `#2D6FB0` (azul); bg `#E8F0F8`
+- Foto-Test IA (análisis/resultado): `#7B4BC4` / `#A78BFA` (morado); bg `#F1ECFA`
+- Simulacros oficiales: `#1f9d6b` (verde); bg `#EAF7F1`
+- Laboratorio de errores: `#E2483D` (rojo); bg `#FDEBE9`
+- Refuerzo IA dentro del lab: `#7B4BC4` (morado); bg `#F1ECFA`
+
+### Dependencias del bloque
+- `expo-camera` (`CameraView`, `useCameraPermissions`) — pantalla 6.3.
+- `expo-image-picker` — selección desde galería en pantalla 6.3.
+- Permisos de cámara ya declarados en `app.json`; validar en dispositivo
+  físico con Expo Go o EAS Build antes de considerar 6.3 cerrado en hardware.
+
+### API mobile → backend (implementado)
+`apps/mobile/src/api/training.js` — 11 métodos siguiendo el mismo patrón
+`{ data, error }` que `planningApi` / `motivationApi`:
+- `listMocks(oposicion)` → GET `/training/mocks?oposicion=X`
+- `getMock(id)` / `getMockQuestions(id)` → detalle y preguntas
+- `generateQuestions(body)` → POST `/training/generate`
+- `analyzePhoto(imageBase64, mimeType, oposicion)` → POST `/training/photo-test`
+- `generateSurgical(oposicion, count)` → POST `/training/surgical`
+- `saveAttempt(body)` → POST `/training/attempts`
+- `listErrorPatterns()` → GET `/training/error-patterns`
+- `listBookmarks()` / `saveBookmark(body)` / `deleteBookmark(id)` → bookmarks
+
+La oposición del usuario se lee de la sesión guardada:
+`session?.user?.oposicion ?? session?.user?.user_metadata?.oposicion ?? 'justicia-tramitacion'`.
+
+### Contratos de datos (implementados en `packages/types/src/training.ts`)
+`GeneratedQuestion`, `PhotoTestResult`, `SurgicalTestResult`, `MockExamDTO`,
+`ErrorPatternDTO`, `TrainingAttemptDTO`, `TrainingBookmarkDTO` + tipos de
+request (`GenerateQuestionsRequest`, `AnalyzePhotoRequest`, etc.).
+
+### Integración de IA (stub activo, real pendiente)
+Los tres puntos de entrada de IA están cableados en el backend con un stub
+que devuelve datos mock realistas. Para conectar IA real:
+1. Rellenar `AI_API_BASE_URL`, `AI_API_KEY`, `AI_API_DEFAULT_MODEL` en `.env`.
+2. Implementar los 3 métodos en `AiApiClient.ts` siguiendo los prompts de
+   `packages/ai/prompts/` y el contrato de `AiApiContract.ts`.
+**La API key nunca va al móvil** — el mobile habla con nuestro backend, el
+backend habla con el proveedor de IA.
+
+### Seed de datos pendiente
+El SQL seed (`bloque6_entrenamiento.sql`) incluye 4 simulacros solo para
+`oposicion = 'justicia-tramitacion'`. Añadir filas para otras oposiciones
+antes de probar con usuarios con distinta oposición. La tabla
+`training_questions` está vacía — necesita un script de importación de las
+preguntas reales de cada examen oficial.
+
+---
 
 ## Convenciones del bloque 4 · Planificación y bloque 5 · Motivación
 

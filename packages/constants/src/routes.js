@@ -52,6 +52,19 @@ export const API_ROUTES = {
         AGENDA: '/planning/agenda',
     },
 
+    TRAINING: {
+        MOCKS:              '/training/mocks',
+        MOCK_DETAIL:        '/training/mocks/:id',
+        MOCK_QUESTIONS:     '/training/mocks/:id/questions',
+        GENERATE:           '/training/generate',
+        PHOTO_TEST:         '/training/photo-test',
+        SURGICAL:           '/training/surgical',
+        ATTEMPTS:           '/training/attempts',
+        ERROR_PATTERNS:     '/training/error-patterns',
+        BOOKMARKS:          '/training/bookmarks',
+        BOOKMARK_DELETE:    '/training/bookmarks/:id',
+    },
+
     MOTIVATION: {
         SUMMARY: '/motivation/summary',
         STREAK: '/motivation/streak',

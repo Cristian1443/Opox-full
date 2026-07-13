@@ -1,19 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Modal } from 'react-native';
+import {
+    View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
+    StatusBar, ScrollView, Modal, PanResponder,
+} from 'react-native';
+import Svg, { Defs, LinearGradient as SvgGradient, Stop, Rect } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import ConfirmExitModal from '../../components/ConfirmExitModal';
 
-// ─── Opciones de configuración ───────────────────────────────────────────────
-// Dificultad y nº preguntas se ofrecen como presets porque el usuario opositor
-// no piensa en escalas 1-10: piensa en "calentar" (10), "un test normal" (50),
-// "un simulacro largo" (100). Ver nota UX del PR.
-const DIFFICULTY_OPTIONS = [
-    { id: 'easy', label: 'Fácil' },
-    { id: 'medium', label: 'Media' },
-    { id: 'hard', label: 'Difícil' },
-];
+// ─── Constantes de configuración ─────────────────────────────────────────────
 
-const COUNT_OPTIONS = [10, 25, 50, 100];
+const DIFF_STEPS = ['easy', 'medium', 'hard'];
+const DIFF_LABELS = { easy: 'Fácil', medium: 'Media', hard: 'Difícil' };
+const DIFF_COLORS = { easy: '#3A7BD5', medium: '#D97706', hard: '#DC2626' };
+
+const COUNT_STEPS = [10, 25, 50, 100];
+
+const THUMB = 22;
+const TRACK_H = 6;
 
 // Temarios de ejemplo — el listado real llega desde el backend por oposición.
 const TOPICS = [
@@ -26,7 +29,195 @@ const TOPICS = [
 
 const DEFAULTS = { difficulty: 'medium', count: 50, timed: false, topicId: 'all' };
 
-// ─── Pantalla 6.2 · Generador Infinito · Configuración ───────────────────────
+// ─── Slider de Dificultad (gradiente navy → rojo) ────────────────────────────
+
+function DifficultySlider({ value, onChange }) {
+    const [trackWidth, setTrackWidth] = useState(0);
+    const tw = useRef(0);
+    const valRef = useRef(value);
+    const startLocX = useRef(0);
+
+    useEffect(() => { valRef.current = value; }, [value]);
+
+    const stepIdx = DIFF_STEPS.indexOf(value);
+    const pct = stepIdx / (DIFF_STEPS.length - 1);
+    const fillW = trackWidth * pct;
+    const thumbX = (trackWidth - THUMB) * pct;
+
+    const panResponder = useRef(PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (e) => {
+            const lx = e.nativeEvent.locationX;
+            const w = tw.current;
+            if (!w) return;
+            const ci = Math.max(0, Math.min(DIFF_STEPS.length - 1, Math.round((lx / w) * (DIFF_STEPS.length - 1))));
+            startLocX.current = lx;
+            valRef.current = DIFF_STEPS[ci];
+            onChange(DIFF_STEPS[ci]);
+        },
+        onPanResponderMove: (_, gs) => {
+            const w = tw.current;
+            if (!w) return;
+            const nx = Math.max(0, Math.min(w, startLocX.current + gs.dx));
+            const ci = Math.max(0, Math.min(DIFF_STEPS.length - 1, Math.round((nx / w) * (DIFF_STEPS.length - 1))));
+            if (DIFF_STEPS[ci] !== valRef.current) {
+                valRef.current = DIFF_STEPS[ci];
+                onChange(DIFF_STEPS[ci]);
+            }
+        },
+    })).current;
+
+    return (
+        <View style={sStyles.card}>
+            <View style={sStyles.headerRow}>
+                <Text style={sStyles.cardTitle}>Dificultad</Text>
+                <Text style={[sStyles.valueLabel, { color: DIFF_COLORS[value] }]}>
+                    {DIFF_LABELS[value]}
+                </Text>
+            </View>
+            <View
+                onLayout={e => { const w = e.nativeEvent.layout.width; tw.current = w; setTrackWidth(w); }}
+                style={sStyles.trackZone}
+                {...panResponder.panHandlers}
+            >
+                {/* Pista de fondo */}
+                <View style={sStyles.trackBg} />
+
+                {/* Fill con gradiente navy → rojo */}
+                {trackWidth > 0 && fillW > 1 && (
+                    <Svg
+                        width={fillW}
+                        height={TRACK_H}
+                        style={{ position: 'absolute', left: 0, top: (THUMB - TRACK_H) / 2 }}
+                    >
+                        <Defs>
+                            <SvgGradient id="diffGrad" x1="0" y1="0" x2="1" y2="0">
+                                <Stop offset="0" stopColor="#0F1B33" stopOpacity="1" />
+                                <Stop offset="1" stopColor="#DC2626" stopOpacity="1" />
+                            </SvgGradient>
+                        </Defs>
+                        <Rect x={0} y={0} width={fillW} height={TRACK_H} fill="url(#diffGrad)" rx={TRACK_H / 2} ry={TRACK_H / 2} />
+                    </Svg>
+                )}
+
+                {/* Thumb */}
+                {trackWidth > 0 && (
+                    <View style={[sStyles.thumb, { left: thumbX, borderColor: DIFF_COLORS[value] }]} />
+                )}
+            </View>
+        </View>
+    );
+}
+
+// ─── Slider de Nº de preguntas (fill naranja) ─────────────────────────────────
+
+function CountSlider({ value, onChange }) {
+    const [trackWidth, setTrackWidth] = useState(0);
+    const tw = useRef(0);
+    const valRef = useRef(value);
+    const startLocX = useRef(0);
+
+    useEffect(() => { valRef.current = value; }, [value]);
+
+    const stepIdx = COUNT_STEPS.indexOf(value);
+    const pct = stepIdx / (COUNT_STEPS.length - 1);
+    const fillW = trackWidth * pct;
+    const thumbX = (trackWidth - THUMB) * pct;
+
+    const panResponder = useRef(PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (e) => {
+            const lx = e.nativeEvent.locationX;
+            const w = tw.current;
+            if (!w) return;
+            const ci = Math.max(0, Math.min(COUNT_STEPS.length - 1, Math.round((lx / w) * (COUNT_STEPS.length - 1))));
+            startLocX.current = lx;
+            valRef.current = COUNT_STEPS[ci];
+            onChange(COUNT_STEPS[ci]);
+        },
+        onPanResponderMove: (_, gs) => {
+            const w = tw.current;
+            if (!w) return;
+            const nx = Math.max(0, Math.min(w, startLocX.current + gs.dx));
+            const ci = Math.max(0, Math.min(COUNT_STEPS.length - 1, Math.round((nx / w) * (COUNT_STEPS.length - 1))));
+            if (COUNT_STEPS[ci] !== valRef.current) {
+                valRef.current = COUNT_STEPS[ci];
+                onChange(COUNT_STEPS[ci]);
+            }
+        },
+    })).current;
+
+    return (
+        <View style={sStyles.card}>
+            <View style={sStyles.headerRow}>
+                <Text style={sStyles.cardTitle}>Nº de preguntas</Text>
+                <Text style={[sStyles.valueLabel, { color: '#FF6B4A' }]}>{value}</Text>
+            </View>
+            <View
+                onLayout={e => { const w = e.nativeEvent.layout.width; tw.current = w; setTrackWidth(w); }}
+                style={sStyles.trackZone}
+                {...panResponder.panHandlers}
+            >
+                <View style={sStyles.trackBg} />
+
+                {fillW > 1 && (
+                    <View style={[sStyles.fillOrange, { width: fillW, top: (THUMB - TRACK_H) / 2 }]} />
+                )}
+
+                {trackWidth > 0 && (
+                    <View style={[sStyles.thumb, { left: thumbX, borderColor: '#FF6B4A' }]} />
+                )}
+            </View>
+        </View>
+    );
+}
+
+const sStyles = StyleSheet.create({
+    card: {
+        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderColor: '#EEF1F7',
+        borderRadius: 14,
+        padding: 13,
+        marginBottom: 11,
+    },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 14,
+    },
+    cardTitle: { fontSize: 12, fontWeight: '700', color: '#1B2A4A' },
+    valueLabel: { fontSize: 12, fontWeight: '700' },
+    trackZone: { height: THUMB, justifyContent: 'center' },
+    trackBg: { height: TRACK_H, backgroundColor: '#E4E8F0', borderRadius: TRACK_H / 2 },
+    fillOrange: {
+        position: 'absolute',
+        left: 0,
+        height: TRACK_H,
+        backgroundColor: '#FF6B4A',
+        borderRadius: TRACK_H / 2,
+    },
+    thumb: {
+        position: 'absolute',
+        top: 0,
+        width: THUMB,
+        height: THUMB,
+        borderRadius: THUMB / 2,
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.22,
+        shadowRadius: 2,
+    },
+});
+
+// ─── Pantalla 6.2 · Generador · Configuración ────────────────────────────────
+
 export default function GeneratorConfigScreen({ navigation }) {
     const [difficulty, setDifficulty] = useState(DEFAULTS.difficulty);
     const [count, setCount] = useState(DEFAULTS.count);
@@ -42,8 +233,6 @@ export default function GeneratorConfigScreen({ navigation }) {
         timedMode !== DEFAULTS.timed ||
         topicId !== DEFAULTS.topicId;
 
-    // Ref para dejar pasar la salida cuando el usuario confirma en el modal,
-    // sin que el listener de abajo la vuelva a interceptar.
     const allowExitRef = useRef(false);
 
     const handleBack = () => {
@@ -51,8 +240,7 @@ export default function GeneratorConfigScreen({ navigation }) {
         else navigation.goBack();
     };
 
-    // Intercepta también hardware-back (Android) y swipe-back (iOS): si hay
-    // cambios sin guardar, dispara el mismo modal en vez de salir directo.
+    // Intercepta hardware-back (Android) y swipe-back (iOS)
     useEffect(() => {
         const unsubscribe = navigation.addListener('beforeRemove', (e) => {
             if (!hasChanges || allowExitRef.current) return;
@@ -69,7 +257,6 @@ export default function GeneratorConfigScreen({ navigation }) {
     };
 
     const generate = () => {
-        // Navegar al player de test (Bloque 7). Ruta placeholder hasta que exista.
         navigation.navigate('TrainingSession', {
             source: 'generator',
             difficulty,
@@ -84,50 +271,13 @@ export default function GeneratorConfigScreen({ navigation }) {
             <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
             <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
 
-            <ScreenHeader title="Generador Infinito" onBack={handleBack} />
+            <ScreenHeader title="Generador" onBack={handleBack} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                <Text style={styles.subtitle}>Configura el tipo de test que quieres generar.</Text>
 
-                {/* Dificultad */}
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Dificultad</Text>
-                    <View style={styles.chipRow}>
-                        {DIFFICULTY_OPTIONS.map((opt) => {
-                            const active = difficulty === opt.id;
-                            return (
-                                <TouchableOpacity
-                                    key={opt.id}
-                                    style={[styles.chip, active && styles.chipActive]}
-                                    onPress={() => setDifficulty(opt.id)}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
+                <DifficultySlider value={difficulty} onChange={setDifficulty} />
 
-                {/* Nº de preguntas */}
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Nº de preguntas</Text>
-                    <View style={styles.chipRow}>
-                        {COUNT_OPTIONS.map((n) => {
-                            const active = count === n;
-                            return (
-                                <TouchableOpacity
-                                    key={n}
-                                    style={[styles.chip, active && styles.chipActive]}
-                                    onPress={() => setCount(n)}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{n}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
+                <CountSlider value={count} onChange={setCount} />
 
                 {/* Modo contrarreloj */}
                 <View style={styles.card}>
@@ -200,63 +350,37 @@ export default function GeneratorConfigScreen({ navigation }) {
                 </TouchableOpacity>
             </Modal>
 
-            {/* Confirmación de salida sin generar */}
             <ConfirmExitModal
                 visible={exitOpen}
                 onStay={() => setExitOpen(false)}
                 onLeave={confirmLeave}
             />
-
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
+    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 16, paddingBottom: 90 },
-    subtitle: { fontSize: 12.5, color: '#5A6373', marginBottom: 12 },
     groupTitle: { fontSize: 10.5, fontWeight: '700', color: '#5A6373', letterSpacing: 0.4, marginBottom: 8, marginTop: 4 },
+
     card: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 14, padding: 13, marginBottom: 11 },
     cardTitle: { fontSize: 12, fontWeight: '700', color: '#1B2A4A' },
     muted: { fontSize: 11, color: '#8A92A0', marginTop: 3 },
 
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-    chip: {
-        paddingHorizontal: 14,
-        paddingVertical: 9,
-        borderRadius: 10,
-        borderWidth: 1.5,
-        borderColor: '#E4E8F0',
-        backgroundColor: '#fff',
-    },
-    chipActive: { backgroundColor: '#FF6B4A', borderColor: '#FF6B4A' },
-    chipText: { fontSize: 12, fontWeight: '700', color: '#5A6373' },
-    chipTextActive: { color: '#fff' },
-
     toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    toggleTrack: {
-        width: 46,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: '#E4E8F0',
-        padding: 2,
-        justifyContent: 'center',
-    },
+    toggleTrack: { width: 46, height: 26, borderRadius: 13, backgroundColor: '#E4E8F0', padding: 2, justifyContent: 'center' },
     toggleTrackActive: { backgroundColor: '#FF6B4A' },
     toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
     toggleThumbActive: { transform: [{ translateX: 20 }] },
 
     pickerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderWidth: 1.5,
-        borderColor: '#EEF1F7',
-        borderRadius: 14,
-        padding: 13,
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#EEF1F7',
+        borderRadius: 14, padding: 13,
     },
     pickerLabel: { fontSize: 12.5, fontWeight: '700', color: '#1B2A4A' },
     chevron: { marginLeft: 'auto', color: '#C4CBD6', fontSize: 16 },
@@ -265,25 +389,11 @@ const styles = StyleSheet.create({
     btn: { backgroundColor: '#FF6B4A', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
     btnText: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
 
-    // Bottom sheet del picker de temario
     sheetOverlay: { flex: 1, backgroundColor: 'rgba(15, 27, 51, 0.5)', justifyContent: 'flex-end' },
-    sheet: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingTop: 20,
-        paddingHorizontal: 18,
-        paddingBottom: 22,
-    },
+    sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingHorizontal: 18, paddingBottom: 22 },
     sheetGrip: { width: 38, height: 4, borderRadius: 3, backgroundColor: '#E4E8F0', alignSelf: 'center', marginBottom: 16 },
     sheetTitle: { fontSize: 14, fontWeight: '800', color: '#0F1B33', marginBottom: 8 },
-    sheetItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 13,
-        borderTopWidth: 1,
-        borderTopColor: '#EEF1F7',
-    },
+    sheetItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderTopWidth: 1, borderTopColor: '#EEF1F7' },
     sheetItemLabel: { fontSize: 13, color: '#1B2A4A' },
     sheetItemLabelActive: { color: '#FF6B4A', fontWeight: '800' },
     checkmark: { marginLeft: 'auto', color: '#FF6B4A', fontSize: 16, fontWeight: '800' },

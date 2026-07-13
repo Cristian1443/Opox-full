@@ -1,39 +1,12 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
+import { trainingApi } from '../../api/training';
 
 // Acento del Laboratorio de Errores (rojo, mismo que la card 6.1)
 const LAB_COLOR = '#E2483D';
 const LAB_BG = '#FDEBE9';
-
-// Mock de patrones (viene del backend cuando exista: /training/error-patterns)
-const ERROR_PATTERNS = [
-    {
-        id: 'plazos',
-        topic: 'Plazos y recursos',
-        domain: 36,
-        failRate: 64,
-        description: 'Fallas el 64 % de las preguntas sobre plazos y recursos.',
-        isPrimary: true,
-    },
-    {
-        id: 'ley-39',
-        topic: 'Ley 39/2015',
-        domain: 52,
-        failRate: 48,
-        description: 'Necesitas reforzar conceptos clave de la Ley 39.',
-        isPrimary: false,
-    },
-    {
-        id: 'organizacion-estado',
-        topic: 'Organización del Estado',
-        domain: 58,
-        failRate: 42,
-        description: 'Algunos conceptos de la estructura estatal requieren repaso.',
-        isPrimary: false,
-    },
-];
 
 // Mapeo semántico de color por nivel de dominio
 function getDomainColor(domain) {
@@ -77,15 +50,36 @@ function IconTargetBig({ color = '#C4CBD6' }) {
 const MIN_QUESTIONS_FOR_PATTERNS = 30;
 
 export default function ErrorLabScreen({ navigation }) {
-    const primary = ERROR_PATTERNS.find((p) => p.isPrimary);
-    const others = ERROR_PATTERNS.filter((p) => !p.isPrimary);
-    // Estado vacío: usuario nuevo sin historial suficiente.
-    // Cuando exista backend: viene de summary.answeredCount < MIN.
-    const hasEnoughHistory = ERROR_PATTERNS.length > 0;
+    const [patterns, setPatterns] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        trainingApi.listErrorPatterns().then(({ data }) => {
+            if (cancelled) return;
+            // Backend devuelve ErrorPattern[] ya ordenado por failRate desc.
+            // El primero es el patrón principal; los demás son otras debilidades.
+            setPatterns((data ?? []).map((p, i) => ({
+                id: p.topicId,
+                topicId: p.topicId,
+                topic: p.topic,
+                domain: p.domain,
+                failRate: p.failRate,
+                description: `Fallas el ${p.failRate}% de las preguntas sobre ${p.topic}.`,
+                isPrimary: i === 0,
+            })));
+            setLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, []);
+
+    const primary = patterns.find((p) => p.isPrimary);
+    const others = patterns.filter((p) => !p.isPrimary);
+    const hasEnoughHistory = patterns.length > 0;
 
     const startSurgical = () => {
         navigation.navigate('SurgicalTestPreview', {
-            topicId: primary.id,
+            topicId: primary.topicId,
             topic: primary.topic,
             domain: primary.domain,
         });
@@ -98,7 +92,11 @@ export default function ErrorLabScreen({ navigation }) {
 
             <ScreenHeader title="Laboratorio de Errores" onBack={() => navigation.goBack()} />
 
-            {!hasEnoughHistory ? (
+            {loading ? (
+                <View style={styles.emptyWrap}>
+                    <ActivityIndicator color={LAB_COLOR} />
+                </View>
+            ) : !hasEnoughHistory ? (
                 <View style={styles.emptyWrap}>
                     <IconTargetBig />
                     <Text style={styles.emptyTitle}>Aún no hay patrones que atacar</Text>

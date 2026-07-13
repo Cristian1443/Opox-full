@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Image, Animated } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import PhotoErrorModal from '../../components/PhotoErrorModal';
+import { api } from '../../api/client';
+import { trainingApi } from '../../api/training';
 
 // Color de acento del flujo Foto-Test (IA/morado) — coherente con la card 6.1
 // "Foto-Test" y con IconTutor del Dashboard "Repaso IA".
@@ -41,7 +43,7 @@ const MOCK_STEPS = [
 // ─── Pantalla 6.4 · Foto-Test · Análisis IA ──────────────────────────────────
 export default function PhotoTestAnalysisScreen({ navigation, route }) {
     const insets = useSafeAreaInsets();
-    const { uri, mockError } = route.params ?? {};
+    const { uri, mockError, imageBase64, mimeType } = route.params ?? {};
     // `mockError` = 'blur' | 'no-text' → sirve solo en dev para previsualizar el
     // error sin depender del backend. En prod lo dispara la respuesta de la IA.
 
@@ -69,7 +71,7 @@ export default function PhotoTestAnalysisScreen({ navigation, route }) {
         );
         scanLoop.start();
 
-        // Timeline de los pasos (mock)
+        // Animación de pasos cosmética (no navega — la API real lo hace)
         const timers = MOCK_STEPS.slice(1).map((step, i) =>
             setTimeout(() => {
                 setStatusText(step.text);
@@ -80,30 +82,49 @@ export default function PhotoTestAnalysisScreen({ navigation, route }) {
                     useNativeDriver: false,
                 }).start();
 
-                // En el paso 2 ("Comprendiendo…") es donde la IA "decide" si la
-                // foto es válida. Si estamos en modo mockError, cortamos aquí.
+                // Dev: mockError dispara el modal de error en el paso 2
                 if (mockError && i === 1) {
                     setTimeout(() => setErrorType(mockError), 400);
-                    return;
-                }
-
-                if (i === MOCK_STEPS.length - 2) {
-                    // Último paso: dejamos 1.2 s para que se vea "¡Análisis completado!"
-                    // como cierre emocional antes de saltar al resultado.
-                    setTimeout(() => {
-                        navigation.replace('PhotoTestResult', {
-                            uri,
-                            concept: 'Plazos en el procedimiento administrativo',
-                            question: '¿Cuál es el plazo general para resolver un procedimiento administrativo?',
-                            answer: 'El plazo general para resolver es de 3 meses, salvo que una norma con rango de ley establezca uno mayor.',
-                            questionsCount: 10,
-                        });
-                    }, 1200);
                 }
             }, step.at)
         );
 
+        // Llamada real a la API (se salta en modo mockError de dev)
+        let cancelled = false;
+        if (!mockError) {
+            if (!imageBase64) {
+                // Sin datos de imagen (ruta antigua sin base64) → mostramos error
+                setErrorType('no-text');
+            } else {
+                (async () => {
+                    const session = await api.loadSession();
+                    const oposicion =
+                        session?.user?.oposicion ??
+                        session?.user?.user_metadata?.oposicion ??
+                        'justicia-tramitacion';
+                    const { data, error } = await trainingApi.analyzePhoto(
+                        imageBase64,
+                        mimeType ?? 'image/jpeg',
+                        oposicion,
+                    );
+                    if (cancelled) return;
+                    if (error) {
+                        setErrorType('blur');
+                    } else {
+                        navigation.replace('PhotoTestResult', {
+                            uri,
+                            concept: data.concept,
+                            question: data.question ?? '',
+                            answer: data.answer ?? '',
+                            questionsCount: data.availableQuestionsCount ?? 10,
+                        });
+                    }
+                })();
+            }
+        }
+
         return () => {
+            cancelled = true;
             timers.forEach(clearTimeout);
             pulseLoop.stop();
             scanLoop.stop();

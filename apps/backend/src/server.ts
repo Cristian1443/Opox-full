@@ -9,6 +9,7 @@ import {
     createDashboardRouter,
     createPlanningRouter,
     createMotivationRouter,
+    createTrainingRouter,
     errorHandler,
 } from './presentation';
 
@@ -19,7 +20,8 @@ export function createServer(): Express {
     // Seguridad + body parser
     app.use(helmet());
     app.use(cors({ origin: corsOrigins, credentials: true }));
-    app.use(express.json({ limit: '1mb' }));
+    // Límite de 5mb para soportar imágenes base64 del Foto-Test (6.3)
+    app.use(express.json({ limit: '5mb' }));
 
     // Rutas
     app.use(createHealthRouter());
@@ -27,6 +29,7 @@ export function createServer(): Express {
     app.use(createDashboardRouter(container.controllers.dashboard, container.middleware.auth));
     app.use(createPlanningRouter(container.controllers.planning, container.middleware.auth));
     app.use(createMotivationRouter(container.controllers.motivation, container.middleware.auth));
+    app.use(createTrainingRouter(container.controllers.training, container.middleware.auth));
 
     // 404 catch-all
     app.use((_req, res) => {

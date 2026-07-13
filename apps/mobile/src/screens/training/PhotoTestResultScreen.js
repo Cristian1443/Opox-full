@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Scro
 import Svg, { Path } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import TestReadyModal from '../../components/TestReadyModal';
+import { trainingApi } from '../../api/training';
 
 // Acento morado del flujo Foto-Test (mismo que 6.4 y que la card 6.1)
 const AI_COLOR = '#7B4BC4';
@@ -36,39 +37,28 @@ export default function PhotoTestResultScreen({ navigation, route }) {
     const [flipped, setFlipped] = useState(false);
     const [saved, setSaved] = useState(false);
     const [planned, setPlanned] = useState(false);
-    // Modal 6.5 · ok: confirma el arranque del test. Se dispara al pulsar
-    // "Hacer quiz"; al confirmar "Empezar test" navega al Bloque 7.
     const [readyModalOpen, setReadyModalOpen] = useState(false);
-    const flip = useRef(new Animated.Value(0)).current;
 
-    // Entrada suave
-    const fade = useRef(new Animated.Value(0)).current;
+    // Entrada suave de toda la pantalla
+    const entryFade = useRef(new Animated.Value(0)).current;
+    // Crossfade para el flip de la flashcard — fade out → swap contenido → fade in.
+    // Evita el bug de Android con rotateY + absoluteFillObject que dejaba la cara
+    // girada visible o espejada dependiendo del dispositivo.
+    const cardFade = useRef(new Animated.Value(1)).current;
+
     useEffect(() => {
-        Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        Animated.timing(entryFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     }, []);
 
     const doFlip = () => {
-        Animated.spring(flip, {
-            toValue: flipped ? 0 : 1,
-            friction: 8,
-            tension: 12,
-            useNativeDriver: true,
-        }).start();
-        setFlipped((v) => !v);
+        Animated.timing(cardFade, { toValue: 0, duration: 140, useNativeDriver: true }).start(() => {
+            setFlipped((v) => !v);
+            Animated.timing(cardFade, { toValue: 1, duration: 140, useNativeDriver: true }).start();
+        });
     };
 
-    // Interpolaciones de la flashcard.
-    // Añadimos crossfade de opacidad como salvavidas por si backfaceVisibility
-    // falla en algún Android — así al menos la cara visible no queda espejada.
-    const frontRotate = flip.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
-    const backRotate = flip.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] });
-    const frontOpacity = flip.interpolate({ inputRange: [0, 0.5, 0.51, 1], outputRange: [1, 1, 0, 0] });
-    const backOpacity = flip.interpolate({ inputRange: [0, 0.5, 0.51, 1], outputRange: [0, 0, 1, 1] });
-
-    // "Hacer quiz" → abre el modal de confirmación (6.5 · ok)
     const openQuizConfirm = () => setReadyModalOpen(true);
 
-    // "Empezar test" dentro del modal → cierra y navega al player (Bloque 7)
     const startQuiz = () => {
         setReadyModalOpen(false);
         navigation.navigate('TrainingSession', {
@@ -78,14 +68,13 @@ export default function PhotoTestResultScreen({ navigation, route }) {
         });
     };
 
-    const saveDeck = () => {
-        // TODO backend: POST /training/photo/save → guardar el mazo de flashcards
-        setSaved(true);
+    const saveDeck = async () => {
+        const { error } = await trainingApi.saveBookmark({ concept, question, answer });
+        if (!error) setSaved(true);
     };
 
     const addToTodayPlan = () => {
-        // TODO backend: POST /planning/tasks → crea tarea de tipo `test`
-        // con este mazo para hoy. Enlaza con Bloque 4 · Planificación.
+        // TODO backend: POST /planning/tasks → crea tarea de tipo `test` con este mazo
         setPlanned(true);
     };
 
@@ -98,52 +87,40 @@ export default function PhotoTestResultScreen({ navigation, route }) {
             <ScreenHeader title="Foto-Test" onBack={() => navigation.navigate('TrainingHome')} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                <Animated.View style={{ opacity: fade }}>
+                <Animated.View style={{ opacity: entryFade }}>
                     {/* Concepto detectado */}
                     <Text style={[styles.groupTitle, { marginTop: 16 }]}>CONCEPTO DETECTADO</Text>
                     <View style={styles.conceptCard}>
                         <Text style={styles.conceptText}>{concept}</Text>
                     </View>
 
-                    {/* Muestra de flashcard */}
+                    {/* Flashcard con crossfade — sin rotateY ni absoluteFillObject */}
                     <Text style={styles.groupTitle}>MUESTRA</Text>
                     <TouchableOpacity
                         style={styles.flashcardWrap}
                         onPress={doFlip}
                         activeOpacity={0.9}
                     >
-                        {/* Cara delantera: pregunta */}
                         <Animated.View
                             style={[
                                 styles.flashcardFace,
-                                styles.flashcardFront,
-                                {
-                                    zIndex: 1,
-                                    opacity: frontOpacity,
-                                    transform: [{ perspective: 1000 }, { rotateY: frontRotate }],
-                                },
+                                flipped ? styles.flashcardBack : styles.flashcardFront,
+                                { opacity: cardFade },
                             ]}
                         >
-                            <IconBulb />
-                            <Text style={styles.cardText} numberOfLines={5}>{question}</Text>
-                            <Text style={styles.flipHint}>Toca para ver la respuesta</Text>
-                        </Animated.View>
-
-                        {/* Cara trasera: respuesta */}
-                        <Animated.View
-                            style={[
-                                styles.flashcardFace,
-                                styles.flashcardBack,
-                                {
-                                    zIndex: 2,
-                                    opacity: backOpacity,
-                                    transform: [{ perspective: 1000 }, { rotateY: backRotate }],
-                                },
-                            ]}
-                        >
-                            <Text style={styles.answerLabel}>RESPUESTA</Text>
-                            <Text style={styles.cardText} numberOfLines={5}>{answer}</Text>
-                            <Text style={styles.flipHint}>Toca para volver</Text>
+                            {flipped ? (
+                                <>
+                                    <Text style={styles.answerLabel}>RESPUESTA</Text>
+                                    <Text style={styles.cardText} numberOfLines={5}>{answer}</Text>
+                                    <Text style={styles.flipHint}>Toca para volver</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <IconBulb />
+                                    <Text style={styles.cardText} numberOfLines={5}>{question}</Text>
+                                    <Text style={styles.flipHint}>Toca para ver la respuesta</Text>
+                                </>
+                            )}
                         </Animated.View>
                     </TouchableOpacity>
 
@@ -176,7 +153,7 @@ export default function PhotoTestResultScreen({ navigation, route }) {
                 </Animated.View>
             </ScrollView>
 
-            {/* Estado 6.5 · ok — celebración al llegar */}
+            {/* Modal 6.5 · ok — confirmación antes de iniciar el quiz */}
             <TestReadyModal
                 visible={readyModalOpen}
                 onStart={startQuiz}
@@ -189,14 +166,13 @@ export default function PhotoTestResultScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
+    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 16, paddingBottom: 32 },
 
     groupTitle: { fontSize: 10.5, fontWeight: '700', color: '#5A6373', letterSpacing: 0.4, marginBottom: 8, marginTop: 6 },
 
-    // Card del concepto
     conceptCard: {
         backgroundColor: '#fff',
         borderWidth: 1.5,
@@ -207,23 +183,18 @@ const styles = StyleSheet.create({
     },
     conceptText: { fontSize: 14, fontWeight: '700', color: '#0F1B33', lineHeight: 20 },
 
-    // Flashcard con flip 3D — altura amplia para preguntas/respuestas de 3-4
-    // líneas + overflow:'hidden' para que en Android la cara girada no
-    // desborde a la zona de los botones (bug visto en test manual).
+    // Una sola cara visible a la vez — sin absoluteFillObject ni rotateY
     flashcardWrap: {
         width: '100%',
         height: 240,
         marginBottom: 20,
-        overflow: 'hidden',
     },
     flashcardFace: {
-        ...StyleSheet.absoluteFillObject,
+        flex: 1,
         borderRadius: 16,
         padding: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backfaceVisibility: 'hidden',
-        overflow: 'hidden',
     },
     flashcardFront: {
         backgroundColor: '#fff',
@@ -256,7 +227,6 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
 
-    // Botones
     btnPrimary: {
         backgroundColor: '#FF6B4A',
         borderRadius: 12,
@@ -273,17 +243,10 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         alignItems: 'center',
     },
-    btnSecondarySaved: {
-        backgroundColor: '#EAF7F1',
-        borderColor: '#C7E6D6',
-    },
+    btnSecondarySaved: { backgroundColor: '#EAF7F1', borderColor: '#C7E6D6' },
     btnSecondaryText: { color: '#1B2A4A', fontSize: 14, fontWeight: '700' },
     btnSecondaryTextSaved: { color: '#1f9d6b' },
-    btnLink: {
-        paddingVertical: 12,
-        alignItems: 'center',
-        marginTop: 2,
-    },
+    btnLink: { paddingVertical: 12, alignItems: 'center', marginTop: 2 },
     btnLinkText: { color: '#7B4BC4', fontSize: 12.5, fontWeight: '700' },
     btnLinkTextDone: { color: '#1f9d6b' },
 });

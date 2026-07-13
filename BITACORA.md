@@ -5,6 +5,254 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-13 — Bloque 6 · Entrenamiento (frontend cerrado)
+
+Rama de trabajo: `bloque-6-entrenamiento` (nacida de `main`).
+Backend, integración de IA y pantalla de sesión activa de test quedan
+explícitamente para la próxima sesión.
+
+### Pantallas del bloque 6 · Entrenamiento
+
+Se implementaron 9 pantallas cubriendo los cuatro modos de entrenamiento
+del wireframe:
+
+- **6.1 Hub de Entrenamiento** — cuatro cards con acento de color propio
+  (naranja Generador, azul Foto-Test, verde Simulacros, morado Laboratorio
+  de Errores). Entrada a cada modo desde un único punto.
+- **6.2 Generador · Configuración** — slider de dificultad (fácil/media/difícil)
+  con gradiente navy→rojo, slider de nº de preguntas (10/25/50/100) en naranja,
+  toggle de modo contrarreloj y bottom-sheet picker de temario. Guarda el
+  estado entre renders con PanResponder propio (sin librería externa). Modal
+  "¿Salir sin guardar?" intercepta hardware-back y swipe-back en iOS antes de
+  abandonar la pantalla con cambios.
+- **6.3 Foto-Test · Cámara** — visor de cámara a pantalla completa con marco
+  centrado de esquinas, botón obturador y acceso a galería. Usa `expo-camera`
+  (`CameraView`) y `expo-image-picker`. La foto pasa como URI al flujo de
+  análisis (6.4) en cuanto se captura o selecciona.
+- **6.4 Foto-Test · Análisis IA** — pantalla inmersiva (fondo navy oscuro)
+  con animación de pulso sobre el icono-cerebro morado y lista de pasos de
+  procesamiento que se van activando uno a uno. Simula la espera mientras la
+  IA extrae el concepto de la imagen. Al terminar navega a 6.5 con los datos
+  del concepto detectado.
+- **6.5 Foto-Test · Resultado** — muestra el concepto identificado, una
+  flashcard interactiva (tap para girar, pregunta → respuesta) con animación
+  rotateY, y dos CTAs: "Guardar" (bookmark) y "Añadir al plan". Botón
+  "Generar test sobre este tema" abre `TestReadyModal` y luego navega al
+  futuro `TrainingSession`.
+- **6.6 Simulacros oficiales** — FlatList de exámenes reales por año con
+  badge de estado (Pendiente / En curso con % de progreso / Completado con
+  nota). Navega a instrucciones antes de arrancar.
+- **6.7 Instrucciones de simulacro** — resumen de reglas (nº de preguntas,
+  tiempo, sistema de penalización, sin pausa). Usa `NudgeModal` para
+  confirmar antes de arrancar; navega al futuro `TrainingSession` con
+  `source: 'official'`.
+- **6.8 Laboratorio de Errores** — lista de patrones de error detectados
+  (fail rate, % dominio, nivel de gravedad codificado por color). CTA
+  "Atacar punto débil" navega a la vista previa del test quirúrgico (6.9).
+- **6.9 Test Quirúrgico · Preview** — resumen generado por la IA del test
+  que va a atacar el punto débil (tema, nº preguntas, distribución de
+  subtemas con barra de porcentaje animada). CTA "Comenzar" navega al
+  futuro `TrainingSession` con `source: 'surgical'`.
+
+### Componentes nuevos
+
+- `ConfirmExitModal` — modal reutilizable "¿Seguro que quieres salir? Los
+  cambios se perderán" con "Quedarme" y "Salir". Usado en 6.2.
+- `PhotoErrorModal` — modal de error al procesar la foto (reintentar / usar
+  galería). Usado en 6.4.
+- `TestReadyModal` — modal de confirmación "Test listo, ¿empezamos?" con
+  resumen de parámetros. Usado en 6.5 y disponible para 6.7/6.9.
+
+### Dependencias instaladas
+
+- `expo-camera` — acceso a la cámara del dispositivo (6.3).
+- `expo-image-picker` — selección desde galería (6.3).
+
+### Wiring
+
+- 9 rutas registradas en `OnboardingNavigator.js` bajo `// Bloque 6 · Entrenamiento`.
+- El tab "Entrenamiento" del Dashboard navega a `TrainingHome` (6.1).
+- Todos los flujos navegan sin crashes ni taps huérfanos con datos mock.
+
+### Paleta y lenguaje visual del bloque
+
+| Modo               | Color acento | Bg card    |
+|--------------------|--------------|------------|
+| Generador infinito | `#F26C4F`    | `#FFF1EC`  |
+| Foto-Test (hub)    | `#2D6FB0`    | `#E8F0F8`  |
+| Foto-Test IA (flujo interno) | `#7B4BC4` / `#A78BFA` | `#F1ECFA` |
+| Simulacros oficiales | `#1f9d6b`  | `#EAF7F1`  |
+| Laboratorio errores | `#E2483D`  | `#FDEBE9`  |
+| Refuerzo IA (lab)  | `#7B4BC4`    | `#F1ECFA`  |
+
+### Estado del bloque 6 · Entrenamiento
+
+Cerrado en frontend. Los cuatro modos de entrenamiento navegan de punta a
+punta con datos mock. Pendiente de la próxima sesión:
+
+- **`TrainingSession`** — pantalla de sesión activa (preguntas una a una,
+  temporizador, penalización, resultado final). Es el corazón del bloque;
+  los tres modos (generador, simulacro, quirúrgico) navegan a ella con
+  params distintos.
+- **Backend del bloque 6**: endpoints de generación de preguntas
+  (`/training/generate`), histórico de intentos, patrones de error
+  (`/training/error-patterns`) y listado de simulacros oficiales
+  (`/training/mocks`).
+- **Integración de IA**: análisis de imagen (Foto-Test 6.3–6.5), generación
+  inteligente de preguntas (Generador 6.2) y detección de patrones de error
+  (Lab 6.8–6.9). El contrato con el responsable IA es el mismo que el de
+  los otros bloques: prompts en `packages/ai/prompts/`, contratos en
+  `packages/types/src/ai.ts`, cliente en `apps/backend/src/infrastructure/ai/`.
+- **expo-camera en Android físico**: `CameraView` de la versión v57 requiere
+  permisos en tiempo de ejecución — pendiente de validar en dispositivo real
+  con Expo Go o EAS Build.
+
+---
+
+## 2026-07-13 (tarde) — Bloque 6 · Entrenamiento (backend + wiring completo)
+
+Misma rama: `bloque-6-entrenamiento`.
+Continúa la sesión de la mañana. Se cierra el backend del bloque y se conecta
+el mobile a los endpoints reales. Queda pendiente solo `TrainingSession`.
+
+### Contrato IA (Paso 1)
+
+Se definió la estrategia de handoff para el responsable de IA:
+
+- `packages/types/src/contracts/AiApiContract.ts` — interfaz TypeScript con
+  tres métodos: `generateQuestions`, `analyzePhoto`, `generateSurgicalTest`.
+- `apps/backend/src/infrastructure/clients/AiApiClientStub.ts` — stub con
+  datos mock realistas (preguntas en español de Justicia/Admin General, flash-
+  card de procedimiento administrativo). Permite que el backend funcione
+  completo sin IA real conectada.
+- `apps/backend/src/infrastructure/clients/AiApiClient.ts` — esqueleto del
+  cliente real; cada método lanza `Error('[AiApiClient] X no implementado')`
+  hasta que el responsable de IA lo rellene.
+- `packages/ai/prompts/` — tres ficheros Markdown con el prompt, formato de
+  entrada/salida y ejemplos para cada llamada IA.
+- La IA se activa automáticamente en cuanto se rellenen `AI_API_BASE_URL`,
+  `AI_API_KEY` y `AI_API_DEFAULT_MODEL` en `.env`.
+
+### SQL Supabase (Paso 2)
+
+`apps/backend/supabase/bloque6_entrenamiento.sql` (ejecutar en Supabase SQL
+Editor antes de usar el bloque):
+
+- `training_mock_exams` — catálogo de exámenes oficiales (solo lectura).
+- `training_questions` — banco de preguntas por simulacro (solo lectura).
+- `training_attempts` — historial de intentos del usuario (RLS por propietario).
+- `training_attempt_responses` — respuesta a respuesta de cada intento.
+- `training_bookmarks` — flashcards guardadas (RLS por propietario).
+- Vista `training_error_patterns` — agrega fallos por tema para el Lab.
+- Seed: 4 simulacros de Justicia · Tramitación (2019, 2021, 2022, 2023).
+
+### Backend por capas (Paso 3)
+
+Arquitectura limpia domain → application → infrastructure → presentation:
+
+**Domain:** `MockExam`, `TrainingAttempt`, `TrainingBookmark`, `ErrorPattern`,
+`MockExamNotFoundError`, `BookmarkNotFoundError`, `PhotoAnalysisError`,
+`ITrainingRepository`.
+
+**Application:** 10 use cases — `ListMockExamsUseCase`, `GetMockExamUseCase`,
+`GenerateQuestionsUseCase`, `AnalyzePhotoUseCase`, `GenerateSurgicalTestUseCase`,
+`SaveAttemptUseCase`, `ListErrorPatternsUseCase`, `ListBookmarksUseCase`,
+`SaveBookmarkUseCase`, `DeleteBookmarkUseCase`.
+
+Cálculo de score en `SaveAttemptUseCase`:
+`score = max(0, (correctas − incorrectas × penalización) / total) × 10`.
+Penalización 0.33 para simulacros oficiales, 0 para generador y quirúrgico.
+
+**Infrastructure:** `SupabaseTrainingRepository` — los patrones de error se
+agregan en memoria (no usando la vista SQL) porque el cliente admin bypassa RLS.
+`listMockExams` hace dos queries en paralelo y une el mejor intento por examen.
+
+**Presentation:** `TrainingController` (10 handlers), `trainingRoutes.ts`,
+`trainingValidators.ts` (Zod). Todos los endpoints requieren sesión.
+Límite del body subido a 5 MB para soportar base64 del Foto-Test.
+
+**Rutas registradas:**
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/training/mocks` | Lista simulacros por oposición |
+| GET | `/training/mocks/:id` | Detalle + preguntas |
+| GET | `/training/mocks/:id/questions` | Solo preguntas |
+| POST | `/training/generate` | Genera preguntas con IA |
+| POST | `/training/photo-test` | Analiza foto con IA |
+| POST | `/training/surgical` | Genera test quirúrgico |
+| POST | `/training/attempts` | Guarda intento |
+| GET | `/training/error-patterns` | Patrones de fallo del usuario |
+| GET/POST | `/training/bookmarks` | Lista / crea bookmark |
+| DELETE | `/training/bookmarks/:id` | Elimina bookmark |
+
+### Wiring mobile → backend (Paso 4)
+
+- `apps/mobile/src/api/training.js` — cliente HTTP con los 11 métodos.
+- `OfficialMocksScreen.js` — carga desde `/training/mocks` con spinner de
+  carga y empty state de error. Mapea `MockExamWithStatus` al formato de card
+  (`bestScore × 10` → %).
+- `ErrorLabScreen.js` — carga desde `/training/error-patterns`; el primer
+  elemento (mayor failRate) es el patrón principal; los demás son debilidades.
+- `PhotoTestCaptureScreen.js` — añadido `base64: true` a `takePictureAsync`
+  y `launchImageLibraryAsync`; pasa `imageBase64` + `mimeType` a la pantalla
+  de análisis.
+- `PhotoTestAnalysisScreen.js` — la navegación ya no la manejan los timers;
+  la API real determina el resultado. Los timers siguen para la animación
+  cosmética. El path `mockError` de dev se preserva intacto.
+- `PhotoTestResultScreen.js` — `saveDeck` llama a `trainingApi.saveBookmark`.
+
+### Pruebas de endpoints (automatizadas)
+
+Todos los endpoints probados con curl contra `localhost:3000` con token real
+de Supabase (usuario `santigarciavel33@gmail.com`, sesión generada vía admin
+magic link porque la contraseña en Supabase no coincide con la proporcionada).
+
+| Endpoint | Resultado |
+|----------|-----------|
+| GET `/training/mocks` | ✅ 4 simulacros del seed |
+| GET `/training/mocks/:id` | ✅ exam + questions[] |
+| GET `/training/mocks/:id/questions` | ✅ (bug corregido: ruta no estaba registrada) |
+| POST `/training/generate` | ✅ stub devuelve preguntas |
+| POST `/training/photo-test` | ✅ stub devuelve concept/question/answer |
+| POST `/training/surgical` | ✅ preguntas + distribution |
+| POST `/training/attempts` | ✅ score calculado correctamente |
+| GET `/training/error-patterns` | ✅ aggregación en memoria funciona |
+| POST `/training/bookmarks` | ✅ guardado en Supabase |
+| GET `/training/bookmarks` | ✅ listado |
+| DELETE `/training/bookmarks/:id` | ✅ 204 |
+| Sin token | ✅ 401 en todos los endpoints protegidos |
+
+### Bugs encontrados y corregidos en esta sesión
+
+1. **`GET /training/mocks/:id/questions` → 404** — ruta definida en
+   `API_ROUTES` pero no registrada en el router ni implementada en el
+   controller. Añadido `getMockQuestions` handler y registrado antes de
+   `MOCK_DETAIL`.
+2. **`PhotoTestAnalysisScreen` accedía a `data.flashcards[0]`** — el contrato
+   `PhotoTestResult` tiene `question` y `answer` en el objeto raíz, no en un
+   subarray. Corregido a `data.question` / `data.answer`.
+
+### Pendientes del bloque 6
+
+- **`TrainingSession`** — pantalla de sesión activa (preguntas, timer, score
+  final). Todos los CTAs "Empezar test" / "Generar test" navegan a ella y
+  actualmente terminan en un error de navegación. Es el único bloqueante para
+  que el bloque 6 sea funcional de punta a punta.
+- **Pruebas manuales en la app** — documentadas en el reporte de sesión;
+  pendientes de ejecución por el usuario.
+- **Seed de simulacros para "Administración General"** — el seed SQL actual
+  solo tiene mocks para `justicia-tramitacion`. El usuario `santigarciavel33`
+  tiene `oposicion = "Administración General"` en su perfil, por lo que
+  Simulacros Oficiales muestra lista vacía hasta que se añadan datos.
+- **expo-camera en Android físico** — validar `CameraView` y permisos con
+  Expo Go o EAS Build.
+- **Contraseña del usuario** — la contraseña `SantiGV2005` no coincide con
+  la guardada en Supabase para `santigarciavel33@gmail.com`. Usar "Olvidé mi
+  contraseña" en la app para resetearla.
+
+---
+
 ## 2026-07-08 (noche) — Recuperación de contraseña (1.5) implementada de punta a punta
 
 Cierra el pendiente dejado en la entrada de la tarde: `confirmPasswordReset`

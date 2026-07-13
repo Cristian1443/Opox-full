@@ -132,10 +132,17 @@ export default function PhotoTestCaptureScreen({ navigation }) {
         if (!cameraRef.current || busy) return;
         setBusy(true);
         try {
-            const photo = await cameraRef.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
-            // La validación real (foto legible / con texto) la hace el backend
-            // con IA de visión, en 6.4 · Análisis. Aquí solo enviamos.
-            navigation.navigate('PhotoTestAnalysis', { uri: photo.uri, source: 'camera' });
+            const photo = await cameraRef.current.takePictureAsync({
+                quality: 0.9,
+                skipProcessing: false,
+                base64: true,
+            });
+            navigation.navigate('PhotoTestAnalysis', {
+                uri: photo.uri,
+                source: 'camera',
+                imageBase64: photo.base64,
+                mimeType: 'image/jpeg',
+            });
         } catch (err) {
             console.warn('takePictureAsync failed', err);
         } finally {
@@ -149,9 +156,17 @@ export default function PhotoTestCaptureScreen({ navigation }) {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             quality: 0.9,
+            base64: true,
         });
         if (!result.canceled && result.assets?.[0]) {
-            navigation.navigate('PhotoTestAnalysis', { uri: result.assets[0].uri, source: 'gallery' });
+            const asset = result.assets[0];
+            const ext = asset.uri.split('.').pop()?.toLowerCase();
+            navigation.navigate('PhotoTestAnalysis', {
+                uri: asset.uri,
+                source: 'gallery',
+                imageBase64: asset.base64,
+                mimeType: ext === 'png' ? 'image/png' : 'image/jpeg',
+            });
         }
     };
 
