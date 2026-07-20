@@ -8,6 +8,8 @@ import type {
     PhotoTestResult,
     GenerateSurgicalTestParams,
     SurgicalTestResult,
+    HintParams,
+    HintResult,
 } from '@opox/types';
 import { logger } from '@opox/utils';
 
@@ -80,5 +82,10 @@ export class AiApiClient implements AiApiContract {
     async generateSurgicalTest(_params: GenerateSurgicalTestParams): Promise<SurgicalTestResult> {
         // TODO: implementar — ver packages/ai/prompts/generate-surgical-test.md
         throw new Error('[AiApiClient] generateSurgicalTest no implementado. Ver packages/ai/prompts/generate-surgical-test.md');
+    }
+
+    async generateHint(_params: HintParams): Promise<HintResult> {
+        // TODO: implementar — ver packages/ai/BRIEF_IA_BLOQUE7.md
+        throw new Error('[AiApiClient] generateHint no implementado. Ver packages/ai/BRIEF_IA_BLOQUE7.md');
     }
 }

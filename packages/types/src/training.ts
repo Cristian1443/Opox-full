@@ -5,7 +5,7 @@
 
 // Re-exportamos los tipos del contrato de IA para que el móvil no tenga
 // que importar de '@opox/types/contracts' directamente.
-export type { GeneratedQuestion, PhotoTestResult, SurgicalTestResult } from './contracts/AiApiContract';
+export type { GeneratedQuestion, PhotoTestResult, SurgicalTestResult, HintResult } from './contracts/AiApiContract';
 
 export type TrainingSource = 'generator' | 'official' | 'surgical';
 export type TrainingDifficulty = 'easy' | 'medium' | 'hard';
@@ -108,4 +108,20 @@ export interface SaveBookmarkRequest {
     question: string;
     answer: string;
     relatedTopicId?: string;
+}
+
+export interface HintRequest {
+    questionId: string;
+    questionText: string;
+    options: [string, string, string, string];
+    topicId: string;
+    topic: string;
+    oposicion: string;
+}
+
+export type ReportReason = 'wrong_answer' | 'poor_wording' | 'outdated_law' | 'other';
+
+export interface ReportQuestionRequest {
+    reason: ReportReason;
+    details?: string;
 }

@@ -1,5 +1,5 @@
 /**
- * Contrato de la API de IA para el Bloque 6 · Entrenamiento.
+ * Contrato de la API de IA para los Bloques 6 y 7 · Entrenamiento.
  *
  * El responsable de IA implementa esta interfaz en:
  *   apps/backend/src/infrastructure/clients/AiApiClient.ts
@@ -8,7 +8,7 @@
  * la implementación real no esté lista. El container.ts elige cuál usar
  * en función de si las env vars AI_* están configuradas.
  *
- * Prompts y ejemplos de entrada/salida en: packages/ai/prompts/
+ * Prompts y ejemplos de entrada/salida en: packages/ai/
  */
 export interface AiApiContract {
     /**
@@ -36,6 +36,14 @@ export interface AiApiContract {
      * débiles, priorizando los temas con mayor tasa de fallo.
      */
     generateSurgicalTest(params: GenerateSurgicalTestParams): Promise<SurgicalTestResult>;
+
+    /**
+     * Genera una pista contextual para la pregunta activa (pantalla 7.2,
+     * botón "Pista IA"). La pista orienta al usuario sin revelar la respuesta.
+     *
+     * Ver brief completo en: packages/ai/BRIEF_IA_BLOQUE7.md
+     */
+    generateHint(params: HintParams): Promise<HintResult>;
 }
 
 // ─── Tipos compartidos ────────────────────────────────────────────────────────
@@ -57,6 +65,10 @@ export interface GeneratedQuestion {
     /** Nombre legible del tema */
     topic: string;
     difficulty: 'easy' | 'medium' | 'hard';
+    /** Dificultad numérica 1-5 para mostrar estrellas en la UI (1=muy fácil, 5=muy difícil) */
+    difficultyScore?: number;
+    /** Referencia legal principal (ej. "art. 21.2 Ley 39/2015") para mostrar en la sesión */
+    articleRef?: string;
 }
 
 // ─── generateQuestions ────────────────────────────────────────────────────────
@@ -136,6 +148,28 @@ export interface SurgicalTestResult {
         /** Porcentaje del total de preguntas asignado a este tema */
         percentage: number;
     }>;
+}
+
+// ─── generateHint ─────────────────────────────────────────────────────────────
+
+export interface HintParams {
+    /** Texto completo de la pregunta */
+    questionText: string;
+    /** Las 4 opciones en orden A-D */
+    options: [string, string, string, string];
+    /** ID del tema de la pregunta */
+    topicId: string;
+    /** Nombre legible del tema */
+    topic: string;
+    /** Oposición del usuario (ej. 'justicia-tramitacion') */
+    oposicion: string;
+}
+
+export interface HintResult {
+    /** Pista que orienta al usuario sin revelar la respuesta directamente. Máx. 300 caracteres. */
+    hint: string;
+    /** Referencia legal relevante (ej. "art. 21.2 Ley 39/2015"). Opcional. */
+    articleRef?: string;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────

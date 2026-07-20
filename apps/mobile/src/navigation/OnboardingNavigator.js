@@ -63,6 +63,10 @@ import ChallengesScreen from '../screens/motivation/ChallengesScreen';
 import GloryWallScreen from '../screens/motivation/GloryWallScreen';
 import DuelsPlaceholderScreen from '../screens/motivation/DuelsPlaceholderScreen';
 
+// Bloque 7 · Preguntas (sesión activa de test)
+import QuestionActiveScreen from '../screens/questions/QuestionActiveScreen';
+import TrainingResultScreen from '../screens/questions/TrainingResultScreen';
+
 // Bloque 6 · Entrenamiento
 import TrainingHomeScreen from '../screens/training/TrainingHomeScreen';
 import GeneratorConfigScreen from '../screens/training/GeneratorConfigScreen';
@@ -142,6 +146,10 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="Challenges" component={ChallengesScreen} />
             <Stack.Screen name="GloryWall" component={GloryWallScreen} />
             <Stack.Screen name="DuelsPlaceholder" component={DuelsPlaceholderScreen} />
+
+            {/* Bloque 7 · Preguntas */}
+            <Stack.Screen name="TrainingSession" component={QuestionActiveScreen} />
+            <Stack.Screen name="TrainingResult" component={TrainingResultScreen} />
 
             {/* Bloque 6 · Entrenamiento */}
             <Stack.Screen name="TrainingHome" component={TrainingHomeScreen} />

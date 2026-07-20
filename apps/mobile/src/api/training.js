@@ -34,4 +34,14 @@ export const trainingApi = {
 
     deleteBookmark: (id) =>
         api.delete(API_ROUTES.TRAINING.BOOKMARK_DELETE.replace(':id', id), { auth: true }),
+
+    generateHint: (body) =>
+        api.post(API_ROUTES.TRAINING.HINT, body, { auth: true }),
+
+    reportQuestion: (questionId, reason, details) =>
+        api.post(
+            API_ROUTES.TRAINING.QUESTION_REPORT.replace(':id', questionId),
+            { reason, details },
+            { auth: true },
+        ),
 };

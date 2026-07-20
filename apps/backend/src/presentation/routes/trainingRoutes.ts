@@ -9,6 +9,8 @@ import {
     generateSurgicalSchema,
     saveAttemptSchema,
     saveBookmarkSchema,
+    hintSchema,
+    reportQuestionSchema,
 } from '../validators';
 
 /** Todas las rutas del Bloque 6 requieren sesión. */
@@ -88,6 +90,20 @@ export function createTrainingRouter(
         API_ROUTES.TRAINING.BOOKMARK_DELETE,
         authMiddleware,
         controller.deleteBookmark,
+    );
+
+    r.post(
+        API_ROUTES.TRAINING.HINT,
+        authMiddleware,
+        validateBody(hintSchema),
+        controller.generateHint,
+    );
+
+    r.post(
+        API_ROUTES.TRAINING.QUESTION_REPORT,
+        authMiddleware,
+        validateBody(reportQuestionSchema),
+        controller.reportQuestion,
     );
 
     return r;

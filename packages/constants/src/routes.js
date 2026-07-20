@@ -63,6 +63,8 @@ export const API_ROUTES = {
         ERROR_PATTERNS:     '/training/error-patterns',
         BOOKMARKS:          '/training/bookmarks',
         BOOKMARK_DELETE:    '/training/bookmarks/:id',
+        HINT:               '/training/hint',
+        QUESTION_REPORT:    '/training/questions/:id/report',
     },
 
     MOTIVATION: {

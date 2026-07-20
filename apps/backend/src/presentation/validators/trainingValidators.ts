@@ -52,3 +52,17 @@ export const saveBookmarkSchema = z.object({
     answer: z.string().min(1).max(800),
     relatedTopicId: z.string().min(1).max(60).optional(),
 });
+
+export const hintSchema = z.object({
+    questionId: z.string().min(1),
+    questionText: z.string().min(1).max(800),
+    options: z.array(z.string().min(1).max(300)).length(4),
+    topicId: z.string().min(1).max(60),
+    topic: z.string().min(1).max(120),
+    oposicion: z.string().min(1).max(60),
+});
+
+export const reportQuestionSchema = z.object({
+    reason: z.enum(['wrong_answer', 'poor_wording', 'outdated_law', 'other']),
+    details: z.string().max(500).optional(),
+});

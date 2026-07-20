@@ -62,6 +62,9 @@ import {
     ListBookmarksUseCase,
     SaveBookmarkUseCase,
     DeleteBookmarkUseCase,
+    // Bloque 7 · Sesión de entrenamiento
+    GenerateHintUseCase,
+    ReportQuestionUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -222,6 +225,9 @@ export function buildContainer() {
         listBookmarks: new ListBookmarksUseCase(trainingRepo),
         saveBookmark: new SaveBookmarkUseCase(trainingRepo),
         deleteBookmark: new DeleteBookmarkUseCase(trainingRepo),
+        // Bloque 7 · Sesión de entrenamiento
+        generateHint: new GenerateHintUseCase(aiApi),
+        reportQuestion: new ReportQuestionUseCase(),
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -260,6 +266,8 @@ export function buildContainer() {
         listBookmarks: useCases.listBookmarks,
         saveBookmark: useCases.saveBookmark,
         deleteBookmark: useCases.deleteBookmark,
+        generateHint: useCases.generateHint,
+        reportQuestion: useCases.reportQuestion,
     });
 
     const motivationController = new MotivationController({

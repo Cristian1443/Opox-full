@@ -7,6 +7,8 @@ import type {
     PhotoTestResult,
     GenerateSurgicalTestParams,
     SurgicalTestResult,
+    HintParams,
+    HintResult,
 } from '@opox/types';
 import { logger } from '@opox/utils';
 
@@ -66,6 +68,17 @@ export class AiApiClientStub implements AiApiContract {
         );
 
         return { questions, distribution };
+    }
+
+    async generateHint(params: HintParams): Promise<HintResult> {
+        logger.info('[ai-stub] generateHint', { topicId: params.topicId });
+
+        await delay(500);
+
+        return {
+            hint: `Recuerda el marco legal de "${params.topic}": fíjate en la opción que sea más coherente con los principios generales del procedimiento administrativo. Descarta las opciones con plazos o condiciones extremas.`,
+            articleRef: 'art. 21 Ley 39/2015',
+        };
     }
 }
 

@@ -124,6 +124,9 @@ importers:
       expo-crypto:
         specifier: ^57.0.0
         version: 57.0.0(expo@57.0.1)
+      expo-haptics:
+        specifier: ~14.1.4
+        version: 14.1.4(expo@57.0.1)
       expo-image-picker:
         specifier: ~57.0.2
         version: 57.0.2(expo@57.0.1)
@@ -1649,6 +1652,11 @@ packages:
       expo: '*'
       react: '*'
       react-native: '*'
+
+  expo-haptics@14.1.4:
+    resolution: {integrity: sha512-QZdE3NMX74rTuIl82I+n12XGwpDWKb8zfs5EpwsnGi/D/n7O2Jd4tO5ivH+muEG/OCJOMq5aeaVDqqaQOhTkcA==}
+    peerDependencies:
+      expo: '*'
 
   expo-image-loader@57.0.0:
     resolution: {integrity: sha512-EhwnoPC4T/EMdB7Nsg7qITzhO/qB0hUnmVghmtAKQwwDVaLWWYCGE4NLkes3zk9Ub451SmS/swgPp4PCPzOlnw==}
@@ -4760,6 +4768,10 @@ snapshots:
       fontfaceobserver: 2.3.0
       react: 19.2.3
       react-native: 0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3)
+
+  expo-haptics@14.1.4(expo@57.0.1):
+    dependencies:
+      expo: 57.0.1(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
 
   expo-image-loader@57.0.0(expo@57.0.1):
     dependencies:

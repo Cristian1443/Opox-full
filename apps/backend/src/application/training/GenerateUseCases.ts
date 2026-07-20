@@ -1,6 +1,7 @@
-import type { AiApiContract, GeneratedQuestion, SurgicalTestResult } from '@opox/types';
+import type { AiApiContract, GeneratedQuestion, SurgicalTestResult, HintResult } from '@opox/types';
 import type { ITrainingRepository } from '../../domain';
 import { PhotoAnalysisError } from '../../domain';
+import { logger } from '@opox/utils';
 
 export class GenerateQuestionsUseCase {
     constructor(private readonly aiApi: AiApiContract) { }
@@ -75,6 +76,43 @@ export class GenerateSurgicalTestUseCase {
                 domain: p.domain,
             })),
             count: input.count ?? 20,
+        });
+    }
+}
+
+export class GenerateHintUseCase {
+    constructor(private readonly aiApi: AiApiContract) { }
+
+    async execute(input: {
+        questionId: string;
+        questionText: string;
+        options: [string, string, string, string];
+        topicId: string;
+        topic: string;
+        oposicion: string;
+    }): Promise<HintResult> {
+        return this.aiApi.generateHint({
+            questionText: input.questionText,
+            options: input.options,
+            topicId: input.topicId,
+            topic: input.topic,
+            oposicion: input.oposicion,
+        });
+    }
+}
+
+export class ReportQuestionUseCase {
+    async execute(input: {
+        userId: string;
+        questionId: string;
+        reason: string;
+        details?: string;
+    }): Promise<void> {
+        // TODO: persistir en tabla question_reports — Supabase insert
+        logger.info('[report] question reported', {
+            userId: input.userId,
+            questionId: input.questionId,
+            reason: input.reason,
         });
     }
 }

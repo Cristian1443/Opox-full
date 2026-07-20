@@ -8,12 +8,15 @@ import type {
     GeneratedQuestion,
     PhotoTestResult,
     SurgicalTestResult,
+    HintResult,
     ListMocksQuery,
     GenerateQuestionsRequest,
     AnalyzePhotoRequest,
     GenerateSurgicalRequest,
     SaveAttemptRequest,
     SaveBookmarkRequest,
+    HintRequest,
+    ReportQuestionRequest,
 } from '@opox/types';
 import type {
     ListMockExamsUseCase,
@@ -26,6 +29,8 @@ import type {
     ListBookmarksUseCase,
     SaveBookmarkUseCase,
     DeleteBookmarkUseCase,
+    GenerateHintUseCase,
+    ReportQuestionUseCase,
 } from '../../application';
 import type { MockExamWithStatus } from '../../domain/entities/MockExam';
 import type { TrainingAttempt } from '../../domain/entities/TrainingAttempt';
@@ -46,6 +51,8 @@ export class TrainingController {
             listBookmarks: ListBookmarksUseCase;
             saveBookmark: SaveBookmarkUseCase;
             deleteBookmark: DeleteBookmarkUseCase;
+            generateHint: GenerateHintUseCase;
+            reportQuestion: ReportQuestionUseCase;
         },
     ) { }
 
@@ -220,6 +227,34 @@ export class TrainingController {
             await this.deps.deleteBookmark.execute({
                 userId: req.authUser!.id,
                 bookmarkId: req.params['id'] as string,
+            });
+            res.status(204).end();
+        } catch (err) { next(err); }
+    };
+
+    generateHint = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const body = req.body as HintRequest;
+            const result = await this.deps.generateHint.execute({
+                questionId: body.questionId,
+                questionText: body.questionText,
+                options: body.options as [string, string, string, string],
+                topicId: body.topicId,
+                topic: body.topic,
+                oposicion: body.oposicion,
+            });
+            this.ok<HintResult>(res, 200, result);
+        } catch (err) { next(err); }
+    };
+
+    reportQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const body = req.body as ReportQuestionRequest;
+            await this.deps.reportQuestion.execute({
+                userId: req.authUser!.id,
+                questionId: req.params['id'] as string,
+                reason: body.reason,
+                details: body.details,
             });
             res.status(204).end();
         } catch (err) { next(err); }
