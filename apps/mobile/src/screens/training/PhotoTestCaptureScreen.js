@@ -48,13 +48,13 @@ function IconFlashOn({ color = '#FFD84A' }) {
     );
 }
 
-// Marco de encuadre según el mockup 6.3:
+// Marco de encuadre según el nuevo wireframe 6.3:
 //   - Borde punteado suave alrededor del recuadro entero
-//   - Esquinas naranjas más gruesas encima (accent del bloque)
+//   - Esquinas MORADAS (acento IA) más gruesas encima
 function FrameCorners({ w, h }) {
     const c = 28; // longitud de la esquina
     const s = 3;  // grosor
-    const CORNER = '#FF6B4A';
+    const CORNER = '#7B4BC4';
     return (
         <Svg width={w} height={h} pointerEvents="none">
             <Rect
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
 
     permTitle: { color: '#FFF', fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
     permDesc: { color: '#9AA2B1', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-    permBtn: { backgroundColor: '#FF6B4A', paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12, marginBottom: 16 },
+    permBtn: { backgroundColor: '#34C759', paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12, marginBottom: 16 },
     permBtnText: { color: '#FFF', fontSize: 13.5, fontWeight: '700' },
     permCancel: { color: '#9AA2B1', fontSize: 13, fontWeight: '600' },
 });

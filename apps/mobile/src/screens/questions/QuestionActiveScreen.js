@@ -76,6 +76,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
     source = 'generator',
     timedMode = false,
     secondsPerQuestion = 60,
+    examTitle = null,
   } = route?.params ?? {};
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
@@ -253,7 +254,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const getOptionStyle = (option) => {
     if (!isSubmitted) {
       if (selectedOption === option.id) {
-        return { bg: '#FFF1EC', border: colors.primary, bw: 2, textColor: colors.dark };
+        return { bg: colors.purpleBg, border: colors.purple, bw: 2, textColor: colors.dark };
       }
       return { bg: colors.card, border: colors.separator, bw: 1, textColor: colors.text };
     }
@@ -291,6 +292,12 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
       {/* ── HEADER ── */}
       <View style={styles.header}>
+        {/* Fila 0: título de sesión centrado */}
+        <View style={styles.headerRow0}>
+          <Text style={styles.headerSessionTitle}>Zona de entrenamiento</Text>
+          {examTitle && <Text style={styles.headerSessionSub}>{examTitle}</Text>}
+        </View>
+
         {/* Fila 1: back · barra de progreso · pausa · timer */}
         <View style={styles.headerRow1}>
           <TouchableOpacity
@@ -332,10 +339,24 @@ export default function QuestionActiveScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Fila 2: número de pregunta · ley */}
+        {/* Fila 2: número de pregunta con navegación */}
         <View style={styles.headerRow2}>
+          <TouchableOpacity
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            disabled={currentIndex === 0}
+            onPress={() => {
+              if (currentIndex > 0) {
+                setCurrentIndex(prev => prev - 1);
+                setSelectedOption(null);
+                setIsSubmitted(false);
+                feedbackAnim.setValue(0);
+              }
+            }}
+          >
+            <Ionicons name="chevron-back" size={16} color={currentIndex === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.70)'} />
+          </TouchableOpacity>
           <Text style={styles.questionCounter}>Pregunta {currentIndex + 1} de {total}</Text>
-          {question.law && <Text style={styles.headerLaw}>{question.law}</Text>}
+          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.25)" />
         </View>
       </View>
 
@@ -674,12 +695,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
-  // ── Header (navy oscuro, 2 filas) ──
+  // ── Header (navy oscuro, 3 filas) ──
   header: {
     backgroundColor: colors.dark,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
     paddingBottom: 10,
+  },
+  headerRow0: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  headerSessionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.white,
+  },
+  headerSessionSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    marginTop: 1,
   },
   headerRow1: {
     flexDirection: 'row',
@@ -721,18 +756,14 @@ const styles = StyleSheet.create({
   },
   headerRow2: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
   },
   questionCounter: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.50)',
-    fontWeight: '500',
-  },
-  headerLaw: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.50)',
-    fontWeight: '500',
+    fontSize: 13,
+    color: colors.white,
+    fontWeight: '700',
   },
 
   // ── Scroll ──
@@ -890,7 +921,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.success,
     paddingVertical: spacing.md,
     borderRadius: 12,
     gap: spacing.xs,

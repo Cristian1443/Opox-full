@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     },
     highlight: { color: '#1f9d6b', fontWeight: '800' },
     btn: {
-        backgroundColor: '#FF6B4A',
+        backgroundColor: '#34C759',
         borderRadius: 12,
         paddingVertical: 13,
         alignItems: 'center',

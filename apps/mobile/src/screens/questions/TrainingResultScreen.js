@@ -8,7 +8,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Svg, Circle } from 'react-native-svg';
+import { Svg, Circle, Path } from 'react-native-svg';
+import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
 
 const MOCK_DATA = {
@@ -21,12 +22,9 @@ const MOCK_DATA = {
   elapsedSeconds: 142,
 };
 
-// Color propio del lab — elemento único en la app
-const LAB_COLOR = '#6C47FF';
-
-// ── DonutChart ──────────────────────────────────────────────
-const DONUT_SIZE = 160;
-const STROKE_WIDTH = 14;
+// ── Gráfico donut ─────────────────────────────────────────────
+const DONUT_SIZE = 140;
+const STROKE_WIDTH = 12;
 
 function DonutChart({ percentage }) {
   const radius = (DONUT_SIZE - STROKE_WIDTH) / 2;
@@ -41,16 +39,14 @@ function DonutChart({ percentage }) {
   return (
     <View style={donut.root}>
       <Svg width={DONUT_SIZE} height={DONUT_SIZE}>
-        {/* Track semitransparente sobre fondo navy */}
         <Circle
           cx={DONUT_SIZE / 2}
           cy={DONUT_SIZE / 2}
           r={radius}
-          stroke="rgba(255,255,255,0.12)"
+          stroke={colors.separator}
           strokeWidth={STROKE_WIDTH}
           fill="transparent"
         />
-        {/* Arco de progreso */}
         <Circle
           cx={DONUT_SIZE / 2}
           cy={DONUT_SIZE / 2}
@@ -83,7 +79,7 @@ const donut = StyleSheet.create({
     alignItems: 'center',
   },
   percentage: {
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: '800',
     letterSpacing: -1,
   },
@@ -102,12 +98,8 @@ export default function TrainingResultScreen({ navigation, route }) {
   const correct = answers.filter(a => a.isCorrect).length;
   const incorrect = total - correct;
   const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const isHighScore = percentage >= 80;
   const needsLab = incorrect > 0;
-
-  const heroLabel =
-    percentage >= 80 ? 'Test superado' :
-    percentage >= 60 ? 'Test completado' :
-    'Necesitas reforzar';
 
   const formatTime = (s) => {
     const m = Math.floor(s / 60).toString().padStart(2, '0');
@@ -115,25 +107,61 @@ export default function TrainingResultScreen({ navigation, route }) {
     return `${m}:${sec}`;
   };
 
+  // ── Pantalla de felicitación (≥80%) ──
+  if (isHighScore) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+        <ScreenHeader title="Test completado" onBack={() => navigation.goBack()} />
+
+        <ScrollView contentContainerStyle={styles.celebrationBody} showsVerticalScrollIndicator={false}>
+          {/* Trofeo */}
+          <View style={styles.trophyCircle}>
+            <Ionicons name="trophy" size={52} color={colors.success} />
+          </View>
+
+          <Text style={styles.congrats}>¡FELICIDADES!</Text>
+          <Text style={styles.congratsSub}>
+            Estás de racha, has superado este test con un{' '}
+            <Text style={{ fontWeight: '800', color: colors.success }}>{percentage}%</Text>
+            {' '}de aciertos. ¿Qué quieres hacer ahora?
+          </Text>
+
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryBtnText}>¿Vamos a por otro test?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.ghostLink}
+            onPress={() => navigation.navigate('Dashboard')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.ghostLinkText}>Por hoy es suficiente, gracias</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Pantalla de resultados con estadísticas (<80%) ──
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+      <ScreenHeader title="Test completado" onBack={() => navigation.goBack()} />
 
-      {/* ── HERO OSCURO — % + gráfico ── */}
-      <View style={styles.hero}>
-        <Text style={styles.heroLabel}>{heroLabel}</Text>
-        <DonutChart percentage={percentage} />
-        <Text style={styles.correctCount}>{correct} de {total} correctas</Text>
-      </View>
-
-      {/* ── CONTENIDO CLARO ── */}
       <ScrollView
-        style={styles.content}
         contentContainerStyle={styles.contentPad}
         showsVerticalScrollIndicator={false}
-        bounces={false}
       >
+        {/* Donut centrado */}
+        <View style={styles.donutRow}>
+          <DonutChart percentage={percentage} />
+          <Text style={styles.correctCount}>{correct} de {total} correctas</Text>
+        </View>
 
-        {/* Estadísticas: 3 columnas separadas por línea */}
+        {/* Stats: 3 columnas */}
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={[styles.statValue, { color: colors.success }]}>{correct}</Text>
@@ -149,53 +177,40 @@ export default function TrainingResultScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Banner de fallos si los hay */}
+        {/* Banner morado de fallos */}
         {needsLab && (
           <View style={styles.errorBanner}>
-            <Ionicons name="radio-button-on-outline" size={20} color={LAB_COLOR} />
-            <View style={styles.bannerText}>
-              <Text style={styles.bannerTitle}>{incorrect} fallos detectados</Text>
-              <Text style={styles.bannerSub}>Refuérzalos con un test quirúrgico</Text>
-            </View>
+            <Text style={styles.bannerTitle}>{incorrect} fallos detectados</Text>
+            <Text style={styles.bannerSub}>Refuérzalos con un test quirúrgico</Text>
           </View>
         )}
 
-        {/* CTA principal */}
-        {needsLab ? (
+        <Text style={styles.whatNow}>¿Qué quieres hacer ahora?</Text>
+
+        {/* CTAs */}
+        {needsLab && (
           <TouchableOpacity
-            style={styles.labBtn}
+            style={styles.primaryBtn}
             onPress={() => {
               const incorrectQuestions = questions.filter((_, i) =>
                 answers[i] && !answers[i].isCorrect
               );
-              // mock — reemplazar con navegación real al Lab
               navigation.navigate('ErrorLab', { incorrectQuestions });
             }}
             activeOpacity={0.85}
             accessibilityLabel={`Ir al Laboratorio de Errores — ${incorrect} fallos`}
           >
-            <Text style={styles.labBtnText}>Ir al Laboratorio de Errores</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.retryBtn}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.85}
-            accessibilityLabel="Repetir test"
-          >
-            <Text style={styles.retryBtnText}>¡Repetir test!</Text>
+            <Text style={styles.primaryBtnText}>Ir al laboratorio de errores</Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity
-          style={styles.homeBtn}
+          style={styles.primaryBtn}
           onPress={() => navigation.navigate('Dashboard')}
-          activeOpacity={0.75}
-          accessibilityLabel="Volver al inicio"
+          activeOpacity={0.85}
         >
-          <Text style={styles.homeBtnText}>Volver al inicio</Text>
+          <Text style={styles.primaryBtnText}>Volver al inicio</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -204,48 +219,77 @@ export default function TrainingResultScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.dark,
+    backgroundColor: colors.background,
   },
 
-  // Sección hero (navy)
-  hero: {
-    backgroundColor: colors.dark,
+  // ── Celebración ──────────────────────────
+  celebrationBody: {
     alignItems: 'center',
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl + 10,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
   },
-  heroLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.50)',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+  trophyCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.successBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  congrats: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.dark,
+    letterSpacing: -0.5,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  congratsSub: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
+  },
+  ghostLink: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  ghostLinkText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+
+  // ── Resultados ───────────────────────────
+  contentPad: {
+    padding: spacing.lg,
+  },
+  donutRow: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   correctCount: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.60)',
+    color: colors.textSecondary,
     fontWeight: '500',
-    marginTop: 2,
+    marginTop: spacing.sm,
   },
 
-  // Sección clara (blanca/bg) con esquinas redondeadas arriba
-  content: {
-    flex: 1,
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    marginTop: -26,
-  },
-  contentPad: {
-    padding: spacing.lg,
-    paddingTop: spacing.xl,
-  },
-
-  // Stats: 3 columnas
   statsRow: {
     flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: 14,
     marginBottom: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   statBox: {
     flex: 1,
@@ -258,7 +302,7 @@ const styles = StyleSheet.create({
     borderColor: colors.separator,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
@@ -271,72 +315,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Banner de fallos
+  // Banner morado de lab
   errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
+    backgroundColor: colors.purple,
     borderRadius: 12,
-    backgroundColor: 'rgba(108,71,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(108,71,255,0.18)',
+    padding: spacing.md,
     marginBottom: spacing.lg,
-  },
-  bannerText: {
-    flex: 1,
+    alignItems: 'center',
   },
   bannerTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: colors.dark,
+    fontWeight: '800',
+    color: colors.white,
   },
   bannerSub: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.75)',
     marginTop: 2,
   },
 
-  // Botones CTA
-  labBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
+  whatNow: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
     marginBottom: spacing.md,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 5,
+    fontWeight: '500',
   },
-  labBtnText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  retryBtn: {
+
+  // Botón verde compartido
+  primaryBtn: {
     backgroundColor: colors.success,
     paddingVertical: spacing.md,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     marginBottom: spacing.md,
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.20,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  retryBtnText: {
+  primaryBtnText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: '700',
-  },
-  homeBtn: {
-    paddingVertical: spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  homeBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textSecondary,
   },
 });

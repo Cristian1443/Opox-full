@@ -1,110 +1,103 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
-import Svg, { Path, Circle, Polygon } from 'react-native-svg';
+import Svg, { Path, Circle, Ellipse } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
+import { colors, spacing } from '../../theme';
 
-// ─── Iconos SVG del hub 6.1 ──────────────────────────────────────────────────
-// Los colores y forma imitan el mockup: cada modo tiene su acento y todos los
-// iconos viven dentro de una caja blanca con sombra suave.
-
-function IconHexagon({ color = '#F26C4F' }) {
+// Iconos SVG que imitan el nuevo wireframe: todos naranja sobre fondo blanco
+function IconInfinity({ color = colors.primary }) {
     return (
-        <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
-            <Polygon
-                points="12,3 21,7.5 21,16.5 12,21 3,16.5 3,7.5"
-                stroke={color}
-                strokeWidth={1.7}
-                strokeLinejoin="round"
-            />
-            <Path d="M12 3v18M3 7.5l18 9M21 7.5l-18 9" stroke={color} strokeWidth={1.2} />
-        </Svg>
-    );
-}
-
-function IconCamera({ color = '#2D6FB0' }) {
-    return (
-        <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
             <Path
-                d="M4 8h3l2-3h6l2 3h3v11H4z"
-                stroke={color}
-                strokeWidth={1.7}
-                strokeLinejoin="round"
+                d="M12 12c-2-2.5-4-4-6-4a4 4 0 0 0 0 8c2 0 4-1.5 6-4z"
+                stroke={color} strokeWidth={1.8} strokeLinejoin="round"
             />
-            <Circle cx={12} cy={13} r={3.5} stroke={color} strokeWidth={1.7} />
+            <Path
+                d="M12 12c2 2.5 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.5-6 4z"
+                stroke={color} strokeWidth={1.8} strokeLinejoin="round"
+            />
         </Svg>
     );
 }
 
-function IconDoc({ color = '#1f9d6b' }) {
+function IconDocMedal({ color = colors.primary }) {
     return (
-        <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
-            <Path d="M6 3h9l4 4v14H6z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
+        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+            <Path d="M6 3h9l4 4v10H6z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
             <Path d="M14 3v5h5" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Path d="M9 12h7M9 15h7M9 18h4" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+            <Circle cx={12} cy={17} r={3} stroke={color} strokeWidth={1.5} />
+            <Path d="M11 20l-.5 2M13 20l.5 2" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
         </Svg>
     );
 }
 
-function IconTarget({ color = '#7B4BC4' }) {
+function IconAperture({ color = colors.primary }) {
     return (
-        <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
             <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.7} />
-            <Circle cx={12} cy={12} r={5} stroke={color} strokeWidth={1.7} />
-            <Circle cx={12} cy={12} r={1.5} fill={color} />
+            <Path d="M12 3l3 9M21 12l-9 3M15.5 20.7L9 15M12 21l-3-9M3 12l9-3M8.5 3.3L15 9"
+                stroke={color} strokeWidth={1.4} strokeLinecap="round" />
         </Svg>
     );
 }
 
-// Los colores de fondo y acento salen del mockup. Foto-Test es azul (no
-// morado) porque el hub representa la "puerta de entrada" del modo; el
-// morado se reserva al lenguaje visual interno del flujo IA (6.4, 6.5).
+function IconMicroscope({ color = colors.primary }) {
+    return (
+        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+            <Path d="M7 21h10M12 21v-4" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+            <Path d="M9 3h6v9H9z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
+            <Path d="M12 12v5" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+            <Path d="M7 17a5 5 0 0 1 10 0" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
+            <Path d="M10 6h4" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function IconChevron({ color = colors.grayMid }) {
+    return (
+        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+            <Path d="M9 6l6 6-6 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
 const MODES = [
     {
         id: 'infinite',
         title: 'Generador infinito',
-        subtitle: 'Tests a tu medida sin límite',
-        bg: '#FFF1EC',
-        accent: '#F26C4F',
-        Icon: IconHexagon,
+        subtitle: 'Creación de tests a medida sin límite',
+        Icon: IconInfinity,
         route: 'GeneratorConfig',
     },
     {
-        id: 'photo',
-        title: 'Foto-Test',
-        subtitle: 'Saca una foto y resuelve la duda',
-        bg: '#E8F0F8',
-        accent: '#2D6FB0',
-        Icon: IconCamera,
-        route: 'PhotoTestCapture',
+        id: 'official',
+        title: 'Exámenes oficiales',
+        subtitle: 'Exámenes reales de años anteriores',
+        Icon: IconDocMedal,
+        route: 'OfficialMocks',
     },
     {
-        id: 'official',
-        title: 'Simulacros oficiales',
-        subtitle: 'Exámenes reales de años anteriores',
-        bg: '#EAF7F1',
-        accent: '#1f9d6b',
-        Icon: IconDoc,
-        route: 'OfficialMocks',
+        id: 'photo',
+        title: 'Módulo foto-test',
+        subtitle: 'Tests basados en memoria visual',
+        Icon: IconAperture,
+        route: 'PhotoTestCapture',
     },
     {
         id: 'errors',
         title: 'Laboratorio de errores',
-        subtitle: 'La IA ataca tus puntos débiles',
-        bg: '#F1ECFA',
-        accent: '#7B4BC4',
-        Icon: IconTarget,
+        subtitle: 'Repaso quirúrgico de fallos y puntos débiles',
+        Icon: IconMicroscope,
         route: 'ErrorLab',
     },
 ];
 
-// ─── Pantalla 6.1 · Hub de Entrenamiento ─────────────────────────────────────
 export default function TrainingHomeScreen({ navigation }) {
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-            <ScreenHeader title="Entrenamiento" onBack={() => navigation.goBack()} />
+            <ScreenHeader title="Zona de entrenamiento" onBack={() => navigation.goBack()} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 {MODES.map((mode) => {
@@ -112,17 +105,18 @@ export default function TrainingHomeScreen({ navigation }) {
                     return (
                         <TouchableOpacity
                             key={mode.id}
-                            style={[styles.card, { backgroundColor: mode.bg }]}
+                            style={styles.card}
                             onPress={() => navigation.navigate(mode.route)}
-                            activeOpacity={0.85}
+                            activeOpacity={0.82}
                         >
                             <View style={styles.iconBox}>
-                                <Icon color={mode.accent} />
+                                <Icon />
                             </View>
                             <View style={styles.textCol}>
                                 <Text style={styles.cardTitle}>{mode.title}</Text>
                                 <Text style={styles.cardSubtitle}>{mode.subtitle}</Text>
                             </View>
+                            <IconChevron />
                         </TouchableOpacity>
                     );
                 })}
@@ -132,35 +126,35 @@ export default function TrainingHomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
+    container: { flex: 1, backgroundColor: colors.background },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+    body: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.lg },
 
     card: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 14,
-        borderRadius: 18,
+        backgroundColor: colors.card,
+        borderRadius: 14,
         paddingVertical: 16,
         paddingHorizontal: 14,
         marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
     },
     iconBox: {
         width: 52,
         height: 52,
         borderRadius: 14,
-        backgroundColor: '#fff',
+        backgroundColor: colors.grayLight,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#0F1B33',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 5,
-        elevation: 2,
+        flexShrink: 0,
     },
     textCol: { flex: 1 },
-    cardTitle: { fontSize: 15, fontWeight: '800', color: '#0F1B33', marginBottom: 3 },
-    cardSubtitle: { fontSize: 12, color: '#5A6373', lineHeight: 16 },
+    cardTitle: { fontSize: 15, fontWeight: '800', color: colors.dark, marginBottom: 3 },
+    cardSubtitle: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
 });

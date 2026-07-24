@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     btnPrimary: {
-        backgroundColor: '#FF6B4A',
+        backgroundColor: '#34C759',
         borderRadius: 12,
         paddingVertical: 13,
         alignItems: 'center',

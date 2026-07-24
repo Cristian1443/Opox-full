@@ -153,7 +153,7 @@ function CountSlider({ value, onChange }) {
         <View style={sStyles.card}>
             <View style={sStyles.headerRow}>
                 <Text style={sStyles.cardTitle}>Nº de preguntas</Text>
-                <Text style={[sStyles.valueLabel, { color: '#FF6B4A' }]}>{value}</Text>
+                <Text style={[sStyles.valueLabel, { color: '#f26535' }]}>{value}</Text>
             </View>
             <View
                 onLayout={e => { const w = e.nativeEvent.layout.width; tw.current = w; setTrackWidth(w); }}
@@ -167,7 +167,7 @@ function CountSlider({ value, onChange }) {
                 )}
 
                 {trackWidth > 0 && (
-                    <View style={[sStyles.thumb, { left: thumbX, borderColor: '#FF6B4A' }]} />
+                    <View style={[sStyles.thumb, { left: thumbX, borderColor: '#f26535' }]} />
                 )}
             </View>
         </View>
@@ -197,7 +197,7 @@ const sStyles = StyleSheet.create({
         position: 'absolute',
         left: 0,
         height: TRACK_H,
-        backgroundColor: '#FF6B4A',
+        backgroundColor: '#f26535',
         borderRadius: TRACK_H / 2,
     },
     thumb: {
@@ -279,12 +279,12 @@ export default function GeneratorConfigScreen({ navigation }) {
 
                 <CountSlider value={count} onChange={setCount} />
 
-                {/* Modo contrarreloj */}
+                {/* Control de fatiga */}
                 <View style={styles.card}>
                     <View style={styles.toggleRow}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.cardTitle}>Modo contrarreloj</Text>
-                            <Text style={styles.muted}>Simula la presión del examen real</Text>
+                            <Text style={styles.cardTitle}>Control de fatiga</Text>
+                            <Text style={styles.muted}>Monitoreo continuo de tus constantes vitales</Text>
                         </View>
                         <TouchableOpacity
                             style={[styles.toggleTrack, timedMode && styles.toggleTrackActive]}
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
 
     toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     toggleTrack: { width: 46, height: 26, borderRadius: 13, backgroundColor: '#E4E8F0', padding: 2, justifyContent: 'center' },
-    toggleTrackActive: { backgroundColor: '#FF6B4A' },
+    toggleTrackActive: { backgroundColor: '#0d1b2a' },
     toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
     toggleThumbActive: { transform: [{ translateX: 20 }] },
 
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     chevron: { marginLeft: 'auto', color: '#C4CBD6', fontSize: 16 },
 
     btnRow: { position: 'absolute', bottom: 16, left: 18, right: 18 },
-    btn: { backgroundColor: '#FF6B4A', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+    btn: { backgroundColor: '#34C759', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
     btnText: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
 
     sheetOverlay: { flex: 1, backgroundColor: 'rgba(15, 27, 51, 0.5)', justifyContent: 'flex-end' },
@@ -395,6 +395,6 @@ const styles = StyleSheet.create({
     sheetTitle: { fontSize: 14, fontWeight: '800', color: '#0F1B33', marginBottom: 8 },
     sheetItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderTopWidth: 1, borderTopColor: '#EEF1F7' },
     sheetItemLabel: { fontSize: 13, color: '#1B2A4A' },
-    sheetItemLabelActive: { color: '#FF6B4A', fontWeight: '800' },
-    checkmark: { marginLeft: 'auto', color: '#FF6B4A', fontSize: 16, fontWeight: '800' },
+    sheetItemLabelActive: { color: '#f26535', fontWeight: '800' },
+    checkmark: { marginLeft: 'auto', color: '#f26535', fontSize: 16, fontWeight: '800' },
 });

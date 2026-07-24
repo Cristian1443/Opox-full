@@ -149,10 +149,7 @@ export default function HintBottomSheet({ visible, questionSummary, hint, isLoad
 
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.iconBadge}>
-              <Ionicons name="bulb" size={18} color={colors.warning} />
-            </View>
-            <Text style={styles.headerTitle}>Pista del Tutor IA</Text>
+            <Text style={styles.headerTitle}>Pista del tutor IA</Text>
             <TouchableOpacity
               onPress={handleClose}
               style={styles.closeBtn}
@@ -186,7 +183,6 @@ export default function HintBottomSheet({ visible, questionSummary, hint, isLoad
 
             {/* Disclaimer */}
             <View style={styles.disclaimer}>
-              <Ionicons name="information-circle-outline" size={14} color={colors.warning} />
               <Text style={styles.disclaimerText}>
                 La IA te guía sin revelar la respuesta correcta.
               </Text>
@@ -250,36 +246,19 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // Header con fondo ámbar suave
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.warningBg,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,159,10,0.18)',
-  },
-  iconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    borderBottomColor: colors.separator,
   },
   headerTitle: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     color: colors.dark,
-    letterSpacing: 0.2,
   },
   closeBtn: {
     padding: spacing.xs,
@@ -325,25 +304,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   disclaimerText: {
-    fontSize: 12,
-    color: colors.textSecondary,
+    fontSize: 13,
+    color: colors.purple,
     fontStyle: 'italic',
-    flex: 1,
+    fontWeight: '600',
   },
 
-  // Botón CTA
+  // Botón CTA morado
   btn: {
     marginHorizontal: spacing.md,
     marginTop: spacing.sm,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.purple,
     paddingVertical: spacing.md,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 5,
   },
   btnText: {
     color: colors.white,

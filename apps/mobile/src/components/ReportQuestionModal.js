@@ -403,17 +403,17 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // Botón de envío
+  // Botón de envío morado
   sendBtn: {
     paddingVertical: spacing.md,
     borderRadius: 12,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.purple,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 52,
-    shadowColor: colors.primary,
+    shadowColor: colors.purple,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.22,
     shadowRadius: 8,
     elevation: 5,
   },

@@ -22,6 +22,10 @@ export const colors = {
     warningBg: '#FFF4E5',
     error: '#FF3B30',
     errorBg: '#FFEBEB',
+
+    // Acento IA / Bloque 7 — morado usado en bottom sheets, opciones seleccionadas y pausa
+    purple: '#7B4BC4',
+    purpleBg: '#F1ECFA',
 };
 
 export const spacing = {

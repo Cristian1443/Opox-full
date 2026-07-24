@@ -219,7 +219,7 @@ export default function LawReferenceBottomSheet({
             activeOpacity={0.82}
             accessibilityLabel="Cerrar referencia y volver a la pregunta"
           >
-            <Text style={styles.btnText}>Volver a la pregunta</Text>
+            <Text style={styles.btnText}>Entendido, sigo</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -369,11 +369,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // CTA
+  // CTA morado
   btn: {
     marginHorizontal: spacing.md,
     marginTop: spacing.sm,
-    backgroundColor: colors.dark,
+    backgroundColor: colors.purple,
     paddingVertical: spacing.md,
     borderRadius: 12,
     alignItems: 'center',

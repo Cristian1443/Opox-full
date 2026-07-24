@@ -74,9 +74,9 @@ export default function PauseSessionModal({
     >
       <Animated.View style={[styles.screen, { opacity: opacityValue }]}>
 
-        {/* Ícono de pausa */}
+        {/* Ícono de play (el test está en pausa → mostrar triángulo de reanudar) */}
         <View style={styles.iconCircle}>
-          <Ionicons name="pause" size={38} color={colors.white} />
+          <Ionicons name="play" size={38} color={colors.white} />
         </View>
 
         {/* Título */}
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
 
   clockLine: {
     fontSize: 14,
-    color: colors.primary,
+    color: 'rgba(255,255,255,0.55)',
     fontWeight: '600',
     marginBottom: spacing.lg,
   },
@@ -163,13 +163,13 @@ const styles = StyleSheet.create({
   },
 
   resumeBtn: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.purple,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
-    shadowColor: colors.primary,
+    shadowColor: colors.purple,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.30,
     shadowRadius: 10,
     elevation: 6,
   },

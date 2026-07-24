@@ -2,31 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
+import { colors, spacing } from '../../theme';
 import { trainingApi } from '../../api/training';
 
-// Acento del Laboratorio de Errores (rojo, mismo que la card 6.1)
-const LAB_COLOR = '#E2483D';
-const LAB_BG = '#FDEBE9';
-
-// Mapeo semántico de color por nivel de dominio
 function getDomainColor(domain) {
-    if (domain < 40) return '#E2483D'; // crítico
-    if (domain < 70) return '#E89B2C'; // por mejorar
-    return '#1f9d6b'; // sólido
+    if (domain < 40) return colors.error;
+    if (domain < 70) return colors.warning;
+    return colors.success;
 }
 
-// ─── Iconos SVG ──────────────────────────────────────────────────────────────
-
-function IconAlert({ color = LAB_COLOR }) {
+function IconChevronRight({ color = colors.textSecondary }) {
     return (
         <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.7} />
-            <Path d="M12 7v6M12 16v.3" stroke={color} strokeWidth={1.9} strokeLinecap="round" />
+            <Path d="M9 6l6 6-6 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
 
-function IconTarget({ color = '#fff' }) {
+function IconChevronDown({ color = colors.purple }) {
+    return (
+        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M6 9l6 6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function IconTarget({ color = colors.white }) {
     return (
         <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
             <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.7} />
@@ -36,7 +37,7 @@ function IconTarget({ color = '#fff' }) {
     );
 }
 
-function IconTargetBig({ color = '#C4CBD6' }) {
+function IconTargetBig({ color = colors.grayMid }) {
     return (
         <Svg width={48} height={48} viewBox="0 0 24 24" fill="none">
             <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.5} />
@@ -46,19 +47,68 @@ function IconTargetBig({ color = '#C4CBD6' }) {
     );
 }
 
-// ─── Pantalla 6.8 · Laboratorio de Errores ───────────────────────────────────
+// ─── Item de debilidad con expansión ─────────────────────────────────────────
+function WeaknessItem({ item, expanded, onToggle, onStartSurgical }) {
+    const domainColor = getDomainColor(item.domain);
+
+    return (
+        <View style={styles.weaknessWrapper}>
+            <TouchableOpacity
+                style={styles.weaknessRow}
+                onPress={onToggle}
+                activeOpacity={0.75}
+            >
+                <View style={styles.weaknessChevron}>
+                    {expanded ? <IconChevronDown /> : <IconChevronRight />}
+                </View>
+                <Text style={[styles.weaknessTopic, expanded && { color: colors.purple }]}>
+                    {item.topic}
+                </Text>
+                <Text style={[styles.weaknessDomain, { color: domainColor }]}>{item.domain}%</Text>
+            </TouchableOpacity>
+
+            {expanded && (
+                <View style={styles.weaknessDetail}>
+                    {/* Patrón detectado */}
+                    <View style={styles.patternCard}>
+                        <View style={styles.patternHeader}>
+                            <View style={styles.patternIcon}>
+                                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                                    <Circle cx={12} cy={12} r={9} stroke={colors.error} strokeWidth={1.7} />
+                                    <Path d="M8 8l8 8M16 8l-8 8" stroke={colors.error} strokeWidth={1.7} strokeLinecap="round" />
+                                </Svg>
+                            </View>
+                            <Text style={styles.patternTitle}>Patrón de fallo detectado</Text>
+                        </View>
+                        <Text style={styles.patternDesc}>{item.description}</Text>
+                        <Text style={styles.patternNote}>
+                            La IA ha preparado un test quirúrgico para eliminar esta debilidad.
+                        </Text>
+
+                        {/* Barra de dominio */}
+                        <Text style={styles.domainLabel}>Dominio actual del tema</Text>
+                        <View style={styles.progressTrack}>
+                            <View style={[styles.progressFill, { width: `${item.domain}%`, backgroundColor: domainColor }]} />
+                        </View>
+                        <Text style={[styles.domainPct, { color: domainColor }]}>{item.domain}%</Text>
+                    </View>
+                </View>
+            )}
+        </View>
+    );
+}
+
 const MIN_QUESTIONS_FOR_PATTERNS = 30;
 
 export default function ErrorLabScreen({ navigation }) {
     const [patterns, setPatterns] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandedId, setExpandedId] = useState(null);
 
     useEffect(() => {
         let cancelled = false;
         trainingApi.listErrorPatterns().then(({ data }) => {
             if (cancelled) return;
-            // Backend devuelve ErrorPattern[] ya ordenado por failRate desc.
-            // El primero es el patrón principal; los demás son otras debilidades.
             setPatterns((data ?? []).map((p, i) => ({
                 id: p.topicId,
                 topicId: p.topicId,
@@ -74,10 +124,9 @@ export default function ErrorLabScreen({ navigation }) {
     }, []);
 
     const primary = patterns.find((p) => p.isPrimary);
-    const others = patterns.filter((p) => !p.isPrimary);
-    const hasEnoughHistory = patterns.length > 0;
 
     const startSurgical = () => {
+        if (!primary) return;
         navigation.navigate('SurgicalTestPreview', {
             topicId: primary.topicId,
             topic: primary.topic,
@@ -87,22 +136,21 @@ export default function ErrorLabScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-            <ScreenHeader title="Laboratorio de Errores" onBack={() => navigation.goBack()} />
+            <ScreenHeader title="Laboratorio de errores" onBack={() => navigation.goBack()} />
 
             {loading ? (
                 <View style={styles.emptyWrap}>
-                    <ActivityIndicator color={LAB_COLOR} />
+                    <ActivityIndicator color={colors.error} />
                 </View>
-            ) : !hasEnoughHistory ? (
+            ) : patterns.length === 0 ? (
                 <View style={styles.emptyWrap}>
                     <IconTargetBig />
                     <Text style={styles.emptyTitle}>Aún no hay patrones que atacar</Text>
                     <Text style={styles.emptyDesc}>
                         Necesitamos que hagas al menos {MIN_QUESTIONS_FOR_PATTERNS} preguntas para que
-                        la IA detecte en qué temas fallas más. Empieza con un test rápido.
+                        la IA detecte en qué temas fallas más.
                     </Text>
                     <TouchableOpacity
                         style={styles.emptyBtn}
@@ -113,199 +161,133 @@ export default function ErrorLabScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
             ) : (
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                {/* Tarjeta principal: patrón detectado */}
-                <View style={styles.primaryCard}>
-                    <View style={styles.primaryHead}>
-                        <Text style={styles.primaryLabel}>PATRÓN DE FALLO DETECTADO</Text>
-                        <View style={styles.alertBadge}>
-                            <IconAlert />
-                        </View>
-                    </View>
+                <>
+                    <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+                        <Text style={styles.groupTitle}>DEBILIDADES</Text>
 
-                    <Text style={styles.primaryTopic}>{primary.topic}</Text>
+                        {patterns.map((item) => (
+                            <WeaknessItem
+                                key={item.id}
+                                item={item}
+                                expanded={expandedId === item.id}
+                                onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                                onStartSurgical={() => navigation.navigate('SurgicalTestPreview', {
+                                    topicId: item.topicId,
+                                    topic: item.topic,
+                                    domain: item.domain,
+                                })}
+                            />
+                        ))}
 
-                    <View style={styles.statsRow}>
-                        <View style={styles.statItem}>
-                            <Text style={[styles.statValue, { color: LAB_COLOR }]}>{primary.failRate}%</Text>
-                            <Text style={styles.statLabel}>FALLOS</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={[styles.statValue, { color: getDomainColor(primary.domain) }]}>
-                                {primary.domain}%
-                            </Text>
-                            <Text style={styles.statLabel}>DOMINIO</Text>
-                        </View>
-                    </View>
+                        <View style={{ height: 100 }} />
+                    </ScrollView>
 
-                    <Text style={styles.primaryDesc}>
-                        {primary.description} Te preparamos un test de refuerzo a medida para ayudarte a mejorar.
-                    </Text>
-
-                    <TouchableOpacity style={styles.surgicalBtn} onPress={startSurgical} activeOpacity={0.9}>
-                        <IconTarget />
-                        <Text style={styles.surgicalBtnText}>Iniciar test quirúrgico</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Otras debilidades */}
-                <Text style={styles.groupTitle}>OTRAS DEBILIDADES</Text>
-
-                {others.map((item) => {
-                    const color = getDomainColor(item.domain);
-                    return (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={styles.weaknessCard}
-                            onPress={() => navigation.navigate('SurgicalTestPreview', {
-                                topicId: item.id,
-                                topic: item.topic,
-                                domain: item.domain,
-                            })}
-                            activeOpacity={0.85}
-                        >
-                            <View style={styles.weaknessHead}>
-                                <Text style={styles.weaknessTopic}>{item.topic}</Text>
-                                <View style={[styles.domainBadge, { backgroundColor: color }]}>
-                                    <Text style={styles.domainBadgeText}>{item.domain}%</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.progressTrack}>
-                                <View style={[styles.progressFill, { width: `${item.domain}%`, backgroundColor: color }]} />
-                            </View>
-
-                            <Text style={styles.weaknessDesc}>{item.description}</Text>
+                    <View style={styles.btnRow}>
+                        <TouchableOpacity style={styles.btn} onPress={startSurgical} activeOpacity={0.85}>
+                            <IconTarget />
+                            <Text style={styles.btnText}>Iniciar test quirúrgico</Text>
                         </TouchableOpacity>
-                    );
-                })}
-            </ScrollView>
+                    </View>
+                </>
             )}
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
+    container: { flex: 1, backgroundColor: colors.background },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 16, paddingBottom: 32 },
+    body: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
 
-    // ── Card principal (patrón detectado) ─────────────────────────
-    primaryCard: {
-        backgroundColor: '#fff',
-        borderWidth: 1.5,
-        borderColor: LAB_COLOR,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 22,
-        marginTop: 4,
-        shadowColor: LAB_COLOR,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 4,
+    groupTitle: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: colors.textSecondary,
+        letterSpacing: 0.5,
+        marginBottom: spacing.sm,
+        marginTop: spacing.sm,
     },
-    primaryHead: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+
+    // ── Fila de debilidad ─────────────────────────────
+    weaknessWrapper: {
+        backgroundColor: colors.card,
+        borderRadius: 12,
         marginBottom: 8,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+        elevation: 1,
     },
-    primaryLabel: { fontSize: 10.5, fontWeight: '800', color: LAB_COLOR, letterSpacing: 0.6 },
-    alertBadge: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: LAB_BG,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    primaryTopic: { fontSize: 18, fontWeight: '800', color: '#0F1B33', marginBottom: 14 },
-
-    statsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-    statItem: { flex: 1, alignItems: 'center' },
-    statValue: { fontSize: 22, fontWeight: '800', lineHeight: 26 },
-    statLabel: { fontSize: 10, fontWeight: '700', color: '#8A92A0', letterSpacing: 0.4, marginTop: 3 },
-    statDivider: { width: 1, height: 34, backgroundColor: '#EEF1F7', marginHorizontal: 8 },
-
-    primaryDesc: { fontSize: 12.5, color: '#5A6373', lineHeight: 18, marginBottom: 16 },
-
-    surgicalBtn: {
+    weaknessRow: {
         flexDirection: 'row',
-        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingVertical: 14,
+    },
+    weaknessChevron: { marginRight: 8, width: 18 },
+    weaknessTopic: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.dark },
+    weaknessDomain: { fontSize: 14, fontWeight: '800' },
+
+    // ── Detalle expandido ─────────────────────────────
+    weaknessDetail: {
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
+    },
+    patternCard: {
+        backgroundColor: colors.grayLight,
+        borderRadius: 10,
+        padding: spacing.md,
+    },
+    patternHeader: {
+        flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: '#FF6B4A',
-        borderRadius: 12,
-        paddingVertical: 13,
+        marginBottom: spacing.sm,
     },
-    surgicalBtnText: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
-
-    // ── Otras debilidades ─────────────────────────────────────────
-    groupTitle: { fontSize: 10.5, fontWeight: '700', color: '#5A6373', letterSpacing: 0.4, marginBottom: 10 },
-
-    weaknessCard: {
-        backgroundColor: '#fff',
-        borderWidth: 1.5,
-        borderColor: '#EEF1F7',
+    patternIcon: {
+        width: 28,
+        height: 28,
         borderRadius: 14,
-        padding: 13,
-        marginBottom: 10,
-    },
-    weaknessHead: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    weaknessTopic: { fontSize: 13, fontWeight: '800', color: '#0F1B33' },
-    domainBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-    },
-    domainBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-
-    progressTrack: {
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#F4F6FA',
-        overflow: 'hidden',
-        marginBottom: 8,
-    },
-    progressFill: { height: '100%', borderRadius: 3 },
-
-    weaknessDesc: { fontSize: 11.5, color: '#5A6373', lineHeight: 16 },
-
-    // ── Empty state (sin historial) ──────────────────
-    emptyWrap: {
-        flex: 1,
+        backgroundColor: colors.errorBg,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 32,
     },
-    emptyTitle: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#0F1B33',
-        marginTop: 14,
-        marginBottom: 6,
+    patternTitle: { fontSize: 13, fontWeight: '700', color: colors.error },
+    patternDesc: { fontSize: 13, color: colors.dark, lineHeight: 19, marginBottom: 6 },
+    patternNote: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginBottom: spacing.sm },
+    domainLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 6 },
+    progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.separator, overflow: 'hidden', marginBottom: 4 },
+    progressFill: { height: '100%', borderRadius: 3 },
+    domainPct: { fontSize: 12, fontWeight: '700' },
+
+    // ── Empty state ──────────────────────────────────
+    emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+    emptyTitle: { fontSize: 15, fontWeight: '800', color: colors.dark, marginTop: 14, marginBottom: 6 },
+    emptyDesc: { fontSize: 12.5, color: colors.textSecondary, textAlign: 'center', lineHeight: 18, marginBottom: 20 },
+    emptyBtn: { backgroundColor: colors.success, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12 },
+    emptyBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '700' },
+
+    // ── CTA fijo ────────────────────────────────────
+    btnRow: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.lg,
+        paddingTop: spacing.sm,
+        backgroundColor: colors.background,
     },
-    emptyDesc: {
-        fontSize: 12.5,
-        color: '#5A6373',
-        textAlign: 'center',
-        lineHeight: 18,
-        marginBottom: 20,
+    btn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: colors.success,
+        borderRadius: 14,
+        paddingVertical: spacing.md,
     },
-    emptyBtn: {
-        backgroundColor: '#FF6B4A',
-        borderRadius: 12,
-        paddingHorizontal: 22,
-        paddingVertical: 12,
-    },
-    emptyBtnText: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
+    btnText: { color: colors.white, fontSize: 16, fontWeight: '700' },
 });
