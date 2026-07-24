@@ -161,20 +161,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
 
-  // Botón: naranja primario (acción positiva)
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
     width: '100%',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.success,
     paddingVertical: spacing.md,
     borderRadius: 12,
     marginBottom: spacing.md,
-    shadowColor: colors.primary,
+    shadowColor: colors.success,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.22,
     shadowRadius: 8,
     elevation: 5,
   },

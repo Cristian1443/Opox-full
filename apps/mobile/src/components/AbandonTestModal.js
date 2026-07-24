@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   progressHighlight: {
     fontWeight: '800',
-    color: colors.primary,
+    color: colors.dark,
   },
 
   // Caja de advertencia
@@ -222,14 +222,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   btnPrimary: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.success,
     paddingVertical: spacing.md,
     borderRadius: 12,
     alignItems: 'center',
-    // Sombra naranja suave
-    shadowColor: colors.primary,
+    shadowColor: colors.success,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.22,
     shadowRadius: 8,
     elevation: 4,
   },
