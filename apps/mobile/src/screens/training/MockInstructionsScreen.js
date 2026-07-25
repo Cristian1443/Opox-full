@@ -37,7 +37,7 @@ function IconWarning({ color = colors.primary }) {
 // Icono documento+medalla grande para la cabecera
 function IconDocMedalBig({ color = colors.primary }) {
     return (
-        <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
+        <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
             <Path d="M6 3h9l4 4v10H6z" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
             <Path d="M14 3v5h5" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
             <Circle cx={12} cy={17} r={3} stroke={color} strokeWidth={1.3} />
@@ -74,15 +74,17 @@ export default function MockInstructionsScreen({ navigation, route }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-            <ScreenHeader title="Simulacro" onBack={() => navigation.goBack()} />
+            <ScreenHeader
+                title="Simulacro"
+                subtitle={`Examen oficial ${safeExam.year}`}
+                onBack={() => navigation.goBack()}
+            />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
 
-                {/* Cabecera visual centrada */}
+                {/* Cabecera visual centrada — icono compacto, título grande */}
                 <View style={styles.heroCard}>
-                    <View style={styles.heroIcon}>
-                        <IconDocMedalBig />
-                    </View>
+                    <IconDocMedalBig />
                     <Text style={styles.examTitle}>{safeExam.title}</Text>
                     <Text style={styles.examCategory}>{safeExam.category}</Text>
                 </View>
@@ -121,27 +123,21 @@ const styles = StyleSheet.create({
     body: { paddingHorizontal: spacing.md, paddingBottom: 120 },
 
     heroCard: {
-        backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: spacing.lg,
+        backgroundColor: '#F1F3F7',
+        borderRadius: 14,
+        paddingVertical: 20,
+        paddingHorizontal: spacing.lg,
         alignItems: 'center',
         marginBottom: spacing.lg,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
     },
-    heroIcon: {
-        width: 80,
-        height: 80,
-        borderRadius: 20,
-        backgroundColor: colors.grayLight,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: spacing.md,
+    examTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: colors.dark,
+        marginTop: 8,
+        marginBottom: 4,
+        textAlign: 'center',
     },
-    examTitle: { fontSize: 20, fontWeight: '800', color: colors.dark, marginBottom: 4, textAlign: 'center' },
     examCategory: { fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
 
     groupTitle: {

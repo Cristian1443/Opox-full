@@ -1,11 +1,10 @@
 import React from 'react';
-import Svg, { Path } from 'react-native-svg';
-import NudgeModal from './NudgeModal';
+import Svg, { Circle, Path } from 'react-native-svg';
+import AlertCardModal from './AlertCardModal';
 
-// ─── Pop-up "Salir sin guardar" (6.2 · alerta) ───────────────────────────────
-// Reutilizable en cualquier pantalla de configuración del Bloque 6 (Generador,
-// Foto-Test, Simulacros, Laboratorio). Envuelve NudgeModal con la copia y el
-// ícono correctos, y expone una API limpia: onStay / onLeave.
+// ─── Pop-up "Salir sin generar el test" (mockup SALIR GENERAR TEST) ──────────
+// Modal centrado con icono círculo ! gris + CTA verde "Seguir configurando".
+// La acción secundaria "Salir igualmente" queda como link textual.
 export default function ConfirmExitModal({
     visible,
     onStay,
@@ -16,13 +15,13 @@ export default function ConfirmExitModal({
     stayLabel = 'Seguir configurando',
 }) {
     return (
-        <NudgeModal
+        <AlertCardModal
             visible={visible}
-            iconBg="#FFF4E5"
+            iconBg="#F1F3F7"
             icon={
-                <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
-                    <Path d="M12 3l9 16H3z" stroke="#E89B2C" strokeWidth={1.7} strokeLinejoin="round" />
-                    <Path d="M12 9v4M12 16v.3" stroke="#E89B2C" strokeWidth={1.9} strokeLinecap="round" />
+                <Svg width={30} height={30} viewBox="0 0 24 24" fill="none">
+                    <Circle cx={12} cy={12} r={10} stroke="#B4BAC5" strokeWidth={1.7} />
+                    <Path d="M12 7v6M12 16v.3" stroke="#B4BAC5" strokeWidth={2} strokeLinecap="round" />
                 </Svg>
             }
             title={title}
@@ -34,3 +33,4 @@ export default function ConfirmExitModal({
         />
     );
 }
+

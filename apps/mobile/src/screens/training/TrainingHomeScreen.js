@@ -100,16 +100,17 @@ export default function TrainingHomeScreen({ navigation }) {
             <ScreenHeader title="Zona de entrenamiento" onBack={() => navigation.goBack()} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                {MODES.map((mode) => {
+                {MODES.map((mode, idx) => {
                     const Icon = mode.Icon;
+                    const isFeatured = idx === 0;
                     return (
                         <TouchableOpacity
                             key={mode.id}
-                            style={styles.card}
+                            style={[styles.card, isFeatured && styles.cardFeatured]}
                             onPress={() => navigation.navigate(mode.route)}
                             activeOpacity={0.82}
                         >
-                            <View style={styles.iconBox}>
+                            <View style={[styles.iconBox, isFeatured && styles.iconBoxFeatured]}>
                                 <Icon />
                             </View>
                             <View style={styles.textCol}>
@@ -145,14 +146,20 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         elevation: 2,
     },
+    cardFeatured: {
+        backgroundColor: '#F1F3F7',
+    },
     iconBox: {
-        width: 52,
-        height: 52,
+        width: 56,
+        height: 56,
         borderRadius: 14,
-        backgroundColor: colors.grayLight,
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
+    },
+    iconBoxFeatured: {
+        width: 60,
+        height: 60,
     },
     textCol: { flex: 1 },
     cardTitle: { fontSize: 15, fontWeight: '800', color: colors.dark, marginBottom: 3 },

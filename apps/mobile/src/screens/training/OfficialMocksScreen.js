@@ -50,7 +50,11 @@ function MockCard({ item, onPress }) {
     const barColor = isDone ? colors.success : colors.primary;
 
     return (
-        <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+        <TouchableOpacity
+            style={[styles.card, isDone && styles.cardHighlighted]}
+            onPress={onPress}
+            activeOpacity={0.85}
+        >
             <View style={styles.cardRow}>
                 <View style={styles.cardIcon}>
                     {isDone
@@ -186,6 +190,9 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.06,
         shadowRadius: 6,
         elevation: 2,
+    },
+    cardHighlighted: {
+        backgroundColor: '#F1F3F7',
     },
     cardRow: {
         flexDirection: 'row',

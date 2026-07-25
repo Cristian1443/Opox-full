@@ -1,154 +1,131 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import ScreenHeader from '../../components/ScreenHeader';
+import { colors, spacing } from '../../theme';
 
-// Alturas aproximadas de header (X close) y controles (shutter + safe area).
-// Se usan para reservar espacio en el overlay y que el marco central llene
-// todo lo demás — el mockup 6.3 muestra el marco ocupando casi toda la pantalla.
-const HEADER_RESERVE = 64;
-const CONTROLS_RESERVE = 130;
+const CORNER_COLOR = colors.purple;
 
-// ─── Iconos SVG del bloque 6.3 ───────────────────────────────────────────────
+// ─── Iconos ──────────────────────────────────────────────────────────────────
 
-function IconClose({ color = '#FFF' }) {
+function IconCameraPlaceholder({ color = '#B4BAC5' }) {
     return (
-        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-            <Path d="M6 6l12 12M18 6l-12 12" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function IconImages({ color = '#FFF' }) {
-    return (
-        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-            <Rect x={3} y={5} width={16} height={14} rx={2} stroke={color} strokeWidth={1.8} />
-            <Path d="M3 15l4-4 4 4 3-3 5 5" stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
-            <Circle cx={13} cy={10} r={1.5} fill={color} />
-        </Svg>
-    );
-}
-
-function IconFlashOff({ color = '#FFF' }) {
-    return (
-        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-            <Path d="M13 2L4 14h6l-1 8 9-12h-6z" stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
-            <Path d="M4 4l16 16" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function IconFlashOn({ color = '#FFD84A' }) {
-    return (
-        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-            <Path d="M13 2L4 14h6l-1 8 9-12h-6z" fill={color} stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
-// Marco de encuadre según el nuevo wireframe 6.3:
-//   - Borde punteado suave alrededor del recuadro entero
-//   - Esquinas MORADAS (acento IA) más gruesas encima
-function FrameCorners({ w, h }) {
-    const c = 28; // longitud de la esquina
-    const s = 3;  // grosor
-    const CORNER = '#7B4BC4';
-    return (
-        <Svg width={w} height={h} pointerEvents="none">
-            <Rect
-                x={1}
-                y={1}
-                width={w - 2}
-                height={h - 2}
-                rx={14}
-                stroke="rgba(255,255,255,0.35)"
-                strokeWidth={1.5}
-                strokeDasharray="6 6"
-                fill="none"
-            />
-            <Path d={`M0 ${c} L0 0 L${c} 0`} stroke={CORNER} strokeWidth={s} fill="none" strokeLinecap="round" />
-            <Path d={`M${w - c} 0 L${w} 0 L${w} ${c}`} stroke={CORNER} strokeWidth={s} fill="none" strokeLinecap="round" />
-            <Path d={`M0 ${h - c} L0 ${h} L${c} ${h}`} stroke={CORNER} strokeWidth={s} fill="none" strokeLinecap="round" />
-            <Path d={`M${w - c} ${h} L${w} ${h} L${w} ${h - c}`} stroke={CORNER} strokeWidth={s} fill="none" strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function IconCameraCenter() {
-    return (
-        <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
+        <Svg width={72} height={72} viewBox="0 0 24 24" fill="none">
             <Path
                 d="M4 8h3l2-3h6l2 3h3v11H4z"
-                stroke="rgba(255,255,255,0.55)"
-                strokeWidth={1.5}
+                stroke={color}
+                strokeWidth={1.4}
                 strokeLinejoin="round"
             />
-            <Circle cx={12} cy={13} r={3.5} stroke="rgba(255,255,255,0.55)" strokeWidth={1.5} />
+            <Circle cx={12} cy={13} r={3.5} stroke={color} strokeWidth={1.4} />
+        </Svg>
+    );
+}
+
+function IconGallery({ color = '#5A6373' }) {
+    return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <Rect x={3} y={5} width={16} height={14} rx={2} stroke={color} strokeWidth={1.7} />
+            <Path d="M3 15l4-4 4 4 3-3 5 5" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
+            <Circle cx={13} cy={10} r={1.4} fill={color} />
+        </Svg>
+    );
+}
+
+function IconRotateCamera({ color = '#5A6373' }) {
+    return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <Path
+                d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"
+                stroke={color}
+                strokeWidth={1.7}
+                strokeLinecap="round"
+            />
+            <Path d="M18 3v4h-4M6 21v-4h4" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+// Esquinas moradas del marco de encuadre
+function FrameCorners({ w, h }) {
+    if (!w || !h) return null;
+    const c = 34;
+    const s = 4;
+    return (
+        <Svg width={w} height={h} pointerEvents="none">
+            <Path d={`M0 ${c} L0 0 L${c} 0`} stroke={CORNER_COLOR} strokeWidth={s} fill="none" strokeLinecap="round" />
+            <Path d={`M${w - c} 0 L${w} 0 L${w} ${c}`} stroke={CORNER_COLOR} strokeWidth={s} fill="none" strokeLinecap="round" />
+            <Path d={`M0 ${h - c} L0 ${h} L${c} ${h}`} stroke={CORNER_COLOR} strokeWidth={s} fill="none" strokeLinecap="round" />
+            <Path d={`M${w - c} ${h} L${w} ${h} L${w} ${h - c}`} stroke={CORNER_COLOR} strokeWidth={s} fill="none" strokeLinecap="round" />
         </Svg>
     );
 }
 
 // ─── Pantalla 6.3 · Foto-Test · Captura ──────────────────────────────────────
 export default function PhotoTestCaptureScreen({ navigation }) {
-    const insets = useSafeAreaInsets();
-    const cameraRef = useRef(null);
-    const [permission, requestPermission] = useCameraPermissions();
-    const [flash, setFlash] = useState('off'); // 'off' | 'on'
     const [busy, setBusy] = useState(false);
     const [frameSize, setFrameSize] = useState({ w: 0, h: 0 });
+    const [cameraFacing, setCameraFacing] = useState('back');
+    const [cameraPerm, setCameraPerm] = useState(null);
+    const initialLaunchDone = useRef(false);
 
-    // Permiso aún cargando (primer render antes de que Expo resuelva)
-    if (!permission) {
-        return (
-            <View style={[styles.container, styles.center]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <ActivityIndicator color="#FFF" />
-            </View>
-        );
-    }
+    // Pedir permisos de cámara al montar la pantalla — así el prompt del SO
+    // aparece antes de que el usuario tenga que decidir qué botón usar.
+    useEffect(() => {
+        (async () => {
+            const perm = await ImagePicker.requestCameraPermissionsAsync();
+            setCameraPerm(perm.granted);
+        })();
+    }, []);
 
-    // Permiso denegado — estado informativo con CTA para reintentar
-    if (!permission.granted) {
-        return (
-            <View style={[styles.container, styles.center]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <Text style={styles.permTitle}>Necesitamos acceso a la cámara</Text>
-                <Text style={styles.permDesc}>
-                    Para capturar tus apuntes o preguntas y resolverlas con IA.
-                </Text>
-                <TouchableOpacity style={styles.permBtn} onPress={requestPermission} activeOpacity={0.85}>
-                    <Text style={styles.permBtnText}>Permitir acceso</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.permCancel}>Volver</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
-    const takePhoto = async () => {
-        if (!cameraRef.current || busy) return;
+    const openCamera = async () => {
+        if (busy) return;
         setBusy(true);
         try {
-            const photo = await cameraRef.current.takePictureAsync({
+            const perm = cameraPerm
+                ? { granted: true }
+                : await ImagePicker.requestCameraPermissionsAsync();
+            if (!perm.granted) {
+                setCameraPerm(false);
+                setBusy(false);
+                return;
+            }
+            setCameraPerm(true);
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
                 quality: 0.9,
-                skipProcessing: false,
                 base64: true,
+                cameraType: cameraFacing === 'front'
+                    ? ImagePicker.CameraType.front
+                    : ImagePicker.CameraType.back,
             });
-            navigation.navigate('PhotoTestAnalysis', {
-                uri: photo.uri,
-                source: 'camera',
-                imageBase64: photo.base64,
-                mimeType: 'image/jpeg',
-            });
+            if (!result.canceled && result.assets?.[0]) {
+                const asset = result.assets[0];
+                const ext = asset.uri.split('.').pop()?.toLowerCase();
+                navigation.navigate('PhotoTestAnalysis', {
+                    uri: asset.uri,
+                    source: 'camera',
+                    imageBase64: asset.base64,
+                    mimeType: ext === 'png' ? 'image/png' : 'image/jpeg',
+                });
+            }
         } catch (err) {
-            console.warn('takePictureAsync failed', err);
+            console.warn('launchCameraAsync failed', err);
         } finally {
             setBusy(false);
         }
     };
+
+    // Al recibir permiso por primera vez, lanzamos automáticamente la cámara
+    // para que el usuario no tenga que descubrir el botón — el placeholder
+    // del mockup queda solo como fallback tras cancelar la captura.
+    useEffect(() => {
+        if (cameraPerm === true && !initialLaunchDone.current) {
+            initialLaunchDone.current = true;
+            openCamera();
+        }
+    }, [cameraPerm]);
 
     const openGallery = async () => {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -170,156 +147,162 @@ export default function PhotoTestCaptureScreen({ navigation }) {
         }
     };
 
-    return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
+    const toggleFacing = () => {
+        setCameraFacing((f) => (f === 'back' ? 'front' : 'back'));
+    };
 
-            <CameraView
-                ref={cameraRef}
-                style={StyleSheet.absoluteFill}
-                facing="back"
-                flash={flash}
+    return (
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+
+            <ScreenHeader
+                title="Zona de entrenamiento"
+                subtitle="Foto-test"
+                onBack={() => navigation.goBack()}
             />
 
-            {/* Overlay oscuro con hueco central (marco de encuadre)
-                Se reserva altura arriba (header + safe top) y abajo (controles
-                + safe bottom); el frameRow es flex 1 y llena todo el resto.
-                El SVG del marco se dibuja según el tamaño real medido. */}
-            <View style={styles.overlay} pointerEvents="none">
-                <View style={[styles.overlayBand, { height: insets.top + HEADER_RESERVE }]} />
-                <View style={styles.frameRow}>
-                    <View style={styles.overlaySide} />
-                    <View
+            <View style={styles.body}>
+                <View style={styles.previewCard}>
+                    <Text style={styles.previewTitle}>Digitaliza tus apuntes</Text>
+                    <Text style={styles.previewSubtitle}>
+                        Fotografía tus anotaciones para procesarlas con IA
+                    </Text>
+
+                    <TouchableOpacity
                         style={styles.frameBox}
+                        activeOpacity={0.8}
+                        onPress={openCamera}
+                        disabled={busy}
                         onLayout={(e) => {
                             const { width, height } = e.nativeEvent.layout;
                             if (width !== frameSize.w || height !== frameSize.h) {
                                 setFrameSize({ w: width, h: height });
                             }
                         }}
+                        accessibilityLabel="Abrir cámara para tomar foto del apunte"
                     >
-                        {frameSize.w > 0 && (
-                            <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                                <FrameCorners w={frameSize.w} h={frameSize.h} />
-                            </View>
-                        )}
-                        <IconCameraCenter />
+                        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                            <FrameCorners w={frameSize.w} h={frameSize.h} />
+                        </View>
+                        <IconCameraPlaceholder />
                         <Text style={styles.frameHint}>Encuadra tu apunte o pregunta</Text>
-                    </View>
-                    <View style={styles.overlaySide} />
+                        <Text style={styles.frameCta}>
+                            {cameraPerm === false
+                                ? 'Concede acceso a la cámara para continuar'
+                                : 'Toca para abrir la cámara'}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
-                <View style={[styles.overlayBand, { height: insets.bottom + CONTROLS_RESERVE }]} />
+
+                {/* Controles inferiores: galería · disparador · rotar cámara */}
+                <View style={styles.controls}>
+                    <TouchableOpacity style={styles.sideBtn} onPress={openGallery} activeOpacity={0.7}>
+                        <IconGallery />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.shutter, busy && { opacity: 0.7 }]}
+                        onPress={openCamera}
+                        disabled={busy}
+                        activeOpacity={0.85}
+                        accessibilityLabel="Abrir cámara para tomar foto"
+                    >
+                        {busy ? (
+                            <ActivityIndicator color="#FFF" />
+                        ) : (
+                            <View style={styles.shutterDot} />
+                        )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.sideBtn} onPress={toggleFacing} activeOpacity={0.7}>
+                        <IconRotateCamera />
+                    </TouchableOpacity>
+                </View>
             </View>
-
-            {/* Botón cerrar */}
-            <TouchableOpacity
-                style={[styles.closeBtn, { top: insets.top + 12 }]}
-                onPress={() => navigation.goBack()}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-                <IconClose />
-            </TouchableOpacity>
-
-            {/* Controles inferiores: galería · disparador · flash */}
-            <View style={[styles.controls, { paddingBottom: insets.bottom + 24 }]}>
-                <TouchableOpacity style={styles.sideBtn} onPress={openGallery} activeOpacity={0.8}>
-                    <IconImages />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.shutter, busy && { opacity: 0.7 }]}
-                    onPress={takePhoto}
-                    disabled={busy}
-                    activeOpacity={0.85}
-                >
-                    <View style={styles.shutterInner}>
-                        {busy && <ActivityIndicator color="#000" />}
-                    </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.sideBtn}
-                    onPress={() => setFlash((f) => (f === 'off' ? 'on' : 'off'))}
-                    activeOpacity={0.8}
-                >
-                    {flash === 'off' ? <IconFlashOff /> : <IconFlashOn />}
-                </TouchableOpacity>
-            </View>
-
-        </View>
+        </SafeAreaView>
     );
 }
 
-const OVERLAY_BG = 'rgba(0,0,0,0.55)';
-
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#000' },
-    center: { alignItems: 'center', justifyContent: 'center', padding: 32 },
+    container: { flex: 1, backgroundColor: colors.background },
+    body: {
+        flex: 1,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.lg,
+    },
 
-    overlay: { ...StyleSheet.absoluteFillObject, flexDirection: 'column' },
-    overlayBand: { backgroundColor: OVERLAY_BG },
-    frameRow: { flex: 1, flexDirection: 'row' },
-    overlaySide: { width: 20, backgroundColor: OVERLAY_BG },
-    frameBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    previewCard: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    previewTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: colors.dark,
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    previewSubtitle: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: spacing.md,
+    },
+    frameBox: {
+        flex: 1,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     frameHint: {
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 13,
+        color: colors.textSecondary,
+        fontSize: 12,
         fontWeight: '600',
         marginTop: 10,
         textAlign: 'center',
     },
-    closeBtn: {
-        position: 'absolute',
-        left: 16,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        alignItems: 'center',
-        justifyContent: 'center',
+    frameCta: {
+        color: colors.purple,
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 4,
+        textAlign: 'center',
     },
 
     controls: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        paddingTop: 20,
-        paddingHorizontal: 40,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 30,
     },
     sideBtn: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(0,0,0,0.5)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     shutter: {
-        width: 74,
-        height: 74,
-        borderRadius: 37,
-        backgroundColor: 'rgba(0,0,0,0.25)',
-        borderWidth: 4,
-        borderColor: '#FFF',
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        backgroundColor: '#C4CBD6',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    shutterInner: {
+    shutterDot: {
         width: 58,
         height: 58,
         borderRadius: 29,
-        backgroundColor: '#FFF',
-        alignItems: 'center',
-        justifyContent: 'center',
+        backgroundColor: '#B4BAC5',
     },
-
-    permTitle: { color: '#FFF', fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-    permDesc: { color: '#9AA2B1', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-    permBtn: { backgroundColor: '#34C759', paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12, marginBottom: 16 },
-    permBtnText: { color: '#FFF', fontSize: 13.5, fontWeight: '700' },
-    permCancel: { color: '#9AA2B1', fontSize: 13, fontWeight: '600' },
 });

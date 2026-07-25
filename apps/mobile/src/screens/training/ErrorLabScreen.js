@@ -47,6 +47,18 @@ function IconTargetBig({ color = colors.grayMid }) {
     );
 }
 
+function IconMicroscopeBig({ color = colors.primary }) {
+    return (
+        <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
+            <Path d="M7 21h10M12 21v-4" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+            <Path d="M9 3h6v9H9z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
+            <Path d="M12 12v5" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+            <Path d="M7 17a5 5 0 0 1 10 0" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
+            <Path d="M10 6h4" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
 // ─── Item de debilidad con expansión ─────────────────────────────────────────
 function WeaknessItem({ item, expanded, onToggle, onStartSurgical }) {
     const domainColor = getDomainColor(item.domain);
@@ -163,6 +175,17 @@ export default function ErrorLabScreen({ navigation }) {
             ) : (
                 <>
                     <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+                        {/* Card hero: microscopio + título + descripción */}
+                        <View style={styles.hero}>
+                            <IconMicroscopeBig />
+                            <View style={styles.heroText}>
+                                <Text style={styles.heroTitle}>Laboratorio de errores</Text>
+                                <Text style={styles.heroSub}>
+                                    Repaso quirúrgico de fallos{'\n'}y puntos débiles
+                                </Text>
+                            </View>
+                        </View>
+
                         <Text style={styles.groupTitle}>DEBILIDADES</Text>
 
                         {patterns.map((item) => (
@@ -200,13 +223,27 @@ const styles = StyleSheet.create({
     body: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
 
     groupTitle: {
-        fontSize: 10.5,
-        fontWeight: '700',
-        color: colors.textSecondary,
+        fontSize: 11,
+        fontWeight: '800',
+        color: colors.dark,
         letterSpacing: 0.5,
         marginBottom: spacing.sm,
-        marginTop: spacing.sm,
+        marginTop: spacing.md,
     },
+
+    hero: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        backgroundColor: '#F1F3F7',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        marginTop: 4,
+    },
+    heroText: { flex: 1 },
+    heroTitle: { fontSize: 15, fontWeight: '800', color: colors.dark, marginBottom: 3 },
+    heroSub: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
 
     // ── Fila de debilidad ─────────────────────────────
     weaknessWrapper: {
