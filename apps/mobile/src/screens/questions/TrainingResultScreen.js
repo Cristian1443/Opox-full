@@ -7,8 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Svg, Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
 
@@ -22,36 +21,87 @@ const MOCK_DATA = {
   elapsedSeconds: 142,
 };
 
-// ── Gráfico donut ─────────────────────────────────────────────
-const DONUT_SIZE = 140;
-const STROKE_WIDTH = 12;
+// ── Ilustración trofeo con hojas verdes y cinta (mockup LOGRO) ────────────
+function TrophyIllustration() {
+  return (
+    <Svg width={180} height={160} viewBox="0 0 180 160" fill="none">
+      {/* Chispas moradas */}
+      <Path d="M30 30 l0 8 M26 34 l8 0" stroke={colors.purple} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M150 34 l0 6 M147 37 l6 0" stroke={colors.purple} strokeWidth={2} strokeLinecap="round" />
+      <Circle cx={155} cy={80} r={2.5} fill={colors.purple} />
+      <Circle cx={25} cy={80} r={2} fill={colors.purple} />
+
+      {/* Hojas verdes atrás */}
+      <Path
+        d="M50 90 Q30 60 55 45 Q60 65 70 80"
+        fill="#86EFAC"
+        stroke={colors.success}
+        strokeWidth={1.5}
+      />
+      <Path
+        d="M130 90 Q150 60 125 45 Q120 65 110 80"
+        fill="#86EFAC"
+        stroke={colors.success}
+        strokeWidth={1.5}
+      />
+
+      {/* Copa del trofeo */}
+      <Path
+        d="M65 40 Q65 90 90 100 Q115 90 115 40 Z"
+        fill="#F5F7FA"
+        stroke={colors.dark}
+        strokeWidth={2}
+      />
+      {/* Asas laterales */}
+      <Path d="M65 50 Q50 55 55 75" stroke={colors.dark} strokeWidth={2} fill="none" />
+      <Path d="M115 50 Q130 55 125 75" stroke={colors.dark} strokeWidth={2} fill="none" />
+
+      {/* Base */}
+      <Rect x={80} y={100} width={20} height={14} fill="#F5F7FA" stroke={colors.dark} strokeWidth={2} />
+      <Rect x={70} y={114} width={40} height={8} rx={2} fill="#F5F7FA" stroke={colors.dark} strokeWidth={2} />
+
+      {/* Check verde central */}
+      <Circle cx={90} cy={65} r={16} fill={colors.success} />
+      <Path d="M83 65 l5 5 l10 -10" stroke="#FFFFFF" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Cinta */}
+      <Path d="M50 122 h80 v14 h-80 z" fill="#86EFAC" stroke={colors.success} strokeWidth={1.5} />
+      <Path d="M50 122 l-8 8 l8 6 z" fill="#22C55E" />
+      <Path d="M130 122 l8 8 l-8 6 z" fill="#22C55E" />
+
+      {/* Engranaje pequeño */}
+      <Circle cx={105} cy={98} r={5} stroke={colors.textSecondary} strokeWidth={1.3} fill="#FFFFFF" />
+    </Svg>
+  );
+}
+
+// ── Donut morado/verde (mockup LOGRO2) ────────────────────────────────────
+const DONUT_SIZE = 160;
+const STROKE_WIDTH = 14;
 
 function DonutChart({ percentage }) {
   const radius = (DONUT_SIZE - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percentage / 100) * circumference;
 
-  const fillColor =
-    percentage >= 75 ? colors.success :
-    percentage >= 50 ? colors.warning :
-    colors.error;
-
   return (
     <View style={donut.root}>
       <Svg width={DONUT_SIZE} height={DONUT_SIZE}>
+        {/* Fondo morado (resto que falta) */}
         <Circle
           cx={DONUT_SIZE / 2}
           cy={DONUT_SIZE / 2}
           r={radius}
-          stroke={colors.separator}
+          stroke={colors.purple}
           strokeWidth={STROKE_WIDTH}
           fill="transparent"
         />
+        {/* Aciertos verdes */}
         <Circle
           cx={DONUT_SIZE / 2}
           cy={DONUT_SIZE / 2}
           r={radius}
-          stroke={fillColor}
+          stroke={colors.success}
           strokeWidth={STROKE_WIDTH}
           fill="transparent"
           strokeDasharray={circumference}
@@ -61,7 +111,7 @@ function DonutChart({ percentage }) {
         />
       </Svg>
       <View style={donut.label}>
-        <Text style={[donut.percentage, { color: fillColor }]}>{percentage}%</Text>
+        <Text style={donut.percentage}>{percentage}%</Text>
       </View>
     </View>
   );
@@ -79,8 +129,9 @@ const donut = StyleSheet.create({
     alignItems: 'center',
   },
   percentage: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: '800',
+    color: colors.dark,
     letterSpacing: -1,
   },
 });
@@ -98,7 +149,7 @@ export default function TrainingResultScreen({ navigation, route }) {
   const correct = answers.filter(a => a.isCorrect).length;
   const incorrect = total - correct;
   const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
-  const isHighScore = percentage >= 80;
+  const isHighScore = percentage >= 90;
   const needsLab = incorrect > 0;
 
   const formatTime = (s) => {
@@ -107,22 +158,21 @@ export default function TrainingResultScreen({ navigation, route }) {
     return `${m}:${sec}`;
   };
 
-  // ── Pantalla de felicitación (≥80%) ──
+  // ── Pantalla de felicitación (≥90%) — mockup LOGRO ──
   if (isHighScore) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
         <ScreenHeader title="Test completado" onBack={() => navigation.goBack()} />
 
         <ScrollView contentContainerStyle={styles.celebrationBody} showsVerticalScrollIndicator={false}>
-          {/* Trofeo */}
-          <View style={styles.trophyCircle}>
-            <Ionicons name="trophy" size={52} color={colors.success} />
+          <View style={styles.trophyWrap}>
+            <TrophyIllustration />
           </View>
 
           <Text style={styles.congrats}>¡FELICIDADES!</Text>
           <Text style={styles.congratsSub}>
             Estás de racha, has superado este test con un{' '}
-            <Text style={{ fontWeight: '800', color: colors.success }}>{percentage}%</Text>
+            <Text style={{ fontWeight: '800', color: colors.dark }}>{percentage}%</Text>
             {' '}de aciertos. ¿Qué quieres hacer ahora?
           </Text>
 
@@ -146,7 +196,7 @@ export default function TrainingResultScreen({ navigation, route }) {
     );
   }
 
-  // ── Pantalla de resultados con estadísticas (<80%) ──
+  // ── Pantalla de resultados con donut y estadísticas — mockup LOGRO2 ──
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <ScreenHeader title="Test completado" onBack={() => navigation.goBack()} />
@@ -155,19 +205,17 @@ export default function TrainingResultScreen({ navigation, route }) {
         contentContainerStyle={styles.contentPad}
         showsVerticalScrollIndicator={false}
       >
-        {/* Donut centrado */}
         <View style={styles.donutRow}>
           <DonutChart percentage={percentage} />
           <Text style={styles.correctCount}>{correct} de {total} correctas</Text>
         </View>
 
-        {/* Stats: 3 columnas */}
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={[styles.statValue, { color: colors.success }]}>{correct}</Text>
             <Text style={styles.statLabel}>Aciertos</Text>
           </View>
-          <View style={[styles.statBox, styles.statBoxMid]}>
+          <View style={styles.statBox}>
             <Text style={[styles.statValue, { color: colors.error }]}>{incorrect}</Text>
             <Text style={styles.statLabel}>Fallos</Text>
           </View>
@@ -177,17 +225,15 @@ export default function TrainingResultScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Banner morado de fallos */}
         {needsLab && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.bannerTitle}>{incorrect} fallos detectados</Text>
-            <Text style={styles.bannerSub}>Refuérzalos con un test quirúrgico</Text>
+          <View style={styles.errorChip}>
+            <Text style={styles.chipTitle}>{incorrect} fallos detectados</Text>
+            <Text style={styles.chipSub}>¡Refuérzalos con un test quirúrgico!</Text>
           </View>
         )}
 
         <Text style={styles.whatNow}>¿Qué quieres hacer ahora?</Text>
 
-        {/* CTAs */}
         {needsLab && (
           <TouchableOpacity
             style={styles.primaryBtn}
@@ -198,7 +244,6 @@ export default function TrainingResultScreen({ navigation, route }) {
               navigation.navigate('ErrorLab', { incorrectQuestions });
             }}
             activeOpacity={0.85}
-            accessibilityLabel={`Ir al Laboratorio de Errores — ${incorrect} fallos`}
           >
             <Text style={styles.primaryBtnText}>Ir al laboratorio de errores</Text>
           </TouchableOpacity>
@@ -219,24 +264,20 @@ export default function TrainingResultScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
   },
 
   // ── Celebración ──────────────────────────
   celebrationBody: {
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
-  trophyCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.successBg,
+  trophyWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   congrats: {
     fontSize: 26,
@@ -247,10 +288,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   congratsSub: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
     marginBottom: spacing.xl,
     paddingHorizontal: spacing.md,
   },
@@ -260,7 +301,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   ghostLinkText: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
     fontWeight: '500',
   },
@@ -274,90 +315,71 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   correctCount: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
     marginTop: spacing.sm,
   },
 
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    justifyContent: 'space-around',
+    marginBottom: spacing.md,
   },
   statBox: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  statBoxMid: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: colors.separator,
+    paddingVertical: spacing.sm,
+    flex: 1,
   },
   statValue: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     fontWeight: '600',
   },
 
-  // Banner morado de lab
-  errorBanner: {
+  errorChip: {
     backgroundColor: colors.purple,
-    borderRadius: 12,
-    padding: spacing.md,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
     marginBottom: spacing.lg,
     alignItems: 'center',
   },
-  bannerTitle: {
-    fontSize: 14,
+  chipTitle: {
+    fontSize: 13,
     fontWeight: '800',
     color: colors.white,
   },
-  bannerSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)',
+  chipSub: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
   },
 
   whatNow: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     fontWeight: '500',
   },
 
-  // Botón verde compartido
   primaryBtn: {
     backgroundColor: colors.success,
-    paddingVertical: spacing.md,
+    paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
-    marginBottom: spacing.md,
-    shadowColor: colors.success,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.20,
-    shadowRadius: 6,
-    elevation: 4,
+    marginBottom: 10,
   },
   primaryBtnText: {
     color: colors.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
 });

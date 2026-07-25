@@ -26,45 +26,26 @@ import { trainingApi } from '../../api';
 const MOCK_QUESTIONS = [
   {
     id: 'q1',
-    difficulty: 3,
+    difficulty: 2,
     law: 'Ley 39/2015',
-    title: 'Según la Ley 39/2015, ¿cuál es el plazo máximo para resolver y notificar en los procedimientos administrativos?',
+    title: 'Según el artículo 159 de la Constitución Española, ¿cómo se compone el Tribunal Constitucional?',
     options: [
-      { id: 'A', text: 'Tres meses, salvo norma con rango de ley.', correct: true },
-      { id: 'B', text: 'Seis meses, en todo caso.', correct: false },
-      { id: 'C', text: 'Un mes, si no se requiere prueba.', correct: false },
-      { id: 'D', text: 'Un año, para procedimientos complejos.', correct: false },
+      { id: 'A', text: 'Se compone de 12 miembros nombrados por el Rey; de ellos, cuatro a propuesta del Congreso, cuatro a propuesta del Senado, dos a propuesta del Gobierno y dos a propuesta del Consejo General del Poder Judicial.', correct: true },
+      { id: 'B', text: 'Se compone de 10 miembros nombrados por el Rey; cuatro a propuesta del Congreso, cuatro del Senado y dos del Gobierno.', correct: false },
+      { id: 'C', text: 'Se compone de 12 miembros nombrados por el Presidente del Gobierno, a propuesta de las Cortes Generales y el Consejo General del Poder Judicial.', correct: false },
+      { id: 'D', text: 'Se compone de 12 miembros; seis a propuesta del Congreso y seis a propuesta del Senado, por mayoría absoluta de sus miembros.', correct: false },
     ],
-    explanation:
-      'El plazo general son 3 meses (art. 21.2). Solo se amplía si una norma con rango de ley fija otro distinto.',
-    explanationWrong:
-      'La correcta es la A. El plazo general (3 meses) no debe confundirse con el límite máximo ni con plazos especiales.',
+    explanation: 'El plazo general son 3 meses (art. 21). Solo se amplía si lo fija una norma con rango de ley.',
+    explanationWrong: 'La correcta es la A. Confundiste el plazo general (3 meses) con el límite máximo que no se puede exceder (6 meses).',
     articleRef: {
       article: 'Artículo 21',
-      title: 'Obligación de resolver',
-      text: '"La Administración está obligada a dictar resolución expresa y a notificarla en todos los procedimientos cualquiera que sea su forma de iniciación. El plazo máximo en el que debe notificarse la resolución expresa será el fijado por la norma reguladora del correspondiente procedimiento. Este plazo no podrá exceder de seis meses salvo que una norma con rango de Ley establezca uno mayor…"',
+      title: 'Obligación de responder',
+      text: '"El plazo máximo en el que debe notificarse la resolución expresa será el fijado por la norma reguladora del correspondiente procedimiento. Este plazo no podrá exceder de seis meses salvo que una norma con rango de Ley establezca uno mayor…"',
       boeUrl: 'https://www.boe.es/buscar/act.php?id=BOE-A-2015-10565',
     },
   },
-  {
-    id: 'q2',
-    difficulty: 4,
-    law: 'Ley 40/2015',
-    title: '¿Cuál de los siguientes principios NO recoge expresamente la Ley 40/2015 de Régimen Jurídico del Sector Público?',
-    options: [
-      { id: 'A', text: 'Principio de eficacia.', correct: false },
-      { id: 'B', text: 'Principio de transparencia.', correct: false },
-      { id: 'C', text: 'Principio de proporcionalidad.', correct: false },
-      { id: 'D', text: 'Principio de beneficio máximo.', correct: true },
-    ],
-    explanation:
-      '"Beneficio máximo" no es un principio recogido en la Ley 40/2015. Los demás sí figuran en su artículo 3.',
-    explanationWrong:
-      'La correcta es la D. "Beneficio máximo" no existe en la Ley 40/2015. Eficacia, transparencia y proporcionalidad sí están en el art. 3.',
-  },
 ];
 
-// Umbrales de tiempo (segundos)
 const TIMER_WARNING = 30;
 const TIMER_DANGER = 10;
 const MAX_HINTS = 3;
@@ -74,9 +55,9 @@ export default function QuestionActiveScreen({ navigation, route }) {
     questions = MOCK_QUESTIONS,
     startIndex = 0,
     source = 'generator',
-    timedMode = false,
+    timedMode = true,
     secondsPerQuestion = 60,
-    examTitle = null,
+    examTitle = 'Examen oficial 2021',
   } = route?.params ?? {};
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
@@ -87,7 +68,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const [answers, setAnswers] = useState([]);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [showTimeUpModal, setShowTimeUpModal] = useState(false);
-  const [toast, setToast] = useState(null); // { message, type } | null
+  const [toast, setToast] = useState(null);
   const [showHintSheet, setShowHintSheet] = useState(false);
   const [showLawSheet, setShowLawSheet] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -103,28 +84,23 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const feedbackAnim = useRef(new Animated.Value(0)).current;
   const timerPulseAnim = useRef(new Animated.Value(1)).current;
   const pulseRef = useRef(null);
-  const selectAnim = useRef(new Animated.Value(1)).current;
 
   const question = questions[currentIndex];
   const total = questions.length;
   const progress = total > 0 ? (currentIndex + 1) / total : 0;
 
-  // Reinicia el timer cada vez que cambia la pregunta
   useEffect(() => {
     setTimeLeft(secondsPerQuestion);
   }, [currentIndex, secondsPerQuestion]);
 
-  // Contador ascendente de tiempo de sesión — se pausa con isPaused
   useEffect(() => {
     if (isPaused) return;
     const id = setInterval(() => setElapsedSeconds(prev => prev + 1), 1000);
     return () => clearInterval(id);
   }, [isPaused]);
 
-  // Countdown
   useEffect(() => {
     if (!timedMode || isSubmitted || isPaused) return;
-
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -135,14 +111,11 @@ export default function QuestionActiveScreen({ navigation, route }) {
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timerRef.current);
   }, [currentIndex, isSubmitted, timedMode, isPaused]);
 
-  // Pulso del timerPill en los últimos TIMER_DANGER segundos
   useEffect(() => {
     const shouldPulse = timedMode && !isSubmitted && timeLeft <= TIMER_DANGER && timeLeft > 0;
-
     if (shouldPulse) {
       if (!pulseRef.current) {
         pulseRef.current = Animated.loop(
@@ -162,7 +135,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
     }
   }, [timeLeft, isSubmitted, timedMode]);
 
-  // Anuncia al lector de pantalla en umbrales críticos del timer
   useEffect(() => {
     if (!timedMode) return;
     if (timeLeft === TIMER_WARNING) {
@@ -171,18 +143,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
       AccessibilityInfo.announceForAccessibility(`¡Urgente! Quedan ${TIMER_DANGER} segundos.`);
     }
   }, [timeLeft, timedMode]);
-
-  // Micro-animación de escala al seleccionar opción (0.97 → 1.0)
-  useEffect(() => {
-    if (!selectedOption) return;
-    selectAnim.setValue(0.97);
-    Animated.spring(selectAnim, {
-      toValue: 1,
-      tension: 200,
-      friction: 10,
-      useNativeDriver: true,
-    }).start();
-  }, [selectedOption]);
 
   const animateFeedback = useCallback(() => {
     feedbackAnim.setValue(0);
@@ -195,8 +155,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
   }, [feedbackAnim]);
 
   const handleTimeout = useCallback(() => {
-    // En timedMode el tiempo agotado cierra toda la sesión — registra la pregunta
-    // actual como no respondida y muestra el modal de tiempo agotado.
     setAnswers(prev => [...prev, { questionId: question?.id, selected: null, isCorrect: false }]);
     setShowTimeUpModal(true);
   }, [question]);
@@ -210,12 +168,9 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const handleConfirm = () => {
     if (!selectedOption) return;
     clearInterval(timerRef.current);
-
     const selected = question.options.find(o => o.id === selectedOption);
     const isCorrect = selected?.correct ?? false;
-
     if (!isCorrect) Vibration.vibrate(80);
-
     setIsSubmitted(true);
     setAnswers(prev => [...prev, { questionId: question.id, selected: selectedOption, isCorrect }]);
     animateFeedback();
@@ -223,12 +178,10 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
   const handleNext = () => {
     const isLast = currentIndex + 1 >= total;
-
     if (isLast) {
       navigation.replace('TrainingResult', { source, answers, questions, elapsedSeconds });
       return;
     }
-
     setCurrentIndex(prev => prev + 1);
     setSelectedOption(null);
     setIsSubmitted(false);
@@ -237,45 +190,10 @@ export default function QuestionActiveScreen({ navigation, route }) {
     feedbackAnim.setValue(0);
   };
 
-  // --- Helpers de estilo ---
-
-  const getTimerColor = () => {
-    if (timeLeft <= TIMER_DANGER) return colors.error;
-    if (timeLeft <= TIMER_WARNING) return colors.warning;
-    return colors.primary;  // naranja visible sobre fondo navy
-  };
-
   const formatTime = (s) => {
     const m = Math.floor(s / 60).toString().padStart(2, '0');
     const sec = (s % 60).toString().padStart(2, '0');
     return `${m}:${sec}`;
-  };
-
-  const getOptionStyle = (option) => {
-    if (!isSubmitted) {
-      if (selectedOption === option.id) {
-        return { bg: colors.purpleBg, border: colors.purple, bw: 2, textColor: colors.dark };
-      }
-      return { bg: colors.card, border: colors.separator, bw: 1, textColor: colors.text };
-    }
-    if (option.correct) {
-      return { bg: colors.successBg, border: colors.success, bw: 2, textColor: colors.success };
-    }
-    if (selectedOption === option.id) {
-      return { bg: colors.errorBg, border: colors.error, bw: 2, textColor: colors.error };
-    }
-    return { bg: colors.card, border: colors.separator, bw: 1, textColor: colors.grayText };
-  };
-
-  const getOptionIcon = (option) => {
-    if (!isSubmitted) return null;
-    if (option.correct) {
-      return <Ionicons name="checkmark-circle" size={20} color={colors.success} />;
-    }
-    if (selectedOption === option.id) {
-      return <Ionicons name="close-circle" size={20} color={colors.error} />;
-    }
-    return null;
   };
 
   if (!question) return null;
@@ -287,60 +205,47 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const hintsRemaining = MAX_HINTS - hintsUsed;
   const isHintDisabled = isSubmitted || hintsRemaining <= 0;
 
+  // Cuando el usuario ha respondido, se ocultan las opciones incorrectas no elegidas.
+  // Correcta se muestra en verde, elegida (si fue mal) en rojo — mockup.
+  const visibleOptions = question.options.filter((opt) => {
+    if (!isSubmitted) return true;
+    if (opt.correct) return true;
+    if (opt.id === selectedOption) return true;
+    return false;
+  });
+
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
 
-      {/* ── HEADER ── */}
-      <View style={styles.header}>
-        {/* Fila 0: título de sesión centrado */}
-        <View style={styles.headerRow0}>
-          <Text style={styles.headerSessionTitle}>Zona de entrenamiento</Text>
-          {examTitle && <Text style={styles.headerSessionSub}>{examTitle}</Text>}
+      {/* ── HEADER BLANCO ── */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity
+          style={styles.circleBtn}
+          onPress={() => setShowAbandonModal(true)}
+          accessibilityLabel="Salir de la sesión"
+        >
+          <Ionicons name="chevron-back" size={20} color={colors.dark} />
+        </TouchableOpacity>
+
+        <View style={styles.topHeaderTexts}>
+          <Text style={styles.topHeaderTitle}>Zona de entrenamiento</Text>
+          {examTitle ? (
+            <Text style={styles.topHeaderSub}>{examTitle}</Text>
+          ) : null}
         </View>
 
-        {/* Fila 1: back · barra de progreso · pausa · timer */}
-        <View style={styles.headerRow1}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => setShowAbandonModal(true)}
-            accessibilityLabel="Salir de la sesión"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.85)" />
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.circleBtn}
+          onPress={() => { setIsPaused(true); setShowPauseModal(true); }}
+          accessibilityLabel="Pausar sesión"
+        >
+          <Ionicons name="pause" size={18} color={colors.dark} />
+        </TouchableOpacity>
+      </View>
 
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-          </View>
-
-          <View style={styles.headerControls}>
-            <TouchableOpacity
-              style={styles.pauseBtn}
-              onPress={() => { setIsPaused(true); setShowPauseModal(true); }}
-              accessibilityLabel="Pausar sesión"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="pause" size={15} color="rgba(255,255,255,0.75)" />
-            </TouchableOpacity>
-
-            {timedMode && (
-              <Animated.View
-                style={[styles.timerArea, { transform: [{ scale: timerPulseAnim }] }]}
-                accessible
-                accessibilityLabel={`Tiempo restante: ${formatTime(timeLeft)}`}
-                accessibilityLiveRegion="polite"
-              >
-                <Ionicons name="time-outline" size={13} color={getTimerColor()} />
-                <Text style={[styles.timerText, { color: getTimerColor() }]}>
-                  {formatTime(timeLeft)}
-                </Text>
-              </Animated.View>
-            )}
-          </View>
-        </View>
-
-        {/* Fila 2: número de pregunta con navegación */}
-        <View style={styles.headerRow2}>
+      {/* ── BARRA NAVY DE PROGRESO ── */}
+      <View style={styles.progressBar}>
+        <View style={styles.progressRow}>
           <TouchableOpacity
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             disabled={currentIndex === 0}
@@ -353,63 +258,112 @@ export default function QuestionActiveScreen({ navigation, route }) {
               }
             }}
           >
-            <Ionicons name="chevron-back" size={16} color={currentIndex === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.70)'} />
+            <Ionicons
+              name="chevron-back"
+              size={18}
+              color={currentIndex === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.85)'}
+            />
           </TouchableOpacity>
-          <Text style={styles.questionCounter}>Pregunta {currentIndex + 1} de {total}</Text>
-          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.25)" />
+
+          <Text style={styles.progressLabel}>Pregunta {currentIndex + 1} de {total}</Text>
+
+          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
+        </View>
+
+        <View style={styles.progressTrackRow}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+          </View>
+          {timedMode && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onLongPress={() => {
+                // Dev: long-press en el timer fuerza el "tiempo agotado" para poder
+                // ver el TimeUpModal sin tener que esperar los 60 s reales.
+                setTimeLeft(0);
+                clearInterval(timerRef.current);
+                handleTimeout();
+              }}
+              delayLongPress={600}
+            >
+              <Animated.View
+                style={[styles.timerArea, { transform: [{ scale: timerPulseAnim }] }]}
+              >
+                <Ionicons
+                  name="time-outline"
+                  size={14}
+                  color={timeLeft <= TIMER_DANGER ? colors.error : '#FFFFFF'}
+                />
+                <Text style={[
+                  styles.timerText,
+                  timeLeft <= TIMER_DANGER && { color: colors.error },
+                ]}>
+                  {formatTime(timeLeft)}
+                </Text>
+              </Animated.View>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* ── CONTENIDO SCROLLABLE ── */}
+      {/* ── CONTENIDO ── */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Enunciado */}
         <Text style={styles.questionText}>{question.title}</Text>
 
-        {/* Opciones A–D */}
         <View style={styles.optionsList}>
-          {question.options.map(option => {
-            const s = getOptionStyle(option);
-            const icon = getOptionIcon(option);
+          {visibleOptions.map(option => {
             const isSelected = selectedOption === option.id;
+            let bg = colors.card;
+            let border = '#E4E8F0';
+            let borderW = 1.5;
+            let textColor = colors.dark;
+
+            if (!isSubmitted) {
+              if (isSelected) {
+                border = colors.purple;
+                borderW = 2;
+              }
+            } else if (option.correct) {
+              bg = '#DCFCE7';
+              border = colors.success;
+              borderW = 1.5;
+            } else if (isSelected) {
+              bg = '#FCA5A5';
+              border = colors.error;
+              borderW = 1.5;
+            }
+
             return (
-              <Animated.View
+              <TouchableOpacity
                 key={option.id}
-                style={isSelected && !isSubmitted ? { transform: [{ scale: selectAnim }] } : undefined}
+                onPress={() => handleSelectOption(option.id)}
+                disabled={isSubmitted}
+                activeOpacity={0.75}
+                style={[
+                  styles.optionCard,
+                  { backgroundColor: bg, borderColor: border, borderWidth: borderW },
+                ]}
+                accessibilityLabel={`Opción ${option.id}: ${option.text}`}
               >
-                <TouchableOpacity
-                  onPress={() => handleSelectOption(option.id)}
-                  disabled={isSubmitted}
-                  activeOpacity={0.75}
-                  accessibilityLabel={`Opción ${option.id}: ${option.text}`}
-                  style={[
-                    styles.optionCard,
-                    { backgroundColor: s.bg, borderColor: s.border, borderWidth: s.bw },
-                  ]}
-                >
-                  <View style={styles.optionRow}>
-                    <Text style={[styles.optionLetter, { color: s.border }]}>{option.id}</Text>
-                    <Text style={[styles.optionText, { color: s.textColor }]}>{option.text}</Text>
-                    {icon && <View style={styles.optionIcon}>{icon}</View>}
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
+                <Text style={[styles.optionLetter, { color: textColor }]}>{option.id}.</Text>
+                <Text style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
+              </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* ── FEEDBACK (7.4a acierto / 7.4b fallo) ── */}
+        {/* ── FEEDBACK ── */}
         {isSubmitted && (
           <Animated.View
             style={[
-              styles.feedback,
+              styles.feedbackCard,
+              isCorrectAnswer ? styles.feedbackCardOk : styles.feedbackCardErr,
               {
-                borderLeftColor: isCorrectAnswer ? colors.success : colors.error,
-                backgroundColor: isCorrectAnswer ? colors.successBg : colors.errorBg,
                 opacity: feedbackAnim,
                 transform: [{
                   translateY: feedbackAnim.interpolate({
@@ -420,19 +374,12 @@ export default function QuestionActiveScreen({ navigation, route }) {
               },
             ]}
           >
-            {/* Encabezado: icono contextual + título (7.4a trofeo / 7.4b error / timeout reloj) */}
             <View style={styles.feedbackHeader}>
-              <Ionicons
-                name={
-                  isTimeOut
-                    ? 'time-outline'
-                    : isCorrectAnswer
-                    ? 'trophy'
-                    : 'close-circle'
-                }
-                size={26}
-                color={isCorrectAnswer ? colors.success : colors.error}
-              />
+              {isCorrectAnswer ? (
+                <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+              ) : (
+                <Ionicons name="close-circle" size={22} color={colors.error} />
+              )}
               <Text style={[
                 styles.feedbackTitle,
                 { color: isCorrectAnswer ? colors.success : colors.error },
@@ -446,136 +393,141 @@ export default function QuestionActiveScreen({ navigation, route }) {
             </Text>
 
             {!isCorrectAnswer && !isTimeOut && (
-              <View style={styles.errorLabCard}>
-                <Ionicons name="flask" size={16} color={colors.error} />
-                <View style={styles.errorLabCardContent}>
-                  <Text style={styles.errorLabCardTitle}>
-                    Laboratorio de Errores
-                  </Text>
-                  <Text style={styles.errorLabCardBody}>
-                    Esta pregunta se añadirá para que la trabajes después.
-                  </Text>
-                </View>
-              </View>
+              <Text style={styles.errorLabLink}>
+                + Esta pregunta irá a tu Laboratorio de Errores
+              </Text>
             )}
           </Animated.View>
         )}
 
-        <View style={{ height: spacing.xl }} />
+        <View style={{ height: spacing.md }} />
+
+        {/* ── CTA PRINCIPAL ── */}
+        {!isSubmitted ? (
+          <TouchableOpacity
+            style={[styles.mainBtn, !selectedOption && styles.mainBtnDisabled]}
+            onPress={handleConfirm}
+            disabled={!selectedOption}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.mainBtnText}>Confirmar respuesta</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.mainBtn}
+            onPress={handleNext}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.mainBtnText}>
+              {isLastQuestion ? 'Ver resultados' : 'Siguiente pregunta'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ── TOOLBAR INFERIOR ── */}
+        <View style={styles.toolbar}>
+          <View style={styles.difficultyBlock}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <Ionicons
+                key={i}
+                name={i <= (question.difficulty ?? 3) ? 'star' : 'star-outline'}
+                size={13}
+                color={i <= (question.difficulty ?? 3) ? colors.primary : '#D4DAE6'}
+              />
+            ))}
+            <Text style={styles.difficultyLabel}>Evalúa esta pregunta</Text>
+          </View>
+
+          <View style={styles.toolsRow}>
+            <TouchableOpacity
+              style={styles.toolItem}
+              onPress={() => setShowReportModal(true)}
+              accessibilityLabel="Reportar pregunta"
+            >
+              <Ionicons name="warning-outline" size={22} color={isReported ? colors.error : colors.dark} />
+              <Text style={[styles.toolLabel, isReported && { color: colors.error }]}>
+                {isReported ? 'Reportado' : 'Reportar'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.toolItem}
+              onPress={() => {
+                const next = !isBookmarked;
+                setIsBookmarked(next);
+                setToast({
+                  message: next ? 'Pregunta guardada' : 'Guardado eliminado',
+                  type: 'success',
+                });
+              }}
+              accessibilityLabel={isBookmarked ? 'Quitar de guardados' : 'Guardar pregunta'}
+            >
+              <Ionicons
+                name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+                size={22}
+                color={isBookmarked ? colors.primary : colors.dark}
+              />
+              <Text style={[styles.toolLabel, isBookmarked && { color: colors.primary }]}>
+                Guardar
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.toolItem, isHintDisabled && styles.toolItemDisabled]}
+              onPress={async () => {
+                if (isHintDisabled) return;
+                setHintsUsed(prev => prev + 1);
+                setHintText('');
+                setIsHintLoading(true);
+                setShowHintSheet(true);
+                try {
+                  const res = await trainingApi.generateHint({
+                    questionId: question.id,
+                    questionText: question.title,
+                    options: question.options.map(o => o.text),
+                    topicId: question.topicId ?? 'all',
+                    topic: question.law ?? 'Derecho Administrativo',
+                    oposicion: route?.params?.oposicion ?? 'justicia-tramitacion',
+                  });
+                  setHintText(res?.data?.hint ?? '');
+                } catch (_err) {
+                  setHintText('No se pudo obtener la pista. Inténtalo de nuevo.');
+                } finally {
+                  setIsHintLoading(false);
+                }
+              }}
+              accessibilityLabel={
+                isSubmitted ? 'Pista no disponible tras responder' :
+                hintsRemaining <= 0 ? 'Has agotado las pistas' :
+                `Pedir pista a la IA — ${hintsRemaining} restantes`
+              }
+            >
+              <Ionicons
+                name="bulb-outline"
+                size={22}
+                color={isHintDisabled ? '#D4DAE6' : colors.primary}
+              />
+              <Text style={[
+                styles.toolLabel,
+                { color: isHintDisabled ? '#D4DAE6' : colors.primary, fontWeight: '700' },
+              ]}>
+                Pista IA
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.toolItem}
+              onPress={() => setShowLawSheet(true)}
+              accessibilityLabel="Ver ley relacionada"
+            >
+              <Ionicons name="library-outline" size={22} color={colors.dark} />
+              <Text style={styles.toolLabel}>Ley</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
 
-      {/* ── TOOLBAR INFERIOR ── */}
-      <View style={styles.toolbar}>
-        {/* Estrellas de dificultad — mock, reemplazar con question.difficulty real */}
-        <View style={styles.difficultyBlock}>
-          {[1, 2, 3, 4, 5].map(i => (
-            <Ionicons
-              key={i}
-              name={i <= (question.difficulty ?? 3) ? 'star' : 'star-outline'}
-              size={15}
-              color={i <= (question.difficulty ?? 3) ? '#FFB800' : colors.separator}
-            />
-          ))}
-        </View>
-
-        <View style={styles.toolbarSep} />
-
-        {/* Pista IA — desactivada tras responder o al agotar el límite de pistas */}
-        <TouchableOpacity
-          style={[styles.toolItem, isHintDisabled && styles.toolItemDisabled]}
-          onPress={async () => {
-            if (isHintDisabled) return;
-            setHintsUsed(prev => prev + 1);
-            setHintText('');
-            setIsHintLoading(true);
-            setShowHintSheet(true);
-            try {
-              const res = await trainingApi.generateHint({
-                questionId: question.id,
-                questionText: question.title,
-                options: question.options.map(o => o.text),
-                topicId: question.topicId ?? 'all',
-                topic: question.law ?? 'Derecho Administrativo',
-                oposicion: route?.params?.oposicion ?? 'justicia-tramitacion',
-              });
-              setHintText(res?.data?.hint ?? '');
-            } catch (_err) {
-              setHintText('No se pudo obtener la pista. Inténtalo de nuevo.');
-            } finally {
-              setIsHintLoading(false);
-            }
-          }}
-          accessibilityLabel={
-            isSubmitted ? 'Pista no disponible tras responder' :
-            hintsRemaining <= 0 ? 'Has agotado las pistas de esta sesión' :
-            `Pedir pista a la IA — ${hintsRemaining} restantes`
-          }
-          accessibilityState={{ disabled: isHintDisabled }}
-        >
-          <Ionicons
-            name="bulb-outline"
-            size={22}
-            color={isHintDisabled ? colors.separator : colors.warning}
-          />
-          <Text style={[styles.toolLabel, isHintDisabled && styles.toolLabelDisabled]}>
-            Pista IA
-          </Text>
-          <Text style={[
-            styles.toolLabelTiny,
-            hintsRemaining === 0 && { color: colors.error },
-          ]}>
-            {hintsRemaining}/{MAX_HINTS}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => setShowLawSheet(true)}
-          accessibilityLabel="Ver artículo de ley relacionado"
-        >
-          <Ionicons name="library-outline" size={22} color={colors.dark} />
-          <Text style={styles.toolLabel}>Ley</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => {
-            const next = !isBookmarked;
-            setIsBookmarked(next);
-            setToast({
-              message: next ? 'Pregunta guardada' : 'Guardado eliminado',
-              type: 'success',
-            });
-          }}
-          accessibilityLabel={isBookmarked ? 'Quitar de guardados' : 'Guardar pregunta'}
-        >
-          <Ionicons
-            name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-            size={22}
-            color={isBookmarked ? colors.primary : colors.grayText}
-          />
-          <Text style={[styles.toolLabel, isBookmarked && styles.toolLabelActive]}>
-            Guardar
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.toolItem}
-          onPress={() => setShowReportModal(true)}
-          accessibilityLabel={isReported ? 'Pregunta ya reportada' : 'Reportar un error en esta pregunta'}
-        >
-          <Ionicons
-            name={isReported ? 'flag' : 'flag-outline'}
-            size={22}
-            color={isReported ? colors.error : colors.grayText}
-          />
-          <Text style={[styles.toolLabel, isReported && { color: colors.error }]}>
-            {isReported ? 'Reportado' : 'Reportar'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── MODAL: ABANDONAR TEST (7.1 alerta) ── */}
+      {/* ── MODALES ── */}
       <AbandonTestModal
         visible={showAbandonModal}
         currentIndex={currentIndex}
@@ -587,7 +539,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
         }}
       />
 
-      {/* ── MODAL: TIEMPO AGOTADO (7.1 alerta) ── */}
       <TimeUpModal
         visible={showTimeUpModal}
         onContinue={() => {
@@ -596,7 +547,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
         }}
       />
 
-      {/* ── MODAL: REPORTAR ERROR (7.5) ── */}
       <ReportQuestionModal
         visible={showReportModal}
         questionId={question?.id}
@@ -607,7 +557,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
         }}
       />
 
-      {/* ── BOTTOM SHEET: REFERENCIA LEGISLATIVA (7.3) ── */}
       <LawReferenceBottomSheet
         visible={showLawSheet}
         law={question?.law}
@@ -618,7 +567,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
         onClose={() => setShowLawSheet(false)}
       />
 
-      {/* ── BOTTOM SHEET: PISTA IA (7.2) ── */}
       <HintBottomSheet
         visible={showHintSheet}
         questionSummary={question?.title}
@@ -627,7 +575,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
         onClose={() => setShowHintSheet(false)}
       />
 
-      {/* ── MODAL: PAUSA (7.6) ── */}
       <PauseSessionModal
         visible={showPauseModal}
         currentIndex={currentIndex}
@@ -639,52 +586,18 @@ export default function QuestionActiveScreen({ navigation, route }) {
           setIsPaused(false);
         }}
         onExitAndSave={() => {
-          // mock — reemplazar con saveAttempt() antes de salir
           setShowPauseModal(false);
           setIsPaused(false);
           navigation.goBack();
         }}
       />
 
-      {/* ── TOAST: GUARDADO / REPORTADO (7.1 ok) ── */}
       <ToastNotification
         visible={!!toast}
         message={toast?.message ?? ''}
         type={toast?.type ?? 'success'}
         onClose={() => setToast(null)}
       />
-
-      {/* ── BOTÓN DE ACCIÓN PRINCIPAL ── */}
-      <View style={styles.actionArea}>
-        {!isSubmitted ? (
-          <TouchableOpacity
-            style={[styles.mainBtn, !selectedOption && styles.mainBtnDisabled]}
-            onPress={handleConfirm}
-            disabled={!selectedOption}
-            activeOpacity={0.85}
-            accessibilityLabel="Confirmar la respuesta seleccionada"
-          >
-            <Text style={styles.mainBtnText}>Confirmar respuesta</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.mainBtn}
-            onPress={handleNext}
-            activeOpacity={0.85}
-            accessibilityLabel={isLastQuestion ? 'Ver resultados de la sesión' : 'Pasar a la siguiente pregunta'}
-          >
-            <Text style={styles.mainBtnText}>
-              {isLastQuestion ? 'Ver resultados' : 'Siguiente pregunta'}
-            </Text>
-            <Ionicons
-              name={isLastQuestion ? 'trophy-outline' : 'arrow-forward'}
-              size={18}
-              color={colors.white}
-              style={{ marginLeft: spacing.sm }}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
     </SafeAreaView>
   );
 }
@@ -692,58 +605,80 @@ export default function QuestionActiveScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
   },
 
-  // ── Header (navy oscuro, 3 filas) ──
-  header: {
-    backgroundColor: colors.dark,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: 10,
-  },
-  headerRow0: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  headerSessionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.white,
-  },
-  headerSessionSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
-    marginTop: 1,
-  },
-  headerRow1: {
+  // ── Header blanco superior ─────────────
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: 7,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.card,
   },
-  backBtn: {
-    padding: spacing.xs,
+  circleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F1F3F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleBtnRight: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topHeaderTexts: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  topHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.dark,
+  },
+  topHeaderSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+
+  // ── Barra navy de progreso ─────────────
+  progressBar: {
+    backgroundColor: colors.dark,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 14,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  progressTrackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   progressTrack: {
     flex: 1,
-    height: 4,
+    height: 5,
     backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 2,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.success,
-    borderRadius: 2,
-  },
-  headerControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  pauseBtn: {
-    padding: spacing.xs,
+    backgroundColor: colors.primary,
+    borderRadius: 3,
   },
   timerArea: {
     flexDirection: 'row',
@@ -753,186 +688,140 @@ const styles = StyleSheet.create({
   timerText: {
     fontSize: 13,
     fontWeight: '700',
-  },
-  headerRow2: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  questionCounter: {
-    fontSize: 13,
     color: colors.white,
-    fontWeight: '700',
   },
 
-  // ── Scroll ──
-  scroll: {
-    flex: 1,
-  },
+  // ── Scroll ─────────────────────────────
+  scroll: { flex: 1, backgroundColor: colors.card },
   scrollContent: {
     padding: spacing.md,
-    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
 
-  // ── Enunciado ──
+  // ── Enunciado ──────────────────────────
   questionText: {
-    fontSize: 17,
-    fontWeight: '600',
-    lineHeight: 27,
-    color: colors.text,
-    marginBottom: spacing.lg,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    color: colors.dark,
+    marginBottom: spacing.md,
+    marginTop: 4,
   },
 
-  // ── Opciones ──
+  // ── Opciones ───────────────────────────
   optionsList: {
-    gap: spacing.sm,
+    gap: 8,
+    marginBottom: spacing.md,
   },
   optionCard: {
-    borderRadius: 10,
-    padding: spacing.md,
-  },
-  optionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    gap: 8,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   optionLetter: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     width: 18,
-    flexShrink: 0,
+    lineHeight: 18,
   },
   optionText: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  optionIcon: {
-    marginLeft: spacing.xs,
-    flexShrink: 0,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
-  // ── Feedback ──
-  feedback: {
-    marginTop: spacing.lg,
+  // ── Feedback card ──────────────────────
+  feedbackCard: {
+    borderRadius: 12,
+    borderWidth: 1.5,
     padding: spacing.md,
-    borderRadius: 10,
-    borderLeftWidth: 4,
+    marginBottom: spacing.sm,
+  },
+  feedbackCardOk: {
+    backgroundColor: '#F0FDF4',
+    borderColor: colors.success,
+  },
+  feedbackCardErr: {
+    backgroundColor: '#FEF2F2',
+    borderColor: colors.error,
   },
   feedbackHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+    gap: 8,
+    marginBottom: 6,
   },
   feedbackTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: -0.2,
   },
   feedbackBody: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: colors.text,
-  },
-  // Tarjeta de Lab de Errores (7.4b) — contrasta con el fondo errorBg del feedback
-  errorLabCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    padding: spacing.sm,
-    borderRadius: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.error,
-    backgroundColor: colors.card,  // blanco sobre el fondo rojo claro del feedback
-  },
-  errorLabCardContent: {
-    flex: 1,
-    gap: 2,
-  },
-  errorLabCardTitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: colors.error,
+    lineHeight: 18,
+    color: colors.dark,
   },
-  errorLabCardBody: {
+  errorLabLink: {
     fontSize: 12,
-    lineHeight: 17,
-    color: colors.textSecondary,
-  },
-
-  // ── Toolbar ──
-  toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.card,
-    borderTopWidth: 1,
-    borderTopColor: colors.separator,
-  },
-  difficultyBlock: {
-    flexDirection: 'row',
-    gap: 2,
-    paddingHorizontal: spacing.xs,
-  },
-  toolbarSep: {
-    width: 1,
-    height: 22,
-    backgroundColor: colors.separator,
-    marginHorizontal: spacing.xs,
-  },
-  toolItem: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  toolLabel: {
-    fontSize: 10,
-    color: colors.grayText,
-  },
-  toolLabelActive: {
-    color: colors.primary,
-  },
-  toolLabelTiny: {
-    fontSize: 9,
-    color: colors.grayText,
-    letterSpacing: 0.2,
+    color: colors.error,
     fontWeight: '600',
-  },
-  toolItemDisabled: {
-    opacity: 0.38,
-  },
-  toolLabelDisabled: {
-    color: colors.separator,
+    marginTop: 8,
   },
 
-  // ── Botón principal ──
-  actionArea: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
-    backgroundColor: colors.card,
-  },
+  // ── Botón principal ────────────────────
   mainBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: colors.success,
-    paddingVertical: spacing.md,
-    borderRadius: 12,
-    gap: spacing.xs,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: spacing.sm,
   },
   mainBtnDisabled: {
-    backgroundColor: colors.grayMid,
+    backgroundColor: '#A7A9AD',
   },
   mainBtnText: {
     color: colors.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.2,
+  },
+
+  // ── Toolbar inferior ───────────────────
+  toolbar: {
+    marginTop: spacing.md,
+  },
+  difficultyBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: 6,
+  },
+  difficultyLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginLeft: 8,
+  },
+  toolsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginTop: 6,
+  },
+  toolItem: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    minWidth: 60,
+  },
+  toolItemDisabled: {
+    opacity: 0.4,
+  },
+  toolLabel: {
+    fontSize: 10,
+    color: colors.dark,
+    fontWeight: '600',
   },
 });
