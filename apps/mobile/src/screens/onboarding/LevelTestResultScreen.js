@@ -8,52 +8,56 @@ import {
     StatusBar,
     ScrollView,
 } from 'react-native';
-import Svg, { Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 
-// ─── Gauge semicircular ──────────────────────────────────────────────────────
-// SVG exacto del wireframe: viewBox="0 0 150 90", radio 60, track #EEF1F7,
-// fill naranja hasta el punto (110,33) que representa ~58% del arco
-function ScoreGauge({ percent = 58, label = 'Nivel inicial' }) {
+// ─── Rosco circular (full ring) de progreso ─────────────────────────────────
+const RING_SIZE = 150;
+const RING_STROKE = 14;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const BACK_BTN_SIZE = 32;
+
+function ScoreRing({ percent = 58 }) {
+    const clamped = Math.max(0, Math.min(100, percent));
+    const displayPercent = Math.round(clamped);
+    const filled = (clamped / 100) * RING_CIRCUMFERENCE;
+
     return (
-        <Svg width={150} height={90} viewBox="0 0 150 90">
-            {/* Track gris */}
-            <Path
-                d="M15 85 A60 60 0 0 1 135 85"
-                fill="none"
-                stroke="#EEF1F7"
-                strokeWidth={13}
-                strokeLinecap="round"
-            />
-            {/* Fill naranja (58% → punto final 110,33) */}
-            <Path
-                d="M15 85 A60 60 0 0 1 110 33"
-                fill="none"
-                stroke="#FF6B4A"
-                strokeWidth={13}
-                strokeLinecap="round"
-            />
-            {/* Porcentaje */}
-            <SvgText
-                x="75"
-                y="70"
-                textAnchor="middle"
-                fontSize={26}
-                fontWeight="800"
-                fill="#0F1B33"
-            >
-                {percent}%
-            </SvgText>
-            {/* Sublabel */}
-            <SvgText
-                x="75"
-                y="84"
-                textAnchor="middle"
-                fontSize={9}
-                fill="#8A92A0"
-            >
-                {label}
-            </SvgText>
-        </Svg>
+        <View style={styles.ringWrap}>
+            <View style={styles.ringInner}>
+                <Svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+                    {/* Track (remanente) */}
+                    <Circle
+                        cx={RING_SIZE / 2}
+                        cy={RING_SIZE / 2}
+                        r={RING_RADIUS}
+                        stroke={colors.textDark}
+                        strokeWidth={RING_STROKE}
+                        fill="none"
+                    />
+                    {/* Fill de progreso */}
+                    <Circle
+                        cx={RING_SIZE / 2}
+                        cy={RING_SIZE / 2}
+                        r={RING_RADIUS}
+                        stroke={colors.statGreen}
+                        strokeWidth={RING_STROKE}
+                        strokeLinecap="round"
+                        strokeDasharray={`${filled} ${RING_CIRCUMFERENCE}`}
+                        fill="none"
+                        rotation={-90}
+                        origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
+                    />
+                </Svg>
+                <View style={styles.ringLabel} pointerEvents="none">
+                    <Text style={styles.ringPercent}>
+                        {displayPercent}
+                        <Text style={styles.ringPercentSign}>%</Text>
+                    </Text>
+                </View>
+            </View>
+        </View>
     );
 }
 
@@ -76,44 +80,91 @@ function ChipWeakness({ label }) {
 }
 
 // ─── Pantalla principal ──────────────────────────────────────────────────────
-export default function LevelTestResultScreen({ navigation }) {
+export default function LevelTestResultScreen({ navigation, route }) {
+    // NOTA: `LevelTestInProgressScreen` todavía navega con
+    // `navigation.replace('LevelTestResult')` sin parámetros (no calcula
+    // aciertos/fallos/tiempo/fortalezas reales todavía). Hasta que ese flujo
+    // exista, esta pantalla acepta todo por route.params con defaults de
+    // wireframe para no romper la presentación.
+    const {
+        percent = 58,
+        correct = 8,
+        total = 20,
+        level = 'Intermedio',
+        aciertos = 15,
+        fallos = 5,
+        tiempo = '8:12',
+        strengths = ['Constitución', 'Org. del Estado'],
+        weaknesses = ['Ley 39/2015', 'Procedimiento'],
+    } = route?.params || {};
+
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            {/* Status bar */}
-            <View style={styles.statusBar}>
-                <Text style={styles.statusBarTime}>9:41</Text>
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.backBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Text style={styles.backIcon}>‹</Text>
+                </TouchableOpacity>
+                <Text style={styles.headerTitle} numberOfLines={1}>Test completado</Text>
             </View>
 
-            {/* Cuerpo scrollable (scr-scroll) */}
+            {/* Cuerpo scrollable */}
             <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.body}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Gauge semicircular */}
-                <View style={styles.gaugeWrap}>
-                    <ScoreGauge percent={58} label="Nivel inicial" />
-                </View>
+                {/* Rosco circular */}
+                <ScoreRing percent={percent} />
+
+                {/* Aciertos de total */}
+                <Text style={styles.correctLine}>{correct} de {total} correctas</Text>
 
                 {/* Nivel + descripción */}
                 <Text style={styles.levelLine}>
-                    Nivel <Text style={styles.levelBold}>Intermedio</Text>. Buen punto de partida.
+                    Nivel <Text style={styles.levelBold}>{String(level).toUpperCase()}</Text>. Buen punto de partida.
                 </Text>
 
+                <View style={styles.separator} />
+
+                {/* ── Estadísticas ── */}
+                <View style={styles.statsRow}>
+                    <View style={styles.statTile}>
+                        <Text style={[styles.statValue, styles.statValueGreen]}>{aciertos}</Text>
+                        <Text style={styles.statLabel}>Aciertos</Text>
+                    </View>
+                    <View style={styles.statTile}>
+                        <Text style={[styles.statValue, styles.statValueRed]}>{fallos}</Text>
+                        <Text style={styles.statLabel}>Fallos</Text>
+                    </View>
+                    <View style={styles.statTile}>
+                        <Text style={[styles.statValue, styles.statValueDark]}>{tiempo}</Text>
+                        <Text style={styles.statLabel}>Tiempo</Text>
+                    </View>
+                </View>
+
+                <View style={styles.separator} />
+
                 {/* ── Puntos fuertes ── */}
-                <Text style={styles.sectionLabel}>PUNTOS FUERTES</Text>
+                <Text style={styles.sectionLabel}>PUNTOS FUERTES:</Text>
                 <View style={styles.chipsRow}>
-                    <ChipStrength label="Constitución" />
-                    <ChipStrength label="Org. del Estado" />
+                    {strengths.map((label) => (
+                        <ChipStrength key={label} label={label} />
+                    ))}
                 </View>
 
                 {/* ── A reforzar ── */}
-                <Text style={[styles.sectionLabel, styles.sectionLabelWeak]}>A REFORZAR</Text>
+                <Text style={[styles.sectionLabel, styles.sectionLabelWeak]}>A REFORZAR:</Text>
                 <View style={styles.chipsRow}>
-                    <ChipWeakness label="Ley 39/2015" />
-                    <ChipWeakness label="Procedimiento" />
+                    {weaknesses.map((label) => (
+                        <ChipWeakness key={label} label={label} />
+                    ))}
                 </View>
 
                 {/* CTA */}
@@ -133,67 +184,145 @@ export default function LevelTestResultScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.white,
     },
 
-    // Status bar
-    statusBar: {
-        height: 30,
+    // ── Header (back-chevron + título) ───────────
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        flexShrink: 0,
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.sm,
     },
-    statusBarTime: {
-        fontSize: 10,
+    backBtn: {
+        width: BACK_BTN_SIZE,
+        height: BACK_BTN_SIZE,
+        borderRadius: BACK_BTN_SIZE / 2,
+        backgroundColor: colors.grayLight,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    backIcon: {
+        fontSize: 20,
         fontWeight: '700',
-        color: '#1B2A4A',
+        color: colors.textDark,
+    },
+    headerTitle: {
+        flex: 1,
+        textAlign: 'center',
+        marginRight: BACK_BTN_SIZE, // compensa el ancho del botón de back para centrar el título
+        fontSize: 17,
+        fontWeight: '700',
+        color: colors.textDark,
     },
 
-    // ScrollView (scr-scroll + body-area pad)
+    // ScrollView
     scroll: {
         flex: 1,
     },
     body: {
-        paddingHorizontal: 18,
-        paddingVertical: 16,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.md,
     },
 
-    // ── Gauge ────────────────────────────────────
-    // gauge-wrap: text-align:center; padding: 8px 0
-    gaugeWrap: {
+    // ── Rosco ────────────────────────────────────
+    ringWrap: {
         alignItems: 'center',
-        paddingVertical: 8,
+        paddingVertical: spacing.sm,
+    },
+    ringInner: {
+        width: RING_SIZE,
+        height: RING_SIZE,
+    },
+    ringLabel: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    ringPercent: {
+        fontSize: 32,
+        fontWeight: '800',
+        color: colors.textDark,
+    },
+    ringPercentSign: {
+        fontSize: 22,
+        fontWeight: '400',
+        color: colors.textDark,
+    },
+
+    // ── "X de Y correctas" ───────────────────────
+    correctLine: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: colors.textDark,
+        textAlign: 'center',
+        marginTop: spacing.sm,
     },
 
     // ── Nivel line ───────────────────────────────
-    // h-sub + text-align:center
     levelLine: {
         fontSize: 12.5,
-        color: '#5A6373',
+        color: colors.textDark,
         textAlign: 'center',
-        marginTop: 6,
+        marginTop: spacing.xs,
     },
     levelBold: {
         fontWeight: '700',
-        color: '#1B2A4A',
+        color: colors.textDark,
+    },
+
+    // ── Separador ────────────────────────────────
+    separator: {
+        height: 1,
+        backgroundColor: colors.textDark,
+        marginVertical: spacing.md,
+    },
+
+    // ── Estadísticas ─────────────────────────────
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    statTile: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    statValue: {
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    statValueGreen: {
+        color: colors.statGreen,
+    },
+    statValueRed: {
+        color: colors.statRed,
+    },
+    statValueDark: {
+        color: colors.textDark,
+    },
+    statLabel: {
+        fontSize: 11,
+        color: colors.textDark,
+        marginTop: 2,
     },
 
     // ── Section labels ───────────────────────────
-    // margin-top:16px, font-size:11px, font-weight:700, color:#5A6373
     sectionLabel: {
-        marginTop: 16,
+        marginTop: spacing.md,
         fontSize: 11,
         fontWeight: '700',
-        color: '#5A6373',
+        color: colors.textDark,
     },
-    // margin-top:12px para "A REFORZAR"
     sectionLabelWeak: {
-        marginTop: 12,
+        marginTop: spacing.sm + spacing.xs,
     },
 
     // ── Chips row ────────────────────────────────
-    // display:flex; gap:6px; flex-wrap:wrap; margin-top:6px
     chipsRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -201,10 +330,11 @@ const styles = StyleSheet.create({
         marginTop: 6,
     },
 
-    // Chip verde (puntos fuertes)
-    // bg:#E3F6EE, color:#2BB673, borderRadius:10, padding:4px 9px, 10px, 700
+    // Chip verde (puntos fuertes) — fill/stroke/texto #24bd90 (ctaGreen), fondo al 15% de opacidad
     chipStrength: {
-        backgroundColor: '#E3F6EE',
+        backgroundColor: 'rgba(36, 189, 144, 0.15)',
+        borderWidth: 1,
+        borderColor: colors.ctaGreen,
         borderRadius: 10,
         paddingVertical: 4,
         paddingHorizontal: 9,
@@ -212,13 +342,14 @@ const styles = StyleSheet.create({
     chipStrengthText: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#2BB673',
+        color: colors.ctaGreen,
     },
 
-    // Chip rojo (a reforzar)
-    // bg:#FDEBE9, color:#E2483D, borderRadius:10, padding:4px 9px, 10px, 700
+    // Chip rojo (a reforzar) — fill/stroke/texto #ff2638, fondo al 15% de opacidad
     chipWeakness: {
-        backgroundColor: '#FDEBE9',
+        backgroundColor: 'rgba(255, 38, 56, 0.15)',
+        borderWidth: 1,
+        borderColor: colors.statRed,
         borderRadius: 10,
         paddingVertical: 4,
         paddingHorizontal: 9,
@@ -226,20 +357,19 @@ const styles = StyleSheet.create({
     chipWeaknessText: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#E2483D',
+        color: colors.statRed,
     },
 
     // ── Botón CTA ────────────────────────────────
-    // btn + margin-top:18px
     btnPrimary: {
-        backgroundColor: '#FF6B4A',
+        backgroundColor: colors.ctaGreen,
         borderRadius: 12,
         paddingVertical: 13,
         alignItems: 'center',
-        marginTop: 18,
+        marginTop: spacing.lg - 6,
     },
     btnPrimaryText: {
-        color: '#FFFFFF',
+        color: colors.white,
         fontSize: 13.5,
         fontWeight: '700',
     },

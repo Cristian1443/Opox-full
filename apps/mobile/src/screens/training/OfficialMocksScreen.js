@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, FlatList, ActivityIndicator } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
-import ScreenHeader from '../../components/ScreenHeader';
+import TrainingHeader from '../../components/TrainingHeader';
 import { colors, spacing } from '../../theme';
 import { api } from '../../api/client';
 import { trainingApi } from '../../api/training';
@@ -29,12 +29,11 @@ function IconDocMedalDone({ color = colors.success }) {
     );
 }
 
+// Figma ("DESTACADO" 2298:2083): triángulo de "play", no un blanco.
 function IconSurgical({ color = '#fff' }) {
     return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.7} />
-            <Circle cx={12} cy={12} r={5} stroke={color} strokeWidth={1.7} />
-            <Circle cx={12} cy={12} r={1.5} fill={color} />
+        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M8 5.5v13l11-6.5z" fill={color} />
         </Svg>
     );
 }
@@ -141,7 +140,7 @@ export default function OfficialMocksScreen({ navigation }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-            <ScreenHeader title="Simulacros" subtitle="Exámenes oficiales" onBack={() => navigation.goBack()} />
+            <TrainingHeader eyebrow="Simulacros" title="Exámenes oficiales" onBack={() => navigation.goBack()} onSettings={() => navigation.navigate('Settings')} />
 
             {loading ? (
                 <View style={styles.empty}>

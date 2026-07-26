@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/onboarding/SplashScreen';
 import SplashNoConnectionScreen from '../screens/onboarding/SplashNoConnectionScreen';
 import SplashUpdateScreen from '../screens/onboarding/SplashUpdateScreen';
+import IconoScreen from '../screens/onboarding/IconoScreen';
 import OnboardingSliderScreen from '../screens/onboarding/OnboardingSliderScreen';
 import OppositionSelectorScreen from '../screens/onboarding/OppositionSelectorScreen';
 import LevelTestProposalScreen from '../screens/onboarding/LevelTestProposalScreen';
@@ -83,7 +84,7 @@ const Stack = createNativeStackNavigator();
 export default function OnboardingNavigator() {
     return (
         <Stack.Navigator
-            initialRouteName="Splash"
+            initialRouteName="Icono"
             screenOptions={{ headerShown: false, animation: 'fade' }}
         >
             <Stack.Screen name="Dashboard" component={DashboardScreen} />
@@ -93,6 +94,7 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="SplashNoConnection" component={SplashNoConnectionScreen} />
             <Stack.Screen name="SplashUpdate" component={SplashUpdateScreen} />
+            <Stack.Screen name="Icono" component={IconoScreen} />
             <Stack.Screen name="OnboardingSlider" component={OnboardingSliderScreen} />
             <Stack.Screen name="OppositionSelector" component={OppositionSelectorScreen} />
             <Stack.Screen name="LevelTestProposal" component={LevelTestProposalScreen} />

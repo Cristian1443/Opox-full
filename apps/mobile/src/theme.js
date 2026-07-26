@@ -9,6 +9,15 @@ export const colors = {
     green: '#22c55e',
     greenLight: '#dcfce7',
     redSoft: '#fde8df',
+    textDark: '#412950',
+    textMuted: '#343A3D',
+    ctaGreen: '#24bd90',
+    selectionBorder: '#9F6EE4',
+    statGreen: '#3AB675',
+    statRed: '#FF2638',
+    accentOrange: '#F69624',
+    bannerPurple: '#804CC9',
+    neutralGray: '#9D9B9B',
 
     // Tokens semánticos (Bloque 3+)
     background: '#F2F2F7',

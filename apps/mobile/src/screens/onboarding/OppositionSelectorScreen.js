@@ -8,10 +8,14 @@ import {
     TextInput,
     Platform,
     StatusBar,
+    Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PoliciaIcon, JusticiaIcon, HaciendaIcon } from '../../components/icons/OppositionIcons';
+
+const { width: SW } = Dimensions.get('window');
 
 /**
  * Este selector corre en el Bloque 0, ANTES de que exista sesión (el
@@ -22,85 +26,83 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 export const PENDING_OPOSICION_KEY = 'opox.pendingOposicion';
 
-// ─── TOKENS ───────────────────────────────────────────────
+// ─── Colores Figma (frame SELECTOR OPOSICION) ─────────────────────────────────
 const C = {
-    primary: '#f26535',
-    dark: '#0d1b2a',
-    white: '#ffffff',
-    grayLight: '#f4f5f7',
-    grayBorder: '#e4e7ec',
-    grayText: '#667085',
-    graySubtext: '#98a2b3',
-    boeLiveBg: '#d1fae5',
-    boeLiveTxt: '#065f46',
-    selectedBg: '#fff4f0',
-    selectedBdr: '#f26535',
-    iconBg: '#f2f4f7',
+    bg:          '#F4F4F4',
+    white:       '#FFFFFF',
+    title:       '#412950',
+    placeholder: '#412950',
+    searchIcon:  '#BDB6BF',
+    cardBg:      'rgba(255, 255, 255, 0.5)',
+    cardBorder:  'rgba(65, 41, 80, 0.3)',
+    cardBgFirst: 'rgba(235, 235, 235, 0.5)',
+    name:        '#412950',
+    sub:         '#343A3D',
+    boeGreen:    '#24BD90',
+    boeBg:       'rgba(36, 189, 144, 0.15)',
+    boeBorder:   '#24BD90',
+    iconColor:   '#F69624',
 };
+
+// ─── Icono de lupa (mismo color gris del Figma #BDB6BF) ───────────────────────
+function SearchIcon({ size = 24 }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <Circle cx="10.5" cy="10.5" r="7" stroke={C.searchIcon} strokeWidth={2.2} />
+            <Path d="M15.5 15.5L21 21" stroke={C.searchIcon} strokeWidth={2.2} strokeLinecap="round" />
+        </Svg>
+    );
+}
 
 // ─── DATA ──────────────────────────────────────────────────
 const OPPOSITIONS = [
     {
         id: '1',
-        name: 'Justicia',
+        name: 'Policía local',
         sub: 'Tramitación · Auxilio · Gestión',
-        icon: 'scale-outline',
+        Icon: PoliciaIcon,
+        isFirst: true,
     },
     {
         id: '2',
-        name: 'Educación',
-        sub: 'Maestros · Secundaria',
-        icon: 'school-outline',
+        name: 'Justicia',
+        sub: 'Tramitación · Auxilio · Gestión',
+        Icon: JusticiaIcon,
     },
     {
         id: '3',
         name: 'Hacienda',
         sub: 'Agentes · Administrativos',
-        icon: 'home-outline',
-    },
-    {
-        id: '4',
-        name: 'Administración General',
-        sub: 'Estado · CCAA · Local',
-        icon: 'business-outline',
-    },
-    {
-        id: '5',
-        name: 'Guardia Civil / Policía',
-        sub: 'Incluye pruebas físicas',
-        icon: 'shield-outline',
+        Icon: HaciendaIcon,
     },
 ];
 
-// ─── ITEM ──────────────────────────────────────────────────
-const OppositionItem = ({ item, selected, onPress }) => {
-    const active = selected?.id === item.id;
+// ─── CARD ITEM ─────────────────────────────────────────────
+const OppositionItem = ({ item, onPress }) => {
+    const { Icon } = item;
     return (
         <TouchableOpacity
             onPress={() => onPress(item)}
             activeOpacity={0.75}
-            style={[styles.item, active && styles.itemActive]}
+            style={[
+                styles.card,
+                item.isFirst && styles.cardFirst,
+            ]}
         >
-            {/* Ícono cuadrado */}
-            <View style={[styles.itemIconBox, active && styles.itemIconBoxActive]}>
-                <Ionicons
-                    name={item.icon}
-                    size={20}
-                    color={active ? C.primary : C.grayText}
-                />
+            {/* Icono a la izquierda */}
+            <View style={styles.cardIconWrap}>
+                <Icon size={56} color={C.iconColor} />
             </View>
 
-            {/* Texto */}
-            <View style={styles.itemTextBox}>
-                <Text style={[styles.itemName, active && styles.itemNameActive]}>
-                    {item.name}
-                </Text>
-                <Text style={styles.itemSub}>{item.sub}</Text>
+            {/* Textos centrales */}
+            <View style={styles.cardTextWrap}>
+                <Text style={styles.cardName}>{item.name}</Text>
+                <Text style={styles.cardSub}>{item.sub}</Text>
             </View>
 
-            {/* Badge BOE LIVE */}
-            <View style={styles.badge}>
-                <Text style={styles.badgeTxt}>BOE LIVE</Text>
+            {/* Badge BOE LIVE a la derecha */}
+            <View style={styles.boeBadge}>
+                <Text style={styles.boeText}>BOE LIVE</Text>
             </View>
         </TouchableOpacity>
     );
@@ -110,7 +112,6 @@ const OppositionItem = ({ item, selected, onPress }) => {
 export default function OppositionSelectorScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const [query, setQuery] = useState('');
-    const [selected, setSelected] = useState(null);
 
     const filtered = useMemo(() =>
         OPPOSITIONS.filter(o =>
@@ -119,32 +120,26 @@ export default function OppositionSelectorScreen({ navigation }) {
         [query]
     );
 
-    const handleContinue = async () => {
-        if (!selected) return;
-        await AsyncStorage.setItem(PENDING_OPOSICION_KEY, selected.name);
+    const handleSelect = async (item) => {
+        await AsyncStorage.setItem(PENDING_OPOSICION_KEY, item.name);
         navigation.navigate('LevelTestProposal');
     };
 
     return (
         <View style={[styles.root, { paddingTop: insets.top }]}>
-            <StatusBar barStyle="dark-content" backgroundColor={C.white} />
+            <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
-            {/* ── HEADER ── */}
-            <View style={styles.header}>
-                <Text style={styles.title}>¿Qué oposición preparas?</Text>
+            {/* ── TÍTULO ── */}
+            <Text style={styles.title}>¿Qué oposición preparas?</Text>
 
-                {/* Buscador */}
+            {/* ── BUSCADOR ── */}
+            <View style={styles.searchWrap}>
                 <View style={styles.searchBox}>
-                    <Ionicons
-                        name="search-outline"
-                        size={18}
-                        color={C.graySubtext}
-                        style={styles.searchIcon}
-                    />
+                    <SearchIcon size={26} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Buscar oposición..."
-                        placeholderTextColor={C.graySubtext}
+                        placeholder="Buscar oposición"
+                        placeholderTextColor={C.placeholder}
                         value={query}
                         onChangeText={setQuery}
                         returnKeyType="search"
@@ -153,186 +148,136 @@ export default function OppositionSelectorScreen({ navigation }) {
                 </View>
             </View>
 
-            {/* ── LISTA ── */}
+            {/* ── LISTA DE TARJETAS ── */}
             <FlatList
                 data={filtered}
                 keyExtractor={item => item.id}
                 renderItem={({ item }) => (
-                    <OppositionItem
-                        item={item}
-                        selected={selected}
-                        onPress={setSelected}
-                    />
+                    <OppositionItem item={item} onPress={handleSelect} />
                 )}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={true}
-                indicatorStyle="black"
+                contentContainerStyle={[
+                    styles.listContent,
+                    { paddingBottom: insets.bottom + 40 },
+                ]}
+                showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
-                ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+                ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
             />
-
-            {/* ── BOTÓN CONTINUAR — fijo al fondo ── */}
-            <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                <TouchableOpacity
-                    style={[styles.continueBtn, !selected && styles.continueBtnDisabled]}
-                    onPress={handleContinue}
-                    disabled={!selected}
-                    activeOpacity={0.85}
-                >
-                    <Text style={styles.continueTxt}>Continuar</Text>
-                </TouchableOpacity>
-            </View>
         </View>
     );
 }
 
 // ─── STYLES ────────────────────────────────────────────────
+const CARD_H = SW * 0.33;      // Proporción del Figma ~267.9/783.95 × ancho
+const CARD_PAD_H = 24;
+
 const styles = StyleSheet.create({
     root: {
         flex: 1,
-        backgroundColor: C.white,
+        backgroundColor: C.bg,
     },
 
-    // Header: título + buscador
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 12,
-    },
+    // Título grande centrado
     title: {
-        fontSize: 22,
-        fontWeight: '900',
-        color: C.dark,
-        marginBottom: 16,
-        ...Platform.select({
-            android: { fontFamily: 'sans-serif-black' },
-        }),
+        fontFamily: Platform.OS === 'ios' ? 'Poppins-SemiBold' : 'Poppins-SemiBold',
+        fontSize: 24,
+        fontWeight: '600',
+        color: C.title,
+        textAlign: 'center',
+        marginTop: 24,
+        marginBottom: 18,
+        paddingHorizontal: 32,
+        lineHeight: 36,
     },
 
     // Buscador
+    searchWrap: {
+        paddingHorizontal: CARD_PAD_H,
+        marginBottom: 18,
+    },
     searchBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        height: 48,
-        borderRadius: 12,
-        borderWidth: 1.5,
-        borderColor: C.grayBorder,
+        height: 56,
+        borderRadius: 14,
         backgroundColor: C.white,
-        paddingHorizontal: 14,
-    },
-    searchIcon: {
-        marginRight: 8,
+        paddingHorizontal: 18,
+        gap: 12,
     },
     searchInput: {
         flex: 1,
-        fontSize: 15,
-        color: C.dark,
+        fontSize: 16,
+        fontWeight: '400',
+        color: C.title,
         paddingVertical: 0,
     },
 
     // Lista
     listContent: {
-        paddingHorizontal: 20,
+        paddingHorizontal: CARD_PAD_H,
         paddingTop: 4,
-        paddingBottom: 10,
     },
 
-    // Item base
-    item: {
+    // Tarjeta genérica
+    card: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: C.white,
+        backgroundColor: C.cardBg,
         borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: C.grayBorder,
-        paddingVertical: 14,
-        paddingHorizontal: 14,
-        minHeight: 72,
-    },
-    // Item seleccionado
-    itemActive: {
-        borderColor: C.selectedBdr,
-        backgroundColor: C.selectedBg,
+        borderWidth: 0.71,
+        borderColor: C.cardBorder,
+        paddingVertical: 20,
+        paddingHorizontal: 18,
+        minHeight: CARD_H,
     },
 
-    // Ícono cuadrado gris
-    itemIconBox: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        backgroundColor: C.iconBg,
+    // Primera tarjeta (Policía local) tiene fondo ligeramente diferente
+    cardFirst: {
+        backgroundColor: C.cardBgFirst,
+    },
+
+    // Icono
+    cardIconWrap: {
+        width: 70,
+        height: 70,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
-    },
-    itemIconBoxActive: {
-        backgroundColor: '#fff4f0',
+        marginRight: 14,
     },
 
-    // Texto del item
-    itemTextBox: {
+    // Textos
+    cardTextWrap: {
         flex: 1,
     },
-    itemName: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: C.dark,
-        marginBottom: 2,
+    cardName: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: C.name,
+        marginBottom: 4,
+        lineHeight: 26,
     },
-    itemNameActive: {
-        color: C.primary,
-    },
-    itemSub: {
-        fontSize: 12,
-        color: C.graySubtext,
-        lineHeight: 17,
+    cardSub: {
+        fontSize: 13,
+        fontWeight: '400',
+        color: C.sub,
+        lineHeight: 20,
+        opacity: 0.5,
     },
 
-    // Badge BOE LIVE — verde
-    badge: {
-        backgroundColor: C.boeLiveBg,
-        borderRadius: 20,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+    // Badge BOE LIVE
+    boeBadge: {
+        backgroundColor: C.boeBg,
+        borderRadius: 8,
+        borderWidth: 0.92,
+        borderColor: C.boeBorder,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         marginLeft: 8,
     },
-    badgeTxt: {
-        color: C.boeLiveTxt,
-        fontSize: 11,
-        fontWeight: '700',
-        letterSpacing: 0.2,
-    },
-
-    // Footer con botón
-    footer: {
-        paddingHorizontal: 20,
-        paddingTop: 12,
-        backgroundColor: C.white,
-        borderTopWidth: 1,
-        borderTopColor: C.grayBorder,
-    },
-    continueBtn: {
-        backgroundColor: C.primary,
-        borderRadius: 50,
-        height: 56,
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: C.primary,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-            },
-            android: { elevation: 6 },
-        }),
-    },
-    continueBtnDisabled: {
-        opacity: 0.45,
-    },
-    continueTxt: {
-        color: C.white,
-        fontSize: 17,
-        fontWeight: '800',
+    boeText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: C.boeGreen,
+        letterSpacing: 0.3,
     },
 });

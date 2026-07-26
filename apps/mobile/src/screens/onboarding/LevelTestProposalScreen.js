@@ -2,12 +2,13 @@ import React from 'react';
 import {
     View,
     Text,
+    Image,
     TouchableOpacity,
     StyleSheet,
     SafeAreaView,
     StatusBar,
 } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 
 export default function LevelTestProposalScreen({ navigation }) {
     return (
@@ -25,19 +26,12 @@ export default function LevelTestProposalScreen({ navigation }) {
                 {/* Bloque central: icono + título + subtítulo */}
                 <View style={styles.centerBlock}>
 
-                    {/* Icono con fondo circular */}
-                    <View style={styles.iconCircle}>
-                        <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
-                            <Path
-                                d="M3 17l5-5 4 3 8-8"
-                                stroke="#FF6B4A"
-                                strokeWidth={2}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                            <Circle cx={20} cy={7} r={2} fill="#FF6B4A" />
-                        </Svg>
-                    </View>
+                    {/* Ilustración real exportada de Figma (nodo 2346:1868) */}
+                    <Image
+                        source={require('../../../assets/onboarding/level-test-proposal.png')}
+                        style={styles.illustration}
+                        resizeMode="contain"
+                    />
 
                     {/* Título */}
                     <Text style={styles.title}>Mídete en 5 minutos</Text>
@@ -59,11 +53,11 @@ export default function LevelTestProposalScreen({ navigation }) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={styles.btnGhost}
+                        style={styles.secondaryLink}
                         onPress={() => navigation.navigate('Permissions')}
-                        activeOpacity={0.85}
+                        activeOpacity={0.6}
                     >
-                        <Text style={styles.btnGhostText}>Ahora no, lo haré luego</Text>
+                        <Text style={styles.secondaryLinkText}>Ahora no, en otro momento</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -83,7 +77,7 @@ const styles = StyleSheet.create({
         height: 30,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
+        paddingHorizontal: spacing.md,
         flexShrink: 0,
     },
     statusBarTime: {
@@ -97,7 +91,7 @@ const styles = StyleSheet.create({
     body: {
         flex: 1,
         paddingHorizontal: 18,
-        paddingVertical: 16,
+        paddingVertical: spacing.md,
         flexDirection: 'column',
     },
 
@@ -110,22 +104,18 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // Círculo con icono
-    iconCircle: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: '#FFF6F3',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 20,
+    // Ilustración (proporción real del nodo Figma: 606x549)
+    illustration: {
+        width: 190,
+        height: 172,
+        marginBottom: spacing.lg,
     },
 
     // Título
     title: {
         fontSize: 21,
         fontWeight: '800',
-        color: '#0F1B33',
+        color: colors.textDark,
         letterSpacing: -0.4,
         textAlign: 'center',
     },
@@ -133,7 +123,7 @@ const styles = StyleSheet.create({
     // Subtítulo
     subtitle: {
         fontSize: 12.5,
-        color: '#5A6373',
+        color: colors.textMuted,
         marginTop: 6,
         textAlign: 'center',
         maxWidth: 235,
@@ -147,9 +137,9 @@ const styles = StyleSheet.create({
         // marginBottom: 0,  // ya está al fondo del flex
     },
 
-    // Botón primario (naranja)
+    // Botón primario (verde CTA)
     btnPrimary: {
-        backgroundColor: '#FF6B4A',
+        backgroundColor: colors.ctaGreen,
         borderRadius: 12,
         paddingVertical: 13,
         paddingHorizontal: 13,
@@ -157,25 +147,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     btnPrimaryText: {
-        color: '#FFFFFF',
+        color: colors.white,
         fontSize: 13.5,
         fontWeight: '700',
     },
 
-    // Botón ghost (blanco con borde)
-    btnGhost: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        paddingVertical: 13,
-        paddingHorizontal: 13,
-        width: '100%',
+    // Link secundario (texto plano, sin fondo ni borde — coincide con Figma)
+    secondaryLink: {
         alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: '#D4DAE6',
+        justifyContent: 'center',
+        paddingVertical: spacing.sm,
+        width: '100%',
     },
-    btnGhostText: {
-        color: '#1B2A4A',
+    secondaryLinkText: {
+        color: colors.textDark,
         fontSize: 13.5,
-        fontWeight: '700',
+        fontWeight: '400',
     },
 });

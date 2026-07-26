@@ -3,7 +3,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { navigate, getCurrentRouteName } from '../navigation/navigationRef';
 
 // Pantallas donde no tiene sentido interrumpir con el aviso de sin conexión
-const IGNORED_ROUTES = ['SplashNoConnection', 'SplashUpdate', 'Splash'];
+const IGNORED_ROUTES = ['SplashNoConnection', 'SplashUpdate', 'Splash', 'Icono'];
 
 export default function useNetworkWatcher() {
     useEffect(() => {
