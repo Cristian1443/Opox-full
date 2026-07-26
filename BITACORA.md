@@ -5,6 +5,94 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-25 — Bloques 6 y 7 · IA real integrada de punta a punta
+
+Rama de trabajo: `feat/ia-bloques-6-7` (nacida de `diseno-bloques-6-7`). Cierra
+todo lo que la bitácora del 13-07 dejó pendiente: los cuatro flujos del Bloque 6
+ya no muestran datos mock, hablan con OpenAI a través del backend y persisten en
+Supabase. El Bloque 7 (sesión de test activa) también queda funcional.
+
+### Descubrimiento: el equipo IA ya nos entregó su propio motor
+En la raíz del repo apareció `MotorIA_Ingesta_Tests.postman_collection.json` —
+es la entrega real del responsable de IA: un microservicio HTTP separado con
+ingesta de PDFs (~1000 pág. con OCR + chunking + embeddings), generación de
+tests con **evidencia verbatim del temario + página exacta**, y corrección con
+cita literal. Autentica por header `X-API-Key` (no `Authorization: Bearer`).
+
+Estado hoy: el Motor NO está desplegado, sólo lo tienen en local. Por eso OPOX
+usa OpenAI directo mientras tanto, con `MotorAiClient.ts` listo como esqueleto
+para el día que publiquen URL — cambiar de OpenAI a Motor será rellenar env vars
++ un `CompositeAiClient` de ~30 líneas. La guía completa está en
+`packages/ai/MOTOR_INTEGRATION.md`, incluyendo el bloqueante conocido (la vista
+pública del Motor no expone `correcta_idx`, hay que negociarlo con ellos).
+
+### IA: cliente OpenAI real (`AiApiClient.ts`)
+Los 4 métodos del contrato `AiApiContract` (antes lanzaban `throw not
+implemented`) ahora llaman a OpenAI Chat Completions con `response_format:
+json_object`:
+
+| Método | Modelo | Coste típico |
+|---|---|---|
+| `generateQuestions` | gpt-4o-mini | ~$0.0003 por 25 preguntas |
+| `analyzePhoto` (Foto-Test) | gpt-4o (visión) | ~$0.02-$0.05 por imagen |
+| `generateSurgicalTest` | gpt-4o-mini | ~$0.0007 por 20 preguntas |
+| `generateHint` (Pista IA) | gpt-4o-mini | ~$0.0001 por pista |
+
+- Validación Zod de la respuesta con 1 retry automático si el JSON viene malformado.
+- Log de tokens por llamada para vigilar coste (importante con la API key de $5).
+- Distribución del test quirúrgico calculada localmente (determinista) — el modelo
+  sólo escribe las preguntas, así garantizamos que `sum(count) === params.count`.
+- Prompt en español formal, prohíbe prefijos "A)"/"a." en las opciones (la app
+  añade la letra por su cuenta).
+
+Smoke test validado contra OpenAI real: 3 llamadas por menos de $0.001.
+
+### Mobile: 4 flujos cableados a IA + Supabase
+Todos los flujos de tests navegaban a `TrainingSession` sin datos reales y ésta
+caía a `MOCK_QUESTIONS` (la pregunta hardcodeada del Tribunal Constitucional que
+salía SIEMPRE, sin importar de dónde vinieses).
+
+- **6.2 Generador Infinito** — `trainingApi.generateQuestions` con dificultad,
+  count y oposicion del usuario.
+- **6.5 Foto-Test** — al pulsar "Hacer quiz" se llama a `generateQuestions` con
+  el `relatedTopicId` que devolvió el análisis de la imagen (fallback `'all'`).
+- **6.7 Simulacros Oficiales** — carga `getMockQuestions(examId)` desde Supabase
+  seed (32 preguntas oficiales), reparto de tiempo automático.
+- **6.9 Test Quirúrgico** — `trainingApi.generateSurgical` (el backend calcula
+  los `errorPatterns` del usuario solo).
+
+Todos con spinner "Generando preguntas…" y `Alert` de fallo controlado.
+
+### Adaptador de shape (`utils/questionAdapter.js`)
+El backend devuelve `GeneratedQuestion { text, options[4], correctIndex, ... }`.
+`QuestionActiveScreen` espera `{ title, options[{id,text,correct}], difficulty
+numérica, law, articleRef{article,title,text,boeUrl} }`. Adapter minimal + strip
+defensivo de prefijos "A)"/"A."/"a - " en las opciones (por si el modelo se cuela
+a pesar del prompt).
+
+### Persistencia del intento (Laboratorio de Errores desbloqueado)
+Bug encontrado: cuando el usuario terminaba un test, las respuestas se pintaban
+en `TrainingResult` pero **nunca se persistían en Supabase**. Sin filas en
+`training_attempt_responses` no había patrones que agregar → Error Lab siempre
+vacío. Ahora `TrainingResultScreen` llama `trainingApi.saveAttempt` en `useEffect`
+al montar (idempotente por sesión con `savedRef`).
+
+### Bug de UX: la galería no aparecía en Foto-Test
+`PhotoTestCaptureScreen` auto-lanzaba la cámara al obtener permisos → el usuario
+nunca veía el botón de galería que está debajo. Quitado el `useEffect` de
+auto-launch; ahora se ve el placeholder con los tres botones (galería · disparador
+· rotar) y el usuario elige.
+
+### Pendientes conocidos del bloque 6
+- **Simulacros oficiales sólo cubren `justicia-tramitacion`** — si el perfil tiene
+  otra oposición, la lista sale vacía hasta añadir seed SQL para su oposición.
+- **Selector de temario del Generador** — el picker local (Tema 1-5) manda
+  `topicId: 'all'` al backend. Cuando exista una tabla `training_topics` por
+  oposición, mapear las selecciones al ID real.
+- **Motor de IA** — reemplazar OpenAI directo por Motor cuando lo desplieguen.
+
+---
+
 ## 2026-07-13 — Bloque 6 · Entrenamiento (frontend cerrado)
 
 Rama de trabajo: `bloque-6-entrenamiento` (nacida de `main`).

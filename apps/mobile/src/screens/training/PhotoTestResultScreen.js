@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Animated, ActivityIndicator, Alert } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import TestReadyModal from '../../components/TestReadyModal';
 import { trainingApi } from '../../api/training';
+import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 // Acento morado del flujo Foto-Test (mismo que 6.4 y que la card 6.1)
 const AI_COLOR = '#7B4BC4';
@@ -33,11 +34,14 @@ export default function PhotoTestResultScreen({ navigation, route }) {
     const question = params.question ?? '¿Cuál es el plazo general para resolver un procedimiento administrativo?';
     const answer = params.answer ?? 'El plazo general para resolver es de 3 meses, salvo que una norma con rango de ley establezca uno mayor.';
     const questionsCount = params.questionsCount ?? 10;
+    const relatedTopicId = params.relatedTopicId ?? 'all';
+    const oposicion = params.oposicion ?? 'justicia-tramitacion';
 
     const [flipped, setFlipped] = useState(false);
     const [saved, setSaved] = useState(false);
     const [planned, setPlanned] = useState(false);
     const [readyModalOpen, setReadyModalOpen] = useState(false);
+    const [generating, setGenerating] = useState(false);
 
     // Entrada suave de toda la pantalla
     const entryFade = useRef(new Animated.Value(0)).current;
@@ -59,12 +63,32 @@ export default function PhotoTestResultScreen({ navigation, route }) {
 
     const openQuizConfirm = () => setReadyModalOpen(true);
 
-    const startQuiz = () => {
+    const startQuiz = async () => {
         setReadyModalOpen(false);
+        setGenerating(true);
+        // Pedimos preguntas del tema detectado por la IA. Cap a 10 aunque el
+        // análisis diga que hay más disponibles — evita esperas largas.
+        const count = Math.min(questionsCount, 10);
+        const { data, error } = await trainingApi.generateQuestions({
+            oposicion,
+            topicId: relatedTopicId,
+            difficulty: 'medium',
+            count,
+        });
+        setGenerating(false);
+        if (error || !Array.isArray(data) || data.length === 0) {
+            Alert.alert(
+                'No se pudo generar el test',
+                'La IA no devolvió preguntas. Inténtalo de nuevo en un momento.',
+            );
+            return;
+        }
         navigation.navigate('TrainingSession', {
             source: 'photo',
-            concept,
-            questionsCount,
+            questions: adaptGeneratedQuestions(data),
+            examTitle: `Foto-Test · ${concept}`,
+            timedMode: false,
+            oposicion,
         });
     };
 
@@ -125,8 +149,20 @@ export default function PhotoTestResultScreen({ navigation, route }) {
                     </TouchableOpacity>
 
                     {/* Acciones */}
-                    <TouchableOpacity style={styles.btnPrimary} onPress={openQuizConfirm} activeOpacity={0.85}>
-                        <Text style={styles.btnPrimaryText}>Hacer quiz</Text>
+                    <TouchableOpacity
+                        style={[styles.btnPrimary, generating && { opacity: 0.7 }]}
+                        onPress={openQuizConfirm}
+                        activeOpacity={0.85}
+                        disabled={generating}
+                    >
+                        {generating ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <ActivityIndicator color="#fff" size="small" />
+                                <Text style={styles.btnPrimaryText}>Generando preguntas…</Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.btnPrimaryText}>Hacer quiz</Text>
+                        )}
                     </TouchableOpacity>
 
                     <TouchableOpacity

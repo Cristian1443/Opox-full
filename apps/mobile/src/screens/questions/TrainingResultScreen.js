@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,32 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
+import { trainingApi } from '../../api';
+
+const OPTION_ID_TO_INDEX = { A: 0, B: 1, C: 2, D: 3 };
+
+// Mapea el shape del móvil a SaveAttemptResponseInput del backend.
+// La UI trabaja con { questionId, selected: 'A'|'B'|'C'|'D'|null, isCorrect }
+// pero el backend necesita el snapshot completo de la pregunta.
+function buildResponses(questions, answers) {
+  return questions
+    .map((q, i) => {
+      const answer = answers[i] ?? { selected: null };
+      // Sólo aceptamos questionId si es UUID; los MOCK_QUESTIONS tienen "q1"
+      // que rompería la validación Zod uuid() del backend.
+      const uuidLike = typeof q.id === 'string' && /^[0-9a-f-]{36}$/i.test(q.id);
+      return {
+        questionId: uuidLike ? q.id : undefined,
+        topicId: q.topicId ?? 'all',
+        topic: q.law ?? 'General',
+        questionText: q.title ?? q.text ?? '',
+        optionsSnapshot: (q.options ?? []).map((o) => o.text),
+        correctIndex: (q.options ?? []).findIndex((o) => o.correct),
+        userAnswerIndex: answer.selected != null ? OPTION_ID_TO_INDEX[answer.selected] : null,
+      };
+    })
+    .filter((r) => r.optionsSnapshot.length === 4 && r.correctIndex >= 0);
+}
 
 const MOCK_DATA = {
   answers: [
@@ -151,6 +177,27 @@ export default function TrainingResultScreen({ navigation, route }) {
   const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
   const isHighScore = percentage >= 90;
   const needsLab = incorrect > 0;
+
+  // Persiste el intento en el backend UNA SOLA VEZ al montar. Sin esto el
+  // Laboratorio de Errores no tiene con qué calcular los patrones de fallo.
+  const savedRef = useRef(false);
+  useEffect(() => {
+    if (savedRef.current) return;
+    savedRef.current = true;
+    const responses = buildResponses(questions, answers);
+    if (responses.length === 0) return; // MOCK data, no persistimos
+    // 'photo' no es un enum válido del backend — se guarda como 'generator'.
+    const backendSource = source === 'photo' ? 'generator' : source;
+    trainingApi
+      .saveAttempt({
+        source: backendSource,
+        durationSecs: elapsedSeconds,
+        responses,
+      })
+      .catch((_err) => {
+        // No bloqueamos la UI si Supabase falla — el usuario ya ve su resultado.
+      });
+  }, []);
 
   const formatTime = (s) => {
     const m = Math.floor(s / 60).toString().padStart(2, '0');

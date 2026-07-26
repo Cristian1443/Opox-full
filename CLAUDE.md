@@ -75,17 +75,26 @@ Opox-full/
 
 ---
 
-## 4. APIs externas — contratos pendientes
+## 4. APIs externas
 
-Los contratos vacíos viven en `packages/types/src/contracts/`:
+Contratos en `packages/types/src/contracts/`:
 
-- **`ClientApiContract.ts`** — datos del cliente: usuarios, planes, historial.
-- **`AiApiContract.ts`** — IA: generación de tests, OCR foto-test, tutor, legislación.
+- **`ClientApiContract.ts`** — pendiente (datos del cliente: usuarios, planes, historial).
+- **`AiApiContract.ts`** — **cerrado y en uso**. Cuatro métodos (`generateQuestions`,
+  `analyzePhoto`, `generateSurgicalTest`, `generateHint`) cubren toda la IA de los
+  Bloques 6 y 7. Implementado en `apps/backend/src/infrastructure/clients/AiApiClient.ts`
+  contra OpenAI directo (gpt-4o-mini + gpt-4o para visión).
 
-Flujo de integración: **mobile → nuestro backend → proveedor externo**.
-La API key de IA nunca va al móvil; vive en `apps/backend/.env`.
+Flujo de integración: **mobile → nuestro backend → OpenAI**. La API key de IA
+nunca va al móvil; vive en `apps/backend/.env` (`AI_API_KEY`).
 
-Cuando se definan los contratos, actualizar esos archivos primero y propagar cambios.
+### Motor de IA del cliente (sin desplegar)
+
+El equipo IA entregó un microservicio RAG separado
+(`MotorIA_Ingesta_Tests.postman_collection.json`) que ingesta PDFs de temario y
+genera tests con evidencia verbatim + página. **No está hosteado todavía**;
+`MotorAiClient.ts` es esqueleto listo para el día que publiquen URL. Guía completa
+en `packages/ai/MOTOR_INTEGRATION.md`.
 
 ---
 
@@ -110,7 +119,8 @@ pnpm lint                       # lint completo
 | 3 | Salud | Frontend cerrado |
 | 4 | Planificación | Frontend + backend completo |
 | 5 | Motivación | Frontend + backend completo |
-| 6 | Entrenamiento | Frontend + backend completo (falta `TrainingSession`) |
+| 6 | Entrenamiento | Frontend + backend + IA completo (los 4 flujos cableados a OpenAI real) |
+| 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
 | 8 | Aula Virtual / Tutor IA | Pendiente |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

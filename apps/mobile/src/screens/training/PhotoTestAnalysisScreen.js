@@ -117,6 +117,10 @@ export default function PhotoTestAnalysisScreen({ navigation, route }) {
                             question: data.question ?? '',
                             answer: data.answer ?? '',
                             questionsCount: data.availableQuestionsCount ?? 10,
+                            // relatedTopicId es necesario para que "Hacer quiz"
+                            // pida al backend preguntas del tema correcto.
+                            relatedTopicId: data.relatedTopicId ?? 'all',
+                            oposicion,
                         });
                     }
                 })();

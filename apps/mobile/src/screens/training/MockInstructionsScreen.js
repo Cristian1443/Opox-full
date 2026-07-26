@@ -1,8 +1,10 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
+import { trainingApi } from '../../api';
+import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 // Iconos para las condiciones del simulacro
 function IconList({ color = colors.primary }) {
@@ -60,13 +62,32 @@ export default function MockInstructionsScreen({ navigation, route }) {
         status: 'pending',
     };
 
-    const startExam = () => {
+    const [loading, setLoading] = useState(false);
+
+    const startExam = async () => {
+        if (loading) return;
+        setLoading(true);
+        const { data, error } = await trainingApi.getMockQuestions(safeExam.id);
+        setLoading(false);
+        if (error || !Array.isArray(data) || data.length === 0) {
+            Alert.alert(
+                'Simulacro no disponible',
+                'Este examen no tiene preguntas cargadas todavía. Prueba con otro año o con el Generador Infinito.',
+            );
+            return;
+        }
+        // Reparto uniforme del tiempo total del examen entre preguntas — el
+        // temporizador de la sesión funciona por-pregunta, no global.
+        const secondsPerQuestion = Math.max(
+            30,
+            Math.round((safeExam.minutes * 60) / data.length),
+        );
         navigation.navigate('TrainingSession', {
             source: 'official',
-            examId: safeExam.id,
-            questionsCount: safeExam.questions,
-            minutes: safeExam.minutes,
-            timerMode: true,
+            questions: adaptGeneratedQuestions(data),
+            examTitle: safeExam.title,
+            timedMode: true,
+            secondsPerQuestion,
         });
     };
 
@@ -109,8 +130,20 @@ export default function MockInstructionsScreen({ navigation, route }) {
             </ScrollView>
 
             <View style={styles.btnRow}>
-                <TouchableOpacity style={styles.btn} onPress={startExam} activeOpacity={0.85}>
-                    <Text style={styles.btnText}>Comenzar examen</Text>
+                <TouchableOpacity
+                    style={[styles.btn, loading && { opacity: 0.7 }]}
+                    onPress={startExam}
+                    activeOpacity={0.85}
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <ActivityIndicator color="#fff" size="small" />
+                            <Text style={styles.btnText}>Cargando examen…</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.btnText}>Comenzar examen</Text>
+                    )}
                 </TouchableOpacity>
             </View>
         </SafeAreaView>

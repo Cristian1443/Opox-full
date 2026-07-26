@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-    StatusBar, ScrollView, PanResponder,
+    StatusBar, ScrollView, PanResponder, ActivityIndicator, Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import ConfirmExitModal from '../../components/ConfirmExitModal';
 import { colors, spacing } from '../../theme';
+import { api, trainingApi } from '../../api';
+import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 // ─── Constantes de configuración ─────────────────────────────────────────────
 
@@ -124,6 +126,7 @@ export default function GeneratorConfigScreen({ navigation }) {
     const [topicId, setTopicId] = useState(DEFAULTS.topicId);
     const [topicOpen, setTopicOpen] = useState(true);
     const [exitOpen, setExitOpen] = useState(false);
+    const [generating, setGenerating] = useState(false);
 
     const topic = TOPICS.find((t) => t.id === topicId) ?? TOPICS[0];
     const hasChanges =
@@ -154,13 +157,41 @@ export default function GeneratorConfigScreen({ navigation }) {
         navigation.goBack();
     };
 
-    const generate = () => {
+    const generate = async () => {
+        if (generating) return;
+        setGenerating(true);
+        const session = await api.loadSession();
+        const oposicion =
+            session?.user?.oposicion ??
+            session?.user?.user_metadata?.oposicion ??
+            'justicia-tramitacion';
+        // Mapeamos topicId del picker local (t1, t2...) al del backend.
+        // Los temas reales llegarán del backend en una iteración posterior;
+        // por ahora 'all' permite que la IA cubra todo el temario.
+        const backendTopicId = 'all';
+        const { data, error } = await trainingApi.generateQuestions({
+            oposicion,
+            topicId: backendTopicId,
+            difficulty,
+            count,
+        });
+        setGenerating(false);
+        if (error || !Array.isArray(data) || data.length === 0) {
+            Alert.alert(
+                'No se pudo generar el test',
+                'La IA no devolvió preguntas. Inténtalo de nuevo en un momento.',
+            );
+            return;
+        }
+        // Marcamos allowExit para que el guard beforeRemove no abra ConfirmExit
+        // durante la navegación forward al TrainingSession.
+        allowExitRef.current = true;
         navigation.navigate('TrainingSession', {
             source: 'generator',
-            difficulty,
-            questionCount: count,
+            questions: adaptGeneratedQuestions(data),
+            examTitle: 'Generador infinito',
             timedMode: fatigueMode,
-            topicId,
+            oposicion,
         });
     };
 
@@ -279,8 +310,20 @@ export default function GeneratorConfigScreen({ navigation }) {
 
                 <View style={{ height: 24 }} />
 
-                <TouchableOpacity style={styles.btn} onPress={generate} activeOpacity={0.85}>
-                    <Text style={styles.btnText}>Generar test</Text>
+                <TouchableOpacity
+                    style={[styles.btn, generating && { opacity: 0.7 }]}
+                    onPress={generate}
+                    activeOpacity={0.85}
+                    disabled={generating}
+                >
+                    {generating ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <ActivityIndicator color="#fff" size="small" />
+                            <Text style={styles.btnText}>Generando preguntas…</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.btnText}>Generar test</Text>
+                    )}
                 </TouchableOpacity>
 
                 <View style={{ height: 30 }} />

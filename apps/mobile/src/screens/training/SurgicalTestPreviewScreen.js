@@ -1,8 +1,10 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Animated } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Animated, ActivityIndicator, Alert } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
+import { api, trainingApi } from '../../api';
+import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 // Punto naranja para bullets
 function Bullet() {
@@ -55,17 +57,38 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
     ];
     const total = subtopics.reduce((acc, s) => acc + s.count, 0);
 
+    const [generating, setGenerating] = useState(false);
+
     const fade = useRef(new Animated.Value(0)).current;
     useEffect(() => {
         Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
     }, []);
 
-    const startTest = () => {
+    const startTest = async () => {
+        if (generating) return;
+        setGenerating(true);
+        const session = await api.loadSession();
+        const oposicion =
+            session?.user?.oposicion ??
+            session?.user?.user_metadata?.oposicion ??
+            'justicia-tramitacion';
+        // El backend calcula los errorPatterns del usuario y pide el test
+        // quirúrgico a la IA (siempre difficulty hard).
+        const { data, error } = await trainingApi.generateSurgical(oposicion, 10);
+        setGenerating(false);
+        if (error || !data?.questions || data.questions.length === 0) {
+            Alert.alert(
+                'No se pudo generar el test',
+                'La IA no devolvió preguntas. Inténtalo de nuevo en un momento.',
+            );
+            return;
+        }
         navigation.navigate('TrainingSession', {
             source: 'surgical',
-            topicId: params.topicId,
-            topic,
-            questionsCount: total,
+            questions: adaptGeneratedQuestions(data.questions),
+            examTitle: 'Test quirúrgico',
+            timedMode: true,
+            oposicion,
         });
     };
 
@@ -96,8 +119,20 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
                         </View>
                     ))}
 
-                    <TouchableOpacity style={styles.btn} onPress={startTest} activeOpacity={0.85}>
-                        <Text style={styles.btnText}>Empezar</Text>
+                    <TouchableOpacity
+                        style={[styles.btn, generating && { opacity: 0.7 }]}
+                        onPress={startTest}
+                        activeOpacity={0.85}
+                        disabled={generating}
+                    >
+                        {generating ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <ActivityIndicator color="#fff" size="small" />
+                                <Text style={styles.btnText}>Generando preguntas…</Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.btnText}>Empezar</Text>
+                        )}
                     </TouchableOpacity>
 
                     <View style={styles.aiChip}>

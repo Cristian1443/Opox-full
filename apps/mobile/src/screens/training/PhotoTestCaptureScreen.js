@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
@@ -68,10 +68,11 @@ export default function PhotoTestCaptureScreen({ navigation }) {
     const [frameSize, setFrameSize] = useState({ w: 0, h: 0 });
     const [cameraFacing, setCameraFacing] = useState('back');
     const [cameraPerm, setCameraPerm] = useState(null);
-    const initialLaunchDone = useRef(false);
 
-    // Pedir permisos de cámara al montar la pantalla — así el prompt del SO
-    // aparece antes de que el usuario tenga que decidir qué botón usar.
+    // Pedimos permisos de cámara al montar la pantalla para que el prompt del
+    // SO aparezca antes de tocar los botones. NO auto-lanzamos la cámara: el
+    // usuario ve el placeholder con los tres botones (galería · disparador ·
+    // rotar) y elige — imprescindible para poder subir un screenshot.
     useEffect(() => {
         (async () => {
             const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -116,16 +117,6 @@ export default function PhotoTestCaptureScreen({ navigation }) {
             setBusy(false);
         }
     };
-
-    // Al recibir permiso por primera vez, lanzamos automáticamente la cámara
-    // para que el usuario no tenga que descubrir el botón — el placeholder
-    // del mockup queda solo como fallback tras cancelar la captura.
-    useEffect(() => {
-        if (cameraPerm === true && !initialLaunchDone.current) {
-            initialLaunchDone.current = true;
-            openCamera();
-        }
-    }, [cameraPerm]);
 
     const openGallery = async () => {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
