@@ -13,11 +13,11 @@ Opox-full/
 │   ├── mobile/          # React Native + Expo (JS, migrando a TS)
 │   │   ├── App.js
 │   │   ├── src/
-│   │   │   ├── api/         # Clientes HTTP: auth, dashboard, planning, motivation, training
-│   │   │   ├── components/  # Componentes compartidos (ScreenHeader, modales, etc.)
+│   │   │   ├── api/         # Clientes HTTP: auth, dashboard, planning, motivation, training, tutor
+│   │   │   ├── components/  # Componentes compartidos (ScreenHeader, modales, FlashcardsSuccessModal, …)
 │   │   │   ├── hooks/       # Custom hooks de UI (useNetworkWatcher, …)
 │   │   │   ├── navigation/  # OnboardingNavigator.js, navigationRef.js
-│   │   │   ├── screens/     # Pantallas por bloque: access/, health/, training/, …
+│   │   │   ├── screens/     # Pantallas por bloque: access/, health/, training/, tutor/, …
 │   │   │   └── theme.js     # Tokens de diseño OPOX
 │   │   └── app.json
 │   └── backend/         # Node.js + Express + TypeScript, arquitectura por capas
@@ -37,7 +37,7 @@ Opox-full/
 │   │   └── src/
 │   │       ├── contracts/   # AiApiContract.ts, ClientApiContract.ts
 │   │       ├── api.ts       # ApiResponse<T>, códigos de error
-│   │       ├── auth.ts, dashboard.ts, planning.ts, motivation.ts, training.ts
+│   │       ├── auth.ts, dashboard.ts, planning.ts, motivation.ts, training.ts, tutor.ts
 │   │       └── index.ts
 │   ├── constants/       # Constantes y rutas compartidas (routes.js)
 │   ├── utils/           # logger, result pattern (result.ts)
@@ -88,6 +88,19 @@ Contratos en `packages/types/src/contracts/`:
 Flujo de integración: **mobile → nuestro backend → OpenAI**. La API key de IA
 nunca va al móvil; vive en `apps/backend/.env` (`AI_API_KEY`).
 
+### Tutor IA (Bloque 8) — endpoints propios
+
+El Aula Virtual tiene su propio conjunto de rutas bajo `/tutor/`. La entidad central
+es `TutorConversation`; el chat envía mensajes a OpenAI real (`gpt-4o-mini`). Las
+flashcards usan stubs por `topicId` con marcador `TODO(ia-bloque8)`. El podcast y
+los resúmenes leen de tablas Supabase pobladas con seed.
+
+Tipos en `packages/types/src/tutor.ts`. Cliente mobile en `apps/mobile/src/api/tutor.js`.
+Colección de tests completa en `Bloque8_Tutor_Tests.postman_collection.json`.
+
+Patrón de respuesta del API client mobile: devuelve `{ data, error }` — **nunca**
+`{ success, data }`. Usar `!res?.error && res?.data` para comprobar éxito.
+
 ### Motor de IA del cliente (sin desplegar)
 
 El equipo IA entregó un microservicio RAG separado
@@ -121,6 +134,6 @@ pnpm lint                       # lint completo
 | 5 | Motivación | Frontend + backend completo |
 | 6 | Entrenamiento | Frontend + backend + IA completo (los 4 flujos cableados a OpenAI real) |
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
-| 8 | Aula Virtual / Tutor IA | Pendiente |
+| 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

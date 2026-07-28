@@ -5,6 +5,102 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-28 — Bloque 8 · Aula Virtual / Tutor IA completo de punta a punta
+
+Rama de trabajo: `feat/bloque-8-tutor-ia`. Se cierra el Bloque 8 íntegro: backend
+con arquitectura limpia, 6 pantallas mobile conectadas a endpoints reales, smoke
+test verde en todos los flujos y merge limpio con `feat/rediseno-visual-onboarding-motivacion`.
+
+### Backend (arquitectura por capas completa)
+
+**Domain:** 4 entidades nuevas (`TutorConversation`, `TutorMessage`, `TutorFlashcardDeck`,
+`TutorFlashcardDeck`, `TutorPodcastEpisode`, `TutorSummary`), `ITutorRepository`,
+errores tipados (`ConversationNotFoundError`, `DeckNotFoundError`, `SummaryNotFoundError`).
+
+**Application:** 14 use cases repartidos en 4 módulos:
+- Chat: `ListConversations`, `GetConversation`, `CreateConversation`, `SendMessage`, `DeleteConversation`
+- Flashcards: `ListDecks`, `GetDeckWithCards`, `GenerateDeck`, `DeleteDeck`, `SubmitReview`
+- Podcast: `ListEpisodes`, `GetEpisode`, `GetProgress`, `SaveProgress`
+- Resúmenes: `ListSummaries`, `GetSummary`
+
+**Infrastructure:** `SupabaseTutorRepository` — implementa los 18 métodos del contrato.
+Chat usa OpenAI real (`gpt-4o-mini`) via `SendMessageUseCase` para la respuesta del
+tutor IA. Flashcards usa stubs de tarjetas por topicId con marcadores `TODO(ia-bloque8)`
+para cuando IA entregue `generateFlashcards`.
+
+**Presentation:** `TutorController` (16 handlers), `tutorRoutes.ts`, `tutorValidators.ts`.
+15 rutas bajo `/tutor/` registradas y protegidas con auth.
+
+**SQL seed:** `apps/backend/supabase/bloque8_tutor.sql` — 9 tablas con RLS por propietario,
+4 episodios de podcast y 2 resúmenes (constitucion + ley-39) con seed de demostración.
+
+### Mobile — 6 pantallas conectadas a endpoints reales
+
+| Pantalla | Estado |
+|---|---|
+| `TutorHomeScreen` (8.1) | Rediseñada a cards horizontales según mockup 8.1 |
+| `TutorChatScreen` (8.2) | Conectada — crea conversación al montar, envía mensajes a OpenAI |
+| `TutorFlashcardsLoadingScreen` (8.3) | Llama a `generateDeck`; espera animación + API con `Promise.all` |
+| `TutorFlashcardsScreen` (8.5) | Bug de flip corregido; envía `submitReview` al terminar el mazo |
+| `TutorPodcastScreen` (8.6) | Carga metadatos del episodio; guarda progreso cada 10 s |
+| `TutorSummariesScreen` (8.7) | Carga resumen real por `topicId`; FABs navegan a Flashcards/Podcast |
+
+### Bugs encontrados y corregidos
+
+1. **Flip card no respondía al toque** — las `Animated.View` con `position: absolute` y
+   `opacity: 0` interceptan eventos aunque sean invisibles. Solución: la zona de la tarjeta
+   es un `TouchableOpacity` y las dos caras tienen `pointerEvents="none"`.
+
+2. **`res.success` siempre `undefined`** — las pantallas chequeaban `res?.success` pero el
+   API client devuelve `{ data, error }`. Corregido en TutorChatScreen, TutorFlashcardsLoadingScreen,
+   TutorSummariesScreen y TutorPodcastScreen al patrón `!res?.error && res?.data`.
+
+3. **Entidad `TutorPodcastEpisode` con campos distintos a la DTO** — la entidad tenía
+   `topicTitle`/`durationSeconds` pero el mapper devolvía `title`/`totalSeconds` y la DTO
+   también los esperaba. Alineados los tres niveles (domain entity, mapper y serializer del
+   controller).
+
+4. **Entidad `TutorMessage` con `role`/`userId` en vez de `isAI`/`suggestedActions`** —
+   mismo patrón: la DB guarda `role text`, el mapper ya computaba `isAI: r.role === 'assistant'`
+   pero la entidad del dominio seguía exponiendo `role`. Alineado.
+
+5. **`createDeck` devolvía solo `TutorFlashcardDeck`** — el controller y el use case
+   esperaban `{ deck, cards }` para poder navegar a la pantalla de repaso con las tarjetas
+   reales. Propagado el tipo correcto en repositorio, use case y controller.
+
+### Smoke test (todos los endpoints verde)
+
+Colección completa en `Bloque8_Tutor_Tests.postman_collection.json`. Resultados:
+
+| Endpoint | Resultado |
+|---|---|
+| POST `/tutor/conversations` | ✅ crea conversación |
+| POST `/tutor/conversations/:id/messages` | ✅ `userMessage.isAI: false`, `aiMessage.isAI: true` |
+| GET `/tutor/flashcards/decks` | ✅ lista mazos del usuario |
+| POST `/tutor/flashcards/decks` | ✅ genera mazo con 5 tarjetas |
+| GET `/tutor/flashcards/decks/:id` | ✅ deck + cards |
+| POST `/tutor/flashcards/decks/:id/reviews` | ✅ guarda sesión de repaso |
+| GET `/tutor/podcast/episodes?oposicion=` | ✅ 4 episodios con `title`/`totalSeconds` |
+| GET `/tutor/podcast/episodes/:id` | ✅ metadatos completos |
+| POST `/tutor/podcast/progress/:episodeId` | ✅ upsert guardado |
+| GET `/tutor/podcast/progress/:episodeId` | ✅ posición recuperada |
+| GET `/tutor/summaries?oposicion=` | ✅ 2 resúmenes, 3 secciones cada uno |
+| GET `/tutor/summaries/:topicId` | ✅ secciones con type/icon/content |
+| GET `/tutor/summaries/nonexistent` | ✅ `tutor/summary-not-found` |
+
+### Pendientes conocidos del Bloque 8
+
+- **Chat IA**: hoy el tutor responde con OpenAI directo (sin contexto del temario).
+  Cuando el Motor de IA del cliente se despliegue, reemplazar por RAG con evidencia
+  verbatim del PDF.
+- **Flashcards con IA real**: `GenerateDeckUseCase` usa stubs por `topicId`. Marcado
+  `TODO(ia-bloque8)` para reemplazar con `TutorAiContract.generateFlashcards()`.
+- **Podcast — audio real**: `TutorPodcastScreen` simula la reproducción con un timer.
+  Integrar `expo-av` cuando el equipo IA entregue los audios generados.
+- **Pantalla 8.4** — no tocada en esta sesión (estaba completa).
+
+---
+
 ## 2026-07-25 — Bloques 6 y 7 · IA real integrada de punta a punta
 
 Rama de trabajo: `feat/ia-bloques-6-7` (nacida de `diseno-bloques-6-7`). Cierra
