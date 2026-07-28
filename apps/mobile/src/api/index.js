@@ -4,4 +4,5 @@ export { dashboardApi } from './dashboard';
 export { planningApi } from './planning';
 export { motivationApi } from './motivation';
 export { trainingApi } from './training';
+export { tutorApi } from './tutor';
 export { API_BASE_URL } from './config';

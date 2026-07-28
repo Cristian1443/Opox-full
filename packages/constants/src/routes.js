@@ -67,6 +67,24 @@ export const API_ROUTES = {
         QUESTION_REPORT:    '/training/questions/:id/report',
     },
 
+    TUTOR: {
+        // Chat con Tutor IA
+        CONVERSATIONS:        '/tutor/conversations',
+        CONVERSATION:         '/tutor/conversations/:id',
+        MESSAGES:             '/tutor/conversations/:id/messages',
+        // Flashcards
+        DECKS:                '/tutor/flashcards/decks',
+        DECK:                 '/tutor/flashcards/decks/:id',
+        DECK_REVIEW:          '/tutor/flashcards/decks/:id/reviews',
+        // Podcast
+        EPISODES:             '/tutor/podcast/episodes',
+        EPISODE:              '/tutor/podcast/episodes/:id',
+        PODCAST_PROGRESS:     '/tutor/podcast/progress/:episodeId',
+        // Resúmenes
+        SUMMARIES:            '/tutor/summaries',
+        SUMMARY:              '/tutor/summaries/:topicId',
+    },
+
     MOTIVATION: {
         SUMMARY: '/motivation/summary',
         STREAK: '/motivation/streak',

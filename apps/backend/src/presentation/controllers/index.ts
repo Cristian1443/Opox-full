@@ -4,3 +4,4 @@ export * from './DashboardController';
 export * from './PlanningController';
 export * from './MotivationController';
 export * from './TrainingController';
+export * from './TutorController';

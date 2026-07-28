@@ -7,3 +7,4 @@ export * from './clients';
 export * from './storage';
 export * from './push';
 export * from './payments';
+export * from './tutor';

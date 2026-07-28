@@ -1,0 +1,550 @@
+{
+  "info": {
+    "name": "OPOX · Bloque 8 · Aula Virtual / Tutor IA",
+    "description": "Tests completos de los endpoints del Bloque 8 (Chat, Flashcards, Podcast, Resúmenes).\n\n## Variables de colección\n- `base_url`: http://localhost:3000\n- `token`: JWT del usuario (se rellena automáticamente en el paso de login)\n- `conversation_id`: se captura al crear conversación\n- `deck_id`: se captura al generar mazo\n- `episode_id`: se captura al listar episodios\n\n## Orden de ejecución recomendado\n1. Auth · Login → captura token\n2. Chat · Crear conversación\n3. Chat · Enviar mensaje\n4. Chat · Listar conversaciones\n5. Flashcards · Generar mazo\n6. Flashcards · Ver mazo con tarjetas\n7. Flashcards · Enviar reseña\n8. Podcast · Listar episodios\n9. Podcast · Guardar progreso\n10. Resúmenes · Listar\n11. Resúmenes · Obtener resumen (usa seed de DB)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",         "value": "http://localhost:3000" },
+    { "key": "token",            "value": "" },
+    { "key": "conversation_id",  "value": "" },
+    { "key": "deck_id",          "value": "" },
+    { "key": "episode_id",       "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 · Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data?.session?.accessToken) {",
+                  "    pm.collectionVariables.set('token', res.data.session.accessToken);",
+                  "    console.log('✅ Token guardado');",
+                  "} else {",
+                  "    console.error('❌ Login fallido', res);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"TU_EMAIL@ejemplo.com\",\n  \"password\": \"TU_PASSWORD\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+            "description": "⚠️ Rellena email y password con las credenciales de tu usuario de prueba en Supabase."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 · Chat",
+      "item": [
+        {
+          "name": "Crear conversación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(res.success).to.be.true);",
+                  "pm.test('tiene id', () => pm.expect(res.data.id).to.be.a('string'));",
+                  "if (res.data?.id) {",
+                  "    pm.collectionVariables.set('conversation_id', res.data.id);",
+                  "    console.log('✅ conversation_id =', res.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Dudas sobre Ley 39/2015\",\n  \"topic\": \"ley-39\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/tutor/conversations", "host": ["{{base_url}}"], "path": ["tutor", "conversations"] },
+            "description": "Crea una conversación nueva. Captura conversation_id para los siguientes pasos."
+          }
+        },
+        {
+          "name": "Enviar mensaje (stub IA)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(res.success).to.be.true);",
+                  "pm.test('tiene userMessage', () => pm.expect(res.data.userMessage).to.exist);",
+                  "pm.test('tiene aiMessage', () => pm.expect(res.data.aiMessage).to.exist);",
+                  "pm.test('aiMessage.isAI = true', () => pm.expect(res.data.aiMessage.isAI).to.be.true);",
+                  "console.log('🤖 Respuesta IA (stub):', res.data.aiMessage.content);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"¿Qué es el silencio administrativo?\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tutor/conversations/{{conversation_id}}/messages",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "conversations", "{{conversation_id}}", "messages"]
+            },
+            "description": "Envía un mensaje. El backend devuelve userMessage + aiMessage. La respuesta IA es un stub hasta integrar los prompts."
+          }
+        },
+        {
+          "name": "Listar conversaciones",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(res.success).to.be.true);",
+                  "pm.test('es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "console.log('💬 Conversaciones:', res.data.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/tutor/conversations", "host": ["{{base_url}}"], "path": ["tutor", "conversations"] }
+          }
+        },
+        {
+          "name": "Ver conversación (con mensajes)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('tiene messages[]', () => pm.expect(res.data.messages).to.be.an('array'));",
+                  "console.log('📨 Mensajes en conversación:', res.data.messages.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/conversations/{{conversation_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "conversations", "{{conversation_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Flashcards",
+      "item": [
+        {
+          "name": "Generar mazo (stub IA)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(res.success).to.be.true);",
+                  "pm.test('tiene deck.id', () => pm.expect(res.data.deck.id).to.be.a('string'));",
+                  "pm.test('tiene cards[]', () => pm.expect(res.data.cards).to.be.an('array'));",
+                  "pm.test('cards no vacío', () => pm.expect(res.data.cards.length).to.be.greaterThan(0));",
+                  "if (res.data?.deck?.id) {",
+                  "    pm.collectionVariables.set('deck_id', res.data.deck.id);",
+                  "    console.log('✅ deck_id =', res.data.deck.id);",
+                  "    console.log('🃏 Tarjetas generadas:', res.data.cards.length);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topicId\": \"ley-39\",\n  \"topicTitle\": \"Ley 39/2015, Procedimiento Administrativo Común\",\n  \"oposicion\": \"aux-adm-estado\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/tutor/flashcards/decks", "host": ["{{base_url}}"], "path": ["tutor", "flashcards", "decks"] },
+            "description": "Genera un mazo con tarjetas stub (serán reales cuando llegue la IA). Captura deck_id."
+          }
+        },
+        {
+          "name": "Ver mazo con tarjetas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('tiene deck', () => pm.expect(res.data.deck).to.exist);",
+                  "pm.test('tiene cards', () => pm.expect(res.data.cards).to.be.an('array'));",
+                  "const card = res.data.cards[0];",
+                  "pm.test('tarjeta tiene question', () => pm.expect(card.question).to.be.a('string'));",
+                  "pm.test('tarjeta tiene answer', () => pm.expect(card.answer).to.be.a('string'));",
+                  "console.log('Primera tarjeta — Q:', card.question, '| A:', card.answer);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/flashcards/decks/{{deck_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "flashcards", "decks", "{{deck_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Enviar reseña de repaso",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(res.success).to.be.true);",
+                  "console.log('✅ Reseña registrada:', JSON.stringify(res.data));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"knownCount\": 7,\n  \"failedCount\": 3,\n  \"failedCardIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tutor/flashcards/decks/{{deck_id}}/reviews",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "flashcards", "decks", "{{deck_id}}", "reviews"]
+            },
+            "description": "Registra el resultado de una sesión de repaso. failedCardIds puede estar vacío en las pruebas."
+          }
+        },
+        {
+          "name": "Listar mazos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "console.log('📦 Mazos del usuario:', res.data.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/tutor/flashcards/decks", "host": ["{{base_url}}"], "path": ["tutor", "flashcards", "decks"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Podcast",
+      "item": [
+        {
+          "name": "Listar episodios (usa seed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(res.success).to.be.true);",
+                  "pm.test('4 episodios de demo', () => pm.expect(res.data.length).to.equal(4));",
+                  "if (res.data?.length > 0) {",
+                  "    pm.collectionVariables.set('episode_id', res.data[0].id);",
+                  "    console.log('✅ episode_id =', res.data[0].id);",
+                  "    console.log('🎙️ Primer episodio:', res.data[0].title);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/podcast/episodes?oposicion=aux-adm-estado",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "podcast", "episodes"],
+              "query": [{ "key": "oposicion", "value": "aux-adm-estado" }]
+            },
+            "description": "Devuelve los 4 episodios del seed. Si la tabla está vacía, es que el SQL no corrió."
+          }
+        },
+        {
+          "name": "Ver detalle de episodio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('tiene title', () => pm.expect(res.data.title).to.be.a('string'));",
+                  "pm.test('tiene totalSeconds', () => pm.expect(res.data.totalSeconds).to.be.a('number'));",
+                  "console.log('🎙️', res.data.title, '—', res.data.totalSeconds, 's');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/podcast/episodes/{{episode_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "podcast", "episodes", "{{episode_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Guardar progreso",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(res.success).to.be.true);",
+                  "console.log('✅ Progreso guardado:', res.data);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"positionSecs\": 145\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tutor/podcast/progress/{{episode_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "podcast", "progress", "{{episode_id}}"]
+            },
+            "description": "Guarda la posición de reproducción. Si ya existe, hace upsert. Repite con distinto positionSecs para verificar que actualiza."
+          }
+        },
+        {
+          "name": "Obtener progreso",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('positionSecs = 145', () => pm.expect(res.data.positionSecs).to.equal(145));",
+                  "console.log('▶️ Posición guardada:', res.data.positionSecs, 's');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/podcast/progress/{{episode_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "podcast", "progress", "{{episode_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Resúmenes",
+      "item": [
+        {
+          "name": "Listar resúmenes disponibles",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "pm.test('2 resúmenes de demo', () => pm.expect(res.data.length).to.equal(2));",
+                  "console.log('📄 Resúmenes disponibles:', res.data.map(s => s.topicTitle));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/summaries?oposicion=aux-adm-estado",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "summaries"],
+              "query": [{ "key": "oposicion", "value": "aux-adm-estado" }]
+            },
+            "description": "Devuelve los 2 resúmenes del seed. Si la tabla está vacía, el SQL no corrió correctamente."
+          }
+        },
+        {
+          "name": "Obtener resumen — Constitución (del seed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(res.success).to.be.true);",
+                  "pm.test('tiene sections[]', () => pm.expect(res.data.sections).to.be.an('array'));",
+                  "pm.test('3 secciones', () => pm.expect(res.data.sections.length).to.equal(3));",
+                  "const types = res.data.sections.map(s => s.type);",
+                  "pm.test('secciones correctas', () => pm.expect(types).to.deep.equal(['principles','structure','reminder']));",
+                  "console.log('✅ Resumen Constitución OK — topicTitle:', res.data.topicTitle);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/summaries/constitucion?oposicion=aux-adm-estado",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "summaries", "constitucion"],
+              "query": [{ "key": "oposicion", "value": "aux-adm-estado" }]
+            },
+            "description": "Obtiene el resumen de Constitución del seed. Verifica que las 3 secciones (principles, structure, reminder) están bien estructuradas."
+          }
+        },
+        {
+          "name": "Obtener resumen — Ley 39 (del seed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('3 secciones', () => pm.expect(res.data.sections.length).to.equal(3));",
+                  "console.log('✅ Resumen Ley 39 OK — secciones:', res.data.sections.map(s => s.type));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/summaries/ley-39?oposicion=aux-adm-estado",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "summaries", "ley-39"],
+              "query": [{ "key": "oposicion", "value": "aux-adm-estado" }]
+            }
+          }
+        },
+        {
+          "name": "Obtener resumen — topicId inexistente (debe dar 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "const res = pm.response.json();",
+                  "pm.test('success = false', () => pm.expect(res.success).to.be.false);",
+                  "console.log('✅ 404 correcto — el resumen no existe (pendiente de IA):', res.message);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/tutor/summaries/tema-inexistente?oposicion=aux-adm-estado",
+              "host": ["{{base_url}}"],
+              "path": ["tutor", "summaries", "tema-inexistente"],
+              "query": [{ "key": "oposicion", "value": "aux-adm-estado" }]
+            },
+            "description": "Cuando el topicId no existe en BD, devuelve 404. Esto es lo esperado hasta que la IA genere y cachee el resumen."
+          }
+        }
+      ]
+    }
+  ]
+}

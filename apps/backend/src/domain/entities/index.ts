@@ -12,3 +12,7 @@ export * from './ClanChallenge';
 export * from './MockExam';
 export * from './TrainingAttempt';
 export * from './TrainingBookmark';
+export * from './TutorConversation';
+export * from './TutorFlashcardDeck';
+export * from './TutorPodcastEpisode';
+export * from './TutorSummary';

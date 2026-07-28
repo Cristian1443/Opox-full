@@ -341,7 +341,11 @@ export default function DashboardScreen({ navigation }) {
                 {/* ── 2.2 Módulo Acceso rápido ── */}
                 <Text style={styles.quickLabel}>CONTINÚA DONDE LO DEJASTE</Text>
 
-                <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}>
+                <TouchableOpacity
+                    style={styles.quickCard}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('AITutor')}
+                >
                     <View style={[styles.quickIcon, { backgroundColor: '#FFF1EC' }]}>
                         <IconBook />
                     </View>
@@ -352,7 +356,11 @@ export default function DashboardScreen({ navigation }) {
                     <Text style={styles.chevronLight}>›</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.quickCard, { marginTop: 10 }]} activeOpacity={0.7}>
+                <TouchableOpacity
+                    style={[styles.quickCard, { marginTop: 10 }]}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('ErrorLab')}
+                >
                     <View style={[styles.quickIcon, { backgroundColor: '#FDEBE9' }]}>
                         <IconWarning />
                     </View>
@@ -368,7 +376,11 @@ export default function DashboardScreen({ navigation }) {
                         <Text style={styles.resumeTitle}>¿Seguimos con el simulacro?</Text>
                         <Text style={styles.resumeSubtitle}>Examen 2022 · 28% completado</Text>
                     </View>
-                    <TouchableOpacity style={styles.resumeBtn} activeOpacity={0.85}>
+                    <TouchableOpacity
+                        style={styles.resumeBtn}
+                        activeOpacity={0.85}
+                        onPress={() => navigation.navigate('OfficialMocks')}
+                    >
                         <Text style={styles.resumeBtnText}>Reanudar</Text>
                     </TouchableOpacity>
                 </View>
@@ -431,14 +443,19 @@ export default function DashboardScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
 
-                <View style={[styles.widget, { backgroundColor: '#F1ECFA' }]}>
+                <TouchableOpacity
+                    style={[styles.widget, { backgroundColor: '#F1ECFA' }]}
+                    onPress={() => navigation.navigate('AITutor')}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Ir al Aula Virtual con Tutor IA"
+                >
                     <View style={styles.widgetHead}>
                         <IconTutor />
                         <Text style={[styles.widgetHeadText, { color: '#7B4BC4' }]}>Repaso IA</Text>
                         <Text style={styles.chev}>›</Text>
                     </View>
                     <Text style={styles.tutorText}>Pregúntale al Tutor o escucha en modo podcast.</Text>
-                </View>
+                </TouchableOpacity>
 
                 {/* Vista previa temporal de los nudges — quitar cuando cada motor real
                     (fatiga, estadísticas, monitor BOE) dispare el suyo */}
@@ -478,10 +495,10 @@ export default function DashboardScreen({ navigation }) {
                     <Text style={styles.navLabel}>Entreno</Text>
                 </TouchableOpacity>
                 <View style={{ width: 40 }} />
-                <View style={styles.navItem}>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('MotivationHome')}>
                     <IconNavSocial />
                     <Text style={styles.navLabel}>Social</Text>
-                </View>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
                     <IconNavSettings />
                     <Text style={styles.navLabel}>Ajustes</Text>

@@ -4,3 +4,4 @@ export * from './dashboardRoutes';
 export * from './planningRoutes';
 export * from './motivationRoutes';
 export * from './trainingRoutes';
+export * from './tutorRoutes';

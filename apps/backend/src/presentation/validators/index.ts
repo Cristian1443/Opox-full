@@ -3,3 +3,4 @@ export * from './dashboardValidators';
 export * from './planningValidators';
 export * from './motivationValidators';
 export * from './trainingValidators';
+export * from './tutorValidators';

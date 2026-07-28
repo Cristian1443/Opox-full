@@ -10,6 +10,7 @@ import {
     createPlanningRouter,
     createMotivationRouter,
     createTrainingRouter,
+    createTutorRouter,
     errorHandler,
 } from './presentation';
 
@@ -30,6 +31,7 @@ export function createServer(): Express {
     app.use(createPlanningRouter(container.controllers.planning, container.middleware.auth));
     app.use(createMotivationRouter(container.controllers.motivation, container.middleware.auth));
     app.use(createTrainingRouter(container.controllers.training, container.middleware.auth));
+    app.use(createTutorRouter(container.controllers.tutor, container.middleware.auth));
 
     // 404 catch-all
     app.use((_req, res) => {

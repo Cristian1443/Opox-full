@@ -42,7 +42,13 @@ import MenusScreen from '../screens/health/MenusScreen';
 import MenuDetailScreen from '../screens/health/MenuDetailScreen';
 import MeditationListScreen from '../screens/health/MeditationListScreen';
 import MeditationPlayerScreen from '../screens/health/MeditationPlayerScreen';
-import AITutorPlaceholderScreen from '../screens/health/AITutorPlaceholderScreen';
+// AITutorPlaceholderScreen reemplazado por el bloque 8 real
+import TutorHomeScreen from '../screens/tutor/TutorHomeScreen';
+import TutorChatScreen from '../screens/tutor/TutorChatScreen';
+import TutorFlashcardsLoadingScreen from '../screens/tutor/TutorFlashcardsLoadingScreen';
+import TutorPodcastScreen from '../screens/tutor/TutorPodcastScreen';
+import TutorSummariesScreen from '../screens/tutor/TutorSummariesScreen';
+import TutorFlashcardsScreen from '../screens/tutor/TutorFlashcardsScreen';
 
 // Bloque 4 · Planificación
 import PlanningHomeScreen from '../screens/planning/PlanningHomeScreen';
@@ -126,7 +132,13 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="MenuDetail" component={MenuDetailScreen} />
             <Stack.Screen name="MeditationList" component={MeditationListScreen} />
             <Stack.Screen name="MeditationPlayer" component={MeditationPlayerScreen} />
-            <Stack.Screen name="AITutor" component={AITutorPlaceholderScreen} />
+            {/* Bloque 8 · Aula Virtual / Tutor IA */}
+            <Stack.Screen name="AITutor" component={TutorHomeScreen} />
+            <Stack.Screen name="TutorChat" component={TutorChatScreen} />
+            <Stack.Screen name="TutorFlashcardsLoading" component={TutorFlashcardsLoadingScreen} />
+            <Stack.Screen name="TutorPodcast" component={TutorPodcastScreen} />
+            <Stack.Screen name="TutorSummaries" component={TutorSummariesScreen} />
+            <Stack.Screen name="TutorFlashcards" component={TutorFlashcardsScreen} />
 
             {/* Bloque 4 · Planificación */}
             <Stack.Screen name="PlanningHome" component={PlanningHomeScreen} />

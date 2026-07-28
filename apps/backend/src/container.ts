@@ -65,6 +65,23 @@ import {
     // Bloque 7 · Sesión de entrenamiento
     GenerateHintUseCase,
     ReportQuestionUseCase,
+    // Bloque 8 · Aula Virtual / Tutor IA
+    ListConversationsUseCase,
+    GetConversationUseCase,
+    CreateConversationUseCase,
+    SendMessageUseCase,
+    DeleteConversationUseCase,
+    ListDecksUseCase,
+    GetDeckWithCardsUseCase,
+    GenerateDeckUseCase,
+    DeleteDeckUseCase,
+    SubmitReviewUseCase,
+    ListEpisodesUseCase,
+    GetEpisodeUseCase,
+    GetProgressUseCase,
+    SaveProgressUseCase,
+    ListSummariesUseCase,
+    GetSummaryUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -74,6 +91,7 @@ import {
     SupabasePlanningRepository,
     SupabaseMotivationRepository,
     SupabaseTrainingRepository,
+    SupabaseTutorRepository,
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
@@ -84,9 +102,10 @@ import {
     PlanningController,
     MotivationController,
     TrainingController,
+    TutorController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -117,6 +136,10 @@ export function buildContainer() {
     const trainingRepo: ITrainingRepository = isSupabaseConfigured
         ? new SupabaseTrainingRepository(getSupabaseAdmin())
         : createStubTrainingRepository();
+
+    const tutorRepo: ITutorRepository = isSupabaseConfigured
+        ? new SupabaseTutorRepository(getSupabaseAdmin())
+        : createStubTutorRepository();
 
     if (!isSupabaseConfigured) {
         logger.warn(
@@ -228,6 +251,24 @@ export function buildContainer() {
         // Bloque 7 · Sesión de entrenamiento
         generateHint: new GenerateHintUseCase(aiApi),
         reportQuestion: new ReportQuestionUseCase(),
+
+        // Bloque 8 · Aula Virtual / Tutor IA
+        listConversations: new ListConversationsUseCase(tutorRepo),
+        getConversation: new GetConversationUseCase(tutorRepo),
+        createConversation: new CreateConversationUseCase(tutorRepo),
+        sendMessage: new SendMessageUseCase(tutorRepo),
+        deleteConversation: new DeleteConversationUseCase(tutorRepo),
+        listDecks: new ListDecksUseCase(tutorRepo),
+        getDeckWithCards: new GetDeckWithCardsUseCase(tutorRepo),
+        generateDeck: new GenerateDeckUseCase(tutorRepo),
+        deleteDeck: new DeleteDeckUseCase(tutorRepo),
+        submitReview: new SubmitReviewUseCase(tutorRepo),
+        listEpisodes: new ListEpisodesUseCase(tutorRepo),
+        getEpisode: new GetEpisodeUseCase(tutorRepo),
+        getProgress: new GetProgressUseCase(tutorRepo),
+        saveProgress: new SaveProgressUseCase(tutorRepo),
+        listSummaries: new ListSummariesUseCase(tutorRepo),
+        getSummary: new GetSummaryUseCase(tutorRepo),
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -270,6 +311,25 @@ export function buildContainer() {
         reportQuestion: useCases.reportQuestion,
     });
 
+    const tutorController = new TutorController({
+        listConversations: useCases.listConversations,
+        getConversation: useCases.getConversation,
+        createConversation: useCases.createConversation,
+        sendMessage: useCases.sendMessage,
+        deleteConversation: useCases.deleteConversation,
+        listDecks: useCases.listDecks,
+        getDeckWithCards: useCases.getDeckWithCards,
+        generateDeck: useCases.generateDeck,
+        deleteDeck: useCases.deleteDeck,
+        submitReview: useCases.submitReview,
+        listEpisodes: useCases.listEpisodes,
+        getEpisode: useCases.getEpisode,
+        getProgress: useCases.getProgress,
+        saveProgress: useCases.saveProgress,
+        listSummaries: useCases.listSummaries,
+        getSummary: useCases.getSummary,
+    });
+
     const motivationController = new MotivationController({
         getSummary: useCases.getMotivationSummary,
         getStreakDetail: useCases.getStreakDetail,
@@ -303,6 +363,7 @@ export function buildContainer() {
             planning: planningController,
             motivation: motivationController,
             training: trainingController,
+            tutor: tutorController,
         },
         middleware: {
             auth: authMiddleware,
@@ -347,4 +408,11 @@ function createStubTrainingRepository(): ITrainingRepository {
         throw new Error('[training] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as ITrainingRepository, { get: () => notConfigured });
+}
+
+function createStubTutorRepository(): ITutorRepository {
+    const notConfigured = (): never => {
+        throw new Error('[tutor] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as ITutorRepository, { get: () => notConfigured });
 }
