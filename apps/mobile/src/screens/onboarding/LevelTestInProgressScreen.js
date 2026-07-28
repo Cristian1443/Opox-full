@@ -7,6 +7,8 @@ import {
     SafeAreaView,
     StatusBar,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing } from '../../theme';
 
 const QUESTIONS = [
     {
@@ -14,47 +16,56 @@ const QUESTIONS = [
         question:
             'Según la Ley 39/2015, el plazo general para resolver un procedimiento es de:',
         options: [
-            { id: 'A', label: 'A · Un mes' },
-            { id: 'B', label: 'B · Tres meses' },
-            { id: 'C', label: 'C · Seis meses' },
-            { id: 'D', label: 'D · Un año' },
+            { id: 'A', text: 'Un mes' },
+            { id: 'B', text: 'Tres meses' },
+            { id: 'C', text: 'Seis meses' },
+            { id: 'D', text: 'Un año' },
         ],
     },
     {
         id: 2,
         question: '¿Cuántos artículos tiene la Constitución Española de 1978?',
         options: [
-            { id: 'A', label: 'A · 159' },
-            { id: 'B', label: 'B · 169' },
-            { id: 'C', label: 'C · 179' },
-            { id: 'D', label: 'D · 189' },
+            { id: 'A', text: '159' },
+            { id: 'B', text: '169' },
+            { id: 'C', text: '179' },
+            { id: 'D', text: '189' },
         ],
     },
     {
         id: 3,
         question: '¿Cuál es el órgano supremo de la Administración General del Estado?',
         options: [
-            { id: 'A', label: 'A · El Congreso' },
-            { id: 'B', label: 'B · El Senado' },
-            { id: 'C', label: 'C · El Consejo de Ministros' },
-            { id: 'D', label: 'D · El Tribunal Supremo' },
+            { id: 'A', text: 'El Congreso' },
+            { id: 'B', text: 'El Senado' },
+            { id: 'C', text: 'El Consejo de Ministros' },
+            { id: 'D', text: 'El Tribunal Supremo' },
         ],
     },
 ];
 
-const TOTAL = 10;
+// Test de nivel de longitud fija (no depende del nº de preguntas de muestra arriba,
+// que se repiten cíclicamente hasta completar el total).
+const TOTAL = 20;
 
 export default function LevelTestInProgressScreen({ navigation }) {
     const [qIndex, setQIndex] = useState(0);
     const [selected, setSelected] = useState(null);
 
     const question = QUESTIONS[qIndex % QUESTIONS.length];
-    const progress = (qIndex + 1) / TOTAL;
+    const isFirst = qIndex === 0;
+    const isLast = qIndex >= TOTAL - 1;
 
-    const handleNext = () => {
-        if (qIndex < TOTAL - 1) {
-            setQIndex(qIndex + 1);
-            setSelected(null);
+    const goToQuestion = (nextIndex) => {
+        if (nextIndex < 0 || nextIndex > TOTAL - 1) return;
+        setQIndex(nextIndex);
+        setSelected(null);
+    };
+
+    const handleConfirm = () => {
+        if (selected === null) return;
+        if (!isLast) {
+            goToQuestion(qIndex + 1);
         } else {
             navigation.replace('LevelTestResult');
         }
@@ -62,64 +73,88 @@ export default function LevelTestInProgressScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            {/* Status bar */}
-            <View style={styles.statusBar}>
-                <Text style={styles.statusBarTime}>9:41</Text>
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Volver"
+                >
+                    <Ionicons name="chevron-back" size={20} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Test de nivel</Text>
+                <View style={styles.backButtonSpacer} />
             </View>
 
             {/* Cuerpo principal */}
             <View style={styles.body}>
 
-                {/* Barra de progreso + contador */}
+                {/* Indicador de progreso: Pregunta X de Y + navegación prev/next */}
                 <View style={styles.progressRow}>
-                    <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-                    </View>
-                    <Text style={styles.progressLabel}>{qIndex + 1}/{TOTAL}</Text>
+                    <TouchableOpacity
+                        onPress={() => goToQuestion(qIndex - 1)}
+                        disabled={isFirst}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Pregunta anterior"
+                    >
+                        <Ionicons
+                            name="chevron-back"
+                            size={18}
+                            color={isFirst ? colors.grayMid : colors.textDark}
+                        />
+                    </TouchableOpacity>
+                    <Text style={styles.progressLabel}>Pregunta {qIndex + 1} de {TOTAL}</Text>
+                    <TouchableOpacity
+                        onPress={() => goToQuestion(qIndex + 1)}
+                        disabled={isLast}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Pregunta siguiente"
+                    >
+                        <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color={isLast ? colors.grayMid : colors.textDark}
+                        />
+                    </TouchableOpacity>
                 </View>
 
-                {/* Tarjeta de pregunta + opciones */}
-                <View style={styles.questionCard}>
-                    <Text style={styles.questionText}>
-                        {question.question}
-                    </Text>
+                {/* Enunciado */}
+                <Text style={styles.questionText}>
+                    {question.question}
+                </Text>
 
-                    {question.options.map((opt) => (
-                        <TouchableOpacity
-                            key={opt.id}
-                            style={[styles.option, selected === opt.id && styles.optionSelected]}
-                            onPress={() => setSelected(opt.id)}
-                            activeOpacity={0.75}
-                        >
-                            <Text
-                                style={[
-                                    styles.optionText,
-                                    selected === opt.id && styles.optionTextSelected,
-                                ]}
+                {/* Opciones A–D, cada una en su propia tarjeta */}
+                <View style={styles.optionsList}>
+                    {question.options.map((opt) => {
+                        const isSelected = selected === opt.id;
+                        return (
+                            <TouchableOpacity
+                                key={opt.id}
+                                style={[styles.option, isSelected && styles.optionSelected]}
+                                onPress={() => setSelected(opt.id)}
+                                activeOpacity={0.75}
+                                accessibilityLabel={`Opción ${opt.id}: ${opt.text}`}
                             >
-                                {opt.label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                                <Text style={styles.optionLetter}>{opt.id}.</Text>
+                                <Text style={styles.optionText}>{opt.text}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
-
-                {/* Hint */}
-                <Text style={styles.hint}>Sin penalización · responde lo que sepas</Text>
             </View>
 
             {/* Botón fijo en la parte inferior */}
             <View style={styles.bottomRow}>
                 <TouchableOpacity
                     style={[styles.btnPrimary, selected === null && styles.btnPrimaryOff]}
-                    onPress={handleNext}
+                    onPress={handleConfirm}
                     disabled={selected === null}
                     activeOpacity={0.85}
                 >
-                    <Text style={styles.btnPrimaryText}>
-                        {qIndex < TOTAL - 1 ? 'Siguiente pregunta' : 'Ver resultados'}
-                    </Text>
+                    <Text style={styles.btnPrimaryText}>Confirmar respuesta</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -129,28 +164,41 @@ export default function LevelTestInProgressScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.white,
     },
 
-    // ── Status bar ──────────────────────────────
-    statusBar: {
-        height: 30,
+    // ── Header ──────────────────────────────────
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        flexShrink: 0,
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.sm,
     },
-    statusBarTime: {
-        fontSize: 10,
+    backButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.grayLight,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    backButtonSpacer: {
+        width: 32,
+    },
+    headerTitle: {
+        flex: 1,
+        textAlign: 'center',
+        fontSize: 18,
         fontWeight: '700',
-        color: '#1B2A4A',
+        color: colors.textDark,
     },
 
-    // ── Cuerpo (padding: 16px 18px) ─────────────
+    // ── Cuerpo ───────────────────────────────────
     body: {
         flex: 1,
-        paddingHorizontal: 18,
-        paddingTop: 16,
+        paddingHorizontal: spacing.md + 2,
+        paddingTop: spacing.sm,
         paddingBottom: 80, // espacio para el botón absoluto
     },
 
@@ -158,94 +206,77 @@ const styles = StyleSheet.create({
     progressRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        marginBottom: 14,
-    },
-    progressTrack: {
-        flex: 1,
-        height: 7,
-        backgroundColor: '#EEF1F7',
-        borderRadius: 4,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        backgroundColor: '#FF6B4A',
+        justifyContent: 'center',
+        gap: spacing.md,
+        marginBottom: spacing.md,
     },
     progressLabel: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '700',
-        color: '#8A92A0',
+        color: colors.textDark,
     },
 
-    // ── Tarjeta de pregunta ──────────────────────
-    questionCard: {
-        backgroundColor: '#F4F6FA',
-        borderWidth: 1.5,
-        borderColor: '#E4E8F0',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 10,
-    },
+    // ── Enunciado ────────────────────────────────
     questionText: {
-        fontSize: 12,
+        fontSize: 15,
         fontWeight: '700',
-        color: '#1B2A4A',
-        lineHeight: 17,
+        color: colors.textDark,
+        lineHeight: 21,
+        marginBottom: spacing.md,
     },
 
     // ── Opciones ────────────────────────────────
+    optionsList: {
+        gap: spacing.sm,
+    },
     option: {
-        borderWidth: 1.5,
-        borderColor: '#E4E8F0',
-        borderRadius: 9,
-        paddingVertical: 9,
-        paddingHorizontal: 11,
-        marginTop: 7,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.3)',
+        borderRadius: 14,
+        backgroundColor: colors.white,
+        paddingVertical: spacing.sm + 2,
+        paddingHorizontal: spacing.md,
     },
     optionSelected: {
-        borderColor: '#FF6B4A',
-        backgroundColor: '#FFF6F3',
+        borderColor: colors.selectionBorder,
+        borderWidth: 3.5,
+        backgroundColor: colors.white,
+    },
+    optionLetter: {
+        width: 26,
+        fontSize: 15,
+        fontWeight: '700',
+        color: colors.textDark,
     },
     optionText: {
-        fontSize: 11.5,
-        color: '#46506A',
-    },
-    optionTextSelected: {
-        color: '#FF6B4A',
-        fontWeight: '600',
-    },
-
-    // ── Hint ────────────────────────────────────
-    hint: {
-        fontSize: 11,
-        color: '#8A92A0',
-        textAlign: 'center',
-        marginTop: 6,
+        flex: 1,
+        fontSize: 13,
+        lineHeight: 18,
+        color: colors.textDark,
     },
 
     // ── Botón fijo inferior ──────────────────────
     // Equivale a: position:absolute; bottom:16; left:18; right:18
     bottomRow: {
         position: 'absolute',
-        bottom: 16,
-        left: 18,
-        right: 18,
-        flexDirection: 'column',
-        gap: 9,
+        bottom: spacing.md,
+        left: spacing.md + 2,
+        right: spacing.md + 2,
     },
     btnPrimary: {
-        backgroundColor: '#FF6B4A',
-        borderRadius: 12,
-        paddingVertical: 13,
+        backgroundColor: colors.ctaGreen,
+        borderRadius: 20,
+        paddingVertical: spacing.md - 3,
         alignItems: 'center',
     },
     btnPrimaryOff: {
         opacity: 0.4,
     },
     btnPrimaryText: {
-        color: '#FFFFFF',
-        fontSize: 13.5,
+        color: colors.white,
+        fontSize: 15,
         fontWeight: '700',
     },
 });

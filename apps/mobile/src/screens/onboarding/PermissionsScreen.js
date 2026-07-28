@@ -11,29 +11,40 @@ import {
     Linking,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 
-// ─── Iconos SVG exactos del wireframe (17×17, viewBox 0 0 24 24) ─────────────
+// ─── Iconos SVG exactos del wireframe (34×34, viewBox 0 0 24 24) ─────────────
+// Tamaño real proporcional al Figma: los grupos de ícono ocupan ~70-110px
+// dentro de un frame de 905px de ancho, mucho más grandes que el 17x17 previo.
 
 function IconBell() {
     return (
-        <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+        <Svg width={34} height={34} viewBox="0 0 24 24" fill="none">
             <Path
                 d="M12 3a5 5 0 0 1 5 5v4l2 3H5l2-3V8a5 5 0 0 1 5-5zM9 19a3 3 0 0 0 6 0"
-                stroke="#46506A"
+                stroke={colors.accentOrange}
                 strokeWidth={1.6}
             />
         </Svg>
     );
 }
 
+// Corazón con línea de pulso (EKG) — icono real es "Biometría y control de fatiga"
 function IconHealth() {
     return (
-        <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+        <Svg width={34} height={34} viewBox="0 0 24 24" fill="none">
             <Path
-                d="M20 12a8 8 0 1 1-8-8M12 7v5l3 2"
-                stroke="#46506A"
+                d="M12 20.5C7 16.5 3 13.2 3 9.2 3 6.3 5.3 4 8.2 4c1.6 0 3.1.8 4 2 .9-1.2 2.4-2 4-2C19.1 4 21.4 6.3 21.4 9.2c0 4-4 7.3-9 11.3z"
+                stroke={colors.accentOrange}
+                strokeWidth={1.6}
+                strokeLinejoin="round"
+            />
+            <Path
+                d="M5 11h3l1.5-3 2 6 1.5-3H19"
+                stroke={colors.accentOrange}
                 strokeWidth={1.6}
                 strokeLinecap="round"
+                strokeLinejoin="round"
             />
         </Svg>
     );
@@ -41,23 +52,23 @@ function IconHealth() {
 
 function IconCamera() {
     return (
-        <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+        <Svg width={34} height={34} viewBox="0 0 24 24" fill="none">
             <Path
                 d="M5 8h3l2-3h4l2 3h3v11H5z"
-                stroke="#46506A"
+                stroke={colors.accentOrange}
                 strokeWidth={1.6}
             />
-            <Circle cx={12} cy={13} r={3} stroke="#46506A" strokeWidth={1.6} />
+            <Circle cx={12} cy={13} r={3} stroke={colors.accentOrange} strokeWidth={1.6} />
         </Svg>
     );
 }
 
 function IconMic() {
     return (
-        <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+        <Svg width={34} height={34} viewBox="0 0 24 24" fill="none">
             <Path
                 d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4"
-                stroke="#46506A"
+                stroke={colors.accentOrange}
                 strokeWidth={1.6}
                 strokeLinecap="round"
             />
@@ -65,51 +76,55 @@ function IconMic() {
     );
 }
 
-// ─── Icono campana del diálogo nativo (24×24, stroke #1B2A4A) ───────────────
+// ─── Icono campana del diálogo nativo (40×40, trazo naranja sobre tarjeta blanca) ──
 function IconBellLarge() {
     return (
-        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+        <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
             <Path
                 d="M12 3a5 5 0 0 1 5 5v4l2 3H5l2-3V8a5 5 0 0 1 5-5zM9 19a3 3 0 0 0 6 0"
-                stroke="#1B2A4A"
+                stroke={colors.accentOrange}
                 strokeWidth={1.6}
             />
         </Svg>
     );
 }
 
-// ─── Tarjeta del diálogo nativo de permisos ─────────────────────────────────
+// ─── Diálogo de notificaciones (Figma "NOTIFICACIONES" 2346:2015) ──
+// Fondo negro de borde a borde + tarjeta modal blanca (confirmado vía API REST:
+// frame fill=#000000, MODAL vector fill=#ffffff, texto fill=#412950).
 function PermissionCard({ onAllow, onDeny }) {
     return (
-        <View style={modal.card}>
-            <View style={modal.cardIcon}>
-                <IconBellLarge />
-            </View>
+        <View style={modal.backdrop}>
+            <View style={modal.card}>
+                <View style={modal.cardIcon}>
+                    <IconBellLarge />
+                </View>
 
-            <Text style={modal.cardTitle}>
-                "OPOX" quiere enviarte notificaciones
-            </Text>
+                <Text style={modal.cardTitle}>
+                    OPOX quiere enviarte notificaciones
+                </Text>
 
-            <Text style={modal.cardDesc}>
-                Avisos de cambios en el BOE, recordatorios de racha y de descanso.
-            </Text>
+                <Text style={modal.cardDesc}>
+                    Avisos de cambios en el BOE, recordatorios de racha y de descanso.
+                </Text>
 
-            <View style={modal.cardActions}>
-                <TouchableOpacity style={modal.btnAllow} onPress={onAllow} activeOpacity={0.85}>
-                    <Text style={modal.btnAllowText}>Permitir</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={modal.btnDeny} onPress={onDeny} activeOpacity={0.7}>
-                    <Text style={modal.btnDenyText}>No permitir</Text>
-                </TouchableOpacity>
+                <View style={modal.cardActions}>
+                    <TouchableOpacity style={modal.btnAllow} onPress={onAllow} activeOpacity={0.85}>
+                        <Text style={modal.btnAllowText}>¡A por más!</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={modal.btnDeny} onPress={onDeny} activeOpacity={0.7}>
+                        <Text style={modal.btnDenyText}>No permitir</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );
 }
 
 // ─── Fila de permiso ─────────────────────────────────────────────────────────
-function PermissionRow({ icon, title, subtitle }) {
+function PermissionRow({ icon, title, subtitle, highlighted }) {
     return (
-        <View style={styles.row}>
+        <View style={[styles.row, highlighted && styles.rowHighlighted]}>
             <View style={styles.rowIcon}>{icon}</View>
             <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>{title}</Text>
@@ -126,11 +141,12 @@ const PERMISSIONS = [
         icon: <IconBell />,
         title: 'Notificaciones',
         subtitle: 'Avisos BOE, racha y descanso',
+        highlighted: true,
     },
     {
         key: 'health',
         icon: <IconHealth />,
-        title: 'Salud / Wearable',
+        title: 'SALUD',
         subtitle: 'Biometría y control de fatiga',
     },
     {
@@ -147,21 +163,14 @@ const PERMISSIONS = [
     },
 ];
 
-// ─── Icono check verde del estado "Todo listo" (26×26, stroke #2BB673) ──────
+// ─── Icono check verde del estado "Todo listo" (Figma fill #3ab375) ──
 function IconCheckCircle() {
     return (
-        <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
-            <Circle
-                cx={12}
-                cy={12}
-                r={10}
-                stroke="#2BB673"
-                strokeWidth={1.8}
-            />
+        <Svg width={48} height={48} viewBox="0 0 24 24" fill="none">
             <Path
-                d="M7.5 12.5l3 3 6-6.5"
-                stroke="#2BB673"
-                strokeWidth={2}
+                d="M4.5 12.5l5 5 10-11"
+                stroke={colors.statGreen}
+                strokeWidth={2.6}
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
@@ -170,11 +179,12 @@ function IconCheckCircle() {
 }
 
 // ─────────────────────────────────────────────
-// 0.5 · ok — Estado permiso concedido
+// 0.5 · ok — Estado permiso concedido (Figma "PERMISO CONCEDIDO" 2346:2034)
+// Fondo negro de borde a borde + tarjeta modal blanca (confirmado vía API REST).
 // ─────────────────────────────────────────────
 function SuccessState({ onPress }) {
     return (
-        <SafeAreaView style={ok.container}>
+        <SafeAreaView style={ok.backdrop}>
             <View style={ok.card}>
                 <View style={ok.cardIcon}>
                     <IconCheckCircle />
@@ -186,98 +196,82 @@ function SuccessState({ onPress }) {
                     Permisos activados. Ya puedes aprovechar Opox al completo.
                 </Text>
 
-                <View style={ok.cardActions}>
-                    <TouchableOpacity
-                        style={ok.btnAllow}
-                        onPress={onPress}
-                        activeOpacity={0.85}
-                    >
-                        <Text style={ok.btnAllowText}>Empezar</Text>
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                    style={ok.btnAllow}
+                    onPress={onPress}
+                    activeOpacity={0.85}
+                >
+                    <Text style={ok.btnAllowText}>Empezar</Text>
+                </TouchableOpacity>
             </View>
         </SafeAreaView>
     );
 }
 
 const ok = StyleSheet.create({
-    container: {
+    backdrop: {
         flex: 1,
-        backgroundColor: 'rgba(15, 27, 51, 0.45)',
+        backgroundColor: '#000000',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 24,
+        paddingHorizontal: spacing.lg,
     },
     card: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        width: 240,
-        paddingTop: 18,
-        paddingHorizontal: 16,
-        paddingBottom: 14,
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: colors.white,
+        borderRadius: 28,
         alignItems: 'center',
-        shadowColor: '#0F1B33',
-        shadowOffset: { width: 0, height: 14 },
-        shadowOpacity: 0.28,
-        shadowRadius: 40,
-        elevation: 20,
+        paddingVertical: spacing.xl,
+        paddingHorizontal: spacing.lg,
     },
     cardIcon: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
-        backgroundColor: '#E3F6EE',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 11,
+        marginBottom: spacing.lg,
     },
     cardTitle: {
-        fontSize: 14,
+        fontSize: 22,
         fontWeight: '700',
-        color: '#0F1B33',
-        marginBottom: 6,
+        color: colors.textDark,
+        marginBottom: spacing.sm,
         textAlign: 'center',
     },
     cardDesc: {
-        fontSize: 11,
-        color: '#5A6373',
-        marginBottom: 14,
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: spacing.xl,
         textAlign: 'center',
-        lineHeight: 16,
-    },
-    cardActions: {
-        flexDirection: 'column',
-        gap: 7,
-        width: '100%',
+        lineHeight: 20,
     },
     btnAllow: {
-        backgroundColor: '#FF6B4A',
-        borderRadius: 10,
-        paddingVertical: 9,
+        backgroundColor: colors.ctaGreen,
+        borderRadius: 999,
+        paddingVertical: spacing.md,
         alignItems: 'center',
-        width: '100%',
+        alignSelf: 'stretch',
     },
     btnAllowText: {
-        color: '#FFFFFF',
-        fontSize: 12,
+        color: colors.white,
+        fontSize: 16,
         fontWeight: '700',
     },
 });
 
-// ─── Icono alerta roja del estado "Función limitada" (24×24, stroke #E2483D) ─
+// ─── Icono alerta roja del estado "Función limitada" (Figma fill #ff2638) ─
 function IconAlertCircle() {
     return (
-        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+        <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
             <Circle
                 cx={12}
                 cy={12}
                 r={10}
-                stroke="#E2483D"
+                stroke={colors.statRed}
                 strokeWidth={1.8}
             />
             <Path
                 d="M12 7v6M12 16.5v.5"
-                stroke="#E2483D"
+                stroke={colors.statRed}
                 strokeWidth={2}
                 strokeLinecap="round"
             />
@@ -286,11 +280,12 @@ function IconAlertCircle() {
 }
 
 // ─────────────────────────────────────────────
-// 0.5 · err — Estado permiso denegado
+// 0.5 · err — Estado permiso denegado (Figma "PERMISO DENEGADO" 2346:2051)
+// Fondo negro de borde a borde + tarjeta modal blanca (confirmado vía API REST).
 // ─────────────────────────────────────────────
 function DeniedState({ onContinue }) {
     return (
-        <SafeAreaView style={err.container}>
+        <SafeAreaView style={err.backdrop}>
             <View style={err.card}>
                 <View style={err.cardIcon}>
                     <IconAlertCircle />
@@ -302,100 +297,83 @@ function DeniedState({ onContinue }) {
                     Sin acceso a Salud no podremos avisarte de la fatiga. Actívalo cuando quieras en Ajustes.
                 </Text>
 
-                <View style={err.cardActions}>
-                    <TouchableOpacity
-                        style={err.btnAllow}
-                        onPress={() => Linking.openSettings()}
-                        activeOpacity={0.85}
-                    >
-                        <Text style={err.btnAllowText}>Ir a Ajustes</Text>
-                    </TouchableOpacity>
+                <TouchableOpacity
+                    style={err.btnAllow}
+                    onPress={() => Linking.openSettings()}
+                    activeOpacity={0.85}
+                >
+                    <Text style={err.btnAllowText}>Ir a ajustes</Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={err.btnDeny}
-                        onPress={onContinue}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={err.btnDenyText}>Continuar igualmente</Text>
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                    style={err.btnDeny}
+                    onPress={onContinue}
+                    activeOpacity={0.7}
+                >
+                    <Text style={err.btnDenyText}>Continuar igualmente</Text>
+                </TouchableOpacity>
             </View>
         </SafeAreaView>
     );
 }
 
 const err = StyleSheet.create({
-    container: {
+    backdrop: {
         flex: 1,
-        backgroundColor: 'rgba(15, 27, 51, 0.45)',
+        backgroundColor: '#000000',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 24,
+        paddingHorizontal: spacing.lg,
     },
     card: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        width: 240,
-        paddingTop: 18,
-        paddingHorizontal: 16,
-        paddingBottom: 14,
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: colors.white,
+        borderRadius: 28,
         alignItems: 'center',
-        shadowColor: '#0F1B33',
-        shadowOffset: { width: 0, height: 14 },
-        shadowOpacity: 0.28,
-        shadowRadius: 40,
-        elevation: 20,
+        paddingVertical: spacing.xl,
+        paddingHorizontal: spacing.lg,
     },
     cardIcon: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
-        backgroundColor: '#FDEBE9',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 11,
+        marginBottom: spacing.lg,
     },
     cardTitle: {
-        fontSize: 14,
+        fontSize: 22,
         fontWeight: '700',
-        color: '#0F1B33',
-        marginBottom: 6,
+        color: colors.textDark,
+        marginBottom: spacing.sm,
         textAlign: 'center',
     },
     cardDesc: {
-        fontSize: 11,
-        color: '#5A6373',
-        marginBottom: 14,
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: spacing.xl,
         textAlign: 'center',
-        lineHeight: 16,
-    },
-    cardActions: {
-        flexDirection: 'column',
-        gap: 7,
-        width: '100%',
+        lineHeight: 20,
     },
     btnAllow: {
-        backgroundColor: '#FF6B4A',
-        borderRadius: 10,
-        paddingVertical: 9,
+        backgroundColor: colors.ctaGreen,
+        borderRadius: 999,
+        paddingVertical: spacing.md,
         alignItems: 'center',
-        width: '100%',
+        alignSelf: 'stretch',
     },
     btnAllowText: {
-        color: '#FFFFFF',
-        fontSize: 12,
+        color: colors.white,
+        fontSize: 16,
         fontWeight: '700',
     },
     btnDeny: {
         backgroundColor: 'transparent',
-        borderRadius: 10,
-        paddingVertical: 9,
+        paddingVertical: spacing.md,
         alignItems: 'center',
-        width: '100%',
+        alignSelf: 'stretch',
     },
     btnDenyText: {
-        color: '#8A92A0',
-        fontSize: 12,
+        color: colors.textDark,
+        fontSize: 14,
         fontWeight: '700',
     },
 });
@@ -458,6 +436,7 @@ export default function PermissionsScreen({ navigation }) {
                             icon={perm.icon}
                             title={perm.title}
                             subtitle={perm.subtitle}
+                            highlighted={perm.highlighted}
                         />
                     ))}
                 </View>
@@ -472,14 +451,11 @@ export default function PermissionsScreen({ navigation }) {
 
             {/* ── 0.5 · pop — Diálogo nativo simulado ── */}
             <Modal
-                transparent
                 visible={modalVisible}
                 animationType="fade"
                 statusBarTranslucent
             >
-                <View style={modal.overlay}>
-                    <PermissionCard onAllow={handleAllow} onDeny={handleDeny} />
-                </View>
+                <PermissionCard onAllow={handleAllow} onDeny={handleDeny} />
             </Modal>
 
         </SafeAreaView>
@@ -498,13 +474,13 @@ const styles = StyleSheet.create({
         height: 30,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
+        paddingHorizontal: spacing.md,
         flexShrink: 0,
     },
     statusBarTime: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#1B2A4A',
+        color: colors.textDark,
     },
 
     // ── Scroll + body (body-area pad scr-scroll) ─
@@ -513,7 +489,7 @@ const styles = StyleSheet.create({
     },
     body: {
         paddingHorizontal: 18,
-        paddingTop: 16,
+        paddingTop: spacing.md,
         paddingBottom: 80, // espacio para el botón absoluto
     },
 
@@ -521,14 +497,14 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 18,
         fontWeight: '800',
-        color: '#0F1B33',
+        color: colors.textDark,
         letterSpacing: -0.4,
     },
 
     // ── Subtítulo (h-sub) ───────────────────────
     subtitle: {
         fontSize: 12.5,
-        color: '#5A6373',
+        color: colors.textDark,
         marginTop: 6,
         lineHeight: 18,
     },
@@ -536,7 +512,7 @@ const styles = StyleSheet.create({
     // ── Lista de filas ──────────────────────────
     // margin-top:16px; flex-direction:column; gap:10px
     list: {
-        marginTop: 16,
+        marginTop: spacing.md,
         flexDirection: 'column',
         gap: 10,
     },
@@ -557,16 +533,19 @@ const styles = StyleSheet.create({
     },
 
     // ── Icono contenedor (opo-ic) ───────────────
-    // width:34; height:34; borderRadius:9; bg:#EEF1F7
-    // display:flex; alignItems:center; justifyContent:center; flex-shrink:0
+    // Figma: icono desnudo, sin caja de fondo. Se conserva el ancho/alto
+    // solo para mantener la alineación de columna con el texto.
     rowIcon: {
         width: 34,
         height: 34,
-        borderRadius: 9,
-        backgroundColor: '#EEF1F7',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
+    },
+
+    // ── Variante resaltada de fila (Notificaciones, primera fila) ──
+    rowHighlighted: {
+        backgroundColor: 'rgba(235, 235, 235, 0.5)',
     },
 
     // ── Texto contenedor (opo-tx) ───────────────
@@ -574,17 +553,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
-    // opo-tx b → font-size:12.5px; color:#1B2A4A
+    // opo-tx b → font-size:12.5px; color:colors.textDark
     rowTitle: {
         fontSize: 12.5,
         fontWeight: '700',
-        color: '#1B2A4A',
+        color: colors.textDark,
     },
 
     // opo-tx span → font-size:10.5px; color:#8A92A0; display:block
     rowSubtitle: {
         fontSize: 10.5,
-        color: '#8A92A0',
+        color: colors.textMuted,
+        opacity: 0.5,
         marginTop: 1,
     },
 
@@ -601,7 +581,7 @@ const styles = StyleSheet.create({
 
     // btn base
     btnPrimary: {
-        backgroundColor: '#FF6B4A',
+        backgroundColor: colors.ctaGreen,
         borderRadius: 12,
         paddingVertical: 13,
         alignItems: 'center',
@@ -614,99 +594,79 @@ const styles = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────
-// Estilos modal diálogo nativo
+// Estilos diálogo de notificaciones (Figma "NOTIFICACIONES" 2346:2015)
+// Fondo negro de borde a borde + tarjeta modal blanca (confirmado vía API REST:
+// frame fill=#000000, MODAL vector fill=#ffffff, texto fill=#412950).
 // ─────────────────────────────────────────────
 const modal = StyleSheet.create({
-    // ── Overlay oscuro (overlay-bg) ─────────────
-    // position:absolute; inset:0; background:rgba(15,27,51,0.45)
-    // display:flex; align-items:center; justify-content:center
-    overlay: {
+    backdrop: {
         flex: 1,
-        backgroundColor: 'rgba(15, 27, 51, 0.45)',
+        backgroundColor: '#000000',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingHorizontal: spacing.lg,
     },
 
-    // ── Tarjeta (perm-card) ──────────────────────
-    // bg:#FFF; borderRadius:16; width:240; padding:18px 16px 14px
-    // shadow: rgba(15,27,51,0.28) 0 14 40; text-align:center
     card: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        width: 240,
-        paddingTop: 18,
-        paddingHorizontal: 16,
-        paddingBottom: 14,
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: colors.white,
+        borderRadius: 28,
         alignItems: 'center',
-        shadowColor: 'rgba(15, 27, 51, 1)',
-        shadowOffset: { width: 0, height: 14 },
-        shadowOpacity: 0.28,
-        shadowRadius: 40,
-        elevation: 20, // Android
+        paddingVertical: spacing.xl,
+        paddingHorizontal: spacing.lg,
     },
 
-    // ── Icono contenedor (perm-ic) ───────────────
-    // width:52; height:52; margin:0 auto 11px; borderRadius:14
-    // bg:#EEF1F7; flex; alignItems:center; justifyContent:center
     cardIcon: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
-        backgroundColor: '#EEF1F7',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 11,
+        marginBottom: spacing.lg,
     },
 
-    // ── Título (perm-card h4) ────────────────────
     cardTitle: {
-        fontSize: 14,
+        fontSize: 22,
         fontWeight: '700',
-        color: '#0F1B33',
-        marginBottom: 6,
+        color: colors.textDark,
+        marginBottom: spacing.sm,
+        textAlign: 'center',
+    },
+
+    cardDesc: {
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: spacing.xl,
         textAlign: 'center',
         lineHeight: 20,
     },
 
-    // ── Descripción (perm-card p) ────────────────
-    cardDesc: {
-        fontSize: 11,
-        color: '#5A6373',
-        marginBottom: 14,
-        textAlign: 'center',
-        lineHeight: 16,
-    },
-
-    // ── Acciones (perm-actions) ──────────────────
     cardActions: {
         flexDirection: 'column',
-        gap: 7,
+        gap: spacing.sm,
         width: '100%',
     },
 
-    // ── Botón Permitir (perm-btn perm-allow) ─────
+    // ── Botón ¡A por más! (pill) ─────
     btnAllow: {
-        backgroundColor: '#FF6B4A',
-        borderRadius: 10,
-        paddingVertical: 9,
+        backgroundColor: colors.ctaGreen,
+        borderRadius: 999,
+        paddingVertical: spacing.md,
         alignItems: 'center',
     },
     btnAllowText: {
-        color: '#FFFFFF',
-        fontSize: 12,
+        color: colors.white,
+        fontSize: 16,
         fontWeight: '700',
     },
 
-    // ── Botón No permitir (perm-btn perm-deny) ───
+    // ── Botón No permitir (texto simple) ───
     btnDeny: {
         backgroundColor: 'transparent',
-        borderRadius: 10,
-        paddingVertical: 9,
+        paddingVertical: spacing.md,
         alignItems: 'center',
     },
     btnDenyText: {
-        color: '#8A92A0',
-        fontSize: 12,
+        color: colors.textDark,
+        fontSize: 14,
         fontWeight: '700',
     },
 });

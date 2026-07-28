@@ -30,6 +30,7 @@ const SECTIONS = [
         title: 'Bloque 0 · Onboarding',
         rows: [
             { label: '0.1 · Splash', route: 'Splash' },
+            { label: '0.1 · Icono', route: 'Icono' },
             { label: '0.1 · err · Sin conexión', route: 'SplashNoConnection' },
             { label: '0.1 · err · Update requerido', route: 'SplashUpdate' },
             { label: '0.2 · Onboarding Slider', route: 'OnboardingSlider' },
