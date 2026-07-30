@@ -6,7 +6,7 @@ import {
     StatusBar,
 } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
-import camoImg from '../../imports/Icono/3e43d7dd7590060c7fd1b2f8e506e66fc41fe1d7.png';
+import camoImg from '../../imports/Icono/3e43d7dd7590060c7fd1b2f8e506e66fc41fe1d7.jpg';
 
 // ─── Isotipo X (hockey stick) — rutas extraídas del opoxLogo.js existente.
 // Se usa el mismo viewBox "330 0 155 185" para recortar solo la marca X

@@ -9,7 +9,7 @@ import {
 import NetInfo from '@react-native-community/netinfo';
 import OpoxWordmark from '../../../assets/opoxLogo';
 import MasCopLogo from '../../../assets/masCopLogo';
-import camoImg from '../../imports/CargaInicial/3e43d7dd7590060c7fd1b2f8e506e66fc41fe1d7.png';
+import camoImg from '../../imports/CargaInicial/3e43d7dd7590060c7fd1b2f8e506e66fc41fe1d7.jpg';
 
 // ─── MásCOP badge ──────────────────────────────────────────────────────────────
 // Lockup vectorizado real "MásCOP · Formación Policial" (paths exactos extraídos
