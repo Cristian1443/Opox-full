@@ -18,4 +18,4 @@ ENV NODE_ENV=production
 COPY --from=build /app ./
 
 EXPOSE 3000
-CMD ["node", "apps/backend/dist/index.js"]
+CMD ["pnpm", "--filter", "@opox/backend", "start"]
