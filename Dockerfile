@@ -2,7 +2,7 @@
 # packages/* hoisted vía pnpm). Railway/Render deben usar este Dockerfile
 # con el contexto de build en la raíz del repo.
 
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @opox/backend... build
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 ENV NODE_ENV=production
