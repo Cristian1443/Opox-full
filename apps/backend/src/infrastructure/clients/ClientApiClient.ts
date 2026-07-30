@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from 'axios';
-import type { ClientApiConfig, ClientApiContract } from '@opox/types';
+import type { ClientApiConfig } from '@opox/types';
 import { logger } from '@opox/utils';
 
 /**
@@ -7,9 +7,11 @@ import { logger } from '@opox/utils';
  *
  * TODO: los métodos concretos se añadirán cuando se firme el contrato con
  * el cliente. Este stub monta el Axios con timeouts + interceptores para
- * que solo haya que rellenar las operaciones.
+ * que solo haya que rellenar las operaciones. `ClientApiContract` sigue sin
+ * `implements` aquí porque hoy es un placeholder vacío (`_placeholder?: never`);
+ * añadir la clausula cuando el contrato tenga miembros reales.
  */
-export class ClientApiClient implements ClientApiContract {
+export class ClientApiClient {
     private readonly http: AxiosInstance;
 
     constructor(config: ClientApiConfig) {

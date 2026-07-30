@@ -9,7 +9,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  *   - deletePhotoTest(url): purga la imagen tras procesarse
  */
 export class SupabaseStorage {
-    constructor(private readonly supabase: SupabaseClient) { }
+    constructor(_supabase: SupabaseClient) { }
 
     // TODO: métodos concretos aquí
 }

@@ -19,7 +19,7 @@ export interface PushMessage {
 }
 
 export class ExpoPushService {
-    constructor(private readonly accessToken?: string) { }
+    constructor(_accessToken?: string) { }
 
     async send(_messages: PushMessage[]): Promise<void> {
         // TODO: POST a https://exp.host/--/api/v2/push/send

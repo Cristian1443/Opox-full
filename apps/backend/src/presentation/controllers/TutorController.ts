@@ -75,7 +75,7 @@ export class TutorController {
     getConversation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { conversation, messages } = await this.deps.getConversation.execute(
-                req.params.id,
+                (req.params.id as string),
                 req.authUser!.id,
             );
             ok(res, 200, { conversation: this.serializeConversation(conversation), messages: messages.map(this.serializeMessage) });
@@ -94,7 +94,7 @@ export class TutorController {
         try {
             const { content } = req.body as { content: string };
             const { userMessage, aiMessage } = await this.deps.sendMessage.execute({
-                conversationId: req.params.id,
+                conversationId: (req.params.id as string),
                 userId: req.authUser!.id,
                 content,
             });
@@ -104,7 +104,7 @@ export class TutorController {
 
     deleteConversation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            await this.deps.deleteConversation.execute(req.params.id, req.authUser!.id);
+            await this.deps.deleteConversation.execute((req.params.id as string), req.authUser!.id);
             ok(res, 200, null);
         } catch (err) { next(err); }
     };
@@ -120,7 +120,7 @@ export class TutorController {
 
     getDeck = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const { deck, cards } = await this.deps.getDeckWithCards.execute(req.params.id, req.authUser!.id);
+            const { deck, cards } = await this.deps.getDeckWithCards.execute((req.params.id as string), req.authUser!.id);
             ok(res, 200, { deck: this.serializeDeck(deck), cards: cards.map(this.serializeCard) });
         } catch (err) { next(err); }
     };
@@ -135,7 +135,7 @@ export class TutorController {
 
     deleteDeck = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            await this.deps.deleteDeck.execute(req.params.id, req.authUser!.id);
+            await this.deps.deleteDeck.execute((req.params.id as string), req.authUser!.id);
             ok(res, 200, null);
         } catch (err) { next(err); }
     };
@@ -143,7 +143,7 @@ export class TutorController {
     submitReview = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { knownCount, failedCount, failedCardIds } = req.body as { knownCount: number; failedCount: number; failedCardIds: string[] };
-            await this.deps.submitReview.execute({ userId: req.authUser!.id, deckId: req.params.id, knownCount, failedCount, failedCardIds });
+            await this.deps.submitReview.execute({ userId: req.authUser!.id, deckId: (req.params.id as string), knownCount, failedCount, failedCardIds });
             ok(res, 200, null);
         } catch (err) { next(err); }
     };
@@ -160,14 +160,14 @@ export class TutorController {
 
     getEpisode = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const episode = await this.deps.getEpisode.execute(req.params.id);
+            const episode = await this.deps.getEpisode.execute((req.params.id as string));
             ok(res, 200, this.serializeEpisode(episode));
         } catch (err) { next(err); }
     };
 
     getProgress = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const progress = await this.deps.getProgress.execute(req.authUser!.id, req.params.episodeId);
+            const progress = await this.deps.getProgress.execute(req.authUser!.id, (req.params.episodeId as string));
             ok(res, 200, progress ? this.serializeProgress(progress) : null);
         } catch (err) { next(err); }
     };
@@ -175,7 +175,7 @@ export class TutorController {
     saveProgress = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { positionSecs } = req.body as { positionSecs: number };
-            const progress = await this.deps.saveProgress.execute({ userId: req.authUser!.id, episodeId: req.params.episodeId, positionSecs });
+            const progress = await this.deps.saveProgress.execute({ userId: req.authUser!.id, episodeId: (req.params.episodeId as string), positionSecs });
             ok(res, 200, this.serializeProgress(progress));
         } catch (err) { next(err); }
     };
@@ -193,7 +193,7 @@ export class TutorController {
     getSummary = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { oposicion } = req.validatedQuery as { oposicion: string };
-            const summary = await this.deps.getSummary.execute(req.params.topicId, oposicion);
+            const summary = await this.deps.getSummary.execute((req.params.topicId as string), oposicion);
             ok(res, 200, this.serializeSummary(summary));
         } catch (err) { next(err); }
     };

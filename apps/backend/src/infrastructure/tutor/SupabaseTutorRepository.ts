@@ -22,7 +22,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .select('*')
             .eq('user_id', userId)
             .order('updated_at', { ascending: false });
-        if (error) { logger.error('[tutor-repo] listConversations', error); return []; }
+        if (error) { logger.error('[tutor-repo] listConversations', { error }); return []; }
         return (data ?? []).map(mapConversation);
     }
 
@@ -33,7 +33,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .eq('id', id)
             .eq('user_id', userId)
             .maybeSingle();
-        if (error) { logger.error('[tutor-repo] getConversation', error); return null; }
+        if (error) { logger.error('[tutor-repo] getConversation', { error }); return null; }
         return data ? mapConversation(data) : null;
     }
 
@@ -63,7 +63,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .eq('conversation_id', conversationId)
             .eq('user_id', userId)
             .order('created_at', { ascending: true });
-        if (error) { logger.error('[tutor-repo] listMessages', error); return []; }
+        if (error) { logger.error('[tutor-repo] listMessages', { error }); return []; }
         return (data ?? []).map(mapMessage);
     }
 
@@ -102,7 +102,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .select('*')
             .eq('user_id', userId)
             .order('created_at', { ascending: false });
-        if (error) { logger.error('[tutor-repo] listDecks', error); return []; }
+        if (error) { logger.error('[tutor-repo] listDecks', { error }); return []; }
         return (data ?? []).map(mapDeck);
     }
 
@@ -113,7 +113,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .eq('id', id)
             .eq('user_id', userId)
             .maybeSingle();
-        if (error) { logger.error('[tutor-repo] getDeck', error); return null; }
+        if (error) { logger.error('[tutor-repo] getDeck', { error }); return null; }
         return data ? mapDeck(data) : null;
     }
 
@@ -159,7 +159,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .eq('deck_id', deckId)
             .eq('user_id', userId)
             .order('created_at', { ascending: true });
-        if (error) { logger.error('[tutor-repo] getDeckCards', error); return []; }
+        if (error) { logger.error('[tutor-repo] getDeckCards', { error }); return []; }
         return (data ?? []).map(mapCard);
     }
 
@@ -205,7 +205,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .select('*')
             .eq('oposicion', oposicion)
             .order('created_at', { ascending: true });
-        if (error) { logger.error('[tutor-repo] listEpisodes', error); return []; }
+        if (error) { logger.error('[tutor-repo] listEpisodes', { error }); return []; }
         return (data ?? []).map(mapEpisode);
     }
 
@@ -215,7 +215,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .select('*')
             .eq('id', id)
             .maybeSingle();
-        if (error) { logger.error('[tutor-repo] getEpisode', error); return null; }
+        if (error) { logger.error('[tutor-repo] getEpisode', { error }); return null; }
         return data ? mapEpisode(data) : null;
     }
 
@@ -226,7 +226,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .eq('user_id', userId)
             .eq('episode_id', episodeId)
             .maybeSingle();
-        if (error) { logger.error('[tutor-repo] getProgress', error); return null; }
+        if (error) { logger.error('[tutor-repo] getProgress', { error }); return null; }
         return data ? mapProgress(data) : null;
     }
 
@@ -251,7 +251,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .select('*')
             .eq('oposicion', oposicion)
             .order('topic_title', { ascending: true });
-        if (error) { logger.error('[tutor-repo] listSummaries', error); return []; }
+        if (error) { logger.error('[tutor-repo] listSummaries', { error }); return []; }
         return (data ?? []).map(mapSummary);
     }
 
@@ -262,7 +262,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .eq('topic_id', topicId)
             .eq('oposicion', oposicion)
             .maybeSingle();
-        if (error) { logger.error('[tutor-repo] getSummary', error); return null; }
+        if (error) { logger.error('[tutor-repo] getSummary', { error }); return null; }
         return data ? mapSummary(data) : null;
     }
 }

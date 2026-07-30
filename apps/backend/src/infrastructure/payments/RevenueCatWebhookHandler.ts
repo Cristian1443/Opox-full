@@ -28,7 +28,7 @@ export interface RevenueCatEvent {
 }
 
 export class RevenueCatWebhookHandler {
-    constructor(private readonly webhookSecret?: string) { }
+    constructor(_webhookSecret?: string) { }
 
     /**
      * Verifica firma HMAC del webhook. RevenueCat firma con el secret
