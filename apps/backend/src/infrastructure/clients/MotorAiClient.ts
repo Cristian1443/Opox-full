@@ -9,6 +9,12 @@ import type {
     SurgicalTestResult,
     HintParams,
     HintResult,
+    AnalyzeNoteDocumentParams,
+    AnalyzeNoteDocumentResult,
+    GenerateTagsFromNoteParams,
+    GenerateTagsFromNoteResult,
+    GenerateQuestionsFromNoteParams,
+    GenerateQuestionsFromNoteResult,
 } from '@opox/types';
 import { logger } from '@opox/utils';
 
@@ -123,5 +129,22 @@ export class MotorAiClient implements AiApiContract {
 
     async generateHint(_params: HintParams): Promise<HintResult> {
         throw new Error('[MotorAiClient] generateHint NO forma parte del Motor de IA. Usa AiApiClient (OpenAI GPT-4o-mini).');
+    }
+
+    // ── Bloque 9 · Factoría de Apuntes ───────────────────────────────────────
+    // El Motor de IA del cliente no cubre estas tareas por diseño (su ingesta
+    // está pensada para PDFs oficiales de temario, no para apuntes del usuario).
+    // Delegar en AiApiClient (OpenAI) o en el pipeline propio del BRIEF_IA_BLOQUE9.
+
+    async analyzeNoteDocument(_params: AnalyzeNoteDocumentParams): Promise<AnalyzeNoteDocumentResult> {
+        throw new Error('[MotorAiClient] analyzeNoteDocument NO forma parte del Motor de IA. Usa AiApiClient (BRIEF_IA_BLOQUE9).');
+    }
+
+    async generateTagsFromNote(_params: GenerateTagsFromNoteParams): Promise<GenerateTagsFromNoteResult> {
+        throw new Error('[MotorAiClient] generateTagsFromNote NO forma parte del Motor de IA. Usa AiApiClient (BRIEF_IA_BLOQUE9).');
+    }
+
+    async generateQuestionsFromNote(_params: GenerateQuestionsFromNoteParams): Promise<GenerateQuestionsFromNoteResult> {
+        throw new Error('[MotorAiClient] generateQuestionsFromNote NO forma parte del Motor de IA. Usa AiApiClient (BRIEF_IA_BLOQUE9).');
     }
 }

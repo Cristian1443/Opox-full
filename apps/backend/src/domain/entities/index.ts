@@ -16,3 +16,4 @@ export * from './TutorConversation';
 export * from './TutorFlashcardDeck';
 export * from './TutorPodcastEpisode';
 export * from './TutorSummary';
+export * from './Note';

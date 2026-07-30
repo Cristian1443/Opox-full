@@ -10,8 +10,10 @@ export default function AlertCardModal({
     icon,
     title,
     description,
+    extraContent,
     primaryLabel,
     onPrimaryPress,
+    primaryColor,
     secondaryLabel,
     onSecondaryPress,
 }) {
@@ -55,11 +57,21 @@ export default function AlertCardModal({
 
                     <Text style={styles.title}>{title}</Text>
                     {description ? (
-                        <Text style={styles.description}>{description}</Text>
+                        // `description` puede ser string o un ReactNode (por ejemplo <Text> con partes coloreadas).
+                        typeof description === 'string'
+                            ? <Text style={styles.description}>{description}</Text>
+                            : <View style={styles.descriptionNode}>{description}</View>
+                    ) : null}
+
+                    {extraContent ? (
+                        <View style={styles.extraContent}>{extraContent}</View>
                     ) : null}
 
                     <TouchableOpacity
-                        style={styles.btnPrimary}
+                        style={[
+                            styles.btnPrimary,
+                            primaryColor && { backgroundColor: primaryColor },
+                        ]}
                         onPress={onPrimaryPress}
                         activeOpacity={0.85}
                     >
@@ -125,6 +137,14 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 19,
         marginBottom: 18,
+    },
+    descriptionNode: {
+        width: '100%',
+        marginBottom: 18,
+    },
+    extraContent: {
+        width: '100%',
+        marginBottom: 14,
     },
     btnPrimary: {
         backgroundColor: '#34C759',

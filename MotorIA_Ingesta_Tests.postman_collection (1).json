@@ -1,0 +1,685 @@
+{
+  "info": {
+    "name": "Motor de IA — Ingesta + Generador de tests",
+    "description": "Doc de integración completa del requerimiento: **ingesta de PDFs de ~1.000 páginas** (parser tolerante, OCR automático, detección de índice/TOC, segmentación Curso → Bloque → Tema), **chunking semántico + embeddings + base RAG**, y **generador de tests parametrizado** (dificultad, nº de preguntas, contrarreloj y selección de temario). Cada request lleva su doc detallada (parámetros, respuestas y errores).\n\n---\n\n### Autenticación\n\nTodas las rutas `/v1/*` exigen header `X-API-Key: {{api_key}}`.\n\n| Modo | Comportamiento |\n|---|---|\n| Producción (`MOTOR_API_KEY` definida) | Debe coincidir; si no → `401 {\"detail\": \"X-API-Key inválida o ausente.\"}` |\n| Dev (`MOTOR_API_KEY` vacía, `REQUIRE_API_KEY=0`) | No se exige |\n| Demo BYOK | Si el valor empieza por `sk-` (key OpenAI), esa key paga ingesta y generación del request |\n\n### Flujo completo (orden del Runner)\n\n1. **Ingesta · 1 Subir PDF** (adjunta el PDF) → captura `curso_id` + `job_id`\n2. **Ingesta · 2 Estado del job** → repetir hasta `estado=done` (2–3 s entre polls)\n3. **Ingesta · 4 Detalle del curso** → árbol Bloque→Tema; los `id` de temas/bloques alimentan la selección de temario\n4. **Generador · 1 Generar test** → `202 {job_id}`\n5. **Ingesta · 2 Estado del job** → hasta `done`; el script captura `sesion_id` de `resultado`\n6. **Generador · 2 Traer sesión** → preguntas SIN la correcta (se revela al responder)\n7. **Generador · 3 Responder** → veredicto + explicación + **cita verbatim con página**\n8. **Generador · 4 Resultado** → nota + desglose por tema\n\nAlternativa sin LLM (casi gratis): **Generador · 6 Test desde caché** reemplaza los pasos 4–5 con respuesta síncrona.\n\n### Convenciones de error\n\n- Formato uniforme: `{\"detail\": \"<código o mensaje>\"}`\n- Generador: `detail` es un **código de dominio estable** (`curso_no_listo`, `respuesta_duplicada`, …) para mapear a mensajes localizados en la app\n- Ingesta: `detail` es mensaje legible en español\n- `401` = X-API-Key ausente/incorrecta · `422` = body inválido (validación pydantic)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Salud",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "health"
+              ]
+            },
+            "description": "Ping del motor. `200` => la API está viva. Sin auth estricta en dev."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ingesta (Cursos)",
+      "item": [
+        {
+          "name": "1 · Subir PDF (ingesta)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses"
+              ]
+            },
+            "description": "Sube un temario PDF y lanza la **ingesta asíncrona**: parser tolerante a PDFs mal formados, OCR automático si es escaneado (`scanned=true`), detección de índice/TOC, segmentación por marcadores `TEMA N` (Curso → Bloque → Tema), chunking semántico, embeddings y carga al índice vectorial (RAG).\n\n**Body (multipart form-data):**\n\n| Campo | Tipo | Obligatorio | Notas |\n|---|---|---|---|\n| `file` | file | sí | PDF (`.pdf` o content-type `application/pdf`). **Adjúntalo aquí.** |\n| `titulo` | text | sí | Nombre visible; vacío → usa el nombre del archivo |\n\n**Respuesta `201`:** `{\"curso_id\": \"…\", \"job_id\": \"…\"}` → hacer polling del job (request 2).\n\n**Errores:**\n\n| Código | Motivo |\n|---|---|\n| `400` | Sin nombre / no es PDF / cifrado con contraseña / sin páginas / ilegible |\n| `413` | Supera máximo de MB (`MAX_PDF_MB`) o de páginas (`MAX_PDF_PAGES`) |\n| `409` | Carga idéntica activándose (reintentar en segundos) |\n\n**Idempotencia:** SHA-256 del archivo. El mismo PDF dos veces NO duplica curso: devuelve `curso_id`/`job_id` existentes (`201`, `resultado.reutilizado: true` en el job).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "El PDF del temario (adjúntalo aquí)."
+                },
+                {
+                  "key": "titulo",
+                  "value": "Bloque 1 — Temas 1-10",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('curso_id', j.curso_id);",
+                  "pm.collectionVariables.set('job_id', j.job_id);",
+                  "pm.test('201 creado', () => pm.response.code === 201);",
+                  "console.log('curso_id =', j.curso_id, '| job_id =', j.job_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · Estado del job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/jobs/{{job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "jobs",
+                "{{job_id}}"
+              ]
+            },
+            "description": "Estado de **cualquier** job (ingesta o generación). Repetir cada 2–3 s hasta `done`. Un PDF de ~1.000 páginas tarda minutos (más con OCR).\n\n**Respuesta `200`:**\n\n```json\n{\n  \"estado\": \"running\",            // reserved | queued | running | done | error\n  \"mensaje\": \"Generando embeddings…\",\n  \"progreso\": {\"fase\": \"embeddings\", \"pct\": 62},\n  \"resultado\": {},                // al terminar generación: {sesion_id, preguntas, deficit}\n  \"tokens_in\": 0, \"tokens_out\": 0,\n  \"embedding_tokens\": 183220,\n  \"cost_usd\": 0.0037              // auditoría de gasto LLM/embeddings\n}\n```\n\n- `estado=error` → `mensaje` trae la causa legible (p. ej. `sin_chunks_elegibles` si los temas pedidos no tienen texto suficiente).\n- Si el job es de **generación** y terminó, el script de tests captura `sesion_id` de `resultado` automáticamente.\n\n`404` si el job no existe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.resultado && j.resultado.sesion_id) pm.collectionVariables.set('sesion_id', j.resultado.sesion_id);",
+                  "pm.test('estado válido', () => ['reserved','queued','running','done','error'].includes(j.estado));",
+                  "console.log('estado =', j.estado, '| progreso =', JSON.stringify(j.progreso), '| $', j.cost_usd);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · Listar cursos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses?limit=100&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Lista cursos, más reciente primero. Query: `limit` (1–500, default 100), `offset` (default 0).\n\n**Respuesta `200` (por curso):**\n\n```json\n{\n  \"id\": \"c-…\", \"titulo\": \"…\", \"source_pdf\": \"temario.pdf\",\n  \"total_pages\": 987,\n  \"scanned\": false,          // true = la ingesta usó OCR\n  \"estado\": \"listo\",         // procesando | listo | error\n  \"error\": \"\", \"creado\": \"2026-07-22T15:04:11Z\",\n  \"n_bloques\": 4, \"n_temas\": 28\n}\n```\n\nSolo con `estado=\"listo\"` se puede generar tests o buscar (RAG)."
+          }
+        },
+        {
+          "name": "4 · Detalle del curso (árbol)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}"
+              ]
+            },
+            "description": "**Endpoint para pintar el selector de temario en la app.** Igual que el listado + `bloques[]` con el árbol completo:\n\n```json\n\"bloques\": [\n  {\n    \"id\": \"b-01…\", \"nombre\": \"Bloque I — …\", \"orden\": 1,\n    \"temas\": [\n      {\"id\": \"t-07…\", \"titulo\": \"TEMA 7. …\", \"orden\": 7,\n       \"page_start\": 121, \"page_end\": 138, \"char_count\": 45210}\n    ]\n  }\n]\n```\n\nLos `id` de bloques y temas son los que acepta el generador en `bloque_ids` / `tema_ids` (**selección de temario**).\n\nEl script captura `topic_id` del primer tema. `404` si no existe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const t = (j.bloques && j.bloques[0] && j.bloques[0].temas && j.bloques[0].temas[0]);",
+                  "if (t) pm.collectionVariables.set('topic_id', t.id);",
+                  "pm.test('curso listo', () => j.estado === 'listo');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 · Buscar en el curso (RAG)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/search",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "search"
+              ]
+            },
+            "description": "Búsqueda semántica sobre el temario (embeddings + índice vectorial).\n\n**Body:** `{\"query\": \"…\", \"k\": 6}` — `query` 1–1000 chars, `k` 1–30 pasajes (default 6).\n\n**Respuesta `200`:**\n\n```json\n{\n  \"query\": \"…\",\n  \"pasajes\": [\n    {\"chunk_id\": \"ch-…\", \"tema_id\": \"t-07…\", \"tema_titulo\": \"TEMA 7. …\",\n     \"texto\": \"…texto literal del temario…\",\n     \"page_start\": 128, \"page_end\": 129, \"score\": 0.83}\n  ]\n}\n```\n\n`409` si la ingesta no terminó (`estado != \"listo\"`) · `404` curso inexistente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"artículos del poder judicial\",\n  \"k\": 6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6 · Chunks de un tema",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/topics/{{topic_id}}/chunks?limit=50&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "topics",
+                "{{topic_id}}",
+                "chunks"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Texto segmentado (canónico) de un tema — depuración/backoffice, no necesario en la app. Query: `limit` (1–200, default 100), `offset`.\n\n**Respuesta:** `[{id, orden, texto, page_start, page_end, elegible}]`.\n\n`404` si el tema no pertenece al curso. `topic_id` se captura en el request 4."
+          }
+        },
+        {
+          "name": "7 · Borrar curso",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}"
+              ]
+            },
+            "description": "Borra el curso **completo**: temario, chunks, vectores, preguntas, sesiones y el PDF original.\n\n- `204` sin cuerpo\n- `409` si la ingesta sigue activa\n- `404` si no existe"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Generador de tests (Bloque 6)",
+      "item": [
+        {
+          "name": "1 · Generar test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/generate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "generate"
+              ]
+            },
+            "description": "**Generador parametrizado** (asíncrono, LLM con pipeline de calidad L0→L1→L2→L3 y evidencia verbatim).\n\n**Body — todos los parámetros del requerimiento:**\n\n| Campo | Tipo | Default | Descripción |\n|---|---|---|---|\n| `curso_id` | string | — | Curso origen (obligatorio) |\n| `user_id` | string | — | Usuario del test (obligatorio) |\n| `tema_ids` | string[] \\| null | null | **Selección de temario**: limita a estos temas |\n| `bloque_ids` | string[] \\| null | null | Igual por bloques (combinable) |\n| `n_preguntas` | int | 10 | **Nº de preguntas** (1–50) |\n| `dificultad` | facil \\| media \\| dificil | media | **Dificultad** objetivo (calibrada por juez) |\n| `contrarreloj_seg` | int | 0 | **Contrarreloj** en segundos; 0 = sin límite |\n| `query` | string \\| null | null | Modo semántico: evidencia por similitud RAG a esta consulta en vez de temario balanceado |\n\nSin `tema_ids`/`bloque_ids` → recorre **todo el temario balanceado** (reparte preguntas entre temas).\n\n**Respuesta `202`:** `{\"job_id\": \"…\"}` → polling en «Ingesta · 2» hasta `done`; `resultado` trae:\n\n```json\n{\"sesion_id\": \"s-…\", \"preguntas\": [...], \"deficit\": null}\n```\n\n**Déficit declarado:** si el control de calidad descarta preguntas se publican menos de las pedidas y se declara (nunca rellena con preguntas malas): `{\"pedidas\": 15, \"publicadas\": 12, \"motivos_descarte\": {…}}`.\n\n**Errores síncronos:** `404 curso_no_encontrado` · `409 curso_no_listo` (ingesta sin terminar). Job en `error` con `sin_chunks_elegibles` = temas sin texto suficiente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"n_preguntas\": 3,\n  \"dificultad\": \"media\",\n  \"tema_ids\": null,\n  \"bloque_ids\": null,\n  \"contrarreloj_seg\": 0,\n  \"query\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('job_id', j.job_id);",
+                  "pm.test('202 aceptado', () => pm.response.code === 202);",
+                  "console.log('job_id =', j.job_id, '— sondea «Ingesta · 2» hasta done');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · Traer sesión",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}"
+              ]
+            },
+            "description": "Sesión con sus preguntas — **vista pública sin `correcta_idx`, explicación ni evidencia** (se revelan al responder; el cliente no puede filtrar la correcta).\n\n**Respuesta `200`:**\n\n```json\n{\n  \"sesion_id\": \"s-…\", \"tipo\": \"test\", \"curso_id\": \"c-…\",\n  \"contrarreloj_seg\": 900,\n  \"preguntas\": [\n    {\"id\": \"p-…\", \"enunciado\": \"…\", \"opciones\": [\"A\",\"B\",\"C\",\"D\"],\n     \"dificultad\": \"dificil\", \"tema_id\": \"t-07…\", \"origen\": \"generada\",\n     \"ref_legislativa\": \"Art. 99 CE\"}\n  ],\n  \"deficit\": null\n}\n```\n\n**Contrarreloj:** el motor guarda y devuelve `contrarreloj_seg`; el temporizador y el corte al llegar a 0 los implementa la app (el backend no rechaza respuestas tardías; sí registra `tiempo_ms` por respuesta).\n\n`404 sesion_no_encontrada`. El script captura `question_id` de la primera pregunta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.preguntas && j.preguntas.length) pm.collectionVariables.set('question_id', j.preguntas[0].id);",
+                  "pm.test('tiene preguntas', () => Array.isArray(j.preguntas));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · Responder pregunta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/answer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "answer"
+              ]
+            },
+            "description": "Corrección inmediata con **evidencia verbatim del temario**.\n\n**Body:**\n\n| Campo | Tipo | Notas |\n|---|---|---|\n| `user_id` | string | Dueño de la sesión |\n| `pregunta_id` | string | Pregunta de esta sesión |\n| `elegida_idx` | int 0–3 | Índice de la opción elegida |\n| `tiempo_ms` | int | Tiempo del usuario en la pregunta (métricas/fatiga) |\n\n**Respuesta `200`:**\n\n```json\n{\n  \"correcta\": false,\n  \"correcta_idx\": 1,\n  \"explicacion\": \"…\",\n  \"justificaciones\": [\"A incorrecta porque…\", \"B correcta: …\", \"…\", \"…\"],\n  \"evidencia\": {\"cita\": \"…texto literal del PDF…\", \"pagina\": 131, \"chunk_id\": \"ch-…\"}\n}\n```\n\n`evidencia.cita` es **verbatim** del documento (`pagina` = página real del PDF): la app puede mostrar «¿De dónde sale esto?» con cita y página exactas.\n\n**Errores:**\n\n| HTTP | `detail` |\n|---|---|\n| `404` | `sesion_no_encontrada` / `pregunta_no_encontrada` |\n| `403` | `usuario_no_corresponde` |\n| `409` | `pregunta_fuera_de_sesion` / `pregunta_no_disponible` / `respuesta_duplicada` |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"pregunta_id\": \"{{question_id}}\",\n  \"elegida_idx\": 0,\n  \"tiempo_ms\": 3000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test('trae veredicto', () => typeof j.correcta === 'boolean');",
+                  "if (j.evidencia) console.log('cita pág.', j.evidencia.pagina, ':', (j.evidencia.cita||'').slice(0,80));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 · Resultado de la sesión",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "result"
+              ]
+            },
+            "description": "Marcador de la sesión — llamable en cualquier momento (parcial si faltan respuestas).\n\n**Respuesta `200`:**\n\n```json\n{\n  \"sesion_id\": \"s-…\",\n  \"respondidas\": 15, \"total\": 15, \"aciertos\": 11,\n  \"nota_pct\": 73.3,\n  \"tiempo_total_ms\": 412000,\n  \"por_tema\": [\n    {\"tema_id\": \"t-07…\", \"tema_titulo\": \"TEMA 7. …\", \"aciertos\": 6, \"fallos\": 2}\n  ]\n}\n```\n\n`404 sesion_no_encontrada`."
+          }
+        },
+        {
+          "name": "5 · Detalle de una pregunta",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/questions/{{question_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "questions",
+                "{{question_id}}"
+              ]
+            },
+            "description": "Vista pública de una pregunta por id — **sin** respuesta correcta ni evidencia (misma forma que las preguntas de sesión).\n\n`404 pregunta_no_encontrada` si no existe o está descartada."
+          }
+        },
+        {
+          "name": "6 · (alt) Test desde caché",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/from-cache",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "from-cache"
+              ]
+            },
+            "description": "Arma sesión con preguntas **YA generadas** (SQL, **sin LLM, casi gratis**). Excluye las que ese `user_id` ya respondió. **Respuesta síncrona** (sin job).\n\n**Body:**\n\n| Campo | Tipo | Default |\n|---|---|---|\n| `curso_id` / `user_id` | string | — (obligatorios) |\n| `tema_ids` / `bloque_ids` | string[] \\| null | null |\n| `dificultad` | Dificultad \\| null | null (= cualquiera) |\n| `n_preguntas` | int | 10 (1–50) |\n| `query` | string \\| null | null |\n\n**Modo semántico:** si mandas `query`, sirve las preguntas cacheadas de los chunks más parecidos a esa consulta (RAG), ordenadas por relevancia, en vez de recorrer el temario.\n\n**Respuesta `200`:** un `SesionOut` directo (misma forma que «2 · Traer sesión»). Si no hay suficientes cacheadas que cumplan los filtros, arma con las disponibles y lo declara en `deficit`.\n\n**Estrategia recomendada:** intentar `from-cache` primero; si `deficit` es alto o vacío, caer a `generate`.\n\n`404 curso_no_encontrado`. El script captura `sesion_id` y `question_id`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"n_preguntas\": 5,\n  \"dificultad\": null,\n  \"tema_ids\": null,\n  \"bloque_ids\": null,\n  \"query\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.sesion_id) pm.collectionVariables.set('sesion_id', j.sesion_id);",
+                  "if (j.preguntas && j.preguntas.length) pm.collectionVariables.set('question_id', j.preguntas[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7 · Ver preguntas generadas (repaso)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/questions?limit=200&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "questions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "200"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Preguntas ya publicadas del curso **CON** `correcta_idx`, `explicacion`, `justificaciones` y `evidencia` verbatim — pantalla «repasar preguntas» sin regenerar ni gastar LLM.\n\nQuery: `limit` (1–200, default 50), `offset`. `404 curso_no_encontrado`."
+          }
+        },
+        {
+          "name": "8 · Purgar descartadas (backoffice)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/questions/discarded",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "questions",
+                "discarded"
+              ]
+            },
+            "description": "**Backoffice** — purga preguntas con `estado=\"descartada\"` (nunca se sirven a alumnos; limpieza de DB).\n\n**Respuesta:** `{\"borradas\": <n>}`. No usar desde la app mobile."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "user_id",
+      "value": "demo"
+    },
+    {
+      "key": "curso_id",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "sesion_id",
+      "value": ""
+    },
+    {
+      "key": "question_id",
+      "value": ""
+    },
+    {
+      "key": "topic_id",
+      "value": ""
+    }
+  ]
+}

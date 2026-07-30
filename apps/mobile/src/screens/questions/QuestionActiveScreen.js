@@ -54,6 +54,9 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const {
     questions = MOCK_QUESTIONS,
     startIndex = 0,
+    // Sources soportados: 'generator' | 'official' | 'surgical' | 'notes' (Bloque 9).
+    // El runner es agnóstico al source; solo lo propaga a TrainingResult y usa
+    // examTitle para el subtítulo del header.
     source = 'generator',
     timedMode = true,
     secondsPerQuestion = 60,

@@ -82,6 +82,14 @@ import {
     SaveProgressUseCase,
     ListSummariesUseCase,
     GetSummaryUseCase,
+    // Bloque 9 · Factoría de Apuntes
+    ListNotesUseCase,
+    GetNoteUseCase,
+    UploadNoteUseCase,
+    GetNoteStatusUseCase,
+    UpdateNoteTagsUseCase,
+    DeleteNoteUseCase,
+    GenerateTestFromNoteUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -92,6 +100,7 @@ import {
     SupabaseMotivationRepository,
     SupabaseTrainingRepository,
     SupabaseTutorRepository,
+    SupabaseNotesRepository,
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
@@ -103,9 +112,10 @@ import {
     MotivationController,
     TrainingController,
     TutorController,
+    NotesController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -140,6 +150,10 @@ export function buildContainer() {
     const tutorRepo: ITutorRepository = isSupabaseConfigured
         ? new SupabaseTutorRepository(getSupabaseAdmin())
         : createStubTutorRepository();
+
+    const notesRepo: INotesRepository = isSupabaseConfigured
+        ? new SupabaseNotesRepository(getSupabaseAdmin())
+        : createStubNotesRepository();
 
     if (!isSupabaseConfigured) {
         logger.warn(
@@ -269,6 +283,15 @@ export function buildContainer() {
         saveProgress: new SaveProgressUseCase(tutorRepo),
         listSummaries: new ListSummariesUseCase(tutorRepo),
         getSummary: new GetSummaryUseCase(tutorRepo),
+
+        // Bloque 9 · Factoría de Apuntes
+        listNotes: new ListNotesUseCase(notesRepo),
+        getNote: new GetNoteUseCase(notesRepo),
+        uploadNote: new UploadNoteUseCase(notesRepo, aiApi),
+        getNoteStatus: new GetNoteStatusUseCase(notesRepo),
+        updateNoteTags: new UpdateNoteTagsUseCase(notesRepo),
+        deleteNote: new DeleteNoteUseCase(notesRepo),
+        generateTestFromNote: new GenerateTestFromNoteUseCase(notesRepo),
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -309,6 +332,16 @@ export function buildContainer() {
         deleteBookmark: useCases.deleteBookmark,
         generateHint: useCases.generateHint,
         reportQuestion: useCases.reportQuestion,
+    });
+
+    const notesController = new NotesController({
+        listNotes: useCases.listNotes,
+        getNote: useCases.getNote,
+        uploadNote: useCases.uploadNote,
+        getNoteStatus: useCases.getNoteStatus,
+        updateTags: useCases.updateNoteTags,
+        deleteNote: useCases.deleteNote,
+        generateTest: useCases.generateTestFromNote,
     });
 
     const tutorController = new TutorController({
@@ -364,6 +397,7 @@ export function buildContainer() {
             motivation: motivationController,
             training: trainingController,
             tutor: tutorController,
+            notes: notesController,
         },
         middleware: {
             auth: authMiddleware,
@@ -415,4 +449,11 @@ function createStubTutorRepository(): ITutorRepository {
         throw new Error('[tutor] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as ITutorRepository, { get: () => notConfigured });
+}
+
+function createStubNotesRepository(): INotesRepository {
+    const notConfigured = (): never => {
+        throw new Error('[notes] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as INotesRepository, { get: () => notConfigured });
 }

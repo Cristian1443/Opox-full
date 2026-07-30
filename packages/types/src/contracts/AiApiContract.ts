@@ -1,5 +1,5 @@
 /**
- * Contrato de la API de IA para los Bloques 6 y 7 · Entrenamiento.
+ * Contrato de la API de IA para los Bloques 6, 7 y 9.
  *
  * El responsable de IA implementa esta interfaz en:
  *   apps/backend/src/infrastructure/clients/AiApiClient.ts
@@ -9,6 +9,7 @@
  * en función de si las env vars AI_* están configuradas.
  *
  * Prompts y ejemplos de entrada/salida en: packages/ai/
+ * Briefs por bloque: BRIEF_IA_BLOQUE6.md / 7 / 8 / 9.
  */
 export interface AiApiContract {
     /**
@@ -44,6 +45,36 @@ export interface AiApiContract {
      * Ver brief completo en: packages/ai/BRIEF_IA_BLOQUE7.md
      */
     generateHint(params: HintParams): Promise<HintResult>;
+
+    // ── Bloque 9 · Factoría de Apuntes ──────────────────────────────────────
+    // Ver brief completo en: packages/ai/BRIEF_IA_BLOQUE9.md
+
+    /**
+     * OCR + limpieza de un apunte subido por el usuario. Recibe las páginas
+     * (imágenes o PDF ya convertido a imágenes) y devuelve el texto extraído
+     * página a página junto con la confianza del OCR.
+     *
+     * Se llama al arrancar el análisis (fase 'processing_ocr' del status).
+     */
+    analyzeNoteDocument(params: AnalyzeNoteDocumentParams): Promise<AnalyzeNoteDocumentResult>;
+
+    /**
+     * Detección de temas/etiquetas sobre el texto ya extraído. Devuelve un
+     * array corto de etiquetas legibles (máx. 6) que el usuario podrá editar
+     * después desde 9.4.
+     *
+     * Se llama tras el OCR (fase 'processing_topics' del status).
+     */
+    generateTagsFromNote(params: GenerateTagsFromNoteParams): Promise<GenerateTagsFromNoteResult>;
+
+    /**
+     * Genera el banco de preguntas tipo test a partir del texto extraído
+     * del apunte del usuario. El backend las persiste para que 9.5 pueda
+     * filtrarlas por tags al arrancar el runner.
+     *
+     * Se llama al final del pipeline (fase 'processing_questions' del status).
+     */
+    generateQuestionsFromNote(params: GenerateQuestionsFromNoteParams): Promise<GenerateQuestionsFromNoteResult>;
 }
 
 // ─── Tipos compartidos ────────────────────────────────────────────────────────
@@ -170,6 +201,63 @@ export interface HintResult {
     hint: string;
     /** Referencia legal relevante (ej. "art. 21.2 Ley 39/2015"). Opcional. */
     articleRef?: string;
+}
+
+// ─── Bloque 9 · Factoría de Apuntes ──────────────────────────────────────────
+
+export interface AnalyzeNoteDocumentParams {
+    /** Oposición del usuario, para orientar la limpieza y el vocabulario. */
+    oposicion: string;
+    /** Cada página en base64. En PDF, el backend ya la ha rasterizado a imágenes. */
+    pages: Array<{
+        pageNumber: number;
+        imageBase64: string;
+        mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+    }>;
+}
+
+export interface AnalyzeNoteDocumentResult {
+    /** Título propuesto por la IA a partir del contenido (máx. 60 caracteres). */
+    suggestedTitle: string;
+    /** Texto extraído + calidad del OCR, página a página. */
+    pages: Array<{
+        pageNumber: number;
+        extractedText: string;
+        /** 0..1 — el móvil marca visualmente las páginas con confidence < 0.6. */
+        ocrConfidence: number;
+    }>;
+}
+
+export interface GenerateTagsFromNoteParams {
+    oposicion: string;
+    /** Concatenación de los `extractedText` de todas las páginas del apunte. */
+    fullText: string;
+}
+
+export interface GenerateTagsFromNoteResult {
+    /** Entre 3 y 6 etiquetas cortas (máx. 30 chars cada una). */
+    tags: string[];
+}
+
+export interface GenerateQuestionsFromNoteParams {
+    oposicion: string;
+    /** Texto completo del apunte ya limpio por el OCR. */
+    fullText: string;
+    /** Etiquetas ya detectadas — la IA puede etiquetar cada pregunta con la que le aplique. */
+    tags: string[];
+    /**
+     * Nº total de preguntas a generar. El backend lo calcula proporcional
+     * al tamaño del texto (ej. ~3 preguntas por página).
+     */
+    count: number;
+}
+
+export interface GenerateQuestionsFromNoteResult {
+    /** Reutiliza el shape de GeneratedQuestion del Bloque 6. */
+    questions: Array<GeneratedQuestion & {
+        /** Tag al que pertenece la pregunta (para que 9.5 filtre por selección). */
+        tag?: string;
+    }>;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────

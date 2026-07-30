@@ -11,6 +11,7 @@ import {
     createMotivationRouter,
     createTrainingRouter,
     createTutorRouter,
+    createNotesRouter,
     errorHandler,
 } from './presentation';
 
@@ -21,8 +22,9 @@ export function createServer(): Express {
     // Seguridad + body parser
     app.use(helmet());
     app.use(cors({ origin: corsOrigins, credentials: true }));
-    // Límite de 5mb para soportar imágenes base64 del Foto-Test (6.3)
-    app.use(express.json({ limit: '5mb' }));
+    // Límite subido a 25mb para soportar subida multi-página del Bloque 9
+    // (Foto-Test del Bloque 6 sigue funcionando por el mismo límite).
+    app.use(express.json({ limit: '25mb' }));
 
     // Rutas
     app.use(createHealthRouter());
@@ -32,6 +34,7 @@ export function createServer(): Express {
     app.use(createMotivationRouter(container.controllers.motivation, container.middleware.auth));
     app.use(createTrainingRouter(container.controllers.training, container.middleware.auth));
     app.use(createTutorRouter(container.controllers.tutor, container.middleware.auth));
+    app.use(createNotesRouter(container.controllers.notes, container.middleware.auth));
 
     // 404 catch-all
     app.use((_req, res) => {

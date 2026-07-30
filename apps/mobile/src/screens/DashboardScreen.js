@@ -94,6 +94,27 @@ function IconStreak() {
     );
 }
 
+function IconNotes() {
+    // Documento con líneas — mismo trazo fino que el resto de iconos del dashboard.
+    return (
+        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+            <Path
+                d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"
+                stroke="#2563EB"
+                strokeWidth={1.6}
+                strokeLinejoin="round"
+            />
+            <Path
+                d="M14 3v6h6M8 13h8M8 17h5"
+                stroke="#2563EB"
+                strokeWidth={1.6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </Svg>
+    );
+}
+
 function IconTutor() {
     return (
         <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
@@ -455,6 +476,21 @@ export default function DashboardScreen({ navigation }) {
                         <Text style={styles.chev}>›</Text>
                     </View>
                     <Text style={styles.tutorText}>Pregúntale al Tutor o escucha en modo podcast.</Text>
+                </TouchableOpacity>
+
+                {/* Bloque 9 · Factoría de Apuntes */}
+                <TouchableOpacity
+                    style={[styles.widget, { backgroundColor: '#EFF6FF' }]}
+                    onPress={() => navigation.navigate('NotesHome')}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Ir a la Factoría de Apuntes"
+                >
+                    <View style={styles.widgetHead}>
+                        <IconNotes />
+                        <Text style={[styles.widgetHeadText, { color: '#2563EB' }]}>Mis apuntes</Text>
+                        <Text style={styles.chev}>›</Text>
+                    </View>
+                    <Text style={styles.tutorText}>Sube PDFs o fotos y practica con preguntas generadas por IA.</Text>
                 </TouchableOpacity>
 
                 {/* Vista previa temporal de los nudges — quitar cuando cada motor real

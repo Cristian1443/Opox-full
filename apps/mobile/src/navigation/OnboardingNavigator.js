@@ -74,6 +74,13 @@ import DuelsPlaceholderScreen from '../screens/motivation/DuelsPlaceholderScreen
 import QuestionActiveScreen from '../screens/questions/QuestionActiveScreen';
 import TrainingResultScreen from '../screens/questions/TrainingResultScreen';
 
+// Bloque 9 · Factoría de Apuntes
+import NotesHomeScreen from '../screens/notes/NotesHomeScreen';
+import NotesUploadScreen from '../screens/notes/NotesUploadScreen';
+import NotesAnalysisScreen from '../screens/notes/NotesAnalysisScreen';
+import NoteDetailScreen from '../screens/notes/NoteDetailScreen';
+import NotesTestConfigScreen from '../screens/notes/NotesTestConfigScreen';
+
 // Bloque 6 · Entrenamiento
 import TrainingHomeScreen from '../screens/training/TrainingHomeScreen';
 import GeneratorConfigScreen from '../screens/training/GeneratorConfigScreen';
@@ -164,6 +171,13 @@ export default function OnboardingNavigator() {
             {/* Bloque 7 · Preguntas */}
             <Stack.Screen name="TrainingSession" component={QuestionActiveScreen} />
             <Stack.Screen name="TrainingResult" component={TrainingResultScreen} />
+
+            {/* Bloque 9 · Factoría de Apuntes */}
+            <Stack.Screen name="NotesHome" component={NotesHomeScreen} />
+            <Stack.Screen name="NotesUpload" component={NotesUploadScreen} />
+            <Stack.Screen name="NotesAnalysis" component={NotesAnalysisScreen} />
+            <Stack.Screen name="NoteDetail" component={NoteDetailScreen} />
+            <Stack.Screen name="NotesTestConfig" component={NotesTestConfigScreen} />
 
             {/* Bloque 6 · Entrenamiento */}
             <Stack.Screen name="TrainingHome" component={TrainingHomeScreen} />

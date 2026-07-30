@@ -101,6 +101,26 @@ Colección de tests completa en `Bloque8_Tutor_Tests.postman_collection.json`.
 Patrón de respuesta del API client mobile: devuelve `{ data, error }` — **nunca**
 `{ success, data }`. Usar `!res?.error && res?.data` para comprobar éxito.
 
+### Factoría de Apuntes (Bloque 9) — endpoints propios
+
+Sube fotos/PDFs del temario del usuario, corre un pipeline de IA en background
+(OCR → detectar temas → generar preguntas) y genera tests personalizados a partir
+del apunte. Rutas bajo `/notes/`.
+
+Tipos en `packages/types/src/notes.ts` (`Note`, `NoteDetail`, `NoteAnalysisStatus`,
+`NoteAnalysisErrorCode`). SQL de creación en `apps/backend/supabase/bloque9_notes.sql`
+(4 tablas: `notes`, `note_pages`, `note_tags`, `note_questions`, todas con RLS por
+propietario). Cliente mobile en `apps/mobile/src/api/notes.js`. Colección de tests
+en `Bloque9_Notes_Tests.postman_collection.json` (10 requests con asserts).
+
+**IA — estado real**: los 3 métodos nuevos (`analyzeNoteDocument`,
+`generateTagsFromNote`, `generateQuestionsFromNote`) están definidos en el
+`AiApiContract` y en `AiApiClient.ts`. Como el equipo IA aún no ha entregado los
+prompts del `packages/ai/BRIEF_IA_BLOQUE9.md`, `AiApiClient` delega esos tres
+métodos en `AiApiClientStub` — el pipeline es ejecutable de punta a punta con datos
+mock realistas. El día que llegue la implementación real basta con reemplazar los
+tres métodos delegados por llamadas a OpenAI/Motor.
+
 ### Motor de IA del cliente (sin desplegar)
 
 El equipo IA entregó un microservicio RAG separado
@@ -135,5 +155,6 @@ pnpm lint                       # lint completo
 | 6 | Entrenamiento | Frontend + backend + IA completo (los 4 flujos cableados a OpenAI real) |
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
+| 9 | Factoría de Apuntes | Frontend + backend completo (upload, pipeline OCR→tags→preguntas con AiApiClientStub, generación de tests, 10/10 smoke test verde). IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

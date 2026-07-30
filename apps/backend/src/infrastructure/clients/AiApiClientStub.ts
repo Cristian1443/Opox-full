@@ -9,6 +9,12 @@ import type {
     SurgicalTestResult,
     HintParams,
     HintResult,
+    AnalyzeNoteDocumentParams,
+    AnalyzeNoteDocumentResult,
+    GenerateTagsFromNoteParams,
+    GenerateTagsFromNoteResult,
+    GenerateQuestionsFromNoteParams,
+    GenerateQuestionsFromNoteResult,
 } from '@opox/types';
 import { logger } from '@opox/utils';
 
@@ -79,6 +85,55 @@ export class AiApiClientStub implements AiApiContract {
             hint: `Recuerda el marco legal de "${params.topic}": fíjate en la opción que sea más coherente con los principios generales del procedimiento administrativo. Descarta las opciones con plazos o condiciones extremas.`,
             articleRef: 'art. 21 Ley 39/2015',
         };
+    }
+
+    // ── Bloque 9 · Factoría de Apuntes ───────────────────────────────────────
+    // Stubs con datos realistas para que el pipeline de análisis sea ejecutable
+    // sin IA real. Cuando el equipo IA entregue el brief 9, se sustituyen en AiApiClient.
+
+    async analyzeNoteDocument(params: AnalyzeNoteDocumentParams): Promise<AnalyzeNoteDocumentResult> {
+        logger.info('[ai-stub] analyzeNoteDocument', { pages: params.pages.length });
+        await delay(600);
+        return {
+            suggestedTitle: 'Apunte digitalizado',
+            pages: params.pages.map(p => ({
+                pageNumber: p.pageNumber,
+                extractedText:
+                    'Texto de ejemplo extraído de la página ' + p.pageNumber +
+                    '. La Ley 39/2015 regula el procedimiento administrativo común de las Administraciones Públicas. ' +
+                    'El plazo general para resolver es de 3 meses (art. 21.2).',
+                ocrConfidence: 0.92,
+            })),
+        };
+    }
+
+    async generateTagsFromNote(_params: GenerateTagsFromNoteParams): Promise<GenerateTagsFromNoteResult> {
+        logger.info('[ai-stub] generateTagsFromNote');
+        await delay(300);
+        return {
+            tags: ['Constitución', 'Derechos fundamentales', 'Título I'],
+        };
+    }
+
+    async generateQuestionsFromNote(params: GenerateQuestionsFromNoteParams): Promise<GenerateQuestionsFromNoteResult> {
+        logger.info('[ai-stub] generateQuestionsFromNote', { count: params.count, tags: params.tags.length });
+        await delay(500);
+        const bank = STUB_QUESTIONS_BY_TOPIC['constitucion'] ?? DEFAULT_BANK;
+        const questions = Array.from({ length: params.count }).map((_, i) => {
+            const template = bank[i % bank.length] ?? DEFAULT_BANK[0]!;
+            return {
+                id: randomUUID(),
+                text: template.text,
+                options: template.options,
+                correctIndex: template.correctIndex,
+                explanation: template.explanation,
+                topicId: 'constitucion',
+                topic: 'Constitución Española',
+                difficulty: 'medium' as const,
+                tag: params.tags[i % Math.max(1, params.tags.length)],
+            };
+        });
+        return { questions };
     }
 }
 
@@ -168,3 +223,4 @@ function topicIdToLabel(topicId: string): string {
     };
     return map[topicId] ?? topicId;
 }
+

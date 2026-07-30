@@ -5,3 +5,4 @@ export * from './PlanningController';
 export * from './MotivationController';
 export * from './TrainingController';
 export * from './TutorController';
+export * from './NotesController';

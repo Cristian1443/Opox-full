@@ -1,0 +1,334 @@
+{
+  "info": {
+    "name": "OPOX · Bloque 9 · Factoría de Apuntes",
+    "description": "Tests completos de los endpoints del Bloque 9 (Factoría de Apuntes).\n\n## Variables de colección\n- `base_url`: http://localhost:3000\n- `token`: JWT del usuario (se rellena en el paso de login)\n- `note_id`: se captura al subir un apunte\n\n## Orden de ejecución recomendado\n1. Auth · Login → captura token\n2. Notes · Subir apunte → captura note_id + arranca el pipeline mock (AiApiClientStub)\n3. Notes · Ver status → estará processing → repetir hasta 'ready' (~2s con el stub)\n4. Notes · Listar\n5. Notes · Ver detalle\n6. Notes · Editar etiquetas\n7. Notes · Generar test\n8. Notes · Eliminar\n\n## Notas\n- El pipeline se ejecuta en background. Con AiApiClientStub tarda ~1.5s. Con IA real dependerá del proveedor.\n- Todos los endpoints requieren Authorization: Bearer <token>.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "token",    "value": "" },
+    { "key": "note_id",  "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 · Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.ok && res.data?.session?.accessToken) {",
+                  "    pm.collectionVariables.set('token', res.data.session.accessToken);",
+                  "    console.log('✅ Token guardado');",
+                  "} else {",
+                  "    console.error('❌ Login fallido', res);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"TU_EMAIL@ejemplo.com\",\n  \"password\": \"TU_PASSWORD\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+            "description": "⚠️ Rellena email y password con las credenciales de tu usuario de prueba en Supabase."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 · Notes",
+      "item": [
+        {
+          "name": "Subir apunte (1 página mock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('devuelve noteId', () => pm.expect(res.data.noteId).to.be.a('string'));",
+                  "pm.test('status = processing_ocr', () => pm.expect(res.data.status).to.eql('processing_ocr'));",
+                  "if (res.data?.noteId) {",
+                  "    pm.collectionVariables.set('note_id', res.data.noteId);",
+                  "    console.log('✅ note_id =', res.data.noteId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oposicion\": \"justicia-tramitacion\",\n  \"kind\": \"photo\",\n  \"fileName\": \"IMG_test.jpg\",\n  \"files\": [\n    {\n      \"base64\": \"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\",\n      \"mimeType\": \"image/jpeg\",\n      \"sizeBytes\": 100\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{base_url}}/notes/upload", "host": ["{{base_url}}"], "path": ["notes", "upload"] }
+          }
+        },
+        {
+          "name": "Ver status del análisis",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('shape completo', () => {",
+                  "    pm.expect(res.data).to.have.all.keys('noteId','status','progress','pagesDone','topicsFound','questionsGenerated','pagesWithLowConfidence');",
+                  "});",
+                  "console.log('status =', res.data.status, 'progress =', res.data.progress);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/notes/{{note_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "{{note_id}}", "status"]
+            },
+            "description": "Repite esta petición hasta que status='ready'. Con AiApiClientStub, ~2s."
+          }
+        },
+        {
+          "name": "Listar mis apuntes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('devuelve stats', () => pm.expect(res.data.stats).to.include.keys('totalNotes','totalQuestions','ingestStatus'));",
+                  "pm.test('devuelve notes[]', () => pm.expect(res.data.notes).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/notes", "host": ["{{base_url}}"], "path": ["notes"] }
+          }
+        },
+        {
+          "name": "Ver detalle del apunte",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('shape NoteDetail', () => pm.expect(res.data).to.include.keys('id','title','fileName','kind','pages','status','tags','questionsCount','pageThumbnails'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/notes/{{note_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "{{note_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Editar etiquetas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('devuelve tags actualizados', () => pm.expect(res.data.tags).to.include('Editado'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tags\": [\"Editado\", \"Test manual\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/notes/{{note_id}}/tags",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "{{note_id}}", "tags"]
+            }
+          }
+        },
+        {
+          "name": "Generar test desde el apunte",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('devuelve questions[]', () => pm.expect(res.data.questions).to.be.an('array'));",
+                  "if (res.data.questions?.length) {",
+                  "    const q = res.data.questions[0];",
+                  "    pm.test('cada pregunta tiene 4 opciones', () => pm.expect(q.options).to.have.lengthOf(4));",
+                  "    pm.test('correctIndex 0-3', () => pm.expect(q.correctIndex).to.be.within(0, 3));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionCount\": 10,\n  \"topics\": [\"Editado\"],\n  \"timed\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/notes/{{note_id}}/generate-test",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "{{note_id}}", "generate-test"]
+            },
+            "description": "Requiere que el apunte esté en status='ready'. Filtra por los `topics` pasados."
+          }
+        },
+        {
+          "name": "Eliminar apunte",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/notes/{{note_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "{{note_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Casos de error",
+      "item": [
+        {
+          "name": "Sin token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/notes", "host": ["{{base_url}}"], "path": ["notes"] }
+          }
+        },
+        {
+          "name": "Note inexistente → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "const res = pm.response.json();",
+                  "pm.test('error code = notes/not-found', () => pm.expect(res.error.code).to.eql('notes/not-found'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/notes/00000000-0000-0000-0000-000000000000",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "00000000-0000-0000-0000-000000000000"]
+            }
+          }
+        },
+        {
+          "name": "Formato inválido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oposicion\": \"justicia-tramitacion\",\n  \"kind\": \"photo\",\n  \"fileName\": \"video.mp4\",\n  \"files\": [\n    { \"base64\": \"aGVsbG8=\", \"mimeType\": \"video/mp4\", \"sizeBytes\": 100 }\n  ]\n}"
+            },
+            "url": { "raw": "{{base_url}}/notes/upload", "host": ["{{base_url}}"], "path": ["notes", "upload"] }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -12,8 +12,15 @@ import type {
     SurgicalTestResult,
     HintParams,
     HintResult,
+    AnalyzeNoteDocumentParams,
+    AnalyzeNoteDocumentResult,
+    GenerateTagsFromNoteParams,
+    GenerateTagsFromNoteResult,
+    GenerateQuestionsFromNoteParams,
+    GenerateQuestionsFromNoteResult,
 } from '@opox/types';
 import { logger } from '@opox/utils';
+import { AiApiClientStub } from './AiApiClientStub';
 
 /**
  * Cliente OpenAI para el contrato de IA de OPOX (Bloques 6 y 7).
@@ -212,6 +219,24 @@ export class AiApiClient implements AiApiContract {
             }
         }
         throw new Error('[AiApiClient] chatJson: nunca debería llegar aquí');
+    }
+
+    // ── Bloque 9 · Factoría de Apuntes ───────────────────────────────────────
+    // TODO(ia-bloque9): implementar contra OpenAI cuando el equipo IA entregue
+    // los prompts y user_templates del BRIEF_IA_BLOQUE9.md. Mientras tanto,
+    // delegamos en AiApiClientStub para que el pipeline sea ejecutable.
+    private readonly notesFallback = new AiApiClientStub();
+
+    async analyzeNoteDocument(params: AnalyzeNoteDocumentParams): Promise<AnalyzeNoteDocumentResult> {
+        return this.notesFallback.analyzeNoteDocument(params);
+    }
+
+    async generateTagsFromNote(params: GenerateTagsFromNoteParams): Promise<GenerateTagsFromNoteResult> {
+        return this.notesFallback.generateTagsFromNote(params);
+    }
+
+    async generateQuestionsFromNote(params: GenerateQuestionsFromNoteParams): Promise<GenerateQuestionsFromNoteResult> {
+        return this.notesFallback.generateQuestionsFromNote(params);
     }
 }
 

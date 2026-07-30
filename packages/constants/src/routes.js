@@ -85,6 +85,16 @@ export const API_ROUTES = {
         SUMMARY:              '/tutor/summaries/:topicId',
     },
 
+    NOTES: {
+        // Bloque 9 · Factoría de Apuntes
+        LIST:              '/notes',
+        DETAIL:            '/notes/:id',
+        UPLOAD:            '/notes/upload',
+        STATUS:            '/notes/:id/status',
+        TAGS:              '/notes/:id/tags',
+        GENERATE_TEST:     '/notes/:id/generate-test',
+    },
+
     MOTIVATION: {
         SUMMARY: '/motivation/summary',
         STREAK: '/motivation/streak',

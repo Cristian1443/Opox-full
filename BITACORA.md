@@ -5,6 +5,111 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-07-29 — Bloque 9 · Factoría de Apuntes completa de punta a punta
+
+Rama de trabajo: `feat/bloque-9-factoria-apuntes`. Se cierra el Bloque 9 íntegro:
+contratos IA extendidos, backend con arquitectura limpia, 5 pantallas mobile
+cableadas a endpoints reales con fallback mock, colección Postman de 10 requests
+verde y pipeline de análisis ejecutable sin bloqueo por la IA real.
+
+### Contratos e IA
+
+- `packages/types/src/notes.ts` — DTOs completos (`Note`, `NoteDetail`,
+  `NoteAnalysisStatus`, `UploadNoteRequest`, `GenerateTestFromNoteRequest/Response`,
+  `NoteAnalysisErrorCode`).
+- `packages/types/src/contracts/AiApiContract.ts` — extendido con 3 métodos IA
+  nuevos + tipos (`AnalyzeNoteDocument*`, `GenerateTagsFromNote*`,
+  `GenerateQuestionsFromNote*`).
+- `packages/ai/BRIEF_IA_BLOQUE9.md` — brief completo para el equipo IA con las
+  3 tareas (prompts + user templates + criterios de aceptación).
+- `packages/constants/src/routes.js` — rutas `NOTES.*` añadidas.
+
+### Backend (arquitectura por capas completa)
+
+**Domain:** `Note`, `NotePage`, `NoteTag`, `NoteQuestion` en
+`entities/Note.ts`. `INotesRepository` con 12 métodos. Errores tipados en
+`errors/NotesError.ts` (`NoteNotFoundError`, `NoteInvalidFormatError`,
+`NoteFileTooLargeError`, `NoteNotReadyError`).
+
+**Application:** 7 use cases en `application/notes/NotesUseCases.ts`
+(`ListNotes`, `GetNote`, `UploadNote`, `GetNoteStatus`, `UpdateNoteTags`,
+`DeleteNote`, `GenerateTestFromNote`) más el orquestador `runAnalysisPipeline`
+que actualiza `status`/`progress` en cada hito (OCR → tags → preguntas → ready)
+y persiste error en la nota si algo revienta.
+
+**Infrastructure:** `SupabaseNotesRepository` — implementa los 12 métodos con
+mappers propios. `AiApiClient` delega los 3 nuevos métodos en `AiApiClientStub`
+mientras el equipo IA no entrega los prompts del `BRIEF_IA_BLOQUE9.md`.
+`MotorAiClient` los declara fuera de su ámbito (throw explícito).
+
+**Presentation:** `NotesController` (7 handlers), `notesRoutes.ts` (7 rutas bajo
+`/notes/`), `notesValidators.ts` (Zod). Límite de body subido a 25 MB para
+soportar multi-página.
+
+**SQL seed:** `apps/backend/supabase/bloque9_notes.sql` — 4 tablas con RLS por
+propietario, trigger `touch_notes_updated_at`, seed opcional de 3 apuntes de
+demostración.
+
+### Mobile — 5 pantallas cableadas al backend
+
+| Pantalla | Estado |
+|---|---|
+| `NotesHomeScreen` (9.1) | `notesApi.list()` con fallback mock si el backend no responde |
+| `NotesUploadScreen` (9.2) | `notesApi.upload()` real con `expo-file-system` para base64 |
+| `NotesAnalysisScreen` (9.3) | Polling real `notesApi.getStatus()` cada 1.2 s (fallback timeline mock si no hay `noteId`) |
+| `NoteDetailScreen` (9.4) | Carga real + `updateTags` + `remove` |
+| `NotesTestConfigScreen` (9.5) | `generateTest()` real con adaptador al shape del runner |
+
+Cliente `apps/mobile/src/api/notes.js` con los 7 métodos. `apps/mobile/src/api/client.js`
+extendido con `put()`. Modales nuevos: `NotesTagsEditorModal`, `NotesDigitizedModal`,
+`NotesOcrErrorModal`, `NotesFormatErrorModal`, `NotesDeleteConfirmModal`.
+
+### Bugs encontrados y corregidos durante el smoke test
+
+1. **`NotesController` leía `(req as any).userId`** — el resto de controllers usan
+   `req.authUser!.id`. El upload devolvía 500 con `null value in column "user_id"
+   of relation "notes" violates not-null constraint`. Alineado con el patrón.
+
+2. **`AiApiClient` (real) lanzaba `not implemented` en los 3 métodos IA nuevos** —
+   con `AI_API_BASE_URL/KEY/MODEL` seteados (Bloques 6 y 7), el pipeline reventaba
+   antes de llegar a `ready` y el smoke test se quedaba en `error`. Solución: los
+   3 métodos delegan en `AiApiClientStub` hasta que el equipo IA entregue los
+   prompts. Bloque 6 y 7 siguen usando OpenAI real (no afectados).
+
+### Smoke test (10/10 verde)
+
+Colección completa en `Bloque9_Notes_Tests.postman_collection.json`. Resultados:
+
+| Endpoint | Resultado |
+|---|---|
+| POST `/notes/upload` | ✅ 201 con `noteId` + `status: processing_ocr` |
+| GET `/notes/:id/status` | ✅ llega a `ready` en ~1.5 s con el stub |
+| GET `/notes` | ✅ stats + lista (4 notes: 1 nuevo + 3 seed) |
+| GET `/notes/:id` | ✅ shape completo (tags, pageThumbnails, questionsCount) |
+| PUT `/notes/:id/tags` | ✅ sustituye tags AI por tags de usuario |
+| POST `/notes/:id/generate-test` | ✅ 5 preguntas con 4 opciones y `correctIndex` válido |
+| DELETE `/notes/:id` | ✅ 204 |
+| GET `/notes` (sin token) | ✅ 401 |
+| GET `/notes/00000000-…` | ✅ 404 con `code: notes/not-found` |
+| POST `/notes/upload` (mime inválido) | ✅ 400 con `validation/failed` |
+
+Test extra: `generate-test` con `topics: []` devuelve 5 preguntas realistas del
+stub. El filtro por tag funciona correctamente contra la DB.
+
+### Pendientes conocidos del Bloque 9
+
+- **IA real**: `AiApiClient` sigue delegando en el stub para los 3 métodos del
+  Bloque 9. Reemplazar cuando el equipo IA entregue los prompts del
+  `BRIEF_IA_BLOQUE9.md`. Marcador `TODO(ia-bloque9)` en el código.
+- **Supabase Storage**: `storage_path` se guarda como `null`. Cuando se quiera
+  conservar el original del apunte y generar miniaturas reales, subirlo al bucket
+  `notes` y guardar la ruta. Actualmente sólo persistimos el texto OCR y los tags.
+- **Preguntas rebank**: el runner filtra por tag exacto. Si el usuario edita los
+  tags (9.4) después de que la IA los generó, las preguntas quedan sin match.
+  Considerar re-tagging batch o desacoplar el filtro.
+
+---
+
 ## 2026-07-28 — Bloque 8 · Aula Virtual / Tutor IA completo de punta a punta
 
 Rama de trabajo: `feat/bloque-8-tutor-ia`. Se cierra el Bloque 8 íntegro: backend
