@@ -9,7 +9,6 @@ import {
   Vibration,
   AccessibilityInfo,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
@@ -164,7 +163,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
   const handleSelectOption = (id) => {
     if (isSubmitted) return;
-    Haptics.selectionAsync();
+    Vibration.vibrate(10);
     setSelectedOption(id);
   };
 
