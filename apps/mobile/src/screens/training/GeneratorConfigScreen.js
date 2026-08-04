@@ -85,12 +85,12 @@ function OrangeSlider({ steps, valueIdx, onChange }) {
 
 const s = StyleSheet.create({
     trackZone: { height: THUMB, justifyContent: 'center' },
-    trackBg: { height: TRACK_H, backgroundColor: '#FDE7D8', borderRadius: TRACK_H / 2 },
+    trackBg: { height: TRACK_H, backgroundColor: 'rgba(246, 150, 36, 0.15)', borderRadius: TRACK_H / 2 },
     fill: {
         position: 'absolute',
         left: 0,
         height: TRACK_H,
-        backgroundColor: colors.primary,
+        backgroundColor: colors.accentOrange,
         borderRadius: TRACK_H / 2,
     },
     thumb: {
@@ -230,7 +230,7 @@ export default function GeneratorConfigScreen({ navigation }) {
                         {DIFF_LABELS.map((label, i) => (
                             <Text
                                 key={label}
-                                style={[styles.stepLabel, i === diffIdx && styles.stepLabelActive]}
+                                style={styles.stepLabel}
                             >
                                 {label}
                             </Text>
@@ -353,10 +353,10 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     sectionSubtitle: {
-        fontSize: 12,
+        fontSize: 11,
         fontFamily: 'Poppins-Regular',
         color: colors.textMuted,
-        opacity: 0.6,
+        opacity: 0.5,
         textAlign: 'center',
         marginBottom: 16,
     },
@@ -367,8 +367,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         marginTop: 8,
     },
-    stepLabel: { fontSize: 12, color: colors.textMuted, opacity: 0.6, fontFamily: 'Poppins-Regular' },
-    stepLabelActive: { color: colors.textDark, opacity: 1, fontFamily: 'Poppins-SemiBold' },
+    // Figma: Fácil/Medio/Difícil comparten el mismo estilo (Regular, #000)
+    // sin distinción visual de "seleccionado" — solo el thumb lo indica.
+    stepLabel: { fontSize: 12, color: '#000000', fontFamily: 'Poppins-Regular' },
 
     countRow: {
         flexDirection: 'row',
@@ -381,17 +382,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 8,
-        borderWidth: 1.5,
-        borderColor: '#E4E8F0',
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.3)',
         backgroundColor: '#FFFFFF',
         alignItems: 'center',
     },
-    countChipText: { fontSize: 15, fontFamily: 'Poppins-SemiBold', color: colors.textDark },
+    countChipText: { fontSize: 15, fontFamily: 'Poppins-Regular', color: '#000000' },
 
     divider: {
         height: 1,
-        backgroundColor: '#EEF1F7',
-        marginHorizontal: 4,
+        backgroundColor: 'rgba(65, 41, 80, 0.5)',
+        marginHorizontal: -spacing.md,
     },
 
     toggleRow: {
@@ -401,12 +402,14 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.md,
     },
     toggleTitle: { fontSize: 17, fontFamily: 'Poppins-Bold', color: colors.textDark, marginBottom: 3 },
-    toggleSub: { fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.textMuted, opacity: 0.6 },
+    toggleSub: { fontSize: 11, fontFamily: 'Poppins-Regular', color: colors.textMuted, opacity: 0.5 },
     toggleTrack: {
         width: 46,
         height: 26,
         borderRadius: 13,
-        backgroundColor: '#E4E8F0',
+        backgroundColor: '#F5F5F5',
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.5)',
         padding: 2,
         justifyContent: 'center',
     },
@@ -416,7 +419,9 @@ const styles = StyleSheet.create({
     topicHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F1F3F7',
+        backgroundColor: '#F5F5F5',
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.3)',
         borderRadius: 12,
         paddingHorizontal: 14,
         paddingVertical: 14,
@@ -445,7 +450,7 @@ const styles = StyleSheet.create({
     btn: {
         backgroundColor: colors.ctaGreen,
         borderRadius: 14,
-        paddingVertical: 15,
+        paddingVertical: 17,
         alignItems: 'center',
         marginTop: 12,
     },
