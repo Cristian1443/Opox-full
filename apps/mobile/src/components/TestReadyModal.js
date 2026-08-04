@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
+import { colors } from '../theme';
 
 // ─── Estado "Test generado" (6.5 · ok) ───────────────────────────────────────
 // Modal de éxito centrado que celebra que la IA ha terminado de generar el
@@ -11,11 +12,11 @@ import Svg, { Circle, Path } from 'react-native-svg';
 // - onDismiss: se llama al pulsar fuera o hardware-back. Permite al usuario
 //   ver el contenido subyacente (flashcard, guardar mazo, etc.) sin abandonar.
 
-function IconCheckCircle({ color = '#1f9d6b' }) {
+// Figma ("TEST GENERADO" 2324:138): check gris claro, sin círculo de color.
+function IconCheck({ color = '#D0D5DD' }) {
     return (
         <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={10} fill={color} />
-            <Path d="M7.5 12.5l3 3 6-7" stroke="#fff" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M5 12.5l4.5 4.5L19 7" stroke={color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
@@ -59,7 +60,7 @@ export default function TestReadyModal({
                 />
                 <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
                     <View style={styles.iconWrap}>
-                        <IconCheckCircle />
+                        <IconCheck />
                     </View>
 
                     <Text style={styles.title}>{title}</Text>
@@ -103,32 +104,33 @@ const styles = StyleSheet.create({
         width: 66,
         height: 66,
         borderRadius: 33,
-        backgroundColor: '#EAF7F1',
+        backgroundColor: '#F1F3F7',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 14,
     },
     title: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#0F1B33',
+        fontSize: 19,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: 6,
         textAlign: 'center',
     },
     message: {
         fontSize: 13,
-        color: '#5A6373',
+        fontFamily: 'Poppins-Light',
+        color: colors.textDark,
         textAlign: 'center',
         lineHeight: 19,
         marginBottom: 20,
     },
-    highlight: { color: '#1f9d6b', fontWeight: '800' },
+    highlight: { fontFamily: 'Poppins-Bold' },
     btn: {
-        backgroundColor: '#34C759',
+        backgroundColor: colors.ctaGreen,
         borderRadius: 12,
         paddingVertical: 13,
         alignItems: 'center',
         width: '100%',
     },
-    btnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    btnText: { color: '#fff', fontSize: 14, fontFamily: 'Poppins-SemiBold' },
 });

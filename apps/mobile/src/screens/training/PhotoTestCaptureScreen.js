@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
-import ScreenHeader from '../../components/ScreenHeader';
+import TrainingHeader from '../../components/TrainingHeader';
 import { colors, spacing } from '../../theme';
 
 const CORNER_COLOR = colors.purple;
@@ -144,12 +144,13 @@ export default function PhotoTestCaptureScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <ScreenHeader
-                title="Zona de entrenamiento"
-                subtitle="Foto-test"
+            <TrainingHeader
+                eyebrow="Zona de entrenamiento"
+                title="Foto-test"
                 onBack={() => navigation.goBack()}
+                onSettings={() => navigation.navigate('Settings')}
             />
 
             <View style={styles.body}>
@@ -215,7 +216,7 @@ export default function PhotoTestCaptureScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.white },
     body: {
         flex: 1,
         paddingHorizontal: spacing.md,
@@ -224,47 +225,48 @@ const styles = StyleSheet.create({
 
     previewCard: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#F5F5F5',
         borderRadius: 16,
         padding: spacing.md,
         marginBottom: spacing.md,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
     },
     previewTitle: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: colors.dark,
+        fontSize: 20,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         textAlign: 'center',
         marginTop: 4,
     },
     previewSubtitle: {
         fontSize: 12,
-        color: colors.textSecondary,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textMuted,
+        opacity: 0.6,
         textAlign: 'center',
         marginTop: 4,
         marginBottom: spacing.md,
     },
     frameBox: {
         flex: 1,
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.15)',
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },
     frameHint: {
-        color: colors.textSecondary,
+        color: colors.textMuted,
+        opacity: 0.6,
         fontSize: 12,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Regular',
         marginTop: 10,
         textAlign: 'center',
     },
     frameCta: {
         color: colors.purple,
         fontSize: 12,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
         marginTop: 4,
         textAlign: 'center',
     },

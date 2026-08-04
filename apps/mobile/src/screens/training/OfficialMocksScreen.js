@@ -18,7 +18,7 @@ function IconDocMedal({ color = colors.primary }) {
     );
 }
 
-function IconDocMedalDone({ color = colors.success }) {
+function IconDocMedalDone({ color = colors.statGreen }) {
     return (
         <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
             <Path d="M6 3h9l4 4v10H6z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
@@ -46,7 +46,7 @@ function MockCard({ item, onPress }) {
     const isOngoing = item.status === 'ongoing';
     const ctaLabel = isDone ? 'Repetir' : isOngoing ? 'Continuar' : 'Empezar';
     const progressPct = item.progress ?? 0;
-    const barColor = isDone ? colors.success : colors.primary;
+    const barColor = isDone ? colors.statGreen : colors.primary;
 
     return (
         <TouchableOpacity
@@ -73,8 +73,8 @@ function MockCard({ item, onPress }) {
                     <View style={[styles.progressFill, { width: `${progressPct}%`, backgroundColor: barColor }]} />
                 </View>
                 <View style={styles.progressLabel}>
-                    <Text style={[styles.progressPct, { color: barColor }]}>{progressPct}% completado</Text>
-                    <Text style={[styles.progressCta, { color: barColor }]}>{ctaLabel}</Text>
+                    <Text style={styles.progressPct}>{progressPct}% completado</Text>
+                    <Text style={styles.progressCta}>{ctaLabel}</Text>
                 </View>
             </View>
         </TouchableOpacity>
@@ -138,7 +138,7 @@ export default function OfficialMocksScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
             <TrainingHeader eyebrow="Simulacros" title="Exámenes oficiales" onBack={() => navigation.goBack()} onSettings={() => navigation.navigate('Settings')} />
 
@@ -175,23 +175,21 @@ export default function OfficialMocksScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.white },
 
     list: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.lg },
 
     card: {
         backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.15)',
         borderRadius: 14,
         padding: spacing.md,
         marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        elevation: 2,
     },
     cardHighlighted: {
         backgroundColor: '#F1F3F7',
+        borderColor: 'transparent',
     },
     cardRow: {
         flexDirection: 'row',
@@ -209,14 +207,14 @@ const styles = StyleSheet.create({
         flexShrink: 0,
     },
     cardMeta: { flex: 1 },
-    cardTitle: { fontSize: 15, fontWeight: '800', color: colors.dark, marginBottom: 2 },
-    cardSubtitle: { fontSize: 12, color: colors.textSecondary },
+    cardTitle: { fontSize: 15, fontFamily: 'Poppins-SemiBold', color: colors.textDark, marginBottom: 2 },
+    cardSubtitle: { fontSize: 12, fontFamily: 'Poppins-Light', color: colors.textDark },
 
     progressBlock: { gap: 6 },
     progressTrack: {
         height: 7,
         borderRadius: 4,
-        backgroundColor: colors.grayLight,
+        backgroundColor: '#FDE7D8',
         overflow: 'hidden',
     },
     progressFill: { height: '100%', borderRadius: 4 },
@@ -225,8 +223,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    progressPct: { fontSize: 11, fontWeight: '600' },
-    progressCta: { fontSize: 11, fontWeight: '800' },
+    progressPct: { fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.textDark },
+    progressCta: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: colors.textDark },
 
     // Banner quirúrgico
     surgicalBanner: {
@@ -240,8 +238,8 @@ const styles = StyleSheet.create({
     },
     surgicalLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
     surgicalIcon: { color: '#FFD84A', fontSize: 16 },
-    surgicalTitle: { fontSize: 13, fontWeight: '800', color: colors.white },
-    surgicalSub: { fontSize: 11, color: 'rgba(255,255,255,0.70)', marginTop: 2 },
+    surgicalTitle: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: colors.white },
+    surgicalSub: { fontSize: 11, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.70)', marginTop: 2 },
     surgicalPlay: {
         width: 44,
         height: 44,

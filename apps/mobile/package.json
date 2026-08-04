@@ -13,6 +13,7 @@
     "type-check": "echo 'no ts yet' && exit 0"
   },
   "dependencies": {
+    "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/vector-icons": "^15.1.1",
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
@@ -31,6 +32,7 @@
     "expo-linking": "^57.0.0",
     "expo-local-authentication": "^57.0.0",
     "expo-secure-store": "^57.0.0",
+    "expo-splash-screen": "^57.0.5",
     "expo-standard-web-crypto": "^57.0.0",
     "expo-status-bar": "~57.0.0",
     "react": "19.2.3",

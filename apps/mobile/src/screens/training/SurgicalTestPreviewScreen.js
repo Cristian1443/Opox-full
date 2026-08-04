@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Animated, ActivityIndicator, Alert } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import ScreenHeader from '../../components/ScreenHeader';
+import TrainingHeader from '../../components/TrainingHeader';
 import { colors, spacing } from '../../theme';
 import { api, trainingApi } from '../../api';
 import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
@@ -26,16 +26,16 @@ function IllustrationSurgical() {
             <Circle cx={22} cy={98} r={2} fill={colors.purple} />
 
             {/* Clipboard */}
-            <Rect x={30} y={30} width={54} height={70} rx={6} stroke={colors.dark} strokeWidth={2} fill="#FFFFFF" />
-            <Rect x={44} y={24} width={26} height={12} rx={3} stroke={colors.dark} strokeWidth={2} fill="#FFFFFF" />
+            <Rect x={30} y={30} width={54} height={70} rx={6} stroke={colors.textDark} strokeWidth={2} fill="#FFFFFF" />
+            <Rect x={44} y={24} width={26} height={12} rx={3} stroke={colors.textDark} strokeWidth={2} fill="#FFFFFF" />
 
             {/* Checks verdes */}
             <Path d="M40 50 l3 3 l6 -6" stroke={colors.success} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M56 50 h20" stroke={colors.dark} strokeWidth={2} strokeLinecap="round" />
+            <Path d="M56 50 h20" stroke={colors.textDark} strokeWidth={2} strokeLinecap="round" />
             <Path d="M40 64 l3 3 l6 -6" stroke={colors.success} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M56 64 h20" stroke={colors.dark} strokeWidth={2} strokeLinecap="round" />
+            <Path d="M56 64 h20" stroke={colors.textDark} strokeWidth={2} strokeLinecap="round" />
             <Path d="M40 78 l3 3 l6 -6" stroke={colors.success} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M56 78 h16" stroke={colors.dark} strokeWidth={2} strokeLinecap="round" />
+            <Path d="M56 78 h16" stroke={colors.textDark} strokeWidth={2} strokeLinecap="round" />
 
             {/* Diana verde con check */}
             <Circle cx={95} cy={72} r={20} fill="#DCFCE7" stroke={colors.success} strokeWidth={2.5} />
@@ -94,9 +94,9 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <ScreenHeader title="Test quirúrgico" onBack={() => navigation.goBack()} />
+            <TrainingHeader title="Test quirúrgico" onBack={() => navigation.goBack()} onSettings={() => navigation.navigate('Settings')} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <Animated.View style={{ opacity: fade }}>
@@ -113,8 +113,7 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
                         <View key={s.id} style={styles.bulletItem}>
                             <Bullet />
                             <Text style={styles.bulletText}>
-                                <Text style={styles.bulletLabel}>{s.label}</Text>
-                                {' · '}{s.count} preguntas
+                                {s.label}{' · '}{s.count} preguntas
                             </Text>
                         </View>
                     ))}
@@ -147,7 +146,7 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.white },
     scroll: { flex: 1 },
     body: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
 
@@ -159,23 +158,23 @@ const styles = StyleSheet.create({
     },
     heroTitle: {
         fontSize: 20,
-        fontWeight: '800',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         textAlign: 'center',
         marginBottom: 4,
     },
     heroSub: {
         fontSize: 12,
-        color: colors.textSecondary,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
         textAlign: 'center',
         marginBottom: spacing.lg,
     },
 
     groupTitle: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: colors.dark,
-        letterSpacing: 0.5,
+        fontSize: 16,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: spacing.md,
         marginTop: spacing.sm,
     },
@@ -185,28 +184,27 @@ const styles = StyleSheet.create({
         gap: 12,
         marginBottom: 10,
     },
-    bulletText: { fontSize: 14, color: colors.dark },
-    bulletLabel: { fontWeight: '700' },
+    bulletText: { fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.textDark },
 
     btn: {
-        backgroundColor: colors.success,
+        backgroundColor: colors.ctaGreen,
         borderRadius: 14,
         paddingVertical: spacing.md,
         alignItems: 'center',
         marginTop: spacing.lg,
     },
-    btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    btnText: { color: '#fff', fontSize: 16, fontFamily: 'Poppins-SemiBold' },
 
     aiChip: {
-        backgroundColor: colors.purpleBg,
+        backgroundColor: colors.purple,
         borderRadius: 12,
         padding: 12,
         marginTop: spacing.md,
     },
     aiChipText: {
         fontSize: 12,
-        color: colors.purple,
-        fontWeight: '600',
+        color: colors.white,
+        fontFamily: 'Poppins-Regular',
         textAlign: 'center',
         lineHeight: 17,
     },

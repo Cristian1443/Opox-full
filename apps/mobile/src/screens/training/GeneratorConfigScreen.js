@@ -4,7 +4,7 @@ import {
     StatusBar, ScrollView, PanResponder, ActivityIndicator, Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import ScreenHeader from '../../components/ScreenHeader';
+import TrainingHeader from '../../components/TrainingHeader';
 import ConfirmExitModal from '../../components/ConfirmExitModal';
 import { colors, spacing } from '../../theme';
 import { api, trainingApi } from '../../api';
@@ -101,7 +101,7 @@ const s = StyleSheet.create({
         borderRadius: THUMB / 2,
         backgroundColor: '#FFFFFF',
         borderWidth: 3,
-        borderColor: colors.primary,
+        borderColor: colors.textDark,
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
@@ -202,12 +202,13 @@ export default function GeneratorConfigScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <ScreenHeader
-                title="Zona de entrenamiento"
-                subtitle="Generador infinito"
+            <TrainingHeader
+                eyebrow="Zona de entrenamiento"
+                title="Generador infinito"
                 onBack={handleBack}
+                onSettings={() => navigation.navigate('Settings')}
             />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -339,21 +340,23 @@ export default function GeneratorConfigScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.white },
     scroll: { flex: 1 },
     body: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
 
     section: { paddingVertical: spacing.md, alignItems: 'stretch' },
     sectionTitle: {
-        fontSize: 17,
-        fontWeight: '800',
-        color: colors.dark,
+        fontSize: 20,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         textAlign: 'center',
         marginBottom: 4,
     },
     sectionSubtitle: {
         fontSize: 12,
-        color: colors.textSecondary,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textMuted,
+        opacity: 0.6,
         textAlign: 'center',
         marginBottom: 16,
     },
@@ -364,8 +367,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         marginTop: 8,
     },
-    stepLabel: { fontSize: 11.5, color: colors.textSecondary, fontWeight: '600' },
-    stepLabelActive: { color: colors.dark, fontWeight: '800' },
+    stepLabel: { fontSize: 12, color: colors.textMuted, opacity: 0.6, fontFamily: 'Poppins-Regular' },
+    stepLabelActive: { color: colors.textDark, opacity: 1, fontFamily: 'Poppins-SemiBold' },
 
     countRow: {
         flexDirection: 'row',
@@ -383,7 +386,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         alignItems: 'center',
     },
-    countChipText: { fontSize: 14, fontWeight: '800', color: colors.dark },
+    countChipText: { fontSize: 15, fontFamily: 'Poppins-SemiBold', color: colors.textDark },
 
     divider: {
         height: 1,
@@ -397,8 +400,8 @@ const styles = StyleSheet.create({
         gap: 12,
         paddingVertical: spacing.md,
     },
-    toggleTitle: { fontSize: 14, fontWeight: '800', color: colors.dark, marginBottom: 3 },
-    toggleSub: { fontSize: 11.5, color: colors.textSecondary },
+    toggleTitle: { fontSize: 17, fontFamily: 'Poppins-Bold', color: colors.textDark, marginBottom: 3 },
+    toggleSub: { fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.textMuted, opacity: 0.6 },
     toggleTrack: {
         width: 46,
         height: 26,
@@ -407,7 +410,7 @@ const styles = StyleSheet.create({
         padding: 2,
         justifyContent: 'center',
     },
-    toggleTrackActive: { backgroundColor: colors.purple },
+    toggleTrackActive: { backgroundColor: colors.textDark },
     toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
     toggleThumbActive: { transform: [{ translateX: 20 }] },
 
@@ -421,7 +424,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
         marginBottom: 8,
     },
-    topicHeaderLabel: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.dark },
+    topicHeaderLabel: { flex: 1, fontSize: 20, fontFamily: 'Poppins-Medium', color: colors.textDark },
 
     topicList: {
         borderWidth: 1,
@@ -437,15 +440,15 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     topicItemActive: { backgroundColor: '#FDE7D8' },
-    topicItemText: { fontSize: 14, color: colors.dark, fontWeight: '500' },
-    topicItemTextActive: { color: colors.dark, fontWeight: '700' },
+    topicItemText: { fontSize: 14, color: colors.textDark, fontFamily: 'Poppins-Regular' },
+    topicItemTextActive: { color: colors.textDark, fontFamily: 'Poppins-SemiBold' },
 
     btn: {
-        backgroundColor: colors.success,
+        backgroundColor: colors.ctaGreen,
         borderRadius: 14,
         paddingVertical: 15,
         alignItems: 'center',
         marginTop: 12,
     },
-    btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    btnText: { color: '#fff', fontSize: 15, fontFamily: 'Poppins-SemiBold' },
 });

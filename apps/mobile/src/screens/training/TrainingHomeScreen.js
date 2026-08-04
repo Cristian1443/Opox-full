@@ -1,167 +1,167 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
-import Svg, { Path, Circle, Ellipse } from 'react-native-svg';
-import ScreenHeader from '../../components/ScreenHeader';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Image } from 'react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 
-// Iconos SVG que imitan el nuevo wireframe: todos naranja sobre fondo blanco
-function IconInfinity({ color = colors.primary }) {
-    return (
-        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-            <Path
-                d="M12 12c-2-2.5-4-4-6-4a4 4 0 0 0 0 8c2 0 4-1.5 6-4z"
-                stroke={color} strokeWidth={1.8} strokeLinejoin="round"
-            />
-            <Path
-                d="M12 12c2 2.5 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.5-6 4z"
-                stroke={color} strokeWidth={1.8} strokeLinejoin="round"
-            />
-        </Svg>
-    );
-}
+const ICON_INFINITO = require('../../../assets/icon-generador-infinito.png');
 
-function IconDocMedal({ color = colors.primary }) {
-    return (
-        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-            <Path d="M6 3h9l4 4v10H6z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Path d="M14 3v5h5" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Circle cx={12} cy={17} r={3} stroke={color} strokeWidth={1.5} />
-            <Path d="M11 20l-.5 2M13 20l.5 2" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function IconAperture({ color = colors.primary }) {
-    return (
-        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.7} />
-            <Path d="M12 3l3 9M21 12l-9 3M15.5 20.7L9 15M12 21l-3-9M3 12l9-3M8.5 3.3L15 9"
-                stroke={color} strokeWidth={1.4} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function IconMicroscope({ color = colors.primary }) {
-    return (
-        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-            <Path d="M7 21h10M12 21v-4" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
-            <Path d="M9 3h6v9H9z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Path d="M12 12v5" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
-            <Path d="M7 17a5 5 0 0 1 10 0" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
-            <Path d="M10 6h4" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function IconChevron({ color = colors.grayMid }) {
-    return (
-        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <Path d="M9 6l6 6-6 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
+// Figma ("HUB DE ENTRENAMIENTO 1"): iconos naranja de vector-icons, header
+// con botón atrás circular (morado al 10%) + engranaje de ajustes.
 const MODES = [
     {
         id: 'infinite',
         title: 'Generador infinito',
         subtitle: 'Creación de tests a medida sin límite',
-        Icon: IconInfinity,
+        icon: (
+            <Image
+                source={ICON_INFINITO}
+                resizeMode="contain"
+                style={{ width: 48, height: 48 }}
+            />
+        ),
         route: 'GeneratorConfig',
+        highlighted: true,
     },
     {
         id: 'official',
         title: 'Exámenes oficiales',
         subtitle: 'Exámenes reales de años anteriores',
-        Icon: IconDocMedal,
+        icon: <MaterialCommunityIcons name="certificate-outline" size={40} color={colors.accentOrange} />,
         route: 'OfficialMocks',
     },
     {
         id: 'photo',
         title: 'Módulo foto-test',
         subtitle: 'Tests basados en memoria visual',
-        Icon: IconAperture,
+        icon: <MaterialCommunityIcons name="camera-iris" size={40} color={colors.accentOrange} />,
         route: 'PhotoTestCapture',
     },
     {
         id: 'errors',
         title: 'Laboratorio de errores',
         subtitle: 'Repaso quirúrgico de fallos y puntos débiles',
-        Icon: IconMicroscope,
+        icon: <MaterialCommunityIcons name="microscope" size={40} color={colors.accentOrange} />,
         route: 'ErrorLab',
     },
 ];
 
 export default function TrainingHomeScreen({ navigation }) {
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <SafeAreaView style={styles.safeArea}>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <ScreenHeader title="Zona de entrenamiento" onBack={() => navigation.goBack()} />
+            <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                        activeOpacity={0.7}
+                    >
+                        <Feather name="chevron-left" size={22} color={colors.textDark} />
+                    </TouchableOpacity>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                {MODES.map((mode, idx) => {
-                    const Icon = mode.Icon;
-                    const isFeatured = idx === 0;
-                    return (
+                    <Text style={styles.headerTitle} numberOfLines={1}>
+                        Zona de entrenamiento
+                    </Text>
+
+                    <TouchableOpacity
+                        style={styles.settingsButton}
+                        onPress={() => navigation.navigate('Settings')}
+                        activeOpacity={0.7}
+                    >
+                        <Feather name="settings" size={20} color={colors.textDark} />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.cardsWrapper}>
+                    {MODES.map((mode) => (
                         <TouchableOpacity
                             key={mode.id}
-                            style={[styles.card, isFeatured && styles.cardFeatured]}
+                            activeOpacity={0.75}
+                            style={[styles.card, mode.highlighted && styles.cardHighlighted]}
                             onPress={() => navigation.navigate(mode.route)}
-                            activeOpacity={0.82}
                         >
-                            <View style={[styles.iconBox, isFeatured && styles.iconBoxFeatured]}>
-                                <Icon />
-                            </View>
-                            <View style={styles.textCol}>
+                            <View style={styles.iconWrapper}>{mode.icon}</View>
+
+                            <View style={styles.cardTextWrapper}>
                                 <Text style={styles.cardTitle}>{mode.title}</Text>
                                 <Text style={styles.cardSubtitle}>{mode.subtitle}</Text>
                             </View>
-                            <IconChevron />
+
+                            <Feather name="chevron-right" size={20} color={colors.textDark} />
                         </TouchableOpacity>
-                    );
-                })}
+                    ))}
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    scroll: { flex: 1 },
-    body: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.lg },
-
+    safeArea: { flex: 1, backgroundColor: colors.white },
+    container: {
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.lg + spacing.md,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.lg,
+    },
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 20,
+        color: colors.textDark,
+        marginLeft: spacing.sm + 4,
+    },
+    settingsButton: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cardsWrapper: { gap: spacing.md },
     card: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
-        backgroundColor: colors.card,
-        borderRadius: 14,
-        paddingVertical: 16,
-        paddingHorizontal: 14,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        elevation: 2,
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.3)',
+        borderRadius: 16,
+        paddingVertical: 18,
+        paddingHorizontal: spacing.md,
     },
-    cardFeatured: {
-        backgroundColor: '#F1F3F7',
+    cardHighlighted: {
+        backgroundColor: '#F5F5F5',
     },
-    iconBox: {
+    iconWrapper: {
         width: 56,
         height: 56,
-        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        flexShrink: 0,
+        marginRight: spacing.sm + 6,
     },
-    iconBoxFeatured: {
-        width: 60,
-        height: 60,
+    cardTextWrapper: { flex: 1, marginRight: spacing.sm },
+    cardTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
+        marginBottom: 4,
     },
-    textCol: { flex: 1 },
-    cardTitle: { fontSize: 15, fontWeight: '800', color: colors.dark, marginBottom: 3 },
-    cardSubtitle: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
+    cardSubtitle: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.5,
+        lineHeight: 16,
+        color: 'rgba(52, 58, 61, 0.6)',
+    },
 });

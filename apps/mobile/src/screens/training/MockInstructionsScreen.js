@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
-import ScreenHeader from '../../components/ScreenHeader';
+import TrainingHeader from '../../components/TrainingHeader';
 import { colors, spacing } from '../../theme';
 import { trainingApi } from '../../api';
 import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
@@ -93,12 +93,13 @@ export default function MockInstructionsScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <ScreenHeader
-                title="Simulacro"
-                subtitle={`Examen oficial ${safeExam.year}`}
+            <TrainingHeader
+                eyebrow="Simulacro"
+                title={`Examen oficial ${safeExam.year}`}
                 onBack={() => navigation.goBack()}
+                onSettings={() => navigation.navigate('Settings')}
             />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -151,7 +152,7 @@ export default function MockInstructionsScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.white },
     scroll: { flex: 1 },
     body: { paddingHorizontal: spacing.md, paddingBottom: 120 },
 
@@ -165,19 +166,18 @@ const styles = StyleSheet.create({
     },
     examTitle: {
         fontSize: 22,
-        fontWeight: '800',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginTop: 8,
         marginBottom: 4,
         textAlign: 'center',
     },
-    examCategory: { fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
+    examCategory: { fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.textDark, textAlign: 'center' },
 
     groupTitle: {
-        fontSize: 10.5,
-        fontWeight: '700',
-        color: colors.textSecondary,
-        letterSpacing: 0.5,
+        fontSize: 16,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: spacing.md,
     },
     conditionItem: {
@@ -188,8 +188,8 @@ const styles = StyleSheet.create({
     },
     conditionText: {
         fontSize: 14,
-        color: colors.dark,
-        fontWeight: '500',
+        color: colors.textDark,
+        fontFamily: 'Poppins-Light',
     },
 
     btnRow: {
@@ -200,13 +200,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingBottom: spacing.lg,
         paddingTop: spacing.sm,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     btn: {
-        backgroundColor: colors.success,
+        backgroundColor: colors.ctaGreen,
         borderRadius: 14,
         paddingVertical: spacing.md,
         alignItems: 'center',
     },
-    btnText: { color: colors.white, fontSize: 16, fontWeight: '700' },
+    btnText: { color: colors.white, fontSize: 16, fontFamily: 'Poppins-SemiBold' },
 });

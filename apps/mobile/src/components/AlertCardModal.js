@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated } from 'react-native';
+import { colors } from '../theme';
 
 // ─── Alert card centrada (bloque 6: ERROR FOTO BORROSA, SALIR GENERAR TEST) ──
 // Modal tipo alert-card centrado sobre overlay oscuro con CTA verde y
@@ -125,15 +126,16 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
     title: {
-        fontSize: 17,
-        fontWeight: '800',
-        color: '#0F1B33',
+        fontSize: 19,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: 6,
         textAlign: 'center',
     },
     description: {
         fontSize: 13,
-        color: '#5A6373',
+        fontFamily: 'Poppins-Light',
+        color: colors.textDark,
         textAlign: 'center',
         lineHeight: 19,
         marginBottom: 18,
@@ -147,7 +149,7 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
     btnPrimary: {
-        backgroundColor: '#34C759',
+        backgroundColor: colors.ctaGreen,
         borderRadius: 12,
         paddingVertical: 13,
         alignItems: 'center',
@@ -156,15 +158,15 @@ const styles = StyleSheet.create({
     btnPrimaryText: {
         color: '#FFFFFF',
         fontSize: 14,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
     },
     btnLink: {
         paddingVertical: 10,
         marginTop: 4,
     },
     btnLinkText: {
-        color: '#5A6373',
+        color: colors.textDark,
         fontSize: 13,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Light',
     },
 });
