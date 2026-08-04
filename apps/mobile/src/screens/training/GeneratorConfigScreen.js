@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
         borderBottomColor: '#EEF1F7',
         backgroundColor: '#FFFFFF',
     },
-    topicItemActive: { backgroundColor: '#FDE7D8' },
+    topicItemActive: { backgroundColor: 'rgba(246, 150, 36, 0.15)' },
     topicItemText: { fontSize: 14, color: colors.textDark, fontFamily: 'Poppins-Regular' },
     topicItemTextActive: { color: colors.textDark, fontFamily: 'Poppins-SemiBold' },
 
