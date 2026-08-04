@@ -31,7 +31,7 @@ const TOPICS = [
     { id: 't5', label: 'Tema 5' },
 ];
 
-const DEFAULTS = { difficulty: 'medium', count: 30, timed: false, topicId: 't1' };
+const DEFAULTS = { difficulty: 'medium', count: 30, timed: true, topicId: 't1' };
 
 // ─── Slider genérico naranja (usa índices) ───────────────────────────────────
 function OrangeSlider({ steps, valueIdx, onChange }) {
@@ -110,7 +110,7 @@ const s = StyleSheet.create({
     },
 });
 
-function IconChevronDown({ color = colors.grayText }) {
+function IconChevronDown({ color = colors.textDark }) {
     return (
         <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
             <Path d="M6 9l6 6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -271,7 +271,7 @@ export default function GeneratorConfigScreen({ navigation }) {
                         </Text>
                     </View>
                     <TouchableOpacity
-                        style={[styles.toggleTrack, fatigueMode && styles.toggleTrackActive]}
+                        style={styles.toggleTrack}
                         onPress={() => setFatigueMode((v) => !v)}
                         activeOpacity={0.8}
                     >
@@ -410,9 +410,8 @@ const styles = StyleSheet.create({
         padding: 2,
         justifyContent: 'center',
     },
-    toggleTrackActive: { backgroundColor: colors.textDark },
     toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
-    toggleThumbActive: { transform: [{ translateX: 20 }] },
+    toggleThumbActive: { backgroundColor: colors.textDark, transform: [{ translateX: 20 }] },
 
     topicHeader: {
         flexDirection: 'row',

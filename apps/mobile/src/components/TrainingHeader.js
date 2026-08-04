@@ -21,14 +21,19 @@ function IconGear({ color = colors.textDark }) {
 
 // ─── Cabecera de Bloque 6 · Entrenamiento ────────────────────────────────────
 // Mismo contrato que ScreenHeader (title/subtitle/onBack), pero con los
-// valores exactos confirmados en Figma ("HUB DE ENTRENAMIENTO 1" 2298:1381):
-// título centrado, fontSize 48px/2.25 = 21dp, color #412950 (colors.textDark),
-// botón de volver y engranaje en círculos grises claros. No se toca
-// ScreenHeader.js porque también lo usa Bloque 4, del que no tenemos datos de
-// Figma para confirmar si ese color/tamaño le aplica igual.
-// Figma: cuando hay 2 líneas, la de ARRIBA es el "breadcrumb" pequeño (ej.
-// "Zona de entrenamiento", "Simulacros", "Simulacro") y la de ABAJO es el
-// título grande y en negrita de la pantalla actual (ej. "Generador infinito").
+// valores exactos confirmados en Figma: título centrado, color #412950
+// (colors.textDark), botón de volver y engranaje en círculos grises claros.
+// No se toca ScreenHeader.js porque también lo usa Bloque 4, del que no
+// tenemos datos de Figma para confirmar si ese color/tamaño le aplica igual.
+//
+// Figma: "eyebrow" y "title" son SIEMPRE el mismo tamaño (48px), solo cambia
+// el peso — confirmado en "GENERADOR INFINITO" (2298:1536), "FOTO-TEST"
+// (2298:1836), "SIMULACROS OFICIALES LISTADO" (2298:1958) y "SIMULACRO"
+// (2317:275): la línea de arriba ("Zona de entrenamiento", "Simulacros"…) es
+// Poppins SemiBold, la de abajo (título de la pantalla actual) es Poppins
+// Light. Cuando NO hay eyebrow (pantalla de un solo título, ej. "HUB DE
+// ENTRENAMIENTO 1" 2298:1381, "LABORATORIO DE ERRORES" 2317:365, "TEST
+// QUIRÚRGICO" 2318:478) esa única línea vuelve a ser Poppins SemiBold.
 export default function TrainingHeader({ eyebrow, title, onBack, onSettings }) {
     return (
         <View style={styles.header}>
@@ -42,7 +47,12 @@ export default function TrainingHeader({ eyebrow, title, onBack, onSettings }) {
 
             <View style={styles.titleBlock}>
                 {eyebrow ? <Text style={styles.eyebrow} numberOfLines={1}>{eyebrow}</Text> : null}
-                <Text style={styles.title} numberOfLines={2}>{title}</Text>
+                <Text
+                    style={[styles.title, eyebrow && styles.titleWithEyebrow]}
+                    numberOfLines={2}
+                >
+                    {title}
+                </Text>
             </View>
 
             <TouchableOpacity
@@ -75,16 +85,19 @@ const styles = StyleSheet.create({
     back: { color: colors.textDark, fontFamily: 'Poppins-SemiBold', fontSize: 18, marginTop: -1 },
     titleBlock: { flex: 1, alignItems: 'center' },
     eyebrow: {
-        fontSize: 13,
-        fontFamily: 'Poppins-Medium',
+        fontSize: 20,
+        fontFamily: 'Poppins-SemiBold',
         color: colors.textDark,
         textAlign: 'center',
     },
     title: {
-        fontSize: 21,
+        fontSize: 20,
         fontFamily: 'Poppins-SemiBold',
         color: colors.textDark,
         letterSpacing: -0.3,
         textAlign: 'center',
+    },
+    titleWithEyebrow: {
+        fontFamily: 'Poppins-Light',
     },
 });
