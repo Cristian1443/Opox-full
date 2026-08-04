@@ -1,24 +1,25 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Image } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 
 const ICON_INFINITO = require('../../../assets/icon-generador-infinito.png');
+const ICON_EXAMENES = require('../../../assets/icon-examenes-oficiales.png');
+const ICON_FOTO_TEST = require('../../../assets/icon-foto-test.png');
+const ICON_LABORATORIO = require('../../../assets/icon-laboratorio-errores.png');
 
-// Figma ("HUB DE ENTRENAMIENTO 1"): iconos naranja de vector-icons, header
+function ModeIcon({ source }) {
+    return <Image source={source} resizeMode="contain" style={{ width: 48, height: 48 }} />;
+}
+
+// Figma ("HUB DE ENTRENAMIENTO 1"): iconos naranja exactos del mockup, header
 // con botón atrás circular (morado al 10%) + engranaje de ajustes.
 const MODES = [
     {
         id: 'infinite',
         title: 'Generador infinito',
         subtitle: 'Creación de tests a medida sin límite',
-        icon: (
-            <Image
-                source={ICON_INFINITO}
-                resizeMode="contain"
-                style={{ width: 48, height: 48 }}
-            />
-        ),
+        icon: <ModeIcon source={ICON_INFINITO} />,
         route: 'GeneratorConfig',
         highlighted: true,
     },
@@ -26,21 +27,21 @@ const MODES = [
         id: 'official',
         title: 'Exámenes oficiales',
         subtitle: 'Exámenes reales de años anteriores',
-        icon: <MaterialCommunityIcons name="certificate-outline" size={40} color={colors.accentOrange} />,
+        icon: <ModeIcon source={ICON_EXAMENES} />,
         route: 'OfficialMocks',
     },
     {
         id: 'photo',
         title: 'Módulo foto-test',
         subtitle: 'Tests basados en memoria visual',
-        icon: <MaterialCommunityIcons name="camera-iris" size={40} color={colors.accentOrange} />,
+        icon: <ModeIcon source={ICON_FOTO_TEST} />,
         route: 'PhotoTestCapture',
     },
     {
         id: 'errors',
         title: 'Laboratorio de errores',
         subtitle: 'Repaso quirúrgico de fallos y puntos débiles',
-        icon: <MaterialCommunityIcons name="microscope" size={40} color={colors.accentOrange} />,
+        icon: <ModeIcon source={ICON_LABORATORIO} />,
         route: 'ErrorLab',
     },
 ];
