@@ -1,52 +1,35 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
-import TrainingHeader from '../../components/TrainingHeader';
-import { colors, spacing } from '../../theme';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    Dimensions,
+    SafeAreaView,
+    StatusBar,
+    ScrollView,
+    ActivityIndicator,
+    Alert,
+} from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors } from '../../theme';
 import { trainingApi } from '../../api';
 import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
-// Iconos para las condiciones del simulacro
-function IconList({ color = colors.primary }) {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Circle cx={5} cy={7} r={1.5} fill={color} />
-            <Circle cx={5} cy={12} r={1.5} fill={color} />
-            <Circle cx={5} cy={17} r={1.5} fill={color} />
-            <Path d="M10 7h11M10 12h11M10 17h8" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
-        </Svg>
-    );
-}
+// ------------------------------------------------------------------
+// Escalado proporcional 1:1 respecto al frame original de Figma
+// (905px de ancho).
+// ------------------------------------------------------------------
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const DESIGN_WIDTH = 905;
+const scale = (value) => (SCREEN_WIDTH / DESIGN_WIDTH) * value;
 
-function IconTimer({ color = colors.primary }) {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={13} r={8} stroke={color} strokeWidth={1.7} />
-            <Path d="M12 8v5l3 2M9 3h6" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function IconWarning({ color = colors.primary }) {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M12 3l9 16H3z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Path d="M12 9v4M12 16v.3" stroke={color} strokeWidth={1.9} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-// Icono documento+medalla grande para la cabecera
-function IconDocMedalBig({ color = colors.primary }) {
-    return (
-        <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
-            <Path d="M6 3h9l4 4v10H6z" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
-            <Path d="M14 3v5h5" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
-            <Circle cx={12} cy={17} r={3} stroke={color} strokeWidth={1.3} />
-            <Path d="M11 20l-.5 2M13 20l.5 2" stroke={color} strokeWidth={1.3} strokeLinecap="round" />
-        </Svg>
-    );
-}
+const COLORS = {
+    purple900: colors.textDark,
+    orange: colors.accentOrange,
+    green: colors.ctaGreen,
+    white: colors.white,
+};
 
 // ─── Pantalla 6.7 · Simulacro · Instrucciones ────────────────────────────────
 export default function MockInstructionsScreen({ navigation, route }) {
@@ -92,121 +75,193 @@ export default function MockInstructionsScreen({ navigation, route }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <SafeAreaView style={styles.safe}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
-            <TrainingHeader
-                eyebrow="Simulacro"
-                title={`Examen oficial ${safeExam.year}`}
-                onBack={() => navigation.goBack()}
-                onSettings={() => navigation.navigate('Settings')}
-            />
+            {/* ---------- HEADER ---------- */}
+            <View style={styles.header}>
+                <TouchableOpacity style={styles.iconCircle} activeOpacity={0.7} onPress={() => navigation.goBack()}>
+                    <Ionicons name="chevron-back" size={scale(28)} color={COLORS.purple900} />
+                </TouchableOpacity>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                    Simulacro
+                </Text>
 
-                {/* Cabecera visual centrada — icono compacto, título grande */}
-                <View style={styles.heroCard}>
-                    <IconDocMedalBig />
+                <TouchableOpacity style={styles.iconCircle} activeOpacity={0.7} onPress={() => navigation.navigate('Settings')}>
+                    <Ionicons name="settings-outline" size={scale(34)} color={COLORS.purple900} />
+                </TouchableOpacity>
+            </View>
+
+            <Text style={styles.headerSubtitle}>Examen oficial {safeExam.year}</Text>
+
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* ---------- TARJETA "EXAMEN 2023" ---------- */}
+                <View style={styles.examCard}>
+                    <MaterialCommunityIcons
+                        name="file-certificate-outline"
+                        size={scale(110)}
+                        color={COLORS.orange}
+                    />
                     <Text style={styles.examTitle}>{safeExam.title}</Text>
-                    <Text style={styles.examCategory}>{safeExam.category}</Text>
+                    <Text style={styles.examSubtitle}>{safeExam.category}</Text>
                 </View>
 
-                {/* Condiciones */}
-                <Text style={styles.groupTitle}>CONDICIONES</Text>
+                {/* ---------- CONDICIONES ---------- */}
+                <Text style={styles.conditionsTitle}>CONDICIONES</Text>
 
-                <View style={styles.conditionItem}>
-                    <IconList />
-                    <Text style={styles.conditionText}>{safeExam.questions} preguntas tipo test</Text>
-                </View>
+                <View style={styles.conditionsList}>
+                    <View style={styles.conditionRow}>
+                        <Ionicons name="reader-outline" size={scale(44)} color={COLORS.orange} style={styles.conditionIcon} />
+                        <Text style={styles.conditionText}>{safeExam.questions} preguntas tipo test</Text>
+                    </View>
 
-                <View style={styles.conditionItem}>
-                    <IconTimer />
-                    <Text style={styles.conditionText}>{safeExam.minutes} minutos · contrarreloj</Text>
-                </View>
+                    <View style={styles.conditionRow}>
+                        <Ionicons name="time-outline" size={scale(52)} color={COLORS.orange} style={styles.conditionIcon} />
+                        <Text style={styles.conditionText}>{safeExam.minutes} minutos · contrarreloj</Text>
+                    </View>
 
-                <View style={styles.conditionItem}>
-                    <IconWarning />
-                    <Text style={styles.conditionText}>Cada 3 fallos resta 1 acierto</Text>
+                    <View style={styles.conditionRow}>
+                        <Ionicons name="warning-outline" size={scale(54)} color={COLORS.orange} style={styles.conditionIcon} />
+                        <Text style={styles.conditionText}>Cada 3 fallos resta 1 acierto</Text>
+                    </View>
                 </View>
             </ScrollView>
 
-            <View style={styles.btnRow}>
-                <TouchableOpacity
-                    style={[styles.btn, loading && { opacity: 0.7 }]}
-                    onPress={startExam}
-                    activeOpacity={0.85}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <ActivityIndicator color="#fff" size="small" />
-                            <Text style={styles.btnText}>Cargando examen…</Text>
-                        </View>
-                    ) : (
-                        <Text style={styles.btnText}>Comenzar examen</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
+            {/* ---------- BOTÓN ---------- */}
+            <TouchableOpacity
+                style={[styles.startButton, loading && { opacity: 0.7 }]}
+                activeOpacity={0.85}
+                onPress={startExam}
+                disabled={loading}
+            >
+                {loading ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <ActivityIndicator color={COLORS.white} size="small" />
+                        <Text style={styles.startButtonText}>Cargando examen…</Text>
+                    </View>
+                ) : (
+                    <Text style={styles.startButtonText}>Comenzar examen</Text>
+                )}
+            </TouchableOpacity>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.white },
-    scroll: { flex: 1 },
-    body: { paddingHorizontal: spacing.md, paddingBottom: 120 },
+    safe: {
+        flex: 1,
+        backgroundColor: COLORS.white,
+        paddingTop: scale(189),
+    },
+    scrollContent: {
+        flexGrow: 1,
+    },
 
-    heroCard: {
-        backgroundColor: '#F1F3F7',
-        borderRadius: 14,
-        paddingVertical: 20,
-        paddingHorizontal: spacing.lg,
-        alignItems: 'center',
-        marginBottom: spacing.lg,
-    },
-    examTitle: {
-        fontSize: 22,
-        fontFamily: 'Poppins-SemiBold',
-        color: colors.textDark,
-        marginTop: 8,
-        marginBottom: 4,
-        textAlign: 'center',
-    },
-    examCategory: { fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.textDark, textAlign: 'center' },
-
-    groupTitle: {
-        fontSize: 16,
-        fontFamily: 'Poppins-SemiBold',
-        color: colors.textDark,
-        marginBottom: spacing.md,
-    },
-    conditionItem: {
+    /* ---------- HEADER ---------- */
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 14,
+        justifyContent: 'space-between',
+        marginHorizontal: scale(56),
+        height: scale(54.03),
     },
-    conditionText: {
-        fontSize: 14,
-        color: colors.textDark,
+    iconCircle: {
+        width: scale(54.04),
+        height: scale(54.04),
+        borderRadius: scale(27.02),
+        backgroundColor: 'rgba(65,41,80,0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        flex: 1,
+        textAlign: 'center',
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: scale(48),
+        lineHeight: scale(48) * 1.547,
+        color: COLORS.purple900,
+    },
+    headerSubtitle: {
+        textAlign: 'center',
         fontFamily: 'Poppins-Light',
+        fontSize: scale(48),
+        lineHeight: scale(48) * 1.547,
+        color: COLORS.purple900,
+        marginTop: scale(-2),
     },
 
-    btnRow: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.lg,
-        paddingTop: spacing.sm,
-        backgroundColor: colors.white,
-    },
-    btn: {
-        backgroundColor: colors.ctaGreen,
-        borderRadius: 14,
-        paddingVertical: spacing.md,
+    /* ---------- TARJETA EXAMEN ---------- */
+    examCard: {
+        marginTop: scale(76.5),
+        marginHorizontal: scale(60),
+        minHeight: scale(300.19),
+        borderWidth: scale(1.4),
+        borderColor: 'rgba(65,41,80,0.3)',
+        borderRadius: scale(24),
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: scale(20),
     },
-    btnText: { color: colors.white, fontSize: 16, fontFamily: 'Poppins-SemiBold' },
+    examTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: scale(48),
+        color: COLORS.purple900,
+        marginTop: scale(10),
+        textAlign: 'center',
+    },
+    examSubtitle: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: scale(20),
+        color: COLORS.purple900,
+        marginTop: scale(6),
+        textAlign: 'center',
+    },
+
+    /* ---------- CONDICIONES ---------- */
+    conditionsTitle: {
+        marginTop: scale(71.5),
+        marginLeft: scale(61),
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: scale(36),
+        color: COLORS.purple900,
+    },
+    conditionsList: {
+        marginTop: scale(22),
+        marginLeft: scale(61),
+        marginRight: scale(56),
+    },
+    conditionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: scale(38),
+    },
+    conditionIcon: {
+        width: scale(52),
+        textAlign: 'center',
+    },
+    conditionText: {
+        marginLeft: scale(20),
+        fontFamily: 'Poppins-Light',
+        fontSize: scale(31),
+        lineHeight: scale(31) * 1.2,
+        color: COLORS.purple900,
+    },
+
+    /* ---------- BOTÓN ---------- */
+    startButton: {
+        marginTop: scale(24),
+        marginHorizontal: scale(90),
+        marginBottom: scale(40),
+        height: scale(138),
+        borderRadius: scale(32),
+        backgroundColor: COLORS.green,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    startButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: scale(36),
+        color: COLORS.white,
+    },
 });
