@@ -71,16 +71,19 @@ export default function OfficialMocksScreen({ navigation }) {
             if (error) {
                 setLoadError(error.message);
             } else {
+                // El backend serializa MockExamWithStatus como un DTO plano
+                // (id/year/title/... y status/bestScore al mismo nivel), no
+                // anidado bajo `exam` — ver TrainingController.serializeMockExam.
                 setMocks((data ?? []).map((item) => ({
-                    id: item.exam.id,
-                    year: String(item.exam.year),
-                    title: item.exam.title,
-                    category: item.exam.category ?? item.exam.oposicion,
-                    questions: item.exam.questionCount,
-                    minutes: item.exam.durationMinutes,
+                    id: item.id,
+                    year: String(item.year),
+                    title: item.title,
+                    category: item.category ?? item.oposicion,
+                    questions: item.questionCount,
+                    minutes: item.durationMinutes,
                     status: item.status,
                     score: item.bestScore !== null ? Math.round(item.bestScore * 10) : null,
-                    progress: item.status === 'completed' ? 100 : item.status === 'ongoing' ? 70 : 0,
+                    progress: item.status === 'completed' ? 100 : 0,
                 })));
             }
             setLoading(false);
