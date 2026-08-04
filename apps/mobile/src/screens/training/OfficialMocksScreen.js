@@ -1,81 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, FlatList, ActivityIndicator } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
-import TrainingHeader from '../../components/TrainingHeader';
-import { colors, spacing } from '../../theme';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../../theme';
 import { api } from '../../api/client';
 import { trainingApi } from '../../api/training';
 
-// Icono documento+medalla — igual que en el hub
-function IconDocMedal({ color = colors.primary }) {
-    return (
-        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-            <Path d="M6 3h9l4 4v10H6z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Path d="M14 3v5h5" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Circle cx={12} cy={17} r={3} stroke={color} strokeWidth={1.5} />
-            <Path d="M11 20l-.5 2M13 20l.5 2" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function IconDocMedalDone({ color = colors.statGreen }) {
-    return (
-        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-            <Path d="M6 3h9l4 4v10H6z" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Path d="M14 3v5h5" stroke={color} strokeWidth={1.7} strokeLinejoin="round" />
-            <Circle cx={12} cy={17} r={3} stroke={color} strokeWidth={1.5} />
-            <Path d="M10.5 17l1 1 2-2" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
-// Figma ("DESTACADO" 2298:2083): triángulo de "play", no un blanco.
-function IconSurgical({ color = '#fff' }) {
-    return (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M8 5.5v13l11-6.5z" fill={color} />
-        </Svg>
-    );
-}
+const COLORS = {
+    purple: colors.textDark,
+    purpleBanner: '#7241B8',
+    orange: colors.accentOrange,
+    green: colors.ctaGreen,
+    white: colors.white,
+    cardBorder: 'rgba(65,41,80,0.3)',
+    trackGray: 'rgba(65,41,80,0.15)',
+    trackOrange: 'rgba(246,150,36,0.15)',
+    cardBgCompleted: 'rgba(235,235,235,0.5)',
+    subtitleGray: '#C4C4C4',
+};
 
 const EMPTY_COPY = 'Aún no hay simulacros disponibles para tu oposición.';
 
 // ─── Tarjeta de simulacro ─────────────────────────────────────────────────────
-function MockCard({ item, onPress }) {
-    const isDone = item.status === 'completed';
-    const isOngoing = item.status === 'ongoing';
-    const ctaLabel = isDone ? 'Repetir' : isOngoing ? 'Continuar' : 'Empezar';
-    const progressPct = item.progress ?? 0;
-    const barColor = isDone ? colors.statGreen : colors.primary;
+function ExamCard({ exam, onPress }) {
+    const isDone = exam.status === 'completed';
+    const isOngoing = exam.status === 'ongoing';
+    const action = isDone ? 'Repetir' : isOngoing ? 'Continuar' : 'Empezar';
+    const icon = isDone || isOngoing ? 'ribbon-outline' : 'document-text-outline';
+    const fillColor = isDone ? COLORS.green : isOngoing ? COLORS.orange : COLORS.trackGray;
+    const trackColor = isOngoing ? COLORS.trackOrange : COLORS.trackGray;
+    const cardBg = isDone ? COLORS.cardBgCompleted : 'transparent';
 
     return (
-        <TouchableOpacity
-            style={[styles.card, isDone && styles.cardHighlighted]}
-            onPress={onPress}
-            activeOpacity={0.85}
-        >
-            <View style={styles.cardRow}>
-                <View style={styles.cardIcon}>
-                    {isDone
-                        ? <IconDocMedalDone />
-                        : <IconDocMedal color={isOngoing ? colors.primary : colors.grayMid} />
-                    }
-                </View>
-                <View style={styles.cardMeta}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.cardSubtitle}>{item.questions} preguntas · {item.minutes} min</Text>
+        <TouchableOpacity style={[styles.card, { backgroundColor: cardBg }]} onPress={onPress} activeOpacity={0.85}>
+            <View style={styles.cardTopRow}>
+                <Ionicons name={icon} size={38} color={COLORS.purple} style={styles.cardIcon} />
+                <View style={styles.cardTitleWrap}>
+                    <Text style={styles.cardTitle}>Examen {exam.year}</Text>
+                    <Text style={styles.cardSubtitle}>{exam.questions} preguntas · {exam.minutes} min</Text>
                 </View>
             </View>
 
-            {/* Barra de progreso */}
-            <View style={styles.progressBlock}>
-                <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: `${progressPct}%`, backgroundColor: barColor }]} />
-                </View>
-                <View style={styles.progressLabel}>
-                    <Text style={styles.progressPct}>{progressPct}% completado</Text>
-                    <Text style={styles.progressCta}>{ctaLabel}</Text>
-                </View>
+            <View style={[styles.track, { backgroundColor: trackColor }]}>
+                <View style={[styles.trackFill, { width: `${exam.progress}%`, backgroundColor: fillColor }]} />
+            </View>
+
+            <View style={styles.cardBottomRow}>
+                <Text style={styles.cardStatus}>{exam.progress}% completado</Text>
+                <Text style={styles.cardAction}>{action}</Text>
             </View>
         </TouchableOpacity>
     );
@@ -117,139 +88,202 @@ export default function OfficialMocksScreen({ navigation }) {
         return () => { cancelled = true; };
     }, []);
 
-    const ListFooter = () => (
-        <TouchableOpacity
-            style={styles.surgicalBanner}
-            onPress={() => navigation.navigate('ErrorLab')}
-            activeOpacity={0.85}
-        >
-            <View style={styles.surgicalLeft}>
-                <Text style={styles.surgicalIcon}>✦</Text>
-                <View>
-                    <Text style={styles.surgicalTitle}>Iniciar test quirúrgico</Text>
-                    <Text style={styles.surgicalSub}>Haz clic en el botón para generar test de refuerzo</Text>
-                </View>
-            </View>
-            <View style={styles.surgicalPlay}>
-                <IconSurgical />
-            </View>
-        </TouchableOpacity>
-    );
-
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <SafeAreaView style={styles.safeArea}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
-            <TrainingHeader eyebrow="Simulacros" title="Exámenes oficiales" onBack={() => navigation.goBack()} onSettings={() => navigation.navigate('Settings')} />
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.nav}>
+                    <TouchableOpacity onPress={() => navigation.goBack()}>
+                        <Ionicons name="chevron-back" size={22} color={COLORS.purple} />
+                    </TouchableOpacity>
+                    <View style={styles.navTitleWrap}>
+                        <Text style={styles.navTitle}>Simulacros</Text>
+                        <Text style={styles.navSubtitle}>Exámenes oficiales</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+                        <Ionicons name="settings-outline" size={22} color={COLORS.purple} />
+                    </TouchableOpacity>
+                </View>
 
-            {loading ? (
-                <View style={styles.empty}>
-                    <ActivityIndicator color={colors.primary} />
-                </View>
-            ) : loadError ? (
-                <View style={styles.empty}>
-                    <Text style={styles.emptyText}>{loadError}</Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={mocks}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
-                        <MockCard
-                            item={item}
-                            onPress={() => navigation.navigate('MockInstructions', { exam: item })}
+                {loading ? (
+                    <View style={styles.empty}>
+                        <ActivityIndicator color={COLORS.orange} />
+                    </View>
+                ) : loadError ? (
+                    <View style={styles.empty}>
+                        <Text style={styles.emptyText}>{loadError}</Text>
+                    </View>
+                ) : mocks.length === 0 ? (
+                    <View style={styles.empty}>
+                        <Text style={styles.emptyText}>{EMPTY_COPY}</Text>
+                    </View>
+                ) : (
+                    mocks.map((exam) => (
+                        <ExamCard
+                            key={exam.id}
+                            exam={exam}
+                            onPress={() => navigation.navigate('MockInstructions', { exam })}
                         />
-                    )}
-                    contentContainerStyle={styles.list}
-                    showsVerticalScrollIndicator={false}
-                    ListFooterComponent={<ListFooter />}
-                    ListEmptyComponent={
-                        <View style={styles.empty}>
-                            <Text style={styles.emptyText}>{EMPTY_COPY}</Text>
+                    ))
+                )}
+
+                <TouchableOpacity
+                    style={styles.banner}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('ErrorLab')}
+                >
+                    <View style={styles.bannerTextWrap}>
+                        <View style={styles.bannerTitleRow}>
+                            <Ionicons name="sparkles" size={16} color={COLORS.white} style={{ marginRight: 6 }} />
+                            <Text style={styles.bannerTitle}>Iniciar test quirúrgico</Text>
                         </View>
-                    }
-                />
-            )}
+                        <Text style={styles.bannerSubtitle}>
+                            Haz clic en el botón para generar test de refuerzo
+                        </Text>
+                    </View>
+                    <View style={styles.playButton}>
+                        <Ionicons name="play" size={20} color={COLORS.white} />
+                    </View>
+                </TouchableOpacity>
+            </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.white },
-
-    list: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.lg },
-
-    card: {
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: 'rgba(65, 41, 80, 0.15)',
-        borderRadius: 14,
-        padding: spacing.md,
-        marginBottom: 12,
+    safeArea: {
+        flex: 1,
+        backgroundColor: COLORS.white,
     },
-    cardHighlighted: {
-        backgroundColor: '#F1F3F7',
-        borderColor: 'transparent',
+    scrollContent: {
+        paddingHorizontal: 25,
+        paddingTop: 20,
+        paddingBottom: 40,
     },
-    cardRow: {
+
+    // Header / NAV
+    nav: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 12,
+        justifyContent: 'space-between',
+        height: 44,
+        marginBottom: 20,
+    },
+    navTitleWrap: {
+        alignItems: 'center',
+    },
+    navTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 20,
+        color: COLORS.purple,
+        lineHeight: 24,
+    },
+    navSubtitle: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 20,
+        color: COLORS.purple,
+        lineHeight: 24,
+    },
+
+    // Card
+    card: {
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: COLORS.cardBorder,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        marginBottom: 14,
+    },
+    cardTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
     },
     cardIcon: {
+        marginRight: 12,
+    },
+    cardTitleWrap: {
+        alignItems: 'center',
+    },
+    cardTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 15,
+        color: COLORS.purple,
+    },
+    cardSubtitle: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 11,
+        color: COLORS.purple,
+        marginTop: 2,
+    },
+    track: {
+        height: 6,
+        borderRadius: 3,
+        overflow: 'hidden',
+        marginBottom: 8,
+    },
+    trackFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    cardBottomRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    cardStatus: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11,
+        color: COLORS.purple,
+    },
+    cardAction: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 12,
+        color: COLORS.purple,
+    },
+
+    // Banner
+    banner: {
+        backgroundColor: COLORS.purpleBanner,
+        borderRadius: 16,
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 6,
+    },
+    bannerTextWrap: {
+        flex: 1,
+        marginRight: 12,
+    },
+    bannerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    bannerTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: COLORS.white,
+    },
+    bannerSubtitle: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11,
+        color: COLORS.subtitleGray,
+        lineHeight: 15,
+    },
+    playButton: {
         width: 46,
         height: 46,
-        borderRadius: 12,
-        backgroundColor: colors.grayLight,
+        borderRadius: 23,
+        backgroundColor: COLORS.orange,
         alignItems: 'center',
         justifyContent: 'center',
-        flexShrink: 0,
-    },
-    cardMeta: { flex: 1 },
-    cardTitle: { fontSize: 15, fontFamily: 'Poppins-SemiBold', color: colors.textDark, marginBottom: 2 },
-    cardSubtitle: { fontSize: 12, fontFamily: 'Poppins-Light', color: colors.textDark },
-
-    progressBlock: { gap: 6 },
-    progressTrack: {
-        height: 7,
-        borderRadius: 4,
-        backgroundColor: '#FDE7D8',
-        overflow: 'hidden',
-    },
-    progressFill: { height: '100%', borderRadius: 4 },
-    progressLabel: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    progressPct: { fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.textDark },
-    progressCta: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: colors.textDark },
-
-    // Banner quirúrgico
-    surgicalBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: colors.purple,
-        borderRadius: 14,
-        padding: spacing.md,
-        marginTop: 4,
-    },
-    surgicalLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-    surgicalIcon: { color: '#FFD84A', fontSize: 16 },
-    surgicalTitle: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: colors.white },
-    surgicalSub: { fontSize: 11, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.70)', marginTop: 2 },
-    surgicalPlay: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
     },
 
     empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-    emptyText: { fontSize: 13, color: colors.textSecondary, marginTop: 12 },
+    emptyText: { fontSize: 13, fontFamily: 'Poppins-Regular', color: COLORS.purple, opacity: 0.6, textAlign: 'center' },
 });
