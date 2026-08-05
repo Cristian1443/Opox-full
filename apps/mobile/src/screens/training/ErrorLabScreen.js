@@ -1,104 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TrainingHeader from '../../components/TrainingHeader';
-import { colors, spacing } from '../../theme';
+import { colors } from '../../theme';
 import { trainingApi } from '../../api/training';
 
-function IconChevronRight({ color = colors.primary }) {
-    return (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M9 6l6 6-6 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
+const COLORS = {
+    purple: colors.textDark,
+    gray: colors.textMuted,
+    orange: colors.accentOrange,
+    orangeTrack: 'rgba(246,150,36,0.15)',
+    green: colors.ctaGreen,
+    white: colors.white,
+    border: 'rgba(65,41,80,0.3)',
+};
 
-function IconChevronDown({ color = colors.primary }) {
-    return (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M6 9l6 6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
+// ─── Item de debilidad con expansión propia ──────────────────────────────────
+function WeaknessItem({ item }) {
+    const [open, setOpen] = useState(false);
 
-function IconTarget({ color = colors.white }) {
     return (
-        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.7} />
-            <Circle cx={12} cy={12} r={5} stroke={color} strokeWidth={1.7} />
-            <Circle cx={12} cy={12} r={1.5} fill={color} />
-        </Svg>
+        <View style={styles.itemWrapper}>
+            <TouchableOpacity style={styles.itemHeader} onPress={() => setOpen((v) => !v)} activeOpacity={0.7}>
+                <Ionicons
+                    name={open ? 'chevron-down' : 'chevron-forward'}
+                    size={16}
+                    color={COLORS.orange}
+                    style={{ marginRight: 6 }}
+                />
+                <Text style={styles.itemTitle} numberOfLines={1}>{item.topic}</Text>
+                <Text style={styles.itemPct}>{item.domain}%</Text>
+            </TouchableOpacity>
+
+            {open && (
+                <View style={styles.expandedCard}>
+                    <View style={styles.warningRow}>
+                        <Ionicons name="close-circle" size={18} color={COLORS.orange} />
+                        <Text style={styles.warningText}>Patrón de fallo detectado</Text>
+                    </View>
+
+                    <Text style={styles.paragraph}>{item.description}</Text>
+                    <Text style={[styles.paragraph, { marginTop: 8 }]}>
+                        La IA ha preparado un test quirúrgico para eliminar esta debilidad.
+                    </Text>
+
+                    <View style={styles.dominioRow}>
+                        <Text style={styles.dominioLabel}>Dominio actual del tema:</Text>
+                        <Text style={styles.dominioValue}>{item.domain}%</Text>
+                    </View>
+                    <View style={styles.progressTrack}>
+                        <View style={[styles.progressFill, { width: `${item.domain}%` }]} />
+                    </View>
+                </View>
+            )}
+        </View>
     );
 }
 
 function IconTargetBig({ color = colors.grayMid }) {
     return (
-        <Svg width={48} height={48} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.5} />
-            <Circle cx={12} cy={12} r={5} stroke={color} strokeWidth={1.5} />
-            <Circle cx={12} cy={12} r={1.5} fill={color} />
-        </Svg>
-    );
-}
-
-function IconMicroscopeBig({ color = colors.primary }) {
-    return (
-        <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
-            <Path d="M7 21h10M12 21v-4" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
-            <Path d="M9 3h6v9H9z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
-            <Path d="M12 12v5" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
-            <Path d="M7 17a5 5 0 0 1 10 0" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
-            <Path d="M10 6h4" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-// ─── Item de debilidad con expansión ─────────────────────────────────────────
-function WeaknessItem({ item, expanded, onToggle, onStartSurgical }) {
-    return (
-        <View style={[styles.weaknessWrapper, expanded && styles.weaknessWrapperExpanded]}>
-            <TouchableOpacity
-                style={styles.weaknessRow}
-                onPress={onToggle}
-                activeOpacity={0.75}
-            >
-                <View style={styles.weaknessChevron}>
-                    {expanded ? <IconChevronDown /> : <IconChevronRight />}
-                </View>
-                <Text style={styles.weaknessTopic}>
-                    {item.topic}
-                </Text>
-                <Text style={styles.weaknessDomain}>{item.domain}%</Text>
-            </TouchableOpacity>
-
-            {expanded && (
-                <View style={styles.weaknessDetail}>
-                    {/* Patrón detectado */}
-                    <View style={styles.patternHeader}>
-                        <View style={styles.patternIcon}>
-                            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                                <Circle cx={12} cy={12} r={9} stroke={colors.error} strokeWidth={1.7} />
-                                <Path d="M8 8l8 8M16 8l-8 8" stroke={colors.error} strokeWidth={1.7} strokeLinecap="round" />
-                            </Svg>
-                        </View>
-                        <Text style={styles.patternTitle}>Patrón de fallo detectado</Text>
-                    </View>
-                    <Text style={styles.patternDesc}>{item.description}</Text>
-                    <Text style={styles.patternNote}>
-                        La IA ha preparado un test quirúrgico para eliminar esta debilidad.
-                    </Text>
-
-                    {/* Barra de dominio */}
-                    <Text style={styles.domainLabel}>Dominio actual del tema:</Text>
-                    <View style={styles.domainRow}>
-                        <View style={styles.progressTrack}>
-                            <View style={[styles.progressFill, { width: `${item.domain}%` }]} />
-                        </View>
-                        <Text style={styles.domainPct}>{item.domain}%</Text>
-                    </View>
-                </View>
-            )}
-        </View>
+        <Ionicons name="locate-outline" size={48} color={color} />
     );
 }
 
@@ -107,7 +68,6 @@ const MIN_QUESTIONS_FOR_PATTERNS = 30;
 export default function ErrorLabScreen({ navigation }) {
     const [patterns, setPatterns] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [expandedId, setExpandedId] = useState(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -139,14 +99,14 @@ export default function ErrorLabScreen({ navigation }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <SafeAreaView style={styles.safe}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
             <TrainingHeader title="Laboratorio de errores" onBack={() => navigation.goBack()} onSettings={() => navigation.navigate('Settings')} />
 
             {loading ? (
                 <View style={styles.emptyWrap}>
-                    <ActivityIndicator color={colors.error} />
+                    <ActivityIndicator color={COLORS.orange} />
                 </View>
             ) : patterns.length === 0 ? (
                 <View style={styles.emptyWrap}>
@@ -165,125 +125,175 @@ export default function ErrorLabScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
             ) : (
-                <>
-                    <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                        {/* Card hero: microscopio + título + descripción */}
-                        <View style={styles.hero}>
-                            <IconMicroscopeBig />
-                            <View style={styles.heroText}>
-                                <Text style={styles.heroTitle}>Laboratorio de errores</Text>
-                                <Text style={styles.heroSub}>
-                                    Repaso quirúrgico de fallos{'\n'}y puntos débiles
-                                </Text>
-                            </View>
+                <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <View style={styles.cabecera}>
+                        <View style={styles.iconBox}>
+                            <MaterialCommunityIcons name="microscope" size={30} color={COLORS.orange} />
                         </View>
-
-                        <Text style={styles.groupTitle}>DEBILIDADES</Text>
-
-                        {patterns.map((item) => (
-                            <WeaknessItem
-                                key={item.id}
-                                item={item}
-                                expanded={expandedId === item.id}
-                                onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                                onStartSurgical={() => navigation.navigate('SurgicalTestPreview', {
-                                    topicId: item.topicId,
-                                    topic: item.topic,
-                                    domain: item.domain,
-                                })}
-                            />
-                        ))}
-
-                        <View style={{ height: 100 }} />
-                    </ScrollView>
-
-                    <View style={styles.btnRow}>
-                        <TouchableOpacity style={styles.btn} onPress={startSurgical} activeOpacity={0.85}>
-                            <IconTarget />
-                            <Text style={styles.btnText}>Iniciar test quirúrgico</Text>
-                        </TouchableOpacity>
+                        <View style={styles.cabeceraTextBox}>
+                            <Text style={styles.cabeceraTitle}>Laboratorio de errores</Text>
+                            <Text style={styles.cabeceraSubtitle}>
+                                Repaso quirúrgico de fallos y puntos débiles
+                            </Text>
+                        </View>
                     </View>
-                </>
+
+                    <Text style={styles.sectionLabel}>DEBILIDADES</Text>
+
+                    {patterns.map((item) => (
+                        <WeaknessItem key={item.id} item={item} />
+                    ))}
+
+                    <TouchableOpacity style={styles.boton} activeOpacity={0.85} onPress={startSurgical}>
+                        <Text style={styles.botonText}>Iniciar test quirúrgico</Text>
+                    </TouchableOpacity>
+                </ScrollView>
             )}
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.white },
+    safe: { flex: 1, backgroundColor: COLORS.white },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
+    scrollContent: { paddingBottom: 40 },
 
-    groupTitle: {
-        fontSize: 16,
-        fontFamily: 'Poppins-SemiBold',
-        color: colors.textDark,
-        marginBottom: spacing.sm,
-        marginTop: spacing.md,
-    },
-
-    hero: {
+    cabecera: {
+        marginHorizontal: 25,
+        marginTop: 18,
+        minHeight: 111,
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
-        backgroundColor: '#F1F3F7',
-        borderRadius: 14,
-        paddingVertical: 14,
-        paddingHorizontal: 14,
-        marginTop: 4,
+        padding: 16,
     },
-    heroText: { flex: 1 },
-    heroTitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: colors.textDark, marginBottom: 3 },
-    heroSub: { fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.textMuted, opacity: 0.6, lineHeight: 16 },
-
-    // ── Fila de debilidad ─────────────────────────────
-    weaknessWrapper: {
-        borderRadius: 12,
+    iconBox: {
+        width: 62,
+        height: 62,
+        borderRadius: 14,
+        backgroundColor: 'rgba(246,150,36,0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 14,
+    },
+    cabeceraTextBox: { flex: 1 },
+    cabeceraTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 18,
+        color: COLORS.purple,
         marginBottom: 4,
     },
-    weaknessWrapperExpanded: {
-        backgroundColor: colors.white,
+    cabeceraSubtitle: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        lineHeight: 17,
+        color: COLORS.gray,
+        opacity: 0.6,
+    },
+
+    sectionLabel: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: COLORS.purple,
+        marginHorizontal: 25,
+        marginTop: 24,
+        marginBottom: 10,
+    },
+
+    itemWrapper: {
+        marginHorizontal: 25,
+        marginBottom: 10,
+    },
+    itemHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    itemTitle: {
+        flex: 1,
+        fontFamily: 'Poppins-Medium',
+        fontSize: 14,
+        color: COLORS.purple,
+    },
+    itemPct: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 14,
+        color: COLORS.purple,
+    },
+
+    expandedCard: {
         borderWidth: 1,
-        borderColor: 'rgba(65, 41, 80, 0.15)',
+        borderColor: COLORS.border,
+        borderRadius: 12,
+        padding: 16,
+        marginTop: -1,
+    },
+    warningRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginBottom: 8,
     },
-    weaknessRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 14,
+    warningText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 14,
+        color: COLORS.purple,
+        marginLeft: 6,
     },
-    weaknessChevron: { marginRight: 8, width: 18 },
-    weaknessTopic: { flex: 1, fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.textDark },
-    weaknessDomain: { fontSize: 14, fontFamily: 'Poppins-Light', color: colors.textDark },
+    paragraph: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 13,
+        lineHeight: 18,
+        color: COLORS.purple,
+    },
+    dominioRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        marginTop: 16,
+        marginBottom: 6,
+    },
+    dominioLabel: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: COLORS.purple,
+    },
+    dominioValue: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 16,
+        color: COLORS.purple,
+    },
+    progressTrack: {
+        height: 11,
+        borderRadius: 6,
+        backgroundColor: COLORS.orangeTrack,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 6,
+        backgroundColor: COLORS.orange,
+    },
 
-    // ── Detalle expandido ─────────────────────────────
-    weaknessDetail: {
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.md,
-    },
-    patternHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: spacing.sm,
-    },
-    patternIcon: {
-        width: 28,
-        height: 28,
+    boton: {
+        marginHorizontal: 37,
+        marginTop: 24,
+        height: 57,
         borderRadius: 14,
-        backgroundColor: colors.errorBg,
+        backgroundColor: COLORS.green,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    patternTitle: { fontSize: 13, fontFamily: 'Poppins-Regular', color: colors.textDark },
-    patternDesc: { fontSize: 13, fontFamily: 'Poppins-Light', color: colors.textDark, lineHeight: 19, marginBottom: 6 },
-    patternNote: { fontSize: 13, fontFamily: 'Poppins-Light', color: colors.textDark, lineHeight: 17, marginBottom: spacing.sm },
-    domainLabel: { fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.textDark, marginBottom: 6 },
-    domainRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    progressTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: '#FDE7D8', overflow: 'hidden' },
-    progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.primary },
-    domainPct: { fontSize: 15, fontFamily: 'Poppins-Light', color: colors.textDark },
+    botonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: COLORS.white,
+    },
 
     // ── Empty state ──────────────────────────────────
     emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
@@ -291,26 +301,4 @@ const styles = StyleSheet.create({
     emptyDesc: { fontSize: 12.5, fontFamily: 'Poppins-Regular', color: colors.textMuted, opacity: 0.6, textAlign: 'center', lineHeight: 18, marginBottom: 20 },
     emptyBtn: { backgroundColor: colors.ctaGreen, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12 },
     emptyBtnText: { color: colors.white, fontSize: 13.5, fontFamily: 'Poppins-SemiBold' },
-
-    // ── CTA fijo ────────────────────────────────────
-    btnRow: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.lg,
-        paddingTop: spacing.sm,
-        backgroundColor: colors.white,
-    },
-    btn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        backgroundColor: colors.ctaGreen,
-        borderRadius: 14,
-        paddingVertical: spacing.md,
-    },
-    btnText: { color: colors.white, fontSize: 16, fontFamily: 'Poppins-SemiBold' },
 });
