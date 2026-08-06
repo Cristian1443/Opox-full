@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-import { colors } from '../theme';
+import React from 'react';
+import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import AlertCardModal from './AlertCardModal';
 
 // ─── Estado "Test generado" (6.5 · ok) ───────────────────────────────────────
 // Modal de éxito centrado que celebra que la IA ha terminado de generar el
@@ -11,16 +11,6 @@ import { colors } from '../theme';
 // - onStart: acción primaria, ir al test (Bloque 7).
 // - onDismiss: se llama al pulsar fuera o hardware-back. Permite al usuario
 //   ver el contenido subyacente (flashcard, guardar mazo, etc.) sin abandonar.
-
-// Figma ("TEST GENERADO" 2324:138): check gris claro, sin círculo de color.
-function IconCheck({ color = '#D0D5DD' }) {
-    return (
-        <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
-            <Path d="M5 12.5l4.5 4.5L19 7" stroke={color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
 export default function TestReadyModal({
     visible,
     onStart,
@@ -29,108 +19,19 @@ export default function TestReadyModal({
     title = '¡Test listo!',
     ctaLabel = 'Empezar test',
 }) {
-    const fade = useRef(new Animated.Value(0)).current;
-    const scale = useRef(new Animated.Value(0.85)).current;
-
-    useEffect(() => {
-        if (visible) {
-            Animated.parallel([
-                Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
-                Animated.spring(scale, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
-            ]).start();
-        } else {
-            fade.setValue(0);
-            scale.setValue(0.85);
-        }
-    }, [visible]);
-
     return (
-        <Modal
-            transparent
+        <AlertCardModal
             visible={visible}
-            animationType="fade"
-            statusBarTranslucent
-            onRequestClose={onDismiss}
-        >
-            <Animated.View style={[styles.overlay, { opacity: fade }]}>
-                <TouchableOpacity
-                    style={StyleSheet.absoluteFill}
-                    activeOpacity={1}
-                    onPress={onDismiss}
-                />
-                <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-                    <View style={styles.iconWrap}>
-                        <IconCheck />
-                    </View>
-
-                    <Text style={styles.title}>{title}</Text>
-                    <Text style={styles.message}>
-                        Hemos creado <Text style={styles.highlight}>{questionCount} preguntas</Text> a partir de tu apunte.
-                    </Text>
-
-                    <TouchableOpacity style={styles.btn} onPress={onStart} activeOpacity={0.85}>
-                        <Text style={styles.btnText}>{ctaLabel}</Text>
-                    </TouchableOpacity>
-                </Animated.View>
-            </Animated.View>
-        </Modal>
+            icon={<Ionicons name="checkmark" size={40} color="#B9B9B9" />}
+            title={title}
+            description={
+                <Text style={{ fontFamily: 'Poppins-Light', fontSize: 14, lineHeight: 19, color: '#412950', textAlign: 'center', marginBottom: 20 }}>
+                    Hemos creado <Text style={{ fontFamily: 'Poppins-SemiBold' }}>{questionCount} preguntas</Text> a partir de tu apunte.
+                </Text>
+            }
+            primaryLabel={ctaLabel}
+            onPrimaryPress={onStart}
+            onSecondaryPress={onDismiss}
+        />
     );
 }
-
-const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: 'rgba(15, 27, 51, 0.55)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 32,
-    },
-    card: {
-        width: '100%',
-        maxWidth: 320,
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        paddingHorizontal: 22,
-        paddingTop: 24,
-        paddingBottom: 20,
-        alignItems: 'center',
-        shadowColor: '#0F1B33',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.2,
-        shadowRadius: 24,
-        elevation: 16,
-    },
-    iconWrap: {
-        width: 66,
-        height: 66,
-        borderRadius: 33,
-        backgroundColor: '#F1F3F7',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 14,
-    },
-    title: {
-        fontSize: 19,
-        fontFamily: 'Poppins-SemiBold',
-        color: colors.textDark,
-        marginBottom: 6,
-        textAlign: 'center',
-    },
-    message: {
-        fontSize: 13,
-        fontFamily: 'Poppins-Light',
-        color: colors.textDark,
-        textAlign: 'center',
-        lineHeight: 19,
-        marginBottom: 20,
-    },
-    highlight: { fontFamily: 'Poppins-Bold' },
-    btn: {
-        backgroundColor: colors.ctaGreen,
-        borderRadius: 12,
-        paddingVertical: 13,
-        alignItems: 'center',
-        width: '100%',
-    },
-    btnText: { color: '#fff', fontSize: 14, fontFamily: 'Poppins-SemiBold' },
-});

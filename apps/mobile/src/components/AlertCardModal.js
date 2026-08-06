@@ -7,7 +7,8 @@ import { colors } from '../theme';
 // enlace secundario opcional debajo. Igual patrón visual que TestReadyModal.
 export default function AlertCardModal({
     visible,
-    iconBg = '#F1F3F7',
+    iconBg = '#E8E8E8',
+    iconSize = 74,
     icon,
     title,
     description,
@@ -51,7 +52,17 @@ export default function AlertCardModal({
                 />
                 <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
                     {icon ? (
-                        <View style={[styles.iconBox, iconBg && { backgroundColor: iconBg }]}>
+                        <View
+                            style={[
+                                styles.iconBox,
+                                {
+                                    width: iconSize,
+                                    height: iconSize,
+                                    borderRadius: iconSize / 2,
+                                    backgroundColor: iconBg,
+                                },
+                            ]}
+                        >
                             {icon}
                         </View>
                     ) : null}
@@ -97,52 +108,45 @@ export default function AlertCardModal({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(15, 27, 51, 0.55)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 32,
+        paddingHorizontal: 25,
     },
     card: {
         width: '100%',
-        maxWidth: 320,
+        maxWidth: 325,
         backgroundColor: '#FFFFFF',
         borderRadius: 20,
-        paddingHorizontal: 22,
-        paddingTop: 24,
-        paddingBottom: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.3)',
+        paddingVertical: 28,
+        paddingHorizontal: 24,
         alignItems: 'center',
-        shadowColor: '#0F1B33',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.2,
-        shadowRadius: 24,
-        elevation: 16,
     },
     iconBox: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 14,
+        marginBottom: 12,
     },
     title: {
-        fontSize: 19,
+        fontSize: 18,
         fontFamily: 'Poppins-SemiBold',
         color: colors.textDark,
-        marginBottom: 6,
         textAlign: 'center',
+        marginBottom: 10,
     },
     description: {
-        fontSize: 13,
+        fontSize: 14,
         fontFamily: 'Poppins-Light',
         color: colors.textDark,
         textAlign: 'center',
         lineHeight: 19,
-        marginBottom: 18,
+        marginBottom: 20,
     },
     descriptionNode: {
         width: '100%',
-        marginBottom: 18,
+        marginBottom: 20,
     },
     extraContent: {
         width: '100%',
@@ -150,23 +154,24 @@ const styles = StyleSheet.create({
     },
     btnPrimary: {
         backgroundColor: colors.ctaGreen,
-        borderRadius: 12,
-        paddingVertical: 13,
+        borderRadius: 14,
+        height: 57,
         alignItems: 'center',
+        justifyContent: 'center',
         width: '100%',
     },
     btnPrimaryText: {
         color: '#FFFFFF',
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: 'Poppins-SemiBold',
     },
     btnLink: {
-        paddingVertical: 10,
-        marginTop: 4,
+        paddingVertical: 6,
+        marginTop: 14,
     },
     btnLinkText: {
         color: colors.textDark,
-        fontSize: 13,
+        fontSize: 14,
         fontFamily: 'Poppins-Light',
     },
 });
