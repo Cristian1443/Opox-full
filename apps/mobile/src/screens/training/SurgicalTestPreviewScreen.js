@@ -1,56 +1,28 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Animated, ActivityIndicator, Alert } from 'react-native';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import TrainingHeader from '../../components/TrainingHeader';
-import { colors, spacing } from '../../theme';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ScrollView, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors } from '../../theme';
 import { api, trainingApi } from '../../api';
 import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
-// Punto naranja para bullets
-function Bullet() {
-    return (
-        <Svg width={10} height={10} viewBox="0 0 10 10">
-            <Circle cx={5} cy={5} r={4} fill={colors.primary} />
-        </Svg>
-    );
-}
+// ------------------------------------------------------------------
+// Escalado proporcional 1:1 respecto al frame original de Figma
+// (905px de ancho).
+// ------------------------------------------------------------------
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const DESIGN_WIDTH = 905;
+const scale = (value) => (SCREEN_WIDTH / DESIGN_WIDTH) * value;
 
-// Ilustración: clipboard con checks + diana verde + chispas moradas
-function IllustrationSurgical() {
-    return (
-        <Svg width={130} height={130} viewBox="0 0 130 130" fill="none">
-            {/* Chispas moradas */}
-            <Path d="M18 22 l0 8 M14 26 l8 0" stroke={colors.purple} strokeWidth={2.2} strokeLinecap="round" />
-            <Path d="M112 30 l0 6 M109 33 l6 0" stroke={colors.purple} strokeWidth={2} strokeLinecap="round" />
-            <Circle cx={110} cy={90} r={2.5} fill={colors.purple} />
-            <Circle cx={22} cy={98} r={2} fill={colors.purple} />
-
-            {/* Clipboard */}
-            <Rect x={30} y={30} width={54} height={70} rx={6} stroke={colors.textDark} strokeWidth={2} fill="#FFFFFF" />
-            <Rect x={44} y={24} width={26} height={12} rx={3} stroke={colors.textDark} strokeWidth={2} fill="#FFFFFF" />
-
-            {/* Checks verdes */}
-            <Path d="M40 50 l3 3 l6 -6" stroke={colors.success} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M56 50 h20" stroke={colors.textDark} strokeWidth={2} strokeLinecap="round" />
-            <Path d="M40 64 l3 3 l6 -6" stroke={colors.success} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M56 64 h20" stroke={colors.textDark} strokeWidth={2} strokeLinecap="round" />
-            <Path d="M40 78 l3 3 l6 -6" stroke={colors.success} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M56 78 h16" stroke={colors.textDark} strokeWidth={2} strokeLinecap="round" />
-
-            {/* Diana verde con check */}
-            <Circle cx={95} cy={72} r={20} fill="#DCFCE7" stroke={colors.success} strokeWidth={2.5} />
-            <Circle cx={95} cy={72} r={12} fill="#FFFFFF" stroke={colors.success} strokeWidth={2} />
-            <Circle cx={95} cy={72} r={5} fill={colors.success} />
-            <Path d="M91 72 l3 3 l7 -7" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
+const COLORS = {
+    primary: colors.textDark,
+    green: colors.ctaGreen,
+    orange: colors.accentOrange,
+    purple: colors.selectionBorder, // #9F6EE4
+    white: colors.white,
+};
 
 // ─── Pantalla 6.9 · Test Quirúrgico · Preview ────────────────────────────────
 export default function SurgicalTestPreviewScreen({ navigation, route }) {
-    const params = route.params ?? {};
-    const topic = params.topic ?? 'Plazos y recursos';
-
     const subtopics = [
         { id: 'plazos', label: 'Plazos administrativos', count: 8 },
         { id: 'recursos', label: 'Recursos', count: 7 },
@@ -58,11 +30,6 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
     const total = subtopics.reduce((acc, s) => acc + s.count, 0);
 
     const [generating, setGenerating] = useState(false);
-
-    const fade = useRef(new Animated.Value(0)).current;
-    useEffect(() => {
-        Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-    }, []);
 
     const startTest = async () => {
         if (generating) return;
@@ -94,118 +61,196 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
-            <TrainingHeader title="Test quirúrgico" onBack={() => navigation.goBack()} onSettings={() => navigation.navigate('Settings')} />
+            {/* NAV */}
+            <View style={styles.nav}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navButton}>
+                    <Ionicons name="chevron-back" size={scale(28)} color={COLORS.primary} />
+                </TouchableOpacity>
+                <Text style={styles.navTitle}>Test quirúrgico</Text>
+                <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('Settings')}>
+                    <Ionicons name="settings-outline" size={scale(26)} color={COLORS.primary} />
+                </TouchableOpacity>
+            </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                <Animated.View style={{ opacity: fade }}>
-                    <View style={styles.illustration}>
-                        <IllustrationSurgical />
+                {/* Ilustración */}
+                <View style={styles.iconWrapper}>
+                    <MaterialCommunityIcons name="clipboard-check-outline" size={scale(140)} color={COLORS.primary} />
+                    <View style={styles.targetBadge}>
+                        <MaterialCommunityIcons name="target" size={scale(60)} color={COLORS.green} />
                     </View>
+                </View>
 
-                    <Text style={styles.heroTitle}>Test de refuerzo a medida</Text>
-                    <Text style={styles.heroSub}>{total} preguntas centradas en tus fallos</Text>
+                {/* Título + subtítulo */}
+                <View style={styles.titleBlock}>
+                    <Text style={styles.title}>Test de refuerzo a medida</Text>
+                    <Text style={styles.subtitle}>{total} preguntas centradas en tus fallos</Text>
+                </View>
 
-                    <Text style={styles.groupTitle}>QUÉ INCLUYE</Text>
+                {/* QUÉ INCLUYE */}
+                <Text style={styles.sectionHeader}>QUÉ INCLUYE</Text>
 
+                <View style={styles.list}>
                     {subtopics.map((s) => (
-                        <View key={s.id} style={styles.bulletItem}>
-                            <Bullet />
-                            <Text style={styles.bulletText}>
-                                {s.label}{' · '}{s.count} preguntas
-                            </Text>
+                        <View key={s.id} style={styles.listRow}>
+                            <View style={styles.bullet} />
+                            <Text style={styles.listText}>{s.label} · {s.count} preguntas</Text>
                         </View>
                     ))}
+                </View>
 
-                    <TouchableOpacity
-                        style={[styles.btn, generating && { opacity: 0.7 }]}
-                        onPress={startTest}
-                        activeOpacity={0.85}
-                        disabled={generating}
-                    >
-                        {generating ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <ActivityIndicator color="#fff" size="small" />
-                                <Text style={styles.btnText}>Generando preguntas…</Text>
-                            </View>
-                        ) : (
-                            <Text style={styles.btnText}>Empezar</Text>
-                        )}
-                    </TouchableOpacity>
+                {/* Botón */}
+                <TouchableOpacity
+                    style={[styles.button, generating && { opacity: 0.7 }]}
+                    activeOpacity={0.85}
+                    onPress={startTest}
+                    disabled={generating}
+                >
+                    {generating ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <ActivityIndicator color={COLORS.white} size="small" />
+                            <Text style={styles.buttonText}>Generando preguntas…</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.buttonText}>Empezar</Text>
+                    )}
+                </TouchableOpacity>
 
-                    <View style={styles.aiChip}>
-                        <Text style={styles.aiChipText}>
-                            Tras este test, la IA volverá a medir tu dominio del tema para ver si has mejorado.
-                        </Text>
-                    </View>
-                </Animated.View>
+                {/* Caja destacada */}
+                <View style={styles.highlightBox}>
+                    <Text style={styles.highlightText}>
+                        Tras este test, la IA volverá a medir tu dominio del tema para ver si has mejorado.
+                    </Text>
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.white },
+    container: { flex: 1, backgroundColor: COLORS.white },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+    body: { paddingBottom: scale(60) },
 
-    illustration: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: spacing.md,
-        marginBottom: spacing.sm,
-    },
-    heroTitle: {
-        fontSize: 20,
-        fontFamily: 'Poppins-SemiBold',
-        color: colors.textDark,
-        textAlign: 'center',
-        marginBottom: 4,
-    },
-    heroSub: {
-        fontSize: 12,
-        fontFamily: 'Poppins-Regular',
-        color: colors.textDark,
-        textAlign: 'center',
-        marginBottom: spacing.lg,
-    },
-
-    groupTitle: {
-        fontSize: 16,
-        fontFamily: 'Poppins-SemiBold',
-        color: colors.textDark,
-        marginBottom: spacing.md,
-        marginTop: spacing.sm,
-    },
-    bulletItem: {
+    nav: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 10,
+        justifyContent: 'space-between',
+        marginHorizontal: scale(56),
+        height: scale(54.03),
     },
-    bulletText: { fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.textDark },
-
-    btn: {
-        backgroundColor: colors.ctaGreen,
-        borderRadius: 14,
-        paddingVertical: spacing.md,
+    navButton: {
+        width: scale(54),
+        height: scale(54),
         alignItems: 'center',
-        marginTop: spacing.lg,
+        justifyContent: 'center',
     },
-    btnText: { color: '#fff', fontSize: 16, fontFamily: 'Poppins-SemiBold' },
-
-    aiChip: {
-        backgroundColor: colors.purple,
-        borderRadius: 12,
-        padding: 12,
-        marginTop: spacing.md,
-    },
-    aiChipText: {
-        fontSize: 12,
-        color: colors.white,
-        fontFamily: 'Poppins-Regular',
+    navTitle: {
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: scale(48),
+        color: COLORS.primary,
         textAlign: 'center',
-        lineHeight: 17,
+    },
+
+    iconWrapper: {
+        marginTop: scale(40),
+        alignSelf: 'center',
+        width: scale(422.34),
+        height: scale(200),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    targetBadge: {
+        position: 'absolute',
+        bottom: scale(10),
+        right: scale(70),
+        backgroundColor: COLORS.white,
+        borderRadius: scale(40),
+    },
+
+    titleBlock: {
+        width: scale(640),
+        alignSelf: 'center',
+        alignItems: 'center',
+        marginTop: scale(10),
+    },
+    title: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: scale(48),
+        color: COLORS.primary,
+        textAlign: 'center',
+    },
+    subtitle: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: scale(20),
+        color: COLORS.primary,
+        textAlign: 'center',
+        marginTop: scale(4),
+    },
+
+    sectionHeader: {
+        marginLeft: scale(61),
+        marginTop: scale(40),
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: scale(36),
+        color: COLORS.primary,
+    },
+    list: {
+        marginTop: scale(20),
+        marginLeft: scale(61),
+    },
+    listRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: scale(50),
+    },
+    bullet: {
+        width: scale(17),
+        height: scale(17),
+        borderRadius: scale(4),
+        backgroundColor: COLORS.orange,
+        marginRight: scale(20),
+    },
+    listText: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: scale(31),
+        color: COLORS.primary,
+    },
+
+    button: {
+        width: scale(725),
+        height: scale(138),
+        borderRadius: scale(32),
+        backgroundColor: COLORS.green,
+        alignSelf: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: scale(30),
+    },
+    buttonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: scale(36),
+        color: COLORS.white,
+    },
+
+    highlightBox: {
+        width: scale(560.76),
+        minHeight: scale(185.35),
+        borderRadius: scale(20),
+        backgroundColor: COLORS.purple,
+        opacity: 0.75,
+        alignSelf: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: scale(30),
+        marginTop: scale(17),
+    },
+    highlightText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: scale(26),
+        color: COLORS.white,
+        textAlign: 'center',
     },
 });
