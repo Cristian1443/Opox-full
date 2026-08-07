@@ -114,6 +114,7 @@ import {
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
+    MotorBoeClient,
 } from './infrastructure';
 import {
     AuthController,
@@ -200,6 +201,22 @@ export function buildContainer() {
         logger.warn(
             '[container] IA no configurada — usando AiApiClientStub con datos mock. ' +
             'Rellena AI_API_BASE_URL / AI_API_KEY / AI_API_DEFAULT_MODEL en .env para usar IA real.',
+        );
+    }
+
+    const motorBoe = env.MOTOR_BOE_BASE_URL
+        ? new MotorBoeClient({
+            baseUrl: env.MOTOR_BOE_BASE_URL,
+            apiKey: env.MOTOR_BOE_API_KEY ?? '',
+            openAiKey: env.MOTOR_BOE_OPENAI_KEY ?? env.AI_API_KEY ?? '',
+            timeoutMs: 20_000,
+        })
+        : null;
+
+    if (!env.MOTOR_BOE_BASE_URL) {
+        logger.warn(
+            '[container] Motor BOE no configurado — MotorBoeClient desactivado. ' +
+            'Rellena MOTOR_BOE_BASE_URL en .env para activar la sincronización automática de cambios.',
         );
     }
 
@@ -425,6 +442,7 @@ export function buildContainer() {
         trainingRepo,
         clientApi,
         aiApi,
+        motorBoe,
         useCases,
         controllers: {
             auth: authController,
