@@ -5,10 +5,10 @@ import {
     TouchableOpacity,
     StyleSheet,
     Dimensions,
-    SafeAreaView,
     StatusBar,
     ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../theme';

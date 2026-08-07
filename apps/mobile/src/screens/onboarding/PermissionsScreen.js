@@ -4,12 +4,12 @@ import {
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     StatusBar,
     ScrollView,
     Modal,
     Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 

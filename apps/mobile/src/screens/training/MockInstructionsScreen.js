@@ -5,12 +5,12 @@ import {
     TouchableOpacity,
     StyleSheet,
     Dimensions,
-    SafeAreaView,
     StatusBar,
     ScrollView,
     ActivityIndicator,
     Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { trainingApi } from '../../api';

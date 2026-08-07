@@ -5,9 +5,9 @@ import {
     Image,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../../theme';
 
 export default function LevelTestProposalScreen({ navigation }) {

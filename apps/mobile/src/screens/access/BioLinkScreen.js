@@ -4,10 +4,10 @@ import {
     Text,
     View,
     TouchableOpacity,
-    SafeAreaView,
     ActivityIndicator,
     StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { detectBiometricType, biometricLabel, setupBiometric } from '../../lib/biometric';
