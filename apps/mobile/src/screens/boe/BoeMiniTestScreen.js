@@ -9,7 +9,7 @@ import {
     Animated,
     Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
@@ -80,6 +80,7 @@ const MOCK_QUESTIONS_BY_ITEM = {
 export default function BoeMiniTestScreen({ route, navigation }) {
     const { itemId = '1', title } = route.params ?? {};
     const mockQuestions = MOCK_QUESTIONS_BY_ITEM[itemId] ?? MOCK_QUESTIONS_BY_ITEM.default;
+    const insets = useSafeAreaInsets();
 
     const [apiQuestions, setApiQuestions] = useState(null);
 
@@ -296,7 +297,7 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                 </ScrollView>
 
                 {/* Botón de acción fijo al fondo */}
-                <View style={styles.actionArea}>
+                <View style={[styles.actionArea, { paddingBottom: spacing.md + 4 + insets.bottom }]}>
                     {!isSubmitted ? (
                         <TouchableOpacity
                             style={[styles.confirmBtn, !selectedOption && styles.confirmBtnDisabled]}

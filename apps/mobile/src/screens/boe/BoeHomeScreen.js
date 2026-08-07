@@ -20,11 +20,6 @@ function changeTypeToFeedType(ct) {
     return 'info';
 }
 
-function formatDetectedAt(iso) {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-}
-
 // ─── Tokens de color Bloque 10 · Monitor BOE ──────────────────────────────────
 // Acento rojo alineado con el nudge BOE del Dashboard (NUDGE_VISUALS.boe → #E2483D).
 const BOE_ACCENT = '#E2483D';
@@ -72,7 +67,6 @@ const MOCK_FEED = {
                     type: 'critical',
                     title: 'Modificación del art. 14 · Ley 39/2015',
                     description: 'Cambia la obligación de relación electrónica para ciertos colectivos.',
-                    time: '10:41',
                     read: false,
                 },
             ],
@@ -85,7 +79,6 @@ const MOCK_FEED = {
                     type: 'info',
                     title: 'Nueva instrucción · Registro electrónico',
                     description: 'Afecta a los plazos de presentación telemática.',
-                    time: '14:30',
                     read: false,
                 },
             ],
@@ -98,7 +91,6 @@ const MOCK_FEED = {
                     type: 'review',
                     title: 'Corrección de errores · Ley 40/2015',
                     description: 'Ajuste menor de redacción, sin impacto en el test.',
-                    time: '09:15',
                     read: true,
                 },
             ],
@@ -113,7 +105,6 @@ const MOCK_FEED = {
                     type: 'info',
                     title: 'RD 203/2021 — Reglamento LPACAP',
                     description: 'Nuevo reglamento de desarrollo de la Ley 39/2015.',
-                    time: '11:00',
                     read: false,
                 },
             ],
@@ -147,7 +138,6 @@ export default function BoeHomeScreen({ navigation }) {
                             description: c.affectedQuestionsCount > 0
                                 ? `${c.affectedQuestionsCount} pregunta${c.affectedQuestionsCount > 1 ? 's' : ''} afectada${c.affectedQuestionsCount > 1 ? 's' : ''}.`
                                 : 'Cambio detectado en tu temario.',
-                            time: formatDetectedAt(c.detectedAt),
                             read: c.isRead,
                         })),
                     }));
@@ -376,9 +366,8 @@ export default function BoeHomeScreen({ navigation }) {
                                                 {item.description}
                                             </Text>
 
-                                            {/* Footer: hora + chip (View — la card padre ya navega) */}
+                                            {/* Footer: chip (View — la card padre ya navega) */}
                                             <View style={styles.cardFooter}>
-                                                <Text style={styles.cardTime}>{item.time}</Text>
                                                 <View style={[styles.actionChip, { backgroundColor: cfg.badgeBg }]}>
                                                     <Text style={[styles.actionChipText, { color: cfg.badgeColor }]}>
                                                         {cfg.actionLabel}
@@ -567,11 +556,7 @@ const styles = StyleSheet.create({
     cardFooter: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    cardTime: {
-        fontSize: 11,
-        color: colors.textSecondary,
+        justifyContent: 'flex-end',
     },
     actionChip: {
         paddingHorizontal: 12,
