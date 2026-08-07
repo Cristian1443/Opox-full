@@ -73,27 +73,62 @@ export class AiApiClient implements AiApiContract {
     }
 
     // ─── generateQuestions ────────────────────────────────────────────────────
+    // El modelo no siempre respeta el "genera exactamente N" del prompt (más
+    // notorio cuanto mayor es N). Por eso validamos el conteo y, si se queda
+    // corto, pedimos las que faltan en rondas adicionales en vez de devolver
+    // silenciosamente menos preguntas de las solicitadas.
+    private static readonly GENERATE_QUESTIONS_MAX_ROUNDS = 3;
+
     async generateQuestions(params: GenerateQuestionsParams): Promise<GeneratedQuestion[]> {
         logger.info('[ai-openai] generateQuestions', { count: params.count, difficulty: params.difficulty, topicId: params.topicId });
 
         const systemPrompt = QUESTIONS_SYSTEM_PROMPT;
-        const userPrompt = renderQuestionsUserPrompt(params);
+        // ~220 tokens/pregunta (texto + 4 opciones + explicación) con margen.
+        const maxTokens = Math.min(16000, 400 + params.count * 220);
 
-        const raw = await this.chatJson({
-            model: this.textModel,
-            system: systemPrompt,
-            user: userPrompt,
-            maxTokens: 4096,
-        });
+        const collected: GeneratedQuestion[] = [];
+        const seenTexts = new Set<string>();
 
-        // Aceptamos { questions: [...] } o directamente [...] (los modelos varían).
-        const parsed = questionsResponseSchema.safeParse(raw);
-        if (!parsed.success) {
-            throw new Error(`[AiApiClient] generateQuestions: respuesta OpenAI malformada — ${parsed.error.message}`);
+        for (
+            let round = 1;
+            round <= AiApiClient.GENERATE_QUESTIONS_MAX_ROUNDS && collected.length < params.count;
+            round++
+        ) {
+            const remaining = params.count - collected.length;
+            const userPrompt = renderQuestionsUserPrompt({ ...params, count: remaining });
+
+            const raw = await this.chatJson({
+                model: this.textModel,
+                system: systemPrompt,
+                user: userPrompt,
+                maxTokens,
+            });
+
+            // Aceptamos { questions: [...] } o directamente [...] (los modelos varían).
+            const parsed = questionsResponseSchema.safeParse(raw);
+            if (!parsed.success) {
+                if (collected.length > 0) break; // nos quedamos con lo ya obtenido
+                throw new Error(`[AiApiClient] generateQuestions: respuesta OpenAI malformada — ${parsed.error.message}`);
+            }
+            const arr = Array.isArray(parsed.data) ? parsed.data : parsed.data.questions;
+            if (arr.length === 0) break; // el modelo no tiene más que ofrecer
+
+            for (const q of arr) {
+                if (seenTexts.has(q.text)) continue;
+                seenTexts.add(q.text);
+                collected.push(normalizeQuestion(q, params.topicId, params.difficulty));
+                if (collected.length === params.count) break;
+            }
         }
-        const arr = Array.isArray(parsed.data) ? parsed.data : parsed.data.questions;
 
-        return arr.map((q) => normalizeQuestion(q, params.topicId, params.difficulty));
+        if (collected.length < params.count) {
+            logger.warn('[ai-openai] generateQuestions: entregando menos preguntas de las pedidas', {
+                requested: params.count,
+                got: collected.length,
+            });
+        }
+
+        return collected;
     }
 
     // ─── analyzePhoto ─────────────────────────────────────────────────────────
