@@ -162,23 +162,34 @@ function FatigueToggle({ value, onValueChange }) {
     );
 }
 
+const TTL_WARN_MS  = 15_000;
+const TTL_KILL_MS  = 60_000;
+
 // ─── Pantalla 6.2 · Generador infinito ───────────────────────────────────────
 export default function GeneratorConfigScreen({ navigation }) {
     const [difficulty, setDifficulty] = useState(DEFAULTS.difficulty);
     const [count, setCount] = useState(DEFAULTS.count);
     const [fatigueMode, setFatigueMode] = useState(DEFAULTS.timed);
-    const [topicId, setTopicId] = useState(null);
+
+    // Multi-selección de temas — 'all' es el valor especial "Todos los temas"
+    const [selectedTopicIds, setSelectedTopicIds] = useState(new Set(['all']));
     const [topics, setTopics] = useState([]);
     const [topicOpen, setTopicOpen] = useState(true);
+
     const [exitOpen, setExitOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
+    const [slowWarning, setSlowWarning] = useState(false);
+    const [generateError, setGenerateError] = useState(false);
+
+    const cancelledRef = useRef(false);
+    const allowExitRef = useRef(false);
+    const warnTimerRef = useRef(null);
+    const killTimerRef = useRef(null);
 
     const hasChanges =
         difficulty !== DEFAULTS.difficulty ||
         count !== DEFAULTS.count ||
         fatigueMode !== DEFAULTS.timed;
-
-    const allowExitRef = useRef(false);
 
     const handleBack = () => {
         if (hasChanges) setExitOpen(true);
@@ -202,15 +213,19 @@ export default function GeneratorConfigScreen({ navigation }) {
                 session?.user?.user_metadata?.oposicion ??
                 'justicia-tramitacion';
             let res = await boeApi.listTopics(oposicion);
-            // Si la oposición del usuario no tiene temas seeded, fallback al disponible
             if (!res?.data?.length && oposicion !== 'justicia-tramitacion') {
                 res = await boeApi.listTopics('justicia-tramitacion');
             }
             if (res?.data?.length) {
                 setTopics(res.data);
-                setTopicId(prev => prev ?? res.data[0].topicId);
             }
         })();
+    }, []);
+
+    // Limpiar timers si el componente se desmonta durante la generación
+    useEffect(() => () => {
+        clearTimeout(warnTimerRef.current);
+        clearTimeout(killTimerRef.current);
     }, []);
 
     const confirmLeave = () => {
@@ -219,42 +234,98 @@ export default function GeneratorConfigScreen({ navigation }) {
         navigation.goBack();
     };
 
+    function toggleTopic(id) {
+        setSelectedTopicIds(prev => {
+            const next = new Set(prev);
+            if (id === 'all') {
+                return new Set(['all']);
+            }
+            next.delete('all');
+            if (next.has(id)) {
+                next.delete(id);
+                if (next.size === 0) return new Set(['all']);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    }
+
     const generate = async () => {
         if (generating) return;
+
         setGenerating(true);
-        const session = await api.loadSession();
-        const oposicion =
-            session?.user?.oposicion ??
-            session?.user?.user_metadata?.oposicion ??
-            'justicia-tramitacion';
-        const backendTopicId = topicId ?? 'all';
-        const { data, error } = await trainingApi.generateQuestions({
-            oposicion,
-            topicId: backendTopicId,
-            difficulty,
-            count,
-        });
-        setGenerating(false);
-        if (error || !Array.isArray(data) || data.length === 0) {
-            Alert.alert(
-                'No se pudo generar el test',
-                'La IA no devolvió preguntas. Inténtalo de nuevo en un momento.',
-            );
-            return;
+        setSlowWarning(false);
+        setGenerateError(false);
+        cancelledRef.current = false;
+
+        warnTimerRef.current = setTimeout(() => {
+            if (!cancelledRef.current) setSlowWarning(true);
+        }, TTL_WARN_MS);
+
+        killTimerRef.current = setTimeout(() => {
+            cancelledRef.current = true;
+            setGenerating(false);
+            setSlowWarning(false);
+            setGenerateError(true);
+        }, TTL_KILL_MS);
+
+        try {
+            const session = await api.loadSession();
+            const oposicion =
+                session?.user?.oposicion ??
+                session?.user?.user_metadata?.oposicion ??
+                'justicia-tramitacion';
+
+            const backendTopicId =
+                selectedTopicIds.has('all') || selectedTopicIds.size === topics.length
+                    ? 'all'
+                    : [...selectedTopicIds].join(',');
+
+            const { data, error } = await trainingApi.generateQuestions({
+                oposicion,
+                topicId: backendTopicId,
+                difficulty,
+                count,
+            });
+
+            clearTimeout(warnTimerRef.current);
+            clearTimeout(killTimerRef.current);
+
+            if (cancelledRef.current) return;
+
+            setGenerating(false);
+            setSlowWarning(false);
+
+            if (error || !Array.isArray(data) || data.length === 0) {
+                setGenerateError(true);
+                return;
+            }
+
+            allowExitRef.current = true;
+            navigation.navigate('TrainingSession', {
+                source: 'generator',
+                questions: adaptGeneratedQuestions(data),
+                examTitle: 'Generador infinito',
+                timedMode: fatigueMode,
+                oposicion,
+            });
+        } catch {
+            clearTimeout(warnTimerRef.current);
+            clearTimeout(killTimerRef.current);
+            if (!cancelledRef.current) {
+                setGenerating(false);
+                setSlowWarning(false);
+                setGenerateError(true);
+            }
         }
-        // Marcamos allowExit para que el guard beforeRemove no abra ConfirmExit
-        // durante la navegación forward al TrainingSession.
-        allowExitRef.current = true;
-        navigation.navigate('TrainingSession', {
-            source: 'generator',
-            questions: adaptGeneratedQuestions(data),
-            examTitle: 'Generador infinito',
-            timedMode: fatigueMode,
-            oposicion,
-        });
     };
 
     const diffIdx = DIFF_STEPS.indexOf(difficulty);
+
+    const selectionLabel = selectedTopicIds.has('all')
+        ? 'Todos los temas'
+        : `${selectedTopicIds.size} tema${selectedTopicIds.size > 1 ? 's' : ''} seleccionado${selectedTopicIds.size > 1 ? 's' : ''}`;
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -314,14 +385,17 @@ export default function GeneratorConfigScreen({ navigation }) {
 
                 <View style={styles.divider} />
 
-                {/* Temario */}
+                {/* Temario — multi-selección */}
                 <View style={styles.temarioCard}>
                     <TouchableOpacity
                         style={styles.temarioHeader}
                         activeOpacity={0.7}
                         onPress={() => setTopicOpen((v) => !v)}
                     >
-                        <Text style={styles.temarioLabel}>Temario</Text>
+                        <View>
+                            <Text style={styles.temarioLabel}>Temario</Text>
+                            <Text style={styles.temarioSublabel}>{selectionLabel}</Text>
+                        </View>
                         <Ionicons
                             name={topicOpen ? 'chevron-up' : 'chevron-down'}
                             size={18}
@@ -337,40 +411,95 @@ export default function GeneratorConfigScreen({ navigation }) {
                                     color={COLORS.purple}
                                     style={{ marginVertical: 12 }}
                                 />
-                            ) : topics.map((t) => {
-                                const active = t.topicId === topicId;
-                                return (
+                            ) : (
+                                <>
+                                    {/* Opción "Todos los temas" */}
                                     <TouchableOpacity
-                                        key={t.id}
-                                        onPress={() => setTopicId(t.topicId)}
-                                        style={[styles.topicItem, active && styles.topicItemActive]}
+                                        onPress={() => toggleTopic('all')}
+                                        style={[styles.topicItem, selectedTopicIds.has('all') && styles.topicItemActive]}
                                     >
-                                        <Text style={[styles.topicText, active && styles.topicTextActive]}>
-                                            {t.label}
-                                        </Text>
+                                        <View style={styles.topicRow}>
+                                            <Text style={[styles.topicText, selectedTopicIds.has('all') && styles.topicTextActive]}>
+                                                Todos los temas
+                                            </Text>
+                                            {selectedTopicIds.has('all') && (
+                                                <Ionicons name="checkmark" size={16} color={COLORS.purple} />
+                                            )}
+                                        </View>
                                     </TouchableOpacity>
-                                );
-                            })}
+
+                                    <View style={styles.topicDivider} />
+
+                                    {topics.map((t) => {
+                                        const active = selectedTopicIds.has(t.topicId);
+                                        return (
+                                            <TouchableOpacity
+                                                key={t.id}
+                                                onPress={() => toggleTopic(t.topicId)}
+                                                style={[styles.topicItem, active && styles.topicItemActive]}
+                                            >
+                                                <View style={styles.topicRow}>
+                                                    <Text style={[styles.topicText, active && styles.topicTextActive, { flex: 1 }]}>
+                                                        {t.label}
+                                                    </Text>
+                                                    {active && (
+                                                        <Ionicons name="checkmark" size={16} color={COLORS.purple} />
+                                                    )}
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </>
+                            )}
                         </View>
                     )}
                 </View>
 
-                {/* Botón */}
-                <TouchableOpacity
-                    style={[styles.button, generating && { opacity: 0.7 }]}
-                    onPress={generate}
-                    activeOpacity={0.85}
-                    disabled={generating}
-                >
-                    {generating ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <ActivityIndicator color="#fff" size="small" />
-                            <Text style={styles.buttonText}>Generando preguntas…</Text>
-                        </View>
-                    ) : (
-                        <Text style={styles.buttonText}>Generar test</Text>
-                    )}
-                </TouchableOpacity>
+                {/* Botón generar / estado error */}
+                {generateError ? (
+                    <View style={styles.errorCard}>
+                        <Ionicons name="alert-circle-outline" size={22} color="#C0392B" />
+                        <Text style={styles.errorText}>
+                            La IA tardó demasiado o encontró un error. Inténtalo de nuevo.
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.retryBtn}
+                            onPress={() => { setGenerateError(false); generate(); }}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.retryBtnText}>Reintentar</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <>
+                        <TouchableOpacity
+                            style={[styles.button, generating && { opacity: 0.7 }]}
+                            onPress={generate}
+                            activeOpacity={0.85}
+                            disabled={generating}
+                        >
+                            {generating ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <ActivityIndicator color="#fff" size="small" />
+                                    <Text style={styles.buttonText}>
+                                        {slowWarning ? 'La IA está pensando…' : 'Generando preguntas…'}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.buttonText}>Generar test</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        {slowWarning && (
+                            <View style={styles.slowWarningRow}>
+                                <Ionicons name="time-outline" size={14} color={COLORS.grayText} />
+                                <Text style={styles.slowWarningText}>
+                                    Esto está tardando más de lo normal. Por favor espera…
+                                </Text>
+                            </View>
+                        )}
+                    </>
+                )}
             </ScrollView>
 
             <ConfirmExitModal
@@ -537,18 +666,35 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: COLORS.purple,
     },
+    temarioSublabel: {
+        fontFamily: FONTS.regular,
+        fontSize: 12,
+        color: COLORS.grayText,
+        marginTop: 1,
+    },
     temarioList: {
         marginTop: 10,
         backgroundColor: COLORS.white,
     },
     topicItem: {
-        paddingVertical: 12,
+        paddingVertical: 11,
         paddingHorizontal: 12,
         borderRadius: 10,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     topicItemActive: {
         backgroundColor: COLORS.orangeBg15,
+    },
+    topicRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    topicDivider: {
+        height: 1,
+        backgroundColor: COLORS.divider,
+        marginVertical: 4,
+        marginHorizontal: 4,
     },
     topicText: {
         fontFamily: FONTS.regular,
@@ -572,6 +718,51 @@ const styles = StyleSheet.create({
     buttonText: {
         fontFamily: FONTS.semiBold,
         fontSize: 16,
+        color: COLORS.white,
+    },
+
+    /* TTL — aviso de lentitud */
+    slowWarningRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 10,
+        justifyContent: 'center',
+    },
+    slowWarningText: {
+        fontFamily: FONTS.regular,
+        fontSize: 12,
+        color: COLORS.grayText,
+    },
+
+    /* Error de generación */
+    errorCard: {
+        marginTop: 28,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#F5C6C0',
+        backgroundColor: '#FFF5F5',
+        padding: 16,
+        alignItems: 'center',
+        gap: 10,
+    },
+    errorText: {
+        fontFamily: FONTS.regular,
+        fontSize: 14,
+        color: '#C0392B',
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    retryBtn: {
+        marginTop: 4,
+        paddingHorizontal: 28,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: COLORS.green,
+    },
+    retryBtnText: {
+        fontFamily: FONTS.semiBold,
+        fontSize: 15,
         color: COLORS.white,
     },
 });

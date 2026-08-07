@@ -5,6 +5,74 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-07 (cont.) — Motor BOE integrado + mejoras UX Generador Infinito
+
+Continuación de la misma rama `feat/bloque-10-monitor-boe`.
+
+### Motor BOE — integración real de extremo a extremo
+
+Se reemplazó el esqueleto `MotorBoeClient` por la implementación real contra
+el servicio desplegado (`https://ingesta-demo-uadftnwmda-ue.a.run.app`):
+
+- **Auth corregida**: `X-API-Key` + `X-OpenAI-Key` (antes usaba `Authorization: Bearer`).
+- **Rutas corregidas**: prefijo `/v1/boe/` (antes `/api/`).
+- **8 métodos**: `followRegulation`, `listRegulations`, `stopFollowingRegulation`,
+  `checkForChanges`, `getChanges`, `regenerateQuestions`, `searchCatalog`, `pollJob`.
+- **`MotorBoeContract`** añadido a `packages/types/src/contracts/` — interfaz mínima
+  que expone los 3 métodos que usa `SyncBoeChangesUseCase`. `MotorBoeClient`
+  implementa la interfaz (`implements MotorBoeContract`).
+- **Env vars** nuevas: `MOTOR_BOE_BASE_URL`, `MOTOR_BOE_API_KEY`, `MOTOR_BOE_OPENAI_KEY`
+  (todas opcionales; el cliente no se instancia si `MOTOR_BOE_BASE_URL` está vacío).
+
+### `SyncBoeChangesUseCase` — puente Motor BOE → Supabase
+
+Nuevo use case en `application/boe/BoeUseCases.ts` que cierra el flujo real:
+
+1. `motor.checkForChanges(cursoId)` → lanza job async en el Motor.
+2. `pollUntilDone(jobId)` — polling cada 2 s, máximo 60 s.
+3. `motor.getChanges(cursoId)` → `MotorBoeCambio[]`.
+4. Para cada cambio: infiere `changeType` (modificacion/derogacion/nueva), extrae
+   `articulo` del campo `contexto` del fragmento, concatena `antes`/`despues` de
+   todos los fragmentos y llama a `repo.upsertChange(BoeChangeInput)`.
+
+`SupabaseBoeRepository.upsertChange()`: idempotente — deduplica por
+`boe_identifier + detected_at` (mismo día). Reemplaza fragmentos en cada sync.
+
+Expuesto vía `POST /boe/sync` (requiere JWT). Ruta añadida a
+`packages/constants/src/routes.js` (`BOE.SYNC`).
+
+### Verificación real con curso `1357e871b542425b`
+
+Se probó el flujo completo contra el Motor real:
+- 8 normas registradas (Constitución, Ley 39, Ley 40, Código Civil, Código Penal,
+  TREBEP, Ley Contratos, LOPDGDD).
+- `POST /v1/boe/check` → `job_id: 119b80cc924e4d7d` → `estado: done`,
+  `revisadas: 8`, `cambios: 0`, `cost_usd: 0.0`.
+- Resultado correcto: el BOE no ha modificado estas leyes recientemente.
+  El check usa diff de texto, no consume tokens OpenAI.
+
+### Generador Infinito (pantalla 6.2) — mejoras UX
+
+**TTL / tiempo de espera:**
+- A los **15 s** sin respuesta: el texto del botón cambia a "La IA está pensando…"
+  y aparece un aviso gris: *"Esto está tardando más de lo normal. Por favor espera…"*
+- A los **60 s**: se cancela, se oculta el botón y aparece una tarjeta roja con
+  mensaje de error y botón **Reintentar** que relanza `generate()` directamente.
+
+**Multi-selección de temas:**
+- El selector de tema pasa de single-select (resaltado de fondo) a **multi-select
+  con checkmarks**.
+- Nueva opción **"Todos los temas"** al inicio, seleccionada por defecto → `topicId = 'all'`.
+- Seleccionar temas específicos desmarca "Todos" y permite acumular; el subtítulo
+  muestra *"3 temas seleccionados"*.
+- Si se deseleccionan todos los específicos, vuelve automáticamente a "Todos".
+- Al generar: si todos seleccionados → `topicId = 'all'`; si subconjunto → IDs
+  separados por coma (el stub los ignora; la IA real los recibirá cuando se entregue
+  el prompt del `BRIEF_IA_BLOQUE6.md`).
+- Sin cambios en el contrato `GenerateQuestionsParams` — sigue siendo `topicId: string`.
+
+---
+
 ## 2026-08-07 — Bloque 10 · Monitor BOE completo de punta a punta
 
 Rama de trabajo: `feat/bloque-10-monitor-boe`. Se cierra el Bloque 10 íntegro:
