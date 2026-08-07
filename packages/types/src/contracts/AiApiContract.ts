@@ -75,6 +75,18 @@ export interface AiApiContract {
      * Se llama al final del pipeline (fase 'processing_questions' del status).
      */
     generateQuestionsFromNote(params: GenerateQuestionsFromNoteParams): Promise<GenerateQuestionsFromNoteResult>;
+
+    // ── Bloque 10 · Monitor BOE ──────────────────────────────────────────────
+    // Ver brief completo en: packages/ai/BRIEF_IA_BLOQUE10.md
+
+    /**
+     * Genera un mini-test de 2-3 preguntas para validar que el usuario
+     * ha asimilado un cambio legislativo detectado por el Monitor BOE.
+     *
+     * Se usa cuando el usuario pulsa "Mini-test" en la pantalla de detalle
+     * del cambio (pantalla 10.4).
+     */
+    generateBoeMiniTest(params: GenerateBoeMiniTestParams): Promise<BoeMiniTestAiResult>;
 }
 
 // ─── Tipos compartidos ────────────────────────────────────────────────────────
@@ -258,6 +270,44 @@ export interface GenerateQuestionsFromNoteResult {
         /** Tag al que pertenece la pregunta (para que 9.5 filtre por selección). */
         tag?: string;
     }>;
+}
+
+// ─── Bloque 10 · Monitor BOE ─────────────────────────────────────────────────
+
+export interface GenerateBoeMiniTestParams {
+    /** Oposición del usuario (contexto del temario). */
+    oposicion: string;
+    /** Precepto modificado (ej. "Art. 14", "Art. 21.2"). */
+    articulo: string;
+    /** Nombre y número de la ley modificada. */
+    ley: string;
+    /** Código oficial BOE-A-AAAA-NNNNN — solo trazabilidad, no usar en preguntas. */
+    identificador_boe: string;
+    /** Redacción derogada. Vacío si el artículo es nuevo. */
+    antes: string;
+    /** Redacción vigente. Vacío si el artículo fue derogado. */
+    despues: string;
+    /** Número de preguntas a generar: 2 o 3. */
+    count: 2 | 3;
+}
+
+export interface BoeMiniTestQuestion {
+    /** String único por pregunta en el lote (ej. "boe-q1"). */
+    id: string;
+    /** Etiqueta corta del cambio para el banner de contexto (máx. 40 chars). */
+    context: string;
+    /** Enunciado de la pregunta (máx. 280 chars). */
+    question: string;
+    /** Exactamente 3 opciones (sin prefijo A/B/C — la app lo añade). */
+    options: [string, string, string];
+    /** Índice de la opción correcta (0, 1 o 2). */
+    correctIndex: 0 | 1 | 2;
+    /** Justificación breve citando la redacción vigente (máx. 300 chars). */
+    explanation: string;
+}
+
+export interface BoeMiniTestAiResult {
+    questions: BoeMiniTestQuestion[];
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────

@@ -53,6 +53,19 @@ declare const API_ROUTES: {
         readonly BOOKMARK_DELETE: string;
         readonly HINT: string;
         readonly QUESTION_REPORT: string;
+        readonly TOPICS: string;
+    };
+
+    readonly BOE: {
+        readonly FEED: string;
+        readonly REGULATIONS: string;
+        readonly REGULATION: string;
+        readonly CHANGE_DETAIL: string;
+        readonly CHANGE_COMPARISON: string;
+        readonly CHANGE_MINI_TEST: string;
+        readonly CHANGE_MINI_TEST_COMPLETE: string;
+        readonly CHANGE_READ: string;
+        readonly CHANGE_BOOKMARK: string;
     };
 
     readonly TUTOR: {

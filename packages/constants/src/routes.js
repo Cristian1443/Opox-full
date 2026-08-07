@@ -65,6 +65,19 @@ export const API_ROUTES = {
         BOOKMARK_DELETE:    '/training/bookmarks/:id',
         HINT:               '/training/hint',
         QUESTION_REPORT:    '/training/questions/:id/report',
+        TOPICS:             '/training/topics',
+    },
+
+    BOE: {
+        FEED:                     '/boe/feed',
+        REGULATIONS:              '/boe/regulations',
+        REGULATION:               '/boe/regulations/:id',
+        CHANGE_DETAIL:            '/boe/changes/:id',
+        CHANGE_COMPARISON:        '/boe/changes/:id/comparison',
+        CHANGE_MINI_TEST:         '/boe/changes/:id/mini-test',
+        CHANGE_MINI_TEST_COMPLETE:'/boe/changes/:id/mini-test/complete',
+        CHANGE_READ:              '/boe/changes/:id/read',
+        CHANGE_BOOKMARK:          '/boe/changes/:id/bookmark',
     },
 
     TUTOR: {
