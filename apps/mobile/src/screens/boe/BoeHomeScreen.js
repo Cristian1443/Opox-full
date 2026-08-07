@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     StyleSheet,
     View,
@@ -131,31 +132,35 @@ export default function BoeHomeScreen({ navigation }) {
     const [demoEmpty, setDemoEmpty] = useState(false);
     const [apiMyTopicsSections, setApiMyTopicsSections] = useState(null);
 
-    useEffect(() => {
-        boeApi.getFeed().then(res => {
-            if (res?.data?.sections) {
-                const sections = res.data.sections.map(s => ({
-                    section: s.sectionTitle,
-                    items: s.data.map(c => ({
-                        id: c.id,
-                        type: changeTypeToFeedType(c.changeType),
-                        title: `${c.articulo} · ${c.shortTitle}`,
-                        description: c.affectedQuestionsCount > 0
-                            ? `${c.affectedQuestionsCount} pregunta${c.affectedQuestionsCount > 1 ? 's' : ''} afectada${c.affectedQuestionsCount > 1 ? 's' : ''}.`
-                            : 'Cambio detectado en tu temario.',
-                        time: formatDetectedAt(c.detectedAt),
-                        read: c.isRead,
-                    })),
-                }));
-                setApiMyTopicsSections(sections);
-                const bmarks = new Set();
-                res.data.sections.flatMap(s => s.data).forEach(c => {
-                    if (c.isBookmarked) bmarks.add(c.id);
-                });
-                setBookmarkSet(bmarks);
-            }
-        }).catch(() => {});
-    }, []);
+    // Recarga el feed cada vez que la pantalla entra en foco, para reflejar
+    // cambios de isRead/isBookmarked producidos en Detalle, Comparativa o Mini-test.
+    useFocusEffect(
+        useCallback(() => {
+            boeApi.getFeed().then(res => {
+                if (res?.data?.sections) {
+                    const sections = res.data.sections.map(s => ({
+                        section: s.sectionTitle,
+                        items: s.data.map(c => ({
+                            id: c.id,
+                            type: changeTypeToFeedType(c.changeType),
+                            title: `${c.articulo} · ${c.shortTitle}`,
+                            description: c.affectedQuestionsCount > 0
+                                ? `${c.affectedQuestionsCount} pregunta${c.affectedQuestionsCount > 1 ? 's' : ''} afectada${c.affectedQuestionsCount > 1 ? 's' : ''}.`
+                                : 'Cambio detectado en tu temario.',
+                            time: formatDetectedAt(c.detectedAt),
+                            read: c.isRead,
+                        })),
+                    }));
+                    setApiMyTopicsSections(sections);
+                    const bmarks = new Set();
+                    res.data.sections.flatMap(s => s.data).forEach(c => {
+                        if (c.isBookmarked) bmarks.add(c.id);
+                    });
+                    setBookmarkSet(bmarks);
+                }
+            }).catch(() => {});
+        }, [])
+    );
 
     function toggleBookmark(id) {
         setBookmarkSet(prev => {

@@ -201,7 +201,11 @@ export default function GeneratorConfigScreen({ navigation }) {
                 session?.user?.oposicion ??
                 session?.user?.user_metadata?.oposicion ??
                 'justicia-tramitacion';
-            const res = await boeApi.listTopics(oposicion);
+            let res = await boeApi.listTopics(oposicion);
+            // Si la oposición del usuario no tiene temas seeded, fallback al disponible
+            if (!res?.data?.length && oposicion !== 'justicia-tramitacion') {
+                res = await boeApi.listTopics('justicia-tramitacion');
+            }
             if (res?.data?.length) {
                 setTopics(res.data);
                 setTopicId(prev => prev ?? res.data[0].topicId);

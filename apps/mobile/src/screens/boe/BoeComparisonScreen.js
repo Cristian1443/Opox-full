@@ -70,13 +70,15 @@ function InlineRichText({ segments, variant }) {
     return (
         <Text style={styles.richParagraph}>
             {segments.map((seg, i) => {
+                // El API devuelve { type, text }; el mock local usa { type, content }
+                const txt = seg.text ?? seg.content ?? '';
                 if (variant === 'before' && seg.type === 'deleted') {
                     return (
                         <Text
                             key={i}
                             style={[styles.segBase, styles.deletedSeg]}
                         >
-                            {seg.content}
+                            {txt}
                         </Text>
                     );
                 }
@@ -86,13 +88,13 @@ function InlineRichText({ segments, variant }) {
                             key={i}
                             style={[styles.segBase, styles.addedSeg]}
                         >
-                            {seg.content}
+                            {txt}
                         </Text>
                     );
                 }
                 return (
                     <Text key={i} style={styles.segBase}>
-                        {seg.content}
+                        {txt}
                     </Text>
                 );
             })}

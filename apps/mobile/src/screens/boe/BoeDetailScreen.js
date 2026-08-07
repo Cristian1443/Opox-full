@@ -168,34 +168,36 @@ export default function BoeDetailScreen({ route, navigation }) {
                     <Text style={styles.sourceText}>{detail.source}</Text>
                 </View>
 
-                {/* ── CTAs ──────────────────────────────────────────────────────── */}
-                <View style={styles.ctas}>
-                    <TouchableOpacity
-                        style={styles.primaryBtn}
-                        activeOpacity={0.82}
-                        onPress={() =>
-                            navigation.navigate('BoeComparison', {
-                                itemId,
-                                title: detail.title,
-                                subtitle: detail.subtitle,
-                            })
-                        }
-                        accessibilityLabel="Ver comparativa antes y después"
-                    >
-                        <Text style={styles.primaryBtnText}>Ver comparativa</Text>
-                    </TouchableOpacity>
+                {/* ── CTAs — solo para cambios que afectan al banco de preguntas ─── */}
+                {type !== 'review' && (
+                    <View style={styles.ctas}>
+                        <TouchableOpacity
+                            style={styles.primaryBtn}
+                            activeOpacity={0.82}
+                            onPress={() =>
+                                navigation.navigate('BoeComparison', {
+                                    itemId,
+                                    title: detail.title,
+                                    subtitle: detail.subtitle,
+                                })
+                            }
+                            accessibilityLabel="Ver comparativa antes y después"
+                        >
+                            <Text style={styles.primaryBtnText}>Ver comparativa</Text>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.secondaryBtn}
-                        activeOpacity={0.78}
-                        onPress={() =>
-                            navigation.navigate('BoeMiniTest', { itemId, title: detail.title })
-                        }
-                        accessibilityLabel="Mini-test para validar aprendizaje"
-                    >
-                        <Text style={styles.secondaryBtnText}>Mini-test</Text>
-                    </TouchableOpacity>
-                </View>
+                        <TouchableOpacity
+                            style={styles.secondaryBtn}
+                            activeOpacity={0.78}
+                            onPress={() =>
+                                navigation.navigate('BoeMiniTest', { itemId, title: detail.title })
+                            }
+                            accessibilityLabel="Mini-test para validar aprendizaje"
+                        >
+                            <Text style={styles.secondaryBtnText}>Mini-test</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 <View style={{ height: spacing.xl }} />
             </ScrollView>
