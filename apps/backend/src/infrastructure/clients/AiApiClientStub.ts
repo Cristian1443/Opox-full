@@ -15,6 +15,9 @@ import type {
     GenerateTagsFromNoteResult,
     GenerateQuestionsFromNoteParams,
     GenerateQuestionsFromNoteResult,
+    GenerateBoeMiniTestParams,
+    BoeMiniTestAiResult,
+    BoeMiniTestQuestion,
 } from '@opox/types';
 import { logger } from '@opox/utils';
 
@@ -113,6 +116,54 @@ export class AiApiClientStub implements AiApiContract {
         return {
             tags: ['Constitución', 'Derechos fundamentales', 'Título I'],
         };
+    }
+
+    // ── Bloque 10 · Monitor BOE ───────────────────────────────────────────────
+
+    async generateBoeMiniTest(params: GenerateBoeMiniTestParams): Promise<BoeMiniTestAiResult> {
+        logger.info('[ai-stub] generateBoeMiniTest', { articulo: params.articulo, count: params.count });
+        await delay(400);
+
+        const all: BoeMiniTestQuestion[] = [
+            {
+                id: 'boe-q1',
+                context: `${params.articulo} modificado`,
+                question: `Tras la modificación del ${params.articulo} de la ${params.ley}, ¿qué colectivo se añade expresamente entre los obligados a relacionarse electrónicamente con la Administración?`,
+                options: [
+                    'Los autónomos sin colegiación obligatoria.',
+                    'Los empleados públicos en el ejercicio de sus funciones.',
+                    'Los ciudadanos mayores de 18 años.',
+                ],
+                correctIndex: 1,
+                explanation: `La nueva redacción añade expresamente a los empleados públicos en el ejercicio de sus funciones (${params.articulo}).`,
+            },
+            {
+                id: 'boe-q2',
+                context: `${params.articulo} — nueva redacción`,
+                question: `Según la redacción vigente del ${params.articulo}, ¿cómo queda recogida la actividad profesional colegiada?`,
+                options: [
+                    'Se exige que la colegiación sea obligatoria para el trámite concreto.',
+                    'Se simplifica a "quienes ejerzan cualquier actividad profesional colegiada".',
+                    'Se elimina la referencia a profesionales colegiados.',
+                ],
+                correctIndex: 1,
+                explanation: `La redacción vigente simplifica el texto suprimiendo la referencia a la obligatoriedad de la colegiación (${params.articulo}).`,
+            },
+            {
+                id: 'boe-q3',
+                context: `${params.articulo} — efecto práctico`,
+                question: `¿Cuál es el efecto práctico de la modificación del ${params.articulo} respecto a los empleados públicos?`,
+                options: [
+                    'Quedan exentos de la obligación de relacionarse electrónicamente.',
+                    'Deben relacionarse electrónicamente solo en procedimientos sancionadores.',
+                    'Deben relacionarse electrónicamente en el ejercicio de sus funciones.',
+                ],
+                correctIndex: 2,
+                explanation: `El nuevo apartado incorporado en ${params.articulo} obliga a los empleados públicos a relacionarse electrónicamente en el ejercicio de sus funciones.`,
+            },
+        ];
+
+        return { questions: all.slice(0, params.count) };
     }
 
     async generateQuestionsFromNote(params: GenerateQuestionsFromNoteParams): Promise<GenerateQuestionsFromNoteResult> {

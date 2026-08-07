@@ -9,3 +9,4 @@ export * from './push';
 export * from './payments';
 export * from './tutor';
 export * from './notes';
+export * from './boe';

@@ -15,6 +15,8 @@ import type {
     GenerateTagsFromNoteResult,
     GenerateQuestionsFromNoteParams,
     GenerateQuestionsFromNoteResult,
+    GenerateBoeMiniTestParams,
+    BoeMiniTestAiResult,
 } from '@opox/types';
 import { logger } from '@opox/utils';
 
@@ -146,5 +148,12 @@ export class MotorAiClient implements AiApiContract {
 
     async generateQuestionsFromNote(_params: GenerateQuestionsFromNoteParams): Promise<GenerateQuestionsFromNoteResult> {
         throw new Error('[MotorAiClient] generateQuestionsFromNote NO forma parte del Motor de IA. Usa AiApiClient (BRIEF_IA_BLOQUE9).');
+    }
+
+    // ── Bloque 10 · Monitor BOE ───────────────────────────────────────────────
+    // El mini-test del BOE tampoco está cubierto por el Motor de IA del cliente.
+
+    async generateBoeMiniTest(_params: GenerateBoeMiniTestParams): Promise<BoeMiniTestAiResult> {
+        throw new Error('[MotorAiClient] generateBoeMiniTest NO forma parte del Motor de IA. Usa AiApiClient (BRIEF_IA_BLOQUE10).');
     }
 }
