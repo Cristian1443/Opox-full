@@ -28,5 +28,8 @@ export function createBoeRouter(
     r.post(B.CHANGE_READ, authMiddleware, controller.markRead);
     r.post(B.CHANGE_BOOKMARK, authMiddleware, controller.toggleBookmark);
 
+    // Sincronización con Motor BOE (admin/cron — requiere JWT válido)
+    r.post(B.SYNC, authMiddleware, controller.syncChanges);
+
     return r;
 }

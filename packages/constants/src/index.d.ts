@@ -66,6 +66,7 @@ declare const API_ROUTES: {
         readonly CHANGE_MINI_TEST_COMPLETE: string;
         readonly CHANGE_READ: string;
         readonly CHANGE_BOOKMARK: string;
+        readonly SYNC: string;
     };
 
     readonly TUTOR: {

@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance } from 'axios';
 import { logger } from '@opox/utils';
+import type { MotorBoeContract } from '@opox/types';
 
 /**
  * Cliente HTTP para el Motor BOE externo.
@@ -90,7 +91,7 @@ export interface MotorJob {
 
 // ─── Cliente ────────────────────────────────────────────────────────────────
 
-export class MotorBoeClient {
+export class MotorBoeClient implements MotorBoeContract {
     private readonly http: AxiosInstance;
 
     constructor(config: MotorBoeConfig) {

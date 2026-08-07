@@ -2,6 +2,7 @@ import type {
     BoeWatchedRegulation,
     BoeChange,
     BoeChangeFragment,
+    BoeChangeInput,
     BoeAlertRead,
     BoeMiniTestResult,
     TrainingTopic,
@@ -52,4 +53,8 @@ export interface IBoeRepository {
 
     // ── Temas del temario ───────────────────────────────────────────────────
     listTopics(oposicion: string): Promise<TrainingTopic[]>;
+
+    // ── Sincronización con Motor BOE ────────────────────────────────────────
+    /** Inserta o actualiza un cambio del Motor BOE y reemplaza sus fragmentos. */
+    upsertChange(input: BoeChangeInput): Promise<void>;
 }

@@ -99,6 +99,7 @@ import {
     ToggleBoeBookmarkUseCase,
     CompleteBoeMiniTestUseCase,
     ListTopicsUseCase,
+    SyncBoeChangesUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -334,6 +335,7 @@ export function buildContainer() {
         toggleBoeBookmark: new ToggleBoeBookmarkUseCase(boeRepo),
         completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo),
         listTopics: new ListTopicsUseCase(boeRepo),
+        syncBoeChanges: motorBoe ? new SyncBoeChangesUseCase(boeRepo, motorBoe) : undefined,
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -395,6 +397,7 @@ export function buildContainer() {
         markRead: useCases.markBoeRead,
         toggleBookmark: useCases.toggleBoeBookmark,
         completeMiniTest: useCases.completeBoeMiniTest,
+        syncChanges: useCases.syncBoeChanges,
     });
 
     const tutorController = new TutorController({

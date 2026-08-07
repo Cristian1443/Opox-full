@@ -4,6 +4,7 @@ import type {
     BoeWatchedRegulation,
     BoeChange,
     BoeChangeFragment,
+    BoeChangeInput,
     BoeAlertRead,
     BoeMiniTestResult,
     TrainingTopic,
@@ -181,6 +182,60 @@ export class SupabaseBoeRepository implements IBoeRepository {
             .eq('change_id', changeId)
             .maybeSingle();
         return data ? mapMiniTestResult(data) : null;
+    }
+
+    // ── Sincronización con Motor BOE ──────────────────────────────────────────
+
+    async upsertChange(input: BoeChangeInput): Promise<void> {
+        // Buscar si ya existe un cambio para este identificador en la misma fecha
+        const dayStart = new Date(input.detectedAt);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+
+        const { data: existing } = await this.db
+            .from('boe_changes')
+            .select('id')
+            .eq('boe_identifier', input.boeIdentifier)
+            .gte('detected_at', dayStart.toISOString())
+            .lt('detected_at', dayEnd.toISOString())
+            .maybeSingle();
+
+        let changeId: string;
+
+        if (existing) {
+            changeId = (existing as any).id;
+            await this.db
+                .from('boe_changes')
+                .update({ affected_questions: input.affectedQuestions })
+                .eq('id', changeId);
+        } else {
+            const { data, error } = await this.db
+                .from('boe_changes')
+                .insert({
+                    boe_identifier: input.boeIdentifier,
+                    regulation_title: input.regulationTitle,
+                    short_title: input.shortTitle,
+                    articulo: input.articulo,
+                    change_type: input.changeType,
+                    affected_questions: input.affectedQuestions,
+                    detected_at: input.detectedAt.toISOString(),
+                })
+                .select('id')
+                .single();
+            if (error) throw new Error(`[boe-repo] upsertChange: ${error.message}`);
+            changeId = (data as any).id;
+        }
+
+        if (input.fragmentos.length > 0) {
+            await this.db.from('boe_change_fragments').delete().eq('change_id', changeId);
+            await this.db.from('boe_change_fragments').insert(
+                input.fragmentos.map(f => ({
+                    change_id: changeId,
+                    frag_type: f.fragType,
+                    text: f.text,
+                })),
+            );
+        }
     }
 
     // ── Temas del temario ─────────────────────────────────────────────────────

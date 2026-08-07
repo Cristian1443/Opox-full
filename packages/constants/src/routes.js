@@ -78,6 +78,7 @@ export const API_ROUTES = {
         CHANGE_MINI_TEST_COMPLETE:'/boe/changes/:id/mini-test/complete',
         CHANGE_READ:              '/boe/changes/:id/read',
         CHANGE_BOOKMARK:          '/boe/changes/:id/bookmark',
+        SYNC:                     '/boe/sync',
     },
 
     TUTOR: {

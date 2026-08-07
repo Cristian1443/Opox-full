@@ -8,6 +8,7 @@ import type {
     MarkBoeReadUseCase,
     ToggleBoeBookmarkUseCase,
     CompleteBoeMiniTestUseCase,
+    SyncBoeChangesUseCase,
 } from '../../application';
 
 function ok<T>(res: Response, status: number, data: T): void {
@@ -24,6 +25,7 @@ export class BoeController {
             markRead: MarkBoeReadUseCase;
             toggleBookmark: ToggleBoeBookmarkUseCase;
             completeMiniTest: CompleteBoeMiniTestUseCase;
+            syncChanges?: SyncBoeChangesUseCase;
         },
     ) {}
 
@@ -87,6 +89,19 @@ export class BoeController {
             const { score, total } = req.body as { score: number; total: number };
             await this.deps.completeMiniTest.execute(changeId, req.authUser!.id, score, total);
             res.status(204).end();
+        } catch (e) { next(e); }
+    };
+
+    // POST /boe/sync  — endpoint admin/cron para sincronizar cambios del Motor BOE
+    syncChanges = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.syncChanges) {
+                res.status(503).json({ ok: false, error: 'Motor BOE no configurado (MOTOR_BOE_BASE_URL)' });
+                return;
+            }
+            const { curso_id } = req.body as { curso_id: string };
+            const result = await this.deps.syncChanges.execute(curso_id);
+            ok(res, 200, result);
         } catch (e) { next(e); }
     };
 }

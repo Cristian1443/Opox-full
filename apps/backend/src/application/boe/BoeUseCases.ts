@@ -1,9 +1,9 @@
-import type { IBoeRepository, BoeChange, BoeChangeFragment } from '../../domain';
+import type { IBoeRepository, BoeChange, BoeChangeFragment, BoeChangeType } from '../../domain';
 import { computeBoeDiff } from './boeDiff';
 import {
     BoeChangeNotFoundError,
 } from '../../domain';
-import type { AiApiContract, BoeMiniTestQuestionDto } from '@opox/types';
+import type { AiApiContract, BoeMiniTestQuestionDto, MotorBoeContract, MotorCambio } from '@opox/types';
 import type {
     BoeFeedSection,
     BoeFeedResponse,
@@ -233,7 +233,102 @@ export class ListTopicsUseCase {
     }
 }
 
+// ─── Sincronización con Motor BOE ────────────────────────────────────────────
+
+export interface SyncBoeResult {
+    synced: number;
+    skipped: number;
+}
+
+export class SyncBoeChangesUseCase {
+    constructor(
+        private readonly repo: IBoeRepository,
+        private readonly motor: MotorBoeContract,
+    ) {}
+
+    async execute(cursoId: string): Promise<SyncBoeResult> {
+        logger.info('[boe] syncChanges start', { cursoId });
+
+        const jobId = await this.motor.checkForChanges(cursoId);
+        logger.info('[boe] syncChanges job launched', { jobId });
+
+        const job = await this.pollUntilDone(jobId);
+        if (job.estado === 'error') {
+            throw new Error(`Motor BOE job falló: ${job.mensaje}`);
+        }
+
+        const motorChanges = await this.motor.getChanges(cursoId);
+        logger.info('[boe] syncChanges motor returned', { count: motorChanges.length });
+
+        let synced = 0;
+        let skipped = 0;
+
+        for (const mc of motorChanges) {
+            try {
+                const input = buildChangeInput(mc);
+                await this.repo.upsertChange(input);
+                synced++;
+            } catch (e) {
+                logger.warn('[boe] syncChanges skip', { id: mc.id, error: e });
+                skipped++;
+            }
+        }
+
+        logger.info('[boe] syncChanges done', { synced, skipped });
+        return { synced, skipped };
+    }
+
+    private async pollUntilDone(jobId: string, maxAttempts = 30): Promise<{ estado: string; mensaje: string }> {
+        for (let i = 0; i < maxAttempts; i++) {
+            const job = await this.motor.pollJob(jobId);
+            if (job.estado === 'done' || job.estado === 'error') return job;
+            await new Promise(r => setTimeout(r, 2_000));
+        }
+        throw new Error(`Motor BOE job ${jobId} no terminó en ${maxAttempts * 2}s`);
+    }
+}
+
 // ─── Helpers privados ─────────────────────────────────────────────────────────
+
+function buildChangeInput(mc: MotorCambio) {
+    const antesTexts = mc.fragmentos.map(f => f.antes).filter(Boolean).join('\n\n');
+    const despuesTexts = mc.fragmentos.map(f => f.despues).filter(Boolean).join('\n\n');
+
+    const changeType = inferChangeType(antesTexts, despuesTexts);
+    const articulo = extractArticulo(mc.fragmentos[0]?.contexto ?? '');
+    const shortTitle = mc.norma_titulo.length > 60
+        ? mc.norma_titulo.slice(0, 57) + '...'
+        : mc.norma_titulo;
+
+    const fragmentos: Array<{ fragType: 'antes' | 'despues'; text: string }> = [];
+    if (antesTexts) fragmentos.push({ fragType: 'antes', text: antesTexts });
+    if (despuesTexts) fragmentos.push({ fragType: 'despues', text: despuesTexts });
+
+    return {
+        boeIdentifier: mc.identificador_boe,
+        regulationTitle: mc.norma_titulo,
+        shortTitle,
+        articulo,
+        changeType,
+        affectedQuestions: mc.preguntas_afectadas?.length ?? 0,
+        detectedAt: new Date(mc.detectado),
+        fragmentos,
+    };
+}
+
+function inferChangeType(antes: string, despues: string): BoeChangeType {
+    if (antes && despues) return 'modificacion';
+    if (antes && !despues) return 'derogacion';
+    if (!antes && despues) return 'nueva';
+    return 'modificacion';
+}
+
+function extractArticulo(contexto: string): string {
+    if (!contexto) return 'Disposición';
+    const match = contexto.match(/^(Art[íi]culo\s+\d+[a-zA-Z]*)/i);
+    if (match?.[1]) return match[1].replace('Articulo', 'Artículo');
+    return contexto.split('.')[0] ?? contexto.slice(0, 40);
+}
 
 function buildHint(change: BoeChange, fragments: BoeChangeFragment[]): string {
     const typeLabels: Record<string, string> = {

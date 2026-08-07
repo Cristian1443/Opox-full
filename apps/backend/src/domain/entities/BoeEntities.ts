@@ -2,6 +2,18 @@
 
 export type BoeChangeType = 'modificacion' | 'derogacion' | 'nueva' | 'tipografica';
 
+/** Payload de entrada para sincronizar un cambio del Motor BOE en nuestra DB. */
+export interface BoeChangeInput {
+    boeIdentifier: string;
+    regulationTitle: string;
+    shortTitle: string;
+    articulo: string;
+    changeType: BoeChangeType;
+    affectedQuestions: number;
+    detectedAt: Date;
+    fragmentos: Array<{ fragType: 'antes' | 'despues'; text: string }>;
+}
+
 export interface BoeWatchedRegulation {
     id: string;
     userId: string;
