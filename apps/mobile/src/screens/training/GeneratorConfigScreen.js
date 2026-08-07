@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmExitModal from '../../components/ConfirmExitModal';
 import { colors } from '../../theme';
-import { api, trainingApi } from '../../api';
+import { api, trainingApi, boeApi } from '../../api';
 import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 // ─── Constantes de configuración ─────────────────────────────────────────────
@@ -22,16 +22,7 @@ const THUMB = 30;
 const THUMB_BORDER = 3;
 const TRACK_H = 6;
 
-// Temarios de ejemplo — el listado real llega desde el backend por oposición.
-const TOPICS = [
-    { id: 't1', label: 'Tema 1' },
-    { id: 't2', label: 'Tema 2' },
-    { id: 't3', label: 'Tema 3' },
-    { id: 't4', label: 'Tema 4' },
-    { id: 't5', label: 'Tema 5' },
-];
-
-const DEFAULTS = { difficulty: 'medium', count: 30, timed: true, topicId: 't1' };
+const DEFAULTS = { difficulty: 'medium', count: 30, timed: true };
 
 // ─── Slider de pasos (Nivel de dificultad) ───────────────────────────────────
 function StepSlider({ labels, index, onChange }) {
@@ -176,7 +167,8 @@ export default function GeneratorConfigScreen({ navigation }) {
     const [difficulty, setDifficulty] = useState(DEFAULTS.difficulty);
     const [count, setCount] = useState(DEFAULTS.count);
     const [fatigueMode, setFatigueMode] = useState(DEFAULTS.timed);
-    const [topicId, setTopicId] = useState(DEFAULTS.topicId);
+    const [topicId, setTopicId] = useState(null);
+    const [topics, setTopics] = useState([]);
     const [topicOpen, setTopicOpen] = useState(true);
     const [exitOpen, setExitOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -184,8 +176,7 @@ export default function GeneratorConfigScreen({ navigation }) {
     const hasChanges =
         difficulty !== DEFAULTS.difficulty ||
         count !== DEFAULTS.count ||
-        fatigueMode !== DEFAULTS.timed ||
-        topicId !== DEFAULTS.topicId;
+        fatigueMode !== DEFAULTS.timed;
 
     const allowExitRef = useRef(false);
 
@@ -203,6 +194,21 @@ export default function GeneratorConfigScreen({ navigation }) {
         return unsubscribe;
     }, [navigation, hasChanges]);
 
+    useEffect(() => {
+        (async () => {
+            const session = await api.loadSession();
+            const oposicion =
+                session?.user?.oposicion ??
+                session?.user?.user_metadata?.oposicion ??
+                'justicia-tramitacion';
+            const res = await boeApi.listTopics(oposicion);
+            if (res?.data?.length) {
+                setTopics(res.data);
+                setTopicId(prev => prev ?? res.data[0].topicId);
+            }
+        })();
+    }, []);
+
     const confirmLeave = () => {
         allowExitRef.current = true;
         setExitOpen(false);
@@ -217,10 +223,7 @@ export default function GeneratorConfigScreen({ navigation }) {
             session?.user?.oposicion ??
             session?.user?.user_metadata?.oposicion ??
             'justicia-tramitacion';
-        // Mapeamos topicId del picker local (t1, t2...) al del backend.
-        // Los temas reales llegarán del backend en una iteración posterior;
-        // por ahora 'all' permite que la IA cubra todo el temario.
-        const backendTopicId = 'all';
+        const backendTopicId = topicId ?? 'all';
         const { data, error } = await trainingApi.generateQuestions({
             oposicion,
             topicId: backendTopicId,
@@ -324,12 +327,18 @@ export default function GeneratorConfigScreen({ navigation }) {
 
                     {topicOpen && (
                         <View style={styles.temarioList}>
-                            {TOPICS.map((t) => {
-                                const active = t.id === topicId;
+                            {topics.length === 0 ? (
+                                <ActivityIndicator
+                                    size="small"
+                                    color={COLORS.purple}
+                                    style={{ marginVertical: 12 }}
+                                />
+                            ) : topics.map((t) => {
+                                const active = t.topicId === topicId;
                                 return (
                                     <TouchableOpacity
                                         key={t.id}
-                                        onPress={() => setTopicId(t.id)}
+                                        onPress={() => setTopicId(t.topicId)}
                                         style={[styles.topicItem, active && styles.topicItemActive]}
                                     >
                                         <Text style={[styles.topicText, active && styles.topicTextActive]}>

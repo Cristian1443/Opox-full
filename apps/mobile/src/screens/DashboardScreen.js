@@ -11,6 +11,9 @@ import {
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NudgeModal from '../components/NudgeModal';
+import BoeAlertBanner from '../components/BoeAlertBanner';
+import AlertCardModal from '../components/AlertCardModal';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { dashboardApi, planningApi } from '../api';
 
 // ─── Iconos SVG exactos del wireframe (Bloque 2 · Dashboard) ─────────────────
@@ -131,6 +134,15 @@ function IconBook() {
     return (
         <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Path d="M4 5h16v11H7l-3 3z" stroke="#FF6B4A" strokeWidth={1.7} strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function IconBoe() {
+    return (
+        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+            <Path d="M4 5h16v14H4z" stroke="#E2483D" strokeWidth={1.6} />
+            <Path d="M8 9h8M8 13h6" stroke="#E2483D" strokeWidth={1.6} strokeLinecap="round" />
         </Svg>
     );
 }
@@ -288,6 +300,10 @@ export default function DashboardScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const [activeNudge, setActiveNudge] = useState(null); // null | 'fatigue' | 'academic' | 'boe'
     const nudge = activeNudge ? NUDGES[activeNudge] : null;
+    const [boeBannerVisible, setBoeBannerVisible] = useState(false);
+    // staleLawsCount: en Paso 2 lo devuelve dashboardApi.getSummary() → data.staleLawsCount
+    const [staleAlertVisible, setStaleAlertVisible] = useState(false);
+    const [staleLawsCount, setStaleLawsCount] = useState(3); // mock; Paso 2: setStaleLawsCount(data.staleLawsCount)
 
     const [summary, setSummary] = useState(null);
     const [planSummary, setPlanSummary] = useState(null);
@@ -493,6 +509,25 @@ export default function DashboardScreen({ navigation }) {
                     <Text style={styles.tutorText}>Sube PDFs o fotos y practica con preguntas generadas por IA.</Text>
                 </TouchableOpacity>
 
+                {/* Bloque 10 · Monitor BOE */}
+                <TouchableOpacity
+                    style={[styles.widget, { backgroundColor: '#FDEBE9' }]}
+                    onPress={() => navigation.navigate('BoeHome')}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Ir al Monitor BOE"
+                >
+                    <View style={styles.widgetHead}>
+                        <IconBoe />
+                        <Text style={[styles.widgetHeadText, { color: '#E2483D' }]}>Monitor BOE</Text>
+                        <View style={styles.boeliveBadge}>
+                            <View style={styles.boeLiveDot} />
+                            <Text style={styles.boeLiveText}>LIVE</Text>
+                        </View>
+                        <Text style={styles.chev}>›</Text>
+                    </View>
+                    <Text style={styles.tutorText}>Cambios legislativos que afectan a tu temario, al instante.</Text>
+                </TouchableOpacity>
+
                 {/* Vista previa temporal de los nudges — quitar cuando cada motor real
                     (fatiga, estadísticas, monitor BOE) dispare el suyo */}
                 <Text style={styles.demoLabel}>VISTA PREVIA · NUDGES</Text>
@@ -504,7 +539,13 @@ export default function DashboardScreen({ navigation }) {
                         <Text style={styles.demoPillText}>Tema flojo</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.demoPill} onPress={() => setActiveNudge('boe')}>
-                        <Text style={styles.demoPillText}>Alerta BOE</Text>
+                        <Text style={styles.demoPillText}>Nudge BOE</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.demoPill} onPress={() => setBoeBannerVisible(true)}>
+                        <Text style={styles.demoPillText}>Push BOE</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.demoPill} onPress={() => setStaleAlertVisible(true)}>
+                        <Text style={styles.demoPillText}>Temario desact.</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -550,10 +591,48 @@ export default function DashboardScreen({ navigation }) {
                     description={nudge.description}
                     primaryLabel={nudge.primaryLabel}
                     secondaryLabel={nudge.secondaryLabel}
-                    onPrimaryPress={() => setActiveNudge(null)}
+                    onPrimaryPress={() => {
+                        const kind = activeNudge;
+                        setActiveNudge(null);
+                        if (kind === 'boe') navigation.navigate('BoeHome');
+                    }}
                     onSecondaryPress={() => setActiveNudge(null)}
                 />
             )}
+
+            {/* Pop-up temario desactualizado (10.1·alerta) — en Paso 2 lo dispara dashboardApi.getSummary() → staleLawsCount */}
+            <AlertCardModal
+                visible={staleAlertVisible}
+                iconBg="#FDEBE9"
+                iconSize={80}
+                icon={
+                    <MaterialCommunityIcons
+                        name="alert-circle-outline"
+                        size={42}
+                        color="#FF3B30"
+                    />
+                }
+                title={`${staleLawsCount} ${staleLawsCount === 1 ? 'ley' : 'leyes'} de tu temario ${staleLawsCount === 1 ? 'ha cambiado' : 'han cambiado'}`}
+                description="Para no estudiar contenido desfasado, revísalas y pon tu temario al día."
+                primaryLabel="Revisar cambios"
+                primaryColor="#FF3B30"
+                onPrimaryPress={() => {
+                    setStaleAlertVisible(false);
+                    navigation.navigate('BoeHome');
+                }}
+                secondaryLabel="Más tarde"
+                onSecondaryPress={() => setStaleAlertVisible(false)}
+            />
+
+            {/* Banner push BOE en foreground (10.1·notif) — en Paso 2 lo dispara expo-notifications */}
+            <BoeAlertBanner
+                visible={boeBannerVisible}
+                onDismiss={() => setBoeBannerVisible(false)}
+                onPress={() => {
+                    setBoeBannerVisible(false);
+                    navigation.navigate('BoeHome');
+                }}
+            />
 
             {/* Nudge real pendiente del backend (2.4) — no se muestra a la vez que la demo */}
             {!nudge && realNudgeVisible && realNudge && realNudgeVisuals && (
@@ -819,6 +898,28 @@ const styles = StyleSheet.create({
     tutorText: {
         fontSize: 11.5,
         color: '#5A6373',
+    },
+    boeliveBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E8F8EE',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        gap: 3,
+        marginLeft: 4,
+    },
+    boeLiveDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#34C759',
+    },
+    boeLiveText: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#34C759',
+        letterSpacing: 0.3,
     },
 
     // ── Vista previa nudges (temporal) ───────────
