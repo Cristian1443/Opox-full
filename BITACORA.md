@@ -5,6 +5,148 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-07 — Bloque 10 · Monitor BOE completo de punta a punta
+
+Rama de trabajo: `feat/bloque-10-monitor-boe`. Se cierra el Bloque 10 íntegro:
+6 tablas Supabase, 9 endpoints REST, 5 pantallas mobile, diff word-by-word
+pre-calculado en el backend, brief IA para el mini-test y smoke test de 14
+requests / 61 assertions verde.
+
+### Contratos e IA
+
+- `packages/types/src/boe.ts` — DTOs completos (`BoeChange`, `BoeChangeDetail`,
+  `BoeFeedSection`, `BoeFeedResponse`, `BoeTextSegment`, `BoeComparisonBlock`,
+  `BoeComparisonResponse`, `BoeMiniTestQuestionDto`, `BoeMiniTestResponse`,
+  `CompleteMiniTestBody`, `ToggleBookmarkResponse`, `MarkReadResponse`,
+  `TrainingTopic` con campo `topicId` semántico).
+- `packages/types/src/contracts/AiApiContract.ts` — extendido con `generateBoeMiniTest`
+  (input: `changeId`, textos antes/después, hint; output: array de 3 preguntas con
+  exactamente 3 opciones cada una).
+- `packages/ai/BRIEF_IA_BLOQUE10.md` — brief para el equipo IA: tarea única
+  `generateBoeMiniTest`, formato exacto (3 opciones, no 4), nota explícita de que
+  el diff visual NO es tarea de IA (se hace en el backend con la librería `diff`).
+- `packages/constants/src/routes.js` — rutas BOE (`FEED`, `REGULATIONS`, `CHANGE_DETAIL`,
+  `CHANGE_COMPARISON`, `CHANGE_MINI_TEST`, `CHANGE_MINI_TEST_COMPLETE`, `CHANGE_READ`,
+  `CHANGE_BOOKMARK`) y `TRAINING.TOPICS` añadidas.
+- `packages/constants/src/index.d.ts` — declaraciones TypeScript para las nuevas rutas
+  (actualizado manualmente, ya que el archivo es hand-crafted).
+
+### Backend (arquitectura por capas completa)
+
+**Domain:** `BoeChange`, `BoeChangeDetail`, `BoeChangeFragment`, `BoeAlertRead`,
+`BoeAlertBookmark`, `BoeMiniTestResult`, `BoeWatchedRegulation`, `IBoeRepository`
+con 14 métodos. Errores tipados: `BoeChangeNotFoundError`.
+
+**Application:** 8 use cases en `application/boe/BoeUseCases.ts`:
+`GetBoeFeedUseCase`, `GetBoeChangeDetailUseCase`, `GetBoeComparisonUseCase`,
+`GetBoeMiniTestUseCase`, `CompleteMiniTestUseCase`, `MarkReadUseCase`,
+`ToggleBookmarkUseCase`, `ListTopicsUseCase`.
+
+Módulo auxiliar `application/boe/boeDiff.ts` — función `computeBoeDiff(antes, despues)`
+que llama a `diffWords` del paquete npm `diff` y devuelve
+`{ antesSegments: BoeTextSegment[], despuesSegments: BoeTextSegment[] }`. El diff
+es word-by-word: partes eliminadas → `{ type: 'deleted' }` en el bloque `antes`;
+partes añadidas → `{ type: 'added' }` en el bloque `despues`; partes comunes →
+`{ type: 'normal' }` en ambos. Validado con Art.14: 8 segmentos antes (3 deleted),
+9 segmentos después (4 added).
+
+**Infrastructure:** `SupabaseBoeRepository` — implementa los 14 métodos del contrato
+(6 queries principales + joins a `boe_alert_reads` y `boe_alert_bookmarks` por usuario).
+`MotorBoeClient.ts` — esqueleto para el futuro microservicio BOE del equipo IA (vacío,
+sin implementar). `AiApiClientStub.generateBoeMiniTest` — stub que devuelve 3 preguntas
+de demostración sobre el Art.14.
+
+**Presentation:** `BoeController` (9 handlers), `boeRoutes.ts` (9 rutas bajo `/boe/`)
+más `trainingTopicsRoutes.ts` (1 ruta `GET /training/topics`), `boeValidators.ts` (Zod).
+
+**SQL seed:** `apps/backend/supabase/bloque10_boe.sql` — 6 tablas:
+`boe_watched_regulations`, `boe_changes`, `boe_change_fragments`, `boe_alert_reads`,
+`boe_alert_bookmarks`, `boe_mini_test_results`. RLS en las 3 tablas de usuario
+(reads, bookmarks, mini_test_results). Seed de 3 cambios: Art.14 (`modificacion`,
+3 preguntas afectadas), Art.21 (`modificacion`, 5 preguntas), Art.58 (`tipografica`,
+0 preguntas, ya marcado como leído).
+
+Además `apps/backend/supabase/bloque6_topics.sql` — tabla `training_topics` + 10
+temas seed de `justicia-tramitacion` con `topicId` semántico.
+
+### Mobile — 5 pantallas + banner + wiring
+
+| Pantalla | Descripción |
+|---|---|
+| `BoeHomeScreen` (10.1) | Feed con 3 pestañas (Mi temario / Toda mi opo / Guardadas), API-driven con fallback MOCK_FEED |
+| `BoeDetailScreen` (10.2) | Detalle del cambio con toggle bookmark wired al API |
+| `BoeComparisonScreen` (10.3) | Renderiza los `blocks` pre-calculados del backend (segmentos deleted/added/normal) sin diff cliente |
+| `BoeMiniTestScreen` (10.4) | 3 preguntas A/B/C generadas por IA, llama a `completeMiniTest` al terminar |
+| `BoeUpdateSuccessScreen` (10.5) | Pantalla de éxito con score badge |
+
+Cliente `apps/mobile/src/api/boe.js` con 8 métodos: `getFeed`, `getDetail`,
+`getComparison`, `getMiniTest`, `completeMiniTest`, `markRead`, `toggleBookmark`,
+`listTopics`.
+
+Componente `BoeAlertBanner` — banner en el Dashboard con badge de no leídos y
+navegación al feed. `DashboardScreen` lo integra en el área superior de contenido.
+`OnboardingNavigator.js` registra las 5 rutas BOE.
+
+### Fix: GeneratorConfigScreen con temas reales
+
+`GeneratorConfigScreen.js` (Bloque 6 · Generador Infinito) eliminó los 10 temas
+hardcoded y ahora carga los temas reales via `boeApi.listTopics(oposicion)`. Usa
+`t.topicId` (valor semántico como `'ley-39'`) —  NO `t.id` (UUID) — para las
+llamadas a la IA, ya que el backend de generación de preguntas espera el identificador
+semántico, no la clave primaria.
+
+### Bugs encontrados y corregidos
+
+1. **`TrainingTopic.order` vs `sortOrder`** — `@opox/types` tenía `order: number`
+   pero el repositorio Supabase ya mapeaba el campo como `sortOrder`. Alineado en
+   `boe.ts` a `sortOrder`.
+
+2. **`BoeAlertBookmark` declarado y nunca usado (TS6196)** — importado en
+   `IBoeRepository.ts` y `SupabaseBoeRepository.ts` sin uso. Eliminado.
+
+3. **`private readonly config` nunca leído (TS6138)** — `MotorBoeClient` declaraba
+   `private readonly config` pero nunca lo accedía como `this.config`. Cambiado a
+   parámetro de constructor sin almacenar como propiedad.
+
+4. **`diff` package EPERM en Windows/OneDrive** — primer `pnpm add` falló con
+   `EPERM: operation not permitted` por locking de OneDrive. Resuelto repitiendo
+   el comando como operación única (`pnpm add diff @types/diff --filter=backend`).
+
+5. **Login script en colección Postman usaba `res.data?.session?.accessToken`**
+   — el backend devuelve `res.data.accessToken` (sin `session` intermediario).
+   Corregido vía script Python de parcheo del JSON.
+
+6. **9 fallos en el primer run de newman** — los asserts usaban nombres de campos
+   incorrectos (`section.title` vs `sectionTitle`, `d.fragments` vs `d.blocks`,
+   `affectedQuestions` vs `affectedQuestionsCount`, `res.data.bookmarked` vs
+   `isBookmarked`). Corregidos vía script Python; resultado final: 61/61 verde.
+
+### Smoke test (61/61 verde)
+
+Colección completa en `Bloque10_BOE_Tests.postman_collection.json`.
+
+| Grupo | Endpoints | Resultado |
+|---|---|---|
+| Auth | POST `/auth/login` | ✅ token generado |
+| Topics | GET `/training/topics` | ✅ 10 temas con `topicId` semántico |
+| Feed | GET `/boe/feed` | ✅ sections[] con sectionTitle + data[] |
+| Cambios (Art.14) | GET detail / comparison / mini-test / POST read / bookmark ×2 / mini-test/complete | ✅ 7 requests |
+| Art.58 tipográfico | GET detail | ✅ `changeType: tipografica`, `affectedQuestionsCount: 0`, `isRead: true` |
+| Errores | Sin token → 401, ID inexistente → 404 | ✅ 2 requests |
+
+### Pendientes conocidos del Bloque 10
+
+- **IA real del mini-test**: `AiApiClient.generateBoeMiniTest` delega en el stub.
+  Reemplazar cuando el equipo IA entregue el prompt del `BRIEF_IA_BLOQUE10.md`.
+  Marcador `TODO(ia-bloque10)` en `AiApiClientStub.ts`.
+- **MotorBoeClient**: esqueleto vacío para el futuro microservicio BOE. Activar
+  cuando el equipo IA despliegue el servicio de detección de cambios BOE.
+- **Bloque 6 · GeneratorConfigScreen**: `hasChanges` ya no compara `topicId` (se
+  eliminó esa lógica para simplificar); si en el futuro se necesita detectar cambios
+  en el tema seleccionado, re-añadir la comparación con `initialTopicId`.
+
+---
+
 ## 2026-07-29 — Bloque 9 · Factoría de Apuntes completa de punta a punta
 
 Rama de trabajo: `feat/bloque-9-factoria-apuntes`. Se cierra el Bloque 9 íntegro:
