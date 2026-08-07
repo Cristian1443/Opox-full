@@ -5,3 +5,4 @@ export * from './IMotivationRepository';
 export * from './ITrainingRepository';
 export * from './ITutorRepository';
 export * from './INotesRepository';
+export * from './IBoeRepository';

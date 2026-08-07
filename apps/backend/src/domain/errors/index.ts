@@ -6,3 +6,4 @@ export * from './MotivationError';
 export * from './TrainingError';
 export * from './TutorError';
 export * from './NotesError';
+export * from './BoeError';
