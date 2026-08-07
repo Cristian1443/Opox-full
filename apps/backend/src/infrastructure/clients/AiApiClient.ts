@@ -18,6 +18,8 @@ import type {
     GenerateTagsFromNoteResult,
     GenerateQuestionsFromNoteParams,
     GenerateQuestionsFromNoteResult,
+    GenerateBoeMiniTestParams,
+    BoeMiniTestAiResult,
 } from '@opox/types';
 import { logger } from '@opox/utils';
 import { AiApiClientStub } from './AiApiClientStub';
@@ -237,6 +239,14 @@ export class AiApiClient implements AiApiContract {
 
     async generateQuestionsFromNote(params: GenerateQuestionsFromNoteParams): Promise<GenerateQuestionsFromNoteResult> {
         return this.notesFallback.generateQuestionsFromNote(params);
+    }
+
+    // ── Bloque 10 · Monitor BOE ───────────────────────────────────────────────
+    // TODO(ia-bloque10): implementar contra OpenAI cuando el equipo IA entregue
+    // los prompts del BRIEF_IA_BLOQUE10.md. Mientras tanto, delegamos en stub.
+
+    async generateBoeMiniTest(params: GenerateBoeMiniTestParams): Promise<BoeMiniTestAiResult> {
+        return this.notesFallback.generateBoeMiniTest(params);
     }
 }
 

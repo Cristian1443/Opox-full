@@ -90,6 +90,16 @@ import {
     UpdateNoteTagsUseCase,
     DeleteNoteUseCase,
     GenerateTestFromNoteUseCase,
+    // Bloque 10 · Monitor BOE
+    GetBoeFeedUseCase,
+    GetBoeChangeDetailUseCase,
+    GetBoeComparisonUseCase,
+    GetBoeMiniTestUseCase,
+    MarkBoeReadUseCase,
+    ToggleBoeBookmarkUseCase,
+    CompleteBoeMiniTestUseCase,
+    ListTopicsUseCase,
+    SyncBoeChangesUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -101,9 +111,11 @@ import {
     SupabaseTrainingRepository,
     SupabaseTutorRepository,
     SupabaseNotesRepository,
+    SupabaseBoeRepository,
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
+    MotorBoeClient,
 } from './infrastructure';
 import {
     AuthController,
@@ -113,9 +125,10 @@ import {
     TrainingController,
     TutorController,
     NotesController,
+    BoeController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -155,6 +168,10 @@ export function buildContainer() {
         ? new SupabaseNotesRepository(getSupabaseAdmin())
         : createStubNotesRepository();
 
+    const boeRepo: IBoeRepository = isSupabaseConfigured
+        ? new SupabaseBoeRepository(getSupabaseAdmin())
+        : createStubBoeRepository();
+
     if (!isSupabaseConfigured) {
         logger.warn(
             '[container] Supabase no configurado. Todas las rutas /auth, /dashboard, /planning y ' +
@@ -185,6 +202,22 @@ export function buildContainer() {
         logger.warn(
             '[container] IA no configurada — usando AiApiClientStub con datos mock. ' +
             'Rellena AI_API_BASE_URL / AI_API_KEY / AI_API_DEFAULT_MODEL en .env para usar IA real.',
+        );
+    }
+
+    const motorBoe = env.MOTOR_BOE_BASE_URL
+        ? new MotorBoeClient({
+            baseUrl: env.MOTOR_BOE_BASE_URL,
+            apiKey: env.MOTOR_BOE_API_KEY ?? '',
+            openAiKey: env.MOTOR_BOE_OPENAI_KEY ?? env.AI_API_KEY ?? '',
+            timeoutMs: 20_000,
+        })
+        : null;
+
+    if (!env.MOTOR_BOE_BASE_URL) {
+        logger.warn(
+            '[container] Motor BOE no configurado — MotorBoeClient desactivado. ' +
+            'Rellena MOTOR_BOE_BASE_URL en .env para activar la sincronización automática de cambios.',
         );
     }
 
@@ -292,6 +325,17 @@ export function buildContainer() {
         updateNoteTags: new UpdateNoteTagsUseCase(notesRepo),
         deleteNote: new DeleteNoteUseCase(notesRepo),
         generateTestFromNote: new GenerateTestFromNoteUseCase(notesRepo),
+
+        // Bloque 10 · Monitor BOE
+        getBoeFeed: new GetBoeFeedUseCase(boeRepo),
+        getBoeDetail: new GetBoeChangeDetailUseCase(boeRepo),
+        getBoeComparison: new GetBoeComparisonUseCase(boeRepo),
+        getBoeMiniTest: new GetBoeMiniTestUseCase(boeRepo, aiApi),
+        markBoeRead: new MarkBoeReadUseCase(boeRepo),
+        toggleBoeBookmark: new ToggleBoeBookmarkUseCase(boeRepo),
+        completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo),
+        listTopics: new ListTopicsUseCase(boeRepo),
+        syncBoeChanges: motorBoe ? new SyncBoeChangesUseCase(boeRepo, motorBoe) : undefined,
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -332,6 +376,7 @@ export function buildContainer() {
         deleteBookmark: useCases.deleteBookmark,
         generateHint: useCases.generateHint,
         reportQuestion: useCases.reportQuestion,
+        listTopics: useCases.listTopics,
     });
 
     const notesController = new NotesController({
@@ -342,6 +387,17 @@ export function buildContainer() {
         updateTags: useCases.updateNoteTags,
         deleteNote: useCases.deleteNote,
         generateTest: useCases.generateTestFromNote,
+    });
+
+    const boeController = new BoeController({
+        getFeed: useCases.getBoeFeed,
+        getDetail: useCases.getBoeDetail,
+        getComparison: useCases.getBoeComparison,
+        getMiniTest: useCases.getBoeMiniTest,
+        markRead: useCases.markBoeRead,
+        toggleBookmark: useCases.toggleBoeBookmark,
+        completeMiniTest: useCases.completeBoeMiniTest,
+        syncChanges: useCases.syncBoeChanges,
     });
 
     const tutorController = new TutorController({
@@ -389,6 +445,7 @@ export function buildContainer() {
         trainingRepo,
         clientApi,
         aiApi,
+        motorBoe,
         useCases,
         controllers: {
             auth: authController,
@@ -398,6 +455,7 @@ export function buildContainer() {
             training: trainingController,
             tutor: tutorController,
             notes: notesController,
+            boe: boeController,
         },
         middleware: {
             auth: authMiddleware,
@@ -456,4 +514,11 @@ function createStubNotesRepository(): INotesRepository {
         throw new Error('[notes] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as INotesRepository, { get: () => notConfigured });
+}
+
+function createStubBoeRepository(): IBoeRepository {
+    const notConfigured = (): never => {
+        throw new Error('[boe] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IBoeRepository, { get: () => notConfigured });
 }

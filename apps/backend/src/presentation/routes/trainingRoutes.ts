@@ -106,5 +106,11 @@ export function createTrainingRouter(
         controller.reportQuestion,
     );
 
+    r.get(
+        API_ROUTES.TRAINING.TOPICS,
+        authMiddleware,
+        controller.listTopics,
+    );
+
     return r;
 }

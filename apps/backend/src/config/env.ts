@@ -43,6 +43,12 @@ const envSchema = z.object({
     AI_API_DEFAULT_MODEL: optionalString,
     AI_API_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
 
+    // Motor BOE externo — opcional; sin él MotorBoeClient no se instancia
+    MOTOR_BOE_BASE_URL: optionalUrl,
+    MOTOR_BOE_API_KEY: optionalString,
+    // Si no se declara, reutiliza AI_API_KEY para las llamadas OpenAI del Motor
+    MOTOR_BOE_OPENAI_KEY: optionalString,
+
     REVENUECAT_WEBHOOK_SECRET: optionalString,
     EXPO_ACCESS_TOKEN: optionalString,
 

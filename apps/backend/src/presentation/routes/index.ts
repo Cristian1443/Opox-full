@@ -6,3 +6,4 @@ export * from './motivationRoutes';
 export * from './trainingRoutes';
 export * from './tutorRoutes';
 export * from './notesRoutes';
+export * from './boeRoutes';

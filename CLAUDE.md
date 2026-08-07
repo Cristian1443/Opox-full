@@ -13,11 +13,11 @@ Opox-full/
 │   ├── mobile/          # React Native + Expo (JS, migrando a TS)
 │   │   ├── App.js
 │   │   ├── src/
-│   │   │   ├── api/         # Clientes HTTP: auth, dashboard, planning, motivation, training, tutor
-│   │   │   ├── components/  # Componentes compartidos (ScreenHeader, modales, FlashcardsSuccessModal, …)
+│   │   │   ├── api/         # Clientes HTTP: auth, dashboard, planning, motivation, training, tutor, notes, boe
+│   │   │   ├── components/  # Componentes compartidos (ScreenHeader, modales, BoeAlertBanner, …)
 │   │   │   ├── hooks/       # Custom hooks de UI (useNetworkWatcher, …)
 │   │   │   ├── navigation/  # OnboardingNavigator.js, navigationRef.js
-│   │   │   ├── screens/     # Pantallas por bloque: access/, health/, training/, tutor/, …
+│   │   │   ├── screens/     # Pantallas por bloque: access/, health/, training/, tutor/, notes/, boe/
 │   │   │   └── theme.js     # Tokens de diseño OPOX
 │   │   └── app.json
 │   └── backend/         # Node.js + Express + TypeScript, arquitectura por capas
@@ -37,7 +37,7 @@ Opox-full/
 │   │   └── src/
 │   │       ├── contracts/   # AiApiContract.ts, ClientApiContract.ts
 │   │       ├── api.ts       # ApiResponse<T>, códigos de error
-│   │       ├── auth.ts, dashboard.ts, planning.ts, motivation.ts, training.ts, tutor.ts
+│   │       ├── auth.ts, dashboard.ts, planning.ts, motivation.ts, training.ts, tutor.ts, notes.ts, boe.ts
 │   │       └── index.ts
 │   ├── constants/       # Constantes y rutas compartidas (routes.js)
 │   ├── utils/           # logger, result pattern (result.ts)
@@ -121,6 +121,51 @@ métodos en `AiApiClientStub` — el pipeline es ejecutable de punta a punta con
 mock realistas. El día que llegue la implementación real basta con reemplazar los
 tres métodos delegados por llamadas a OpenAI/Motor.
 
+### Monitor BOE (Bloque 10) — endpoints propios
+
+Detecta y notifica cambios legislativos en el BOE que afectan al temario del
+usuario. Rutas bajo `/boe/` y un endpoint adicional `/training/topics`.
+
+Tipos en `packages/types/src/boe.ts` (`BoeChange`, `BoeChangeDetail`,
+`BoeComparisonResponse` con `blocks: BoeComparisonBlock[]`, `BoeMiniTestQuestionDto`,
+`TrainingTopic`). SQL en `apps/backend/supabase/bloque10_boe.sql` (6 tablas con RLS).
+Cliente mobile en `apps/mobile/src/api/boe.js`. Colección de tests en
+`Bloque10_BOE_Tests.postman_collection.json` (14 requests, 61 assertions).
+
+**Diff visual (pantalla 10.3 Comparativa)**: el backend pre-calcula el diff
+word-by-word con el paquete npm `diff` en `application/boe/boeDiff.ts` y devuelve
+`blocks: [{ type: 'antes', segments: [...] }, { type: 'despues', segments: [...] }]`.
+Cada segmento tiene `type: 'normal' | 'deleted' | 'added'`. El mobile renderiza
+directamente los segmentos — no hay diff en cliente.
+
+**IA mini-test**: `AiApiContract.generateBoeMiniTest` definido. `AiApiClient` delega
+en `AiApiClientStub` hasta que el equipo IA entregue el prompt del
+`packages/ai/BRIEF_IA_BLOQUE10.md`. Las preguntas tienen **exactamente 3 opciones**
+(no 4 como el Generador Infinito). Marcador `TODO(ia-bloque10)`.
+
+**`TrainingTopic.topicId`**: identificador semántico (`'constitucion'`, `'ley-39'`,
+etc.) distinto del `id` UUID. El mobile y el backend de generación de preguntas
+SIEMPRE usan `topicId`, nunca el UUID, para las llamadas a la IA.
+
+**Motor BOE externo** (`https://ingesta-demo-uadftnwmda-ue.a.run.app`): servicio
+desplegado para detectar cambios en el BOE oficial. Integrado en:
+- `infrastructure/boe/MotorBoeClient.ts` — cliente HTTP con auth `X-API-Key` +
+  `X-OpenAI-Key`. Implementa `MotorBoeContract` (definido en `@opox/types`).
+- `application/boe/BoeUseCases.ts` → `SyncBoeChangesUseCase` — orquesta el flujo:
+  `checkForChanges → pollJob → getChanges → repo.upsertChange()`.
+- `POST /boe/sync` (ruta `BOE.SYNC`) — endpoint autenticado que dispara la sync.
+  Cuerpo: `{ curso_id: string }` (ID del curso en el Motor).
+- `SupabaseBoeRepository.upsertChange()` — idempotente, deduplica por
+  `boe_identifier + día de detected_at`.
+- Vars de entorno opcionales: `MOTOR_BOE_BASE_URL`, `MOTOR_BOE_API_KEY`,
+  `MOTOR_BOE_OPENAI_KEY`. Sin `MOTOR_BOE_BASE_URL`, el cliente no se instancia.
+
+**Generador Infinito (pantalla 6.2) — `GeneratorConfigScreen.js`**:
+- TTL de 15 s (aviso) / 60 s (cancelación con tarjeta de error + Reintentar).
+- Selector de tema con **multi-selección**: opción "Todos los temas" (`topicId='all'`)
+  más checkboxes individuales acumulables. Múltiple selección → IDs separados por
+  coma en `topicId`. Sin cambio en `GenerateQuestionsParams`.
+
 ### Motor de IA del cliente (sin desplegar)
 
 El equipo IA entregó un microservicio RAG separado
@@ -156,5 +201,6 @@ pnpm lint                       # lint completo
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
 | 9 | Factoría de Apuntes | Frontend + backend completo (upload, pipeline OCR→tags→preguntas con AiApiClientStub, generación de tests, 10/10 smoke test verde). IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
+| 10 | Monitor BOE | Frontend + backend completo (feed, detalle, comparativa con diff word-by-word, mini-test con AiApiClientStub, 14 requests / 61 assertions verde). IA real (`generateBoeMiniTest`) esperando entrega del prompt del `BRIEF_IA_BLOQUE10.md` |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

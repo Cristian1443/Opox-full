@@ -17,3 +17,4 @@ export * from './TutorFlashcardDeck';
 export * from './TutorPodcastEpisode';
 export * from './TutorSummary';
 export * from './Note';
+export * from './BoeEntities';

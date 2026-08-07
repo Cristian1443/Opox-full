@@ -31,6 +31,7 @@ import type {
     DeleteBookmarkUseCase,
     GenerateHintUseCase,
     ReportQuestionUseCase,
+    ListTopicsUseCase,
 } from '../../application';
 import type { MockExamWithStatus } from '../../domain/entities/MockExam';
 import type { TrainingAttempt } from '../../domain/entities/TrainingAttempt';
@@ -53,6 +54,7 @@ export class TrainingController {
             deleteBookmark: DeleteBookmarkUseCase;
             generateHint: GenerateHintUseCase;
             reportQuestion: ReportQuestionUseCase;
+            listTopics: ListTopicsUseCase;
         },
     ) { }
 
@@ -257,6 +259,15 @@ export class TrainingController {
                 details: body.details,
             });
             res.status(204).end();
+        } catch (err) { next(err); }
+    };
+
+    // GET /training/topics?oposicion=
+    listTopics = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const oposicion = (req.query['oposicion'] as string) ?? '';
+            const topics = await this.deps.listTopics.execute(oposicion);
+            this.ok(res, 200, topics);
         } catch (err) { next(err); }
     };
 }

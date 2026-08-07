@@ -1,0 +1,475 @@
+{
+  "info": {
+    "name": "Motor de IA — Monitor BOE (Bloque 10)",
+    "description": "**Monitor legislativo (Bloque 10)** sobre la API oficial de legislación consolidada del BOE (`https://www.boe.es/datosabiertos/api/legislacion-consolidada`).\n\nRecorre la entrega completa: dar de alta las normas del temario, comprobar cambios, ver el antes/después real, y reescribir las preguntas afectadas bajo la validación del generador.\n\n**Autenticación**\n- `X-API-Key`: clave de servicio del motor. Vacía si el despliegue va abierto.\n- `X-OpenAI-Key`: tu clave de OpenAI (`sk-…`). Es una cabecera DISTINTA: en el entorno de pruebas no hay clave en el servidor, así que cada quien paga sus propias llamadas.\n\n**Orden**: 1 → 2 → 3 → 4 (hasta `done`) → 5 → 6 → 4 → 7. Las variables `regulation_id`, `job_id` y `change_id` se capturan solas con los tests de cada petición.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://ingesta-demo-uadftnwmda-ue.a.run.app",
+      "description": "Entorno de pruebas desplegado. En local: http://localhost:8080"
+    },
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "curso_id",
+      "value": ""
+    },
+    {
+      "key": "identificador_boe",
+      "value": "BOE-A-1978-31229"
+    },
+    {
+      "key": "regulation_id",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "change_id",
+      "value": ""
+    },
+    {
+      "key": "openai_key",
+      "value": "",
+      "description": "Tu clave de OpenAI (sk-…)"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 · Seguir una norma",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text",
+            "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+          },
+          {
+            "key": "X-OpenAI-Key",
+            "value": "{{openai_key}}",
+            "type": "text",
+            "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/boe/regulations",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "boe",
+            "regulations"
+          ]
+        },
+        "description": "Da de alta una norma del temario y **descarga su texto consolidado** como snapshot inicial.\n\n| Campo | Tipo | Descripción |\n|---|---|---|\n| `curso_id` | string | Curso al que se vincula el seguimiento |\n| `identificador_boe` | string | Identificador BOE-A-AAAA-NNNNN |\n| `titulo` | string | Opcional; si se omite, se toma el del BOE |\n\n**Respuestas:** `201` con la norma seguida · `422` identificador mal formado o norma sin texto consolidado · `404` curso o norma inexistente · `409` ya seguida · `502` el BOE no responde.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"identificador_boe\": \"{{identificador_boe}}\",\n  \"titulo\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 y snapshot guardado', () => pm.response.to.have.status(201));",
+              "const n = pm.response.json();",
+              "pm.collectionVariables.set('regulation_id', n.id);",
+              "console.log('Norma:', n.identificador_boe, '·', n.texto_len, 'chars');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Listar normas seguidas",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text",
+            "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+          },
+          {
+            "key": "X-OpenAI-Key",
+            "value": "{{openai_key}}",
+            "type": "text",
+            "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/boe/regulations?course_id={{curso_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "boe",
+            "regulations"
+          ],
+          "query": [
+            {
+              "key": "course_id",
+              "value": "{{curso_id}}"
+            }
+          ]
+        },
+        "description": "Normas **activas** del curso, en orden de alta. Las que se dejan de seguir no aparecen."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.code === 200);",
+              "console.log(pm.response.json().length, 'norma(s) en seguimiento');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Comprobar cambios (job)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text",
+            "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+          },
+          {
+            "key": "X-OpenAI-Key",
+            "value": "{{openai_key}}",
+            "type": "text",
+            "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/boe/check",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "boe",
+            "check"
+          ]
+        },
+        "description": "Comprueba las normas del curso contra el BOE. Resultado del job:\n\n- `cambios`: reformas reales (si el diff sale vacío no se registra nada).\n- `preguntas_afectadas`: preguntas que dejan de publicarse en el acto.\n- `contenido_afectado`: fragmentos del temario retirados por copiar la redacción derogada.\n- `resincronizadas`: snapshots puestos al día tras un cambio del parser, sin reforma detrás.\n- `fallidas`/`errores`: normas que se reintentan en el ciclo siguiente.\n- `corte`: presente si el job paró por el tope de coste.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"curso_id\": \"{{curso_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 con job', () => pm.response.to.have.status(202));",
+              "pm.collectionVariables.set('job_id', pm.response.json().job_id);"
+            ]
+          }
+        }
+      ],
+      "description": "Comprueba las normas del curso. Para el barrido completo (cron diario) manda {\"todos\": true} en lugar del curso."
+    },
+    {
+      "name": "3b · Comprobar TODO (lo que hace el cron)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text",
+            "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+          },
+          {
+            "key": "X-OpenAI-Key",
+            "value": "{{openai_key}}",
+            "type": "text",
+            "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/boe/check",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "boe",
+            "check"
+          ]
+        },
+        "description": "Barrido completo de todas las normas de todos los cursos: es exactamente lo que manda el cron diario. Hay que pedirlo a propósito con `todos: true`; un cuerpo vacío se rechaza con 422.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"todos\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 con job', () => pm.response.to.have.status(202));",
+              "pm.collectionVariables.set('job_id', pm.response.json().job_id);"
+            ]
+          }
+        }
+      ],
+      "description": "Comprueba las normas del curso. Para el barrido completo (cron diario) manda {\"todos\": true} en lugar del curso."
+    },
+    {
+      "name": "4 · Estado del job",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text",
+            "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+          },
+          {
+            "key": "X-OpenAI-Key",
+            "value": "{{openai_key}}",
+            "type": "text",
+            "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/jobs/{{job_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "jobs",
+            "{{job_id}}"
+          ]
+        },
+        "description": "Sondea hasta `estado: done`. El resultado trae `{revisadas, cambios, preguntas_afectadas, fallidas, errores}`.\n\nVale tanto para la comprobación como para la regeneración."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const j = pm.response.json();",
+              "console.log(j.estado, JSON.stringify(j.resultado), '$' + j.cost_usd);",
+              "pm.test('el job no falló', () => pm.expect(j.estado).to.not.eql('error'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Ver cambios detectados",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text",
+            "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+          },
+          {
+            "key": "X-OpenAI-Key",
+            "value": "{{openai_key}}",
+            "type": "text",
+            "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/boe/changes?course_id={{curso_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "boe",
+            "changes"
+          ],
+          "query": [
+            {
+              "key": "course_id",
+              "value": "{{curso_id}}"
+            }
+          ]
+        },
+        "description": "Comparador antes/después. Cada cambio trae `fragmentos[{antes, despues, contexto}]`, las `preguntas_afectadas` con su similitud y estado, y el `contenido_afectado` (temario retirado). Los cambios de una norma que se dejó de seguir no se listan."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const cambios = pm.response.json();",
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const pendiente = cambios.find(c => (c.preguntas_afectadas||[]).some(a => a.estado === 'marcada'));",
+              "if (pendiente) { pm.collectionVariables.set('change_id', pendiente.id); }",
+              "cambios.forEach(c => console.log(c.identificador_boe, '·', c.fragmentos.length, 'preceptos ·',",
+              "  (c.preguntas_afectadas||[]).length, 'preguntas ·', (c.contenido_afectado||[]).length, 'fragmentos de temario'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · Regenerar preguntas afectadas (job)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text",
+            "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+          },
+          {
+            "key": "X-OpenAI-Key",
+            "value": "{{openai_key}}",
+            "type": "text",
+            "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/boe/changes/{{change_id}}/regenerate",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "boe",
+            "changes",
+            "{{change_id}}",
+            "regenerate"
+          ]
+        },
+        "description": "Reescribe cada pregunta marcada sobre el texto vigente y la republica SOLO si supera la validación completa (L0→L3). El job devuelve `regeneradas`, `marcadas` (siguen fuera), `fallidas` y `sesion_id` del mini-test de validación.\n\n- `409 regeneracion_en_curso`: ya hay un job en vuelo para ese cambio.\n- `409 norma_no_seguida`: la norma se dio de baja.\n- `404 cambio_no_encontrado`: no existe, o no es de ese curso.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"curso_id\": \"{{curso_id}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 con job', () => pm.response.to.have.status(202));",
+              "pm.collectionVariables.set('job_id', pm.response.json().job_id);"
+            ]
+          }
+        }
+      ],
+      "description": "Reescribe las preguntas afectadas por el cambio. Devuelve 409 si ya hay una regeneración en vuelo para ese cambio."
+    },
+    {
+      "name": "7 · Dejar de seguir una norma",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text",
+            "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+          },
+          {
+            "key": "X-OpenAI-Key",
+            "value": "{{openai_key}}",
+            "type": "text",
+            "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/boe/regulations/{{regulation_id}}?course_id={{curso_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "boe",
+            "regulations",
+            "{{regulation_id}}"
+          ],
+          "query": [
+            {
+              "key": "course_id",
+              "value": "{{curso_id}}",
+              "description": "Curso al que pertenece la norma; sin él no se sabe sobre qué temario se actúa."
+            }
+          ]
+        },
+        "description": "Deja de seguir una norma del curso indicado. El curso es obligatorio: con solo el id de la norma se podía retirar la vigilancia de otro temario."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204 sin cuerpo', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

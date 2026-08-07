@@ -81,6 +81,13 @@ import NotesAnalysisScreen from '../screens/notes/NotesAnalysisScreen';
 import NoteDetailScreen from '../screens/notes/NoteDetailScreen';
 import NotesTestConfigScreen from '../screens/notes/NotesTestConfigScreen';
 
+// Bloque 10 · Monitor BOE
+import BoeHomeScreen from '../screens/boe/BoeHomeScreen';
+import BoeDetailScreen from '../screens/boe/BoeDetailScreen';
+import BoeComparisonScreen from '../screens/boe/BoeComparisonScreen';
+import BoeMiniTestScreen from '../screens/boe/BoeMiniTestScreen';
+import BoeUpdateSuccessScreen from '../screens/boe/BoeUpdateSuccessScreen';
+
 // Bloque 6 · Entrenamiento
 import TrainingHomeScreen from '../screens/training/TrainingHomeScreen';
 import GeneratorConfigScreen from '../screens/training/GeneratorConfigScreen';
@@ -178,6 +185,13 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="NotesAnalysis" component={NotesAnalysisScreen} />
             <Stack.Screen name="NoteDetail" component={NoteDetailScreen} />
             <Stack.Screen name="NotesTestConfig" component={NotesTestConfigScreen} />
+
+            {/* Bloque 10 · Monitor BOE */}
+            <Stack.Screen name="BoeHome" component={BoeHomeScreen} />
+            <Stack.Screen name="BoeDetail" component={BoeDetailScreen} />
+            <Stack.Screen name="BoeComparison" component={BoeComparisonScreen} />
+            <Stack.Screen name="BoeMiniTest" component={BoeMiniTestScreen} />
+            <Stack.Screen name="BoeUpdateSuccess" component={BoeUpdateSuccessScreen} />
 
             {/* Bloque 6 · Entrenamiento */}
             <Stack.Screen name="TrainingHome" component={TrainingHomeScreen} />
