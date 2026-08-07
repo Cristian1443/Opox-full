@@ -147,6 +147,25 @@ en `AiApiClientStub` hasta que el equipo IA entregue el prompt del
 etc.) distinto del `id` UUID. El mobile y el backend de generación de preguntas
 SIEMPRE usan `topicId`, nunca el UUID, para las llamadas a la IA.
 
+**Motor BOE externo** (`https://ingesta-demo-uadftnwmda-ue.a.run.app`): servicio
+desplegado para detectar cambios en el BOE oficial. Integrado en:
+- `infrastructure/boe/MotorBoeClient.ts` — cliente HTTP con auth `X-API-Key` +
+  `X-OpenAI-Key`. Implementa `MotorBoeContract` (definido en `@opox/types`).
+- `application/boe/BoeUseCases.ts` → `SyncBoeChangesUseCase` — orquesta el flujo:
+  `checkForChanges → pollJob → getChanges → repo.upsertChange()`.
+- `POST /boe/sync` (ruta `BOE.SYNC`) — endpoint autenticado que dispara la sync.
+  Cuerpo: `{ curso_id: string }` (ID del curso en el Motor).
+- `SupabaseBoeRepository.upsertChange()` — idempotente, deduplica por
+  `boe_identifier + día de detected_at`.
+- Vars de entorno opcionales: `MOTOR_BOE_BASE_URL`, `MOTOR_BOE_API_KEY`,
+  `MOTOR_BOE_OPENAI_KEY`. Sin `MOTOR_BOE_BASE_URL`, el cliente no se instancia.
+
+**Generador Infinito (pantalla 6.2) — `GeneratorConfigScreen.js`**:
+- TTL de 15 s (aviso) / 60 s (cancelación con tarjeta de error + Reintentar).
+- Selector de tema con **multi-selección**: opción "Todos los temas" (`topicId='all'`)
+  más checkboxes individuales acumulables. Múltiple selección → IDs separados por
+  coma en `topicId`. Sin cambio en `GenerateQuestionsParams`.
+
 ### Motor de IA del cliente (sin desplegar)
 
 El equipo IA entregó un microservicio RAG separado
