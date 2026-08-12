@@ -5,6 +5,89 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-12 — Bloque 11 · Tienda OPOX completo de punta a punta
+
+Rama de trabajo: `main`. Frontend del bloque ya existía; esta sesión cierra el
+backend completo y conecta ambas capas. Smoke test de 20 requests / 65 assertions
+pasa verde en primera ejecución real contra Supabase.
+
+### Frontend — correcciones previas
+
+Antes de pasar al backend se corrigieron 5 bugs del frontend del bloque:
+- **Error map undefined**: `(reward.conditions ?? []).map()` en `StoreRealRewardDetailScreen`.
+- **Filtros invisibles**: cambio de `ScrollView horizontal` a `View` con `flexWrap: 'wrap'`
+  en `StoreRealRewardsScreen`.
+- **Texto "Fase 2"**: eliminado de 5 pantallas (era marcador de wireframe).
+- **Acceso a Comunidad**: añadida 5ª pestaña en `StoreHomeScreen` con `navigateTo: 'StoreMarketplace'`
+  y scroll horizontal en la barra de tabs.
+- **Avatares de partner**: Ionicons sustituidos por View coloreado + abreviatura de 2 letras
+  (`partnerAbbr`) en todas las pantallas de la tienda.
+- **Cartera rediseñada**: sección activas/usadas/caducadas en lugar de tabs; cards
+  compactas con código inline + chip de acción.
+- **Marketplace**: footer sticky "Publicar mi test" en lugar de FAB.
+- **Widget en Dashboard**: widget "Tienda OPOX" añadido a `DashboardScreen`.
+
+### Tipos compartidos
+
+`packages/types/src/store.ts` — 7 DTOs:
+`StoreBalanceDTO`, `StoreProductDTO`, `StoreDiscountDTO`, `WalletItemDTO`,
+`PurchaseResultDTO`, `CommunityTestDTO`, `CommunityTestDetailDTO`,
+`CommunityTestActionResultDTO`.
+
+`packages/constants/src/routes.js` + `index.d.ts` — sección `STORE` con 10 rutas.
+
+### SQL (Supabase)
+
+`apps/backend/supabase/bloque11_tienda.sql` — 6 tablas con RLS:
+- `store_products` — catálogo de recompensas reales (seed: Uber Eats, Decathlon, Spotify, Amazon).
+- `store_discounts` — descuentos/vouchers virtuales (seed: FNAC, El Corte Inglés).
+- `user_wallet` — códigos canjeados por el usuario, estado active/used/expired.
+- `user_opopoints_ledger` — historial earn/spend de Opopoints; saldo calculado como suma neta.
+- `community_tests` — tests publicados por la comunidad.
+- `community_test_purchases` — registro de obtenciones (unique user+test).
+
+### Backend (Clean Architecture)
+
+Mismo patrón que BOE (Bloque 10):
+
+**Dominio:**
+- `StoreEntities.ts` — `StoreProduct`, `StoreDiscount`, `WalletItem`, `OpoLedgerEntry`, `CommunityTest`.
+- `StoreError.ts` — 6 errores de dominio (404 product/wallet, 409 out-of-stock/already-purchased, 422 insufficient-balance).
+- `IStoreRepository.ts` — contrato con 17 métodos.
+
+**Aplicación (11 use cases):**
+`GetStoreBalance`, `ListStoreProducts`, `GetStoreProduct`, `RedeemProduct`
+(genera código, deduce ledger, decrementa stock, crea wallet item),
+`ListStoreDiscounts`, `GetWallet`, `GetWalletItem`, `ListCommunityTests`,
+`GetCommunityTest`, `PublishCommunityTest`, `ObtainCommunityTest`.
+
+**Infraestructura:**
+`SupabaseStoreRepository` — 17 métodos, saldo calculado como suma reduce sobre el ledger,
+`decrementStock` con fallback manual si la RPC no existe.
+
+**Presentación:**
+- `StoreController` — 11 handlers con `ok<T>()` helper estándar.
+- `storeValidators.ts` — Zod para `publishCommunityTest` (título 5-120 chars).
+- `storeRoutes.ts` — 11 rutas bajo `/store/`.
+
+**DI / arranque:**
+- `container.ts` — `storeRepo`, 11 use cases, `storeController`, `createStubStoreRepository()`.
+- `server.ts` — `app.use(createStoreRouter(...))`.
+
+**Cliente mobile:**
+`apps/mobile/src/api/store.js` — `storeApi` con todas las llamadas HTTP, exportado desde `api/index.js`.
+
+### Smoke test
+
+`Bloque11_Tienda_Tests.postman_collection.json` — **20 requests / 65 assertions / 0 fallos**.
+
+Cubre: balance, listado + filtro de productos, detalle, canje (código generado,
+saldo actualizado), cartera (lista + detalle), descuentos, tests comunidad (listar,
+filtrar gratis, publicar, detalle, obtener), y 6 casos de error
+(401, 404×2, 409, 400 Zod, 422 saldo insuficiente).
+
+---
+
 ## 2026-08-07 (cont.) — Motor BOE integrado + mejoras UX Generador Infinito
 
 Continuación de la misma rama `feat/bloque-10-monitor-boe`.

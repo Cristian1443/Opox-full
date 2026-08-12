@@ -92,6 +92,19 @@ declare const API_ROUTES: {
         readonly GENERATE_TEST: string;
     };
 
+    readonly STORE: {
+        readonly BALANCE: string;
+        readonly PRODUCTS: string;
+        readonly PRODUCT: string;
+        readonly REDEEM: string;
+        readonly DISCOUNTS: string;
+        readonly WALLET: string;
+        readonly WALLET_ITEM: string;
+        readonly COMMUNITY_TESTS: string;
+        readonly COMMUNITY_TEST: string;
+        readonly COMMUNITY_TEST_PURCHASE: string;
+    };
+
     readonly MOTIVATION: {
         readonly SUMMARY: string;
         readonly STREAK: string;

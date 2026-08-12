@@ -100,6 +100,18 @@ import {
     CompleteBoeMiniTestUseCase,
     ListTopicsUseCase,
     SyncBoeChangesUseCase,
+    // Bloque 11 · Tienda
+    GetStoreBalanceUseCase,
+    ListStoreProductsUseCase,
+    GetStoreProductUseCase,
+    RedeemProductUseCase,
+    ListStoreDiscountsUseCase,
+    GetWalletUseCase,
+    GetWalletItemUseCase,
+    ListCommunityTestsUseCase,
+    GetCommunityTestUseCase,
+    PublishCommunityTestUseCase,
+    ObtainCommunityTestUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -112,6 +124,7 @@ import {
     SupabaseTutorRepository,
     SupabaseNotesRepository,
     SupabaseBoeRepository,
+    SupabaseStoreRepository,
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
@@ -126,9 +139,10 @@ import {
     TutorController,
     NotesController,
     BoeController,
+    StoreController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -171,6 +185,10 @@ export function buildContainer() {
     const boeRepo: IBoeRepository = isSupabaseConfigured
         ? new SupabaseBoeRepository(getSupabaseAdmin())
         : createStubBoeRepository();
+
+    const storeRepo: IStoreRepository = isSupabaseConfigured
+        ? new SupabaseStoreRepository(getSupabaseAdmin())
+        : createStubStoreRepository();
 
     if (!isSupabaseConfigured) {
         logger.warn(
@@ -336,6 +354,19 @@ export function buildContainer() {
         completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo),
         listTopics: new ListTopicsUseCase(boeRepo),
         syncBoeChanges: motorBoe ? new SyncBoeChangesUseCase(boeRepo, motorBoe) : undefined,
+
+        // Bloque 11 · Tienda
+        getStoreBalance: new GetStoreBalanceUseCase(storeRepo),
+        listStoreProducts: new ListStoreProductsUseCase(storeRepo),
+        getStoreProduct: new GetStoreProductUseCase(storeRepo),
+        redeemProduct: new RedeemProductUseCase(storeRepo),
+        listStoreDiscounts: new ListStoreDiscountsUseCase(storeRepo),
+        getWallet: new GetWalletUseCase(storeRepo),
+        getWalletItem: new GetWalletItemUseCase(storeRepo),
+        listCommunityTests: new ListCommunityTestsUseCase(storeRepo),
+        getCommunityTest: new GetCommunityTestUseCase(storeRepo),
+        publishCommunityTest: new PublishCommunityTestUseCase(storeRepo),
+        obtainCommunityTest: new ObtainCommunityTestUseCase(storeRepo),
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -400,6 +431,20 @@ export function buildContainer() {
         syncChanges: useCases.syncBoeChanges,
     });
 
+    const storeController = new StoreController({
+        getBalance: useCases.getStoreBalance,
+        listProducts: useCases.listStoreProducts,
+        getProduct: useCases.getStoreProduct,
+        redeemProduct: useCases.redeemProduct,
+        listDiscounts: useCases.listStoreDiscounts,
+        getWallet: useCases.getWallet,
+        getWalletItem: useCases.getWalletItem,
+        listCommunityTests: useCases.listCommunityTests,
+        getCommunityTest: useCases.getCommunityTest,
+        publishCommunityTest: useCases.publishCommunityTest,
+        obtainCommunityTest: useCases.obtainCommunityTest,
+    });
+
     const tutorController = new TutorController({
         listConversations: useCases.listConversations,
         getConversation: useCases.getConversation,
@@ -456,6 +501,7 @@ export function buildContainer() {
             tutor: tutorController,
             notes: notesController,
             boe: boeController,
+            store: storeController,
         },
         middleware: {
             auth: authMiddleware,
@@ -521,4 +567,11 @@ function createStubBoeRepository(): IBoeRepository {
         throw new Error('[boe] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as IBoeRepository, { get: () => notConfigured });
+}
+
+function createStubStoreRepository(): IStoreRepository {
+    const notConfigured = (): never => {
+        throw new Error('[store] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IStoreRepository, { get: () => notConfigured });
 }

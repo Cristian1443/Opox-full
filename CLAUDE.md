@@ -166,6 +166,34 @@ desplegado para detectar cambios en el BOE oficial. Integrado en:
   más checkboxes individuales acumulables. Múltiple selección → IDs separados por
   coma en `topicId`. Sin cambio en `GenerateQuestionsParams`.
 
+### Tienda OPOX (Bloque 11) — endpoints propios
+
+Canje de Opopoints por recompensas reales y virtuales + marketplace de tests
+de la comunidad. Rutas bajo `/store/`.
+
+Tipos en `packages/types/src/store.ts` (`StoreProductDTO`, `StoreDiscountDTO`,
+`WalletItemDTO`, `PurchaseResultDTO`, `CommunityTestDTO`, `CommunityTestDetailDTO`,
+`CommunityTestActionResultDTO`, `StoreBalanceDTO`).
+SQL en `apps/backend/supabase/bloque11_tienda.sql` (6 tablas con RLS).
+Cliente mobile en `apps/mobile/src/api/store.js`.
+Colección de tests en `Bloque11_Tienda_Tests.postman_collection.json`
+(20 requests, 65 assertions).
+
+**Saldo Opopoints**: calculado como suma neta del ledger `user_opopoints_ledger`
+(filas `type='earn'` suman, `type='spend'` restan). No hay columna de saldo
+precalculada — siempre se recalcula en `getBalance()`.
+
+**Canje de producto real** (`POST /store/products/:id/redeem`):
+1. Verifica stock > 0 e `isAvailable`.
+2. Verifica saldo >= coste (422 si no alcanza).
+3. Inserta fila `spend` en el ledger.
+4. Decrementa stock.
+5. Genera código con `generateCode(partner)` (prefijo 3 letras + 6 chars random).
+6. Crea item en `user_wallet` con `status='active'` y fecha de caducidad.
+
+**Marketplace**: `community_tests` con campo `is_free` generado (`price = 0`).
+Compra idempotente por unique constraint `(user_id, test_id)` en `community_test_purchases`.
+
 ### Motor de IA del cliente (sin desplegar)
 
 El equipo IA entregó un microservicio RAG separado
@@ -202,5 +230,6 @@ pnpm lint                       # lint completo
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
 | 9 | Factoría de Apuntes | Frontend + backend completo (upload, pipeline OCR→tags→preguntas con AiApiClientStub, generación de tests, 10/10 smoke test verde). IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo (feed, detalle, comparativa con diff word-by-word, mini-test con AiApiClientStub, 14 requests / 61 assertions verde). IA real (`generateBoeMiniTest`) esperando entrega del prompt del `BRIEF_IA_BLOQUE10.md` |
+| 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

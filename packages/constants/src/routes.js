@@ -109,6 +109,19 @@ export const API_ROUTES = {
         GENERATE_TEST:     '/notes/:id/generate-test',
     },
 
+    STORE: {
+        BALANCE:                '/store/balance',
+        PRODUCTS:               '/store/products',
+        PRODUCT:                '/store/products/:id',
+        REDEEM:                 '/store/products/:id/redeem',
+        DISCOUNTS:              '/store/discounts',
+        WALLET:                 '/store/wallet',
+        WALLET_ITEM:            '/store/wallet/:id',
+        COMMUNITY_TESTS:        '/store/community-tests',
+        COMMUNITY_TEST:         '/store/community-tests/:id',
+        COMMUNITY_TEST_PURCHASE:'/store/community-tests/:id/purchase',
+    },
+
     MOTIVATION: {
         SUMMARY: '/motivation/summary',
         STREAK: '/motivation/streak',

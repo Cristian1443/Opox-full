@@ -7,3 +7,4 @@ export * from './TrainingController';
 export * from './TutorController';
 export * from './NotesController';
 export * from './BoeController';
+export * from './StoreController';

@@ -18,3 +18,4 @@ export * from './TutorPodcastEpisode';
 export * from './TutorSummary';
 export * from './Note';
 export * from './BoeEntities';
+export * from './StoreEntities';
