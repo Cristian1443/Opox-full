@@ -1,0 +1,2599 @@
+{
+  "info": {
+    "name": "Motor de IA — colección completa",
+    "description": "Colección única del motor de IA para preparación de oposiciones.\n\n**Cómo usarla.** Las carpetas van en el orden en que se usan de verdad: primero se sube el temario (bloque 6), luego se mide el nivel del opositor (bloque 0) y después se entrena sobre lo que falla (bloque 7). Dentro de cada carpeta las peticiones están numeradas y se ejecutan en ese orden: cada una deja en las variables el identificador que necesita la siguiente.\n\n**Variables.** Están en la pestaña «Variables» de la colección, no en un entorno aparte. Lo único que hay que tocar para empezar es `base_url` (y las claves, si el despliegue las exige).\n\n| Variable | Para qué |\n|---|---|\n| `base_url` | Dónde escucha el motor (`http://localhost:8000` en local) |\n| `api_key` | Clave de servicio (`X-API-Key`). Vacía en desarrollo |\n| `openai_key` | Clave de OpenAI de quien prueba (`X-OpenAI-Key`) |\n| El resto | Identificadores que las peticiones se van pasando entre sí |\n\nLa guía **Guia_Pruebas_Bloques_0_6_7.pdf** explica qué comprobar en cada paso y qué significa cada error.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Salud",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "health"
+              ]
+            },
+            "description": "Ping del motor. `200` => la API está viva. Sin auth estricta en dev."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bloque 0 · Onboarding — test de nivel",
+      "item": [
+        {
+          "name": "1 · Componer el test de nivel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/onboarding/placement-test",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "onboarding",
+                "placement-test"
+              ]
+            },
+            "description": "Devuelve **202** con un `job_id`: la composición corre en segundo plano.\n\nRechaza antes de encolar si el curso no existe (**404**), si la ingesta no ha terminado (**409 `curso_no_listo`**) o si el curso todavía no tiene preguntas publicadas (**409 `curso_sin_preguntas`**): así no se recibe un 202 que acabe en una sesión vacía.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"curso_id\": \"{{curso_id}}\",\n  \"n_preguntas\": 10\n}"
+            }
+          }
+        },
+        {
+          "name": "2 · Seguir el trabajo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/jobs/{{job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "jobs",
+                "{{job_id}}"
+              ]
+            },
+            "description": "Consulta hasta `estado: \"done\"`. El `resultado` trae la sesión completa: `sesion_id`, las preguntas y el `deficit`.\n\n`deficit.motivos_descarte` puede traer `bloques_sin_preguntas`: bloques del temario de los que no se pudo preguntar nada, que es información honesta para el perfil."
+          }
+        },
+        {
+          "name": "3 · Responder una pregunta del test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/answer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "answer"
+              ]
+            },
+            "description": "El test de nivel usa la sesión normal del motor. Repite esta petición con cada `pregunta_id` de la sesión: hay que responderlas TODAS para poder cerrarlo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"pregunta_id\": \"{{pregunta_id}}\",\n  \"elegida_idx\": 0,\n  \"tiempo_ms\": 5000\n}"
+            }
+          }
+        },
+        {
+          "name": "4 · Cerrar el test y ver el perfil",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/onboarding/placement-test/{{sesion_id}}/finish",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "onboarding",
+                "placement-test",
+                "{{sesion_id}}",
+                "finish"
+              ]
+            },
+            "description": "Devuelve el perfil de arranque: `nivel_global` (inicial/medio/avanzado), `nota_pct`, el dominio bloque a bloque y la recomendación de por dónde empezar.\n\nCada bloque trae `preguntas` y `evaluado`: un bloque del que el test no preguntó nada sale con `evaluado: false` y **no** se recomienda reforzarlo — un 0 % sin preguntas no es un suspenso, es falta de datos.\n\nEs idempotente: repetirlo devuelve el mismo perfil. **409 `test_nivel_incompleto`** si queda alguna pregunta sin responder.\n\nCada entrada de `dominio_por_bloque` trae además `documento_id`, el PDF del que sale ese bloque. Cuando el curso se compone de VARIOS PDFs, el `nombre` viene cualificado con el título del documento (`\"Bloque 2 — Temas 11-20 · Contenido\"`): los temarios reales con marcadores `TEMA N` producen un bloque llamado «Contenido» por PDF, y sin cualificar la recomendación «Empieza reforzando Contenido» no le dice nada al opositor.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bloque 6 · Cimiento — temario y documentos",
+      "item": [
+        {
+          "name": "1 · Crear curso con su primer PDF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses"
+              ]
+            },
+            "description": "Crea un **curso** a partir de su primer PDF y lanza la **ingesta asíncrona**: parser tolerante a PDFs mal formados, OCR automático si es escaneado (`scanned=true`), detección de índice/TOC, segmentación por marcadores `TEMA N`, chunking semántico, embeddings y carga al índice vectorial (RAG).\n\n**Un curso se compone de varios PDFs** (Curso → Documento → Bloque → Tema). Este endpoint crea el curso con el primero; los siguientes se adjuntan con `POST /v1/courses/{course_id}/documents`.\n\n**Body (multipart form-data):**\n\n| Campo | Tipo | Obligatorio | Notas |\n|---|---|---|---|\n| `file` | file | sí | PDF (`.pdf` o content-type `application/pdf`). **Adjúntalo aquí.** |\n| `titulo` | text | sí | Nombre del **CURSO** (p. ej. «Auxiliar Administrativo del Estado»). No uses aquí el nombre del fichero: el curso no es un PDF. |\n| `document_title` | text | no | Nombre de este **documento** (p. ej. «Bloque 1 — Temas 1-10»). Vacío → el nombre del fichero sin `.pdf`. |\n\n**Respuesta `201`:** `{\"curso_id\": \"…\", \"job_id\": \"…\"}` → hacer polling del job (request 2).\n\n**Errores:**\n\n| Código | Motivo |\n|---|---|\n| `400` | Sin nombre / no es PDF / cifrado con contraseña / sin páginas / título vacío |\n| `413` | Supera máximo de MB (`MAX_PDF_MB`) o de páginas (`MAX_PDF_PAGES`) |\n| `409` | Carga idéntica activándose (reintentar en segundos) |\n\n**Idempotencia:** SHA-256 del archivo. Si ese PDF ya inauguró un curso, se devuelve aquel en vez de duplicarlo. Meter el mismo temario en un SEGUNDO curso es legítimo y se hace con el endpoint de documentos.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "El PDF del temario (adjúntalo aquí)."
+                },
+                {
+                  "key": "titulo",
+                  "value": "Auxiliar Administrativo del Estado",
+                  "type": "text",
+                  "description": "Nombre del CURSO, no del fichero."
+                },
+                {
+                  "key": "document_title",
+                  "value": "Bloque 1 — Temas 1-10",
+                  "type": "text",
+                  "disabled": true,
+                  "description": "Opcional. Nombre de ESTE PDF dentro del curso."
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('curso_id', j.curso_id);",
+                  "pm.collectionVariables.set('job_id', j.job_id);",
+                  "pm.test('201 creado', () => pm.response.code === 201);",
+                  "console.log('curso_id =', j.curso_id, '| job_id =', j.job_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · Estado del job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/jobs/{{job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "jobs",
+                "{{job_id}}"
+              ]
+            },
+            "description": "Estado de **cualquier** job (ingesta o generación). Repetir cada 2–3 s hasta `done`. Un PDF de ~1.000 páginas tarda minutos (más con OCR).\n\n**Respuesta `200`:**\n\n```json\n{\n  \"estado\": \"running\",            // reserved | queued | running | done | error\n  \"mensaje\": \"Generando embeddings…\",\n  \"progreso\": {\"fase\": \"embeddings\", \"pct\": 62},\n  \"resultado\": {},                // al terminar generación: {sesion_id, preguntas, deficit}\n  \"tokens_in\": 0, \"tokens_out\": 0,\n  \"embedding_tokens\": 183220,\n  \"cost_usd\": 0.0037              // auditoría de gasto LLM/embeddings\n}\n```\n\n- `estado=error` → `mensaje` trae la causa legible (p. ej. `sin_chunks_elegibles` si los temas pedidos no tienen texto suficiente).\n- Si el job es de **generación** y terminó, el script de tests captura `sesion_id` de `resultado` automáticamente.\n\n`404` si el job no existe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.resultado && j.resultado.sesion_id) pm.collectionVariables.set('sesion_id', j.resultado.sesion_id);",
+                  "pm.test('estado válido', () => ['reserved','queued','running','done','error'].includes(j.estado));",
+                  "console.log('estado =', j.estado, '| progreso =', JSON.stringify(j.progreso), '| $', j.cost_usd);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · Añadir otro PDF al curso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "PDF del bloque siguiente. **Adjúntalo aquí.**"
+                },
+                {
+                  "key": "titulo",
+                  "value": "Bloque 2 — Temas 11-20",
+                  "type": "text",
+                  "description": "Opcional. Vacío → el nombre del fichero sin `.pdf`."
+                }
+              ]
+            },
+            "description": "Adjunta otro PDF al temario de un curso YA existente (Bloque 2, Bloque 3…) y lanza su ingesta. **Ingerir este documento no toca el temario de los demás**: los bloques, temas y chunks se borran y recrean solo dentro de este documento.\n\n**Respuesta `201`:** `{\"documento_id\": \"…\", \"job_id\": \"…\"}` → polling del job.\n\n**Errores:**\n\n| Código | Motivo |\n|---|---|\n| `404` | El curso no existe |\n| `400` | No es PDF / cifrado / sin páginas |\n| `413` | Supera `MAX_PDF_MB` o `MAX_PDF_PAGES` |\n\n**Idempotencia:** la huella SHA-256 es única **dentro del curso**. El mismo PDF dos veces en el mismo curso devuelve el documento existente; el mismo PDF en OTRO curso sí se incorpora (dos oposiciones pueden compartir temario)."
+          },
+          "response": []
+        },
+        {
+          "name": "4 · Listar los PDFs del curso",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "documents"
+              ]
+            },
+            "description": "Los documentos (PDFs) que componen el curso, en orden de alta.\n\n**Respuesta `200` (por documento):**\n\n```json\n{\n  \"id\": \"d-…\", \"curso_id\": \"c-…\",\n  \"titulo\": \"Bloque 1 — Temas 1-10\",\n  \"source_pdf\": \"BLOQUE 1 TEMAS 1-10.pdf\",\n  \"total_pages\": 240, \"scanned\": false,\n  \"estado\": \"listo\", \"error\": \"\", \"orden\": 0,\n  \"n_bloques\": 1, \"n_temas\": 10\n}\n```\n\n`estado`: `procesando` | `listo` | `error`. El del CURSO se deriva de estos: `procesando` si alguno lo está, `listo` si hay al menos uno listo, `error` solo si fallaron todos, `vacio` si no tiene documentos."
+          },
+          "response": []
+        },
+        {
+          "name": "5 · Quitar un PDF del curso",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/documents/{{documento_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "documents",
+                "{{documento_id}}"
+              ]
+            },
+            "description": "Retira un PDF del temario: borra sus bloques, temas y chunks (CASCADE) y sus vectores. **El resto del curso queda intacto.**\n\nLas preguntas cuya evidencia salía de ese PDF **no se borran**: pasan a `estado='obsoleta'` con `motivo_descarte='documento_eliminado'`, igual que hace la re-ingesta cuando una cita desaparece del temario.\n\n**Respuesta `204`** (sin cuerpo).\n\n**Errores:**\n\n| Código | Motivo |\n|---|---|\n| `404` | No existe, o pertenece a otro curso |\n| `409` | Su ingesta sigue activa (`estado='procesando'`) |"
+          },
+          "response": []
+        },
+        {
+          "name": "6 · Listar cursos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses?limit=100&offset=0&estado=listo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "estado",
+                  "value": "listo"
+                }
+              ]
+            },
+            "description": "Lista cursos, más reciente primero. Query: `limit` (1–500, default 100), `offset` (default 0), `estado` (opcional: `vacio` | `procesando` | `listo` | `error`; los desplegables de las UIs piden `listo`).\n\n**Respuesta `200` (por curso):**\n\n```json\n{\n  \"id\": \"c-…\", \"titulo\": \"Auxiliar Administrativo del Estado\",\n  \"total_pages\": 987, \"scanned\": false,\n  \"estado\": \"listo\", \"error\": \"\", \"creado\": \"2026-08-11T09:00:00Z\",\n  \"n_documentos\": 4, \"n_bloques\": 4, \"n_temas\": 40\n}\n```\n\n`total_pages` y `scanned` son AGREGADOS de sus documentos: el curso ya no es un PDF y no tiene `source_pdf` (ese vive en cada documento)."
+          }
+        },
+        {
+          "name": "7 · Detalle del curso (árbol)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}"
+              ]
+            },
+            "description": "Árbol completo del curso. Devuelve `documentos` (los PDFs que lo componen, con su estado y sus páginas) y `bloques` **en plano**, cada uno con su `documento_id` para poder agruparlos.\n\nLas páginas (`page_start`/`page_end`) son **las de su PDF**: fuera de su documento un número de página no identifica nada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const t = (j.bloques && j.bloques[0] && j.bloques[0].temas && j.bloques[0].temas[0]);",
+                  "if (t) pm.collectionVariables.set('topic_id', t.id);",
+                  "pm.test('curso listo', () => j.estado === 'listo');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8 · Buscar en el curso (RAG)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/search",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "search"
+              ]
+            },
+            "description": "Búsqueda semántica sobre el temario (embeddings + índice vectorial).\n\n**Body:** `{\"query\": \"…\", \"k\": 6}` — `query` 1–1000 chars, `k` 1–30 pasajes (default 6).\n\n**Respuesta `200`:**\n\n```json\n{\n  \"query\": \"…\",\n  \"pasajes\": [\n    {\"chunk_id\": \"ch-…\", \"tema_id\": \"t-07…\", \"tema_titulo\": \"TEMA 7. …\",\n     \"texto\": \"…texto literal del temario…\",\n     \"page_start\": 128, \"page_end\": 129, \"score\": 0.83}\n  ]\n}\n```\n\n`409` si la ingesta no terminó (`estado != \"listo\"`) · `404` curso inexistente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"artículos del poder judicial\",\n  \"k\": 6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "9 · Chunks de un tema",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/topics/{{topic_id}}/chunks?limit=50&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "topics",
+                "{{topic_id}}",
+                "chunks"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Texto segmentado (canónico) de un tema — depuración/backoffice, no necesario en la app. Query: `limit` (1–200, default 100), `offset`.\n\n**Respuesta:** `[{id, orden, texto, page_start, page_end, elegible}]`.\n\n`404` si el tema no pertenece al curso. `topic_id` se captura en el request 4."
+          }
+        },
+        {
+          "name": "10 · Borrar curso",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}"
+              ]
+            },
+            "description": "Borra el curso **completo**: temario, chunks, vectores, preguntas, sesiones y el PDF original.\n\n- `204` sin cuerpo\n- `409` si la ingesta sigue activa\n- `404` si no existe"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bloque 6 · Generador de tests",
+      "item": [
+        {
+          "name": "1 · Generar test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/generate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "generate"
+              ]
+            },
+            "description": "**Generador parametrizado** (asíncrono, LLM con pipeline de calidad L0→L1→L2→L3 y evidencia verbatim).\n\n**Body — todos los parámetros del requerimiento:**\n\n| Campo | Tipo | Default | Descripción |\n|---|---|---|---|\n| `curso_id` | string | — | Curso origen (obligatorio) |\n| `user_id` | string | — | Usuario del test (obligatorio) |\n| `tema_ids` | string[] \\| null | null | **Selección de temario**: limita a estos temas |\n| `bloque_ids` | string[] \\| null | null | Igual por bloques (combinable) |\n| `n_preguntas` | int | 10 | **Nº de preguntas** (1–50) |\n| `dificultad` | facil \\| media \\| dificil | media | **Dificultad** objetivo (calibrada por juez) |\n| `contrarreloj_seg` | int | 0 | **Contrarreloj** en segundos; 0 = sin límite |\n| `query` | string \\| null | null | Modo semántico: evidencia por similitud RAG a esta consulta en vez de temario balanceado |\n\nSin `tema_ids`/`bloque_ids` → recorre **todo el temario balanceado** (reparte preguntas entre temas).\n\n**Respuesta `202`:** `{\"job_id\": \"…\"}` → polling en «Ingesta · 2» hasta `done`; `resultado` trae:\n\n```json\n{\"sesion_id\": \"s-…\", \"preguntas\": [...], \"deficit\": null}\n```\n\n**Déficit declarado:** si el control de calidad descarta preguntas se publican menos de las pedidas y se declara (nunca rellena con preguntas malas): `{\"pedidas\": 15, \"publicadas\": 12, \"motivos_descarte\": {…}}`.\n\n**Errores síncronos:** `404 curso_no_encontrado` · `409 curso_no_listo` (ingesta sin terminar). Job en `error` con `sin_chunks_elegibles` = temas sin texto suficiente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"n_preguntas\": 3,\n  \"dificultad\": \"media\",\n  \"tema_ids\": null,\n  \"bloque_ids\": null,\n  \"contrarreloj_seg\": 0,\n  \"query\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('job_id', j.job_id);",
+                  "pm.test('202 aceptado', () => pm.response.code === 202);",
+                  "console.log('job_id =', j.job_id, '— sondea «Ingesta · 2» hasta done');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · Traer sesión",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}"
+              ]
+            },
+            "description": "Sesión con sus preguntas — **vista pública sin `correcta_idx`, explicación ni evidencia** (se revelan al responder; el cliente no puede filtrar la correcta).\n\n**Respuesta `200`:**\n\n```json\n{\n  \"sesion_id\": \"s-…\", \"tipo\": \"test\", \"curso_id\": \"c-…\",\n  \"contrarreloj_seg\": 900,\n  \"preguntas\": [\n    {\"id\": \"p-…\", \"enunciado\": \"…\", \"opciones\": [\"A\",\"B\",\"C\",\"D\"],\n     \"dificultad\": \"dificil\", \"tema_id\": \"t-07…\", \"origen\": \"generada\",\n     \"ref_legislativa\": \"Art. 99 CE\"}\n  ],\n  \"deficit\": null\n}\n```\n\n**Contrarreloj:** el motor guarda y devuelve `contrarreloj_seg`; el temporizador y el corte al llegar a 0 los implementa la app (el backend no rechaza respuestas tardías; sí registra `tiempo_ms` por respuesta).\n\n`404 sesion_no_encontrada`. El script captura `question_id` de la primera pregunta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.preguntas && j.preguntas.length) pm.collectionVariables.set('question_id', j.preguntas[0].id);",
+                  "pm.test('tiene preguntas', () => Array.isArray(j.preguntas));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · Responder pregunta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/answer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "answer"
+              ]
+            },
+            "description": "Corrección inmediata con **evidencia verbatim del temario**.\n\n**Body:**\n\n| Campo | Tipo | Notas |\n|---|---|---|\n| `user_id` | string | Dueño de la sesión |\n| `pregunta_id` | string | Pregunta de esta sesión |\n| `elegida_idx` | int 0–3 | Índice de la opción elegida |\n| `tiempo_ms` | int | Tiempo del usuario en la pregunta (métricas/fatiga) |\n\n**Respuesta `200`:**\n\n```json\n{\n  \"correcta\": false,\n  \"correcta_idx\": 1,\n  \"explicacion\": \"…\",\n  \"justificaciones\": [\"A incorrecta porque…\", \"B correcta: …\", \"…\", \"…\"],\n  \"evidencia\": {\"cita\": \"…texto literal del PDF…\", \"pagina\": 131, \"chunk_id\": \"ch-…\"}\n}\n```\n\n`evidencia.cita` es **verbatim** del documento (`pagina` = página real del PDF): la app puede mostrar «¿De dónde sale esto?» con cita y página exactas.\n\n**Errores:**\n\n| HTTP | `detail` |\n|---|---|\n| `404` | `sesion_no_encontrada` / `pregunta_no_encontrada` |\n| `403` | `usuario_no_corresponde` |\n| `409` | `pregunta_fuera_de_sesion` / `pregunta_no_disponible` / `respuesta_duplicada` |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"pregunta_id\": \"{{question_id}}\",\n  \"elegida_idx\": 0,\n  \"tiempo_ms\": 3000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test('trae veredicto', () => typeof j.correcta === 'boolean');",
+                  "if (j.evidencia) console.log('cita pág.', j.evidencia.pagina, ':', (j.evidencia.cita||'').slice(0,80));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 · Resultado de la sesión",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "result"
+              ]
+            },
+            "description": "Marcador de la sesión — llamable en cualquier momento (parcial si faltan respuestas).\n\n**Respuesta `200`:**\n\n```json\n{\n  \"sesion_id\": \"s-…\",\n  \"respondidas\": 15, \"total\": 15, \"aciertos\": 11,\n  \"nota_pct\": 73.3,\n  \"tiempo_total_ms\": 412000,\n  \"por_tema\": [\n    {\"tema_id\": \"t-07…\", \"tema_titulo\": \"TEMA 7. …\", \"aciertos\": 6, \"fallos\": 2}\n  ]\n}\n```\n\n`404 sesion_no_encontrada`."
+          }
+        },
+        {
+          "name": "5 · Detalle de una pregunta",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/questions/{{question_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "questions",
+                "{{question_id}}"
+              ]
+            },
+            "description": "Vista pública de una pregunta por id — **sin** respuesta correcta ni evidencia (misma forma que las preguntas de sesión).\n\n`404 pregunta_no_encontrada` si no existe o está descartada."
+          }
+        },
+        {
+          "name": "6 · (alt) Test desde caché",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/from-cache",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "from-cache"
+              ]
+            },
+            "description": "Arma sesión con preguntas **YA generadas** (SQL, **sin LLM, casi gratis**). Excluye las que ese `user_id` ya respondió. **Respuesta síncrona** (sin job).\n\n**Body:**\n\n| Campo | Tipo | Default |\n|---|---|---|\n| `curso_id` / `user_id` | string | — (obligatorios) |\n| `tema_ids` / `bloque_ids` | string[] \\| null | null |\n| `dificultad` | Dificultad \\| null | null (= cualquiera) |\n| `n_preguntas` | int | 10 (1–50) |\n| `query` | string \\| null | null |\n\n**Modo semántico:** si mandas `query`, sirve las preguntas cacheadas de los chunks más parecidos a esa consulta (RAG), ordenadas por relevancia, en vez de recorrer el temario.\n\n**Respuesta `200`:** un `SesionOut` directo (misma forma que «2 · Traer sesión»). Si no hay suficientes cacheadas que cumplan los filtros, arma con las disponibles y lo declara en `deficit`.\n\n**Estrategia recomendada:** intentar `from-cache` primero; si `deficit` es alto o vacío, caer a `generate`.\n\n`404 curso_no_encontrado`. El script captura `sesion_id` y `question_id`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"n_preguntas\": 5,\n  \"dificultad\": null,\n  \"tema_ids\": null,\n  \"bloque_ids\": null,\n  \"query\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.sesion_id) pm.collectionVariables.set('sesion_id', j.sesion_id);",
+                  "if (j.preguntas && j.preguntas.length) pm.collectionVariables.set('question_id', j.preguntas[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7 · Ver preguntas generadas (repaso)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/questions?limit=200&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "questions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "200"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Preguntas ya publicadas del curso **CON** `correcta_idx`, `explicacion`, `justificaciones` y `evidencia` verbatim — pantalla «repasar preguntas» sin regenerar ni gastar LLM.\n\nQuery: `limit` (1–200, default 50), `offset`. `404 curso_no_encontrado`."
+          }
+        },
+        {
+          "name": "8 · Purgar descartadas (backoffice)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/courses/{{curso_id}}/questions/discarded",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "courses",
+                "{{curso_id}}",
+                "questions",
+                "discarded"
+              ]
+            },
+            "description": "**Backoffice** — purga preguntas con `estado=\"descartada\"` (nunca se sirven a alumnos; limpieza de DB).\n\n**Respuesta:** `{\"borradas\": <n>}`. No usar desde la app mobile."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bloque 6.6 · Banco de exámenes oficiales",
+      "item": [
+        {
+          "name": "1 · Incorporar un examen (PDF o Word)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Paga la extracción de este examen."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/bank/exams",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "bank",
+                "exams"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "El examen en .pdf o .docx. Del Word se leen también las TABLAS, el encabezado, el pie y los cuadros de texto, que es donde suelen ir las opciones."
+                },
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}",
+                  "type": "text",
+                  "description": "Curso al que se incorpora el examen."
+                },
+                {
+                  "key": "titulo",
+                  "value": "Examen oficial 2025",
+                  "type": "text"
+                },
+                {
+                  "key": "anio",
+                  "value": "2025",
+                  "type": "text",
+                  "description": "Entero entre 0 y 2100."
+                },
+                {
+                  "key": "fuente",
+                  "value": "oficial",
+                  "type": "text",
+                  "description": "'oficial' | 'profesor' | 'otro'. Solo las de fuente 'oficial' entran en un simulacro con solo_oficiales=true."
+                }
+              ]
+            },
+            "description": "Sube el examen y devuelve **202 + `job_id`**: la extracción es asíncrona.\n\nEl motor trocea el texto, pide al modelo los pares pregunta–respuesta, descarta lo que no encaja en el esquema (hacen falta enunciado, **4 opciones distintas** y la respuesta correcta), clasifica cada pregunta por el tema más cercano del temario y deduplica contra lo que ya hay en el banco.\n\n**Errores propios:** `415 extension_no_soportada` (solo .pdf/.docx) · `413 archivo_demasiado_grande` · `422 archivo_sin_texto` (ni capa de texto ni nada legible por OCR) · `422 archivo_no_legible` (dañado o cifrado). Si el curso no existe, el 202 se emite igual y el fallo aparece en el job.\n\n**Escaneos:** si el PDF no trae capa de texto se pasa por OCR en español página a página (hasta 60 páginas), igual que la ingesta de temarios.\n\n**Resubidas:** si el archivo ya está incorporado a ese curso, el trabajo termina con `ya_incorporado: true` sin volver a llamar al modelo ni cobrar."
+          }
+        },
+        {
+          "name": "2 · Seguir el trabajo de incorporación",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/jobs/{{job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "jobs",
+                "{{job_id}}"
+              ]
+            },
+            "description": "Consulta hasta `estado: \"done\"`. El `resultado` trae el recuento de la incorporación:\n\n| Campo | Significado |\n|---|---|\n| `extraidas` | Pares pregunta–respuesta que el modelo reconoció en el examen |\n| `guardadas` | Las que entraron al banco |\n| `duplicadas` | Ya estaban en el banco, o venían repetidas por el solape entre fragmentos |\n| `descartadas` | No cumplían el esquema (sin 4 opciones, sin respuesta, opciones repetidas…) |\n| `sin_tema` | De las guardadas, cuántas no se parecen a ningún tema del temario. Un número alto delata que el examen no es de esta oposición |\n| `ya_incorporado` | **Solo si el archivo ya estaba**: no se reprocesa ni se cobra, y `examen_id` apunta al que ya había |\n| `corte` | **Solo si lo hubo**: el trabajo paró por `MAX_COST_USD_PER_JOB`/`MAX_TOKENS_PER_JOB` y el examen quedó a medias |\n\n`cost_usd` lleva el gasto real del trabajo."
+          }
+        },
+        {
+          "name": "3 · Exámenes del banco",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/bank/exams?course_id={{curso_id}}&limit=100&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "bank",
+                "exams"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "description": "1–500."
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Los exámenes incorporados al curso, con su `fuente`, su `anio` y cuántas preguntas aportó cada uno (`n_preguntas`).\n\nUn examen con `n_preguntas: 0` significa que todas sus preguntas ya estaban en el banco (o que no se reconoció ninguna): sirve para detectar una subida repetida.\n\nPaginado con `limit`/`offset`. Subir dos veces el **mismo archivo** no crea un segundo examen: se deduplica por SHA-256 dentro del curso."
+          }
+        },
+        {
+          "name": "4 · Preguntas del banco (con filtro de tema)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/bank/questions?course_id={{curso_id}}&topic_id={{tema_id}}&limit=100&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "bank",
+                "questions"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}"
+                },
+                {
+                  "key": "topic_id",
+                  "value": "{{tema_id}}",
+                  "description": "Opcional: filtra por tema. Bórralo para ver todo el banco."
+                },
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "description": "1–500."
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Las preguntas del banco, paginadas. **Vista pública: no trae `correcta_idx`** — la respuesta correcta se revela al responder, para que la app no pueda filtrarla sin querer.\n\nCada pregunta llega con su `tema_id` asignado por clasificación automática y `origen: \"banco\"` (frente a `\"generada\"`, las que produce el generador del bloque 6)."
+          }
+        },
+        {
+          "name": "5 · Simulacro del banco",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/bank/mock-exams",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "bank",
+                "mock-exams"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"n_preguntas\": 20,\n  \"solo_oficiales\": false,\n  \"contrarreloj_seg\": 1800\n}"
+            },
+            "description": "Compone un simulacro y abre la sesión. Guarda el `sesion_id` en la variable de la colección.\n\n| Campo | Efecto |\n|---|---|\n| `n_preguntas` | 5–100. Lo ignora si mandas `distribucion` |\n| `solo_oficiales` | `true` = solo preguntas de exámenes con `fuente: \"oficial\"` |\n| `contrarreloj_seg` | 0 = sin límite |\n\nSe prioriza el banco sobre las preguntas generadas, se **excluye lo que ese `user_id` ya respondió** y se baraja dentro de cada tramo (dos simulacros seguidos no salen iguales).\n\nEl `deficit` dice qué se pidió y qué se pudo servir. **El cuerpo no admite campos desconocidos:** un nombre mal escrito devuelve 422 en vez de aceptarse y no aplicarse."
+          }
+        },
+        {
+          "name": "6 · Simulacro con reparto por tema",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/bank/mock-exams",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "bank",
+                "mock-exams"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"solo_oficiales\": false,\n  \"contrarreloj_seg\": 1800,\n  \"distribucion\": {\n    \"{{tema_id}}\": 6,\n    \"{{tema_id_2}}\": 4\n  }\n}"
+            },
+            "description": "Mismo endpoint, componiendo el examen **con la distribución por tema que se le pida**: `{tema_id: nº de preguntas}`.\n\nCuando viene `distribucion` manda ella y `n_preguntas` se ignora; el total pedido es la suma (máximo 100, mínimo 1 por tema). Dentro de cada tema se mantiene la prioridad banco → generadas.\n\nSi un tema no tiene material suficiente, el déficit lo dice **tema a tema**:\n\n```json\n\"deficit\": {\n  \"pedidas\": 10,\n  \"publicadas\": 7,\n  \"motivos_descarte\": {\n    \"sin_preguntas_tema:<tema_id>\": 3,\n    \"sin_preguntas_disponibles\": 3\n  }\n}\n```"
+          }
+        },
+        {
+          "name": "7 · Responder una pregunta del simulacro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/answer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "answer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"pregunta_id\": \"{{pregunta_id}}\",\n  \"elegida_idx\": 0\n}"
+            },
+            "description": "El simulacro abre una sesión normal del motor, así que se responde y se corrige con los endpoints de sesión del bloque 6. Devuelve si la respuesta fue correcta y revela la solución de **esa** pregunta."
+          }
+        },
+        {
+          "name": "8 · Resultado del simulacro",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "result"
+              ]
+            },
+            "description": "Corrección completa del simulacro: aciertos, fallos y el detalle pregunta a pregunta con la respuesta correcta y su justificación."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bloque 7 · Entrenamiento y Pista IA",
+      "item": [
+        {
+          "name": "1 · Dominio y preguntas falladas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/modes/errors/{{user_id}}?course_id={{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "modes",
+                "errors",
+                "{{user_id}}"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}"
+                }
+              ]
+            },
+            "description": "Laboratorio de Errores (6.8). Devuelve el **dominio por tema** (aciertos, fallos y %) ordenado de peor a mejor, y las preguntas que este opositor falló y siguen vigentes.\n\nLlámalo antes y después de un test quirúrgico: la diferencia entre las dos respuestas es la remedición del dominio.\n\nSi el curso no existe responde **404 `curso_no_encontrado`** (no una lista vacía)."
+          }
+        },
+        {
+          "name": "2 · Repasar lo fallado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/modes/errors/test",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "modes",
+                "errors",
+                "test"
+              ]
+            },
+            "description": "Arma una sesión con lo que este opositor falló, y la completa con temario nuevo de esos mismos temas. **No repite lo que ya acertó** ni las preguntas retiradas por el monitor BOE.\n\n`deficit` dice cuántas pidió y cuántas pudo servir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"curso_id\": \"{{curso_id}}\",\n  \"n_preguntas\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "3 · Test quirúrgico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/modes/surgical",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "modes",
+                "surgical"
+              ]
+            },
+            "description": "Test Quirúrgico (6.9). Toma los `n_temas_debiles` temas con peor dominio y sirve preguntas solo de ellos, sin repetir lo ya respondido.\n\nAl terminar la sesión, vuelve a llamar a la petición 1 para ver el dominio movido.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"curso_id\": \"{{curso_id}}\",\n  \"n_preguntas\": 5,\n  \"n_temas_debiles\": 3\n}"
+            }
+          }
+        },
+        {
+          "name": "4 · Foto-Test (foto de una página impresa)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/modes/photo-test",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "modes",
+                "photo-test"
+              ]
+            },
+            "description": "Foto-Test (6.3–6.5). Sube la **foto de una página impresa** del temario: el motor valida calidad (resolución mínima 640×480, nitidez y tope de píxeles), transcribe el texto y arma un mini-test de lo que ha leído.\n\n`course_id` es opcional: en blanco la foto va suelta, sin curso.\n\nRechazos habituales: **422** `imagen_resolucion_insuficiente`, `imagen_sin_nitidez`, `imagen_no_es_material_impreso`, `ocr_sin_texto`; **413** `imagen_demasiado_grande`.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Foto de la página (JPG o PNG)."
+                },
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "5 · Pista IA — contrato de la app (pregunta por valor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/modes/hint",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "modes",
+                "hint"
+              ]
+            },
+            "description": "Pista IA (7.2) con el contrato del brief del 25 de julio: la app manda la **pregunta completa**, el motor no toca la base.\n\nDevuelve `hint` (máximo **300 caracteres**, validado en el servidor: si el modelo se pasa se rehace, no se recorta) y `articleRef` opcional en formato `art. X Ley YY/AAAA`.\n\nEl motor **veta** la pista que nombre la letra de una opción (A, B, C, D) o copie el texto de una opción; en ese caso responde **422 `pista_revela_respuesta`**.\n\n**Cupo de la sesión (brief §1).** Si mandas `sessionId`, el motor aplica el tope de **3 pistas por sesión** y la cuarta responde `429 limite_de_pistas_alcanzado`. La salida trae `hintsRemaining` para que la app pinte el contador sin llevar su propia cuenta (`null` si pides la pista sin sesión). Una pista descartada NO gasta cupo.\n\n**`topicId`**: si es un tema ingerido en este motor, su material entra en el prompt y la pista se apoya en el temario real; si es un id del catálogo de la app, se ignora sin error.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"questionText\": \"¿Cuál es el plazo general para resolver un procedimiento administrativo según la Ley 39/2015?\",\n  \"options\": [\n    \"1 mes\",\n    \"2 meses\",\n    \"3 meses\",\n    \"6 meses\"\n  ],\n  \"topicId\": \"ley-39\",\n  \"topic\": \"Ley 39/2015\",\n  \"oposicion\": \"justicia-tramitacion\",\n  \"sessionId\": \"{{sesion_id}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "6 · Pista IA — por identificador (con evidencia del temario)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/modes/hint",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "modes",
+                "hint"
+              ]
+            },
+            "description": "El mismo endpoint con el contrato original: se manda `pregunta_id` y el motor resuelve el enunciado, las opciones y la **cita del temario** que la respalda, así que la pista se apoya en el material y no en el conocimiento suelto del modelo.\n\nAquí el veto es más fino: se conoce la opción correcta y se veta solo esa.\n\n**Cupo de la sesión (brief §1).** Si mandas `sessionId`, el motor aplica el tope de **3 pistas por sesión** y la cuarta responde `429 limite_de_pistas_alcanzado`. La salida trae `hintsRemaining` para que la app pinte el contador sin llevar su propia cuenta (`null` si pides la pista sin sesión). Una pista descartada NO gasta cupo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"pregunta_id\": \"{{pregunta_id}}\",\n  \"sessionId\": \"{{sesion_id}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "7 · Referencia legislativa",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/modes/reference/{{pregunta_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "modes",
+                "reference",
+                "{{pregunta_id}}"
+              ]
+            },
+            "description": "Referencia Legislativa (7.3). Devuelve la norma o artículo de la pregunta: `fuente: \"campo\"` si ya venía guardada, `\"extraida\"` si se ha sacado del pasaje del temario que la respalda (y entonces queda guardada para la próxima vez).\n\n**422 `referencia_no_encontrada`** cuando en la evidencia no hay ninguna cita legal: el motor prefiere no responder a inventarse una."
+          }
+        },
+        {
+          "name": "8 · Responder una pregunta de la sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/answer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "answer"
+              ]
+            },
+            "description": "Los tres modos que crean test abren una sesión normal del motor, así que se responde con los endpoints de sesión del bloque 6. Cada respuesta actualiza el dominio del tema.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"pregunta_id\": \"{{pregunta_id}}\",\n  \"elegida_idx\": 0,\n  \"tiempo_ms\": 4200\n}"
+            }
+          }
+        },
+        {
+          "name": "9 · Resultado de la sesión",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tests/{{sesion_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tests",
+                "{{sesion_id}}",
+                "result"
+              ]
+            },
+            "description": "Cierre del test: aciertos, fallos y desglose por tema."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bloque 8 · Aula Virtual, tono y fatiga",
+      "item": [
+        {
+          "name": "1 · Resumen de un tema",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Clave de OpenAI de quien prueba."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/classroom/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "classroom",
+                "summary"
+              ]
+            },
+            "description": "Resume un tema **a partir de su material**, no de lo que el modelo sepa de la ley: solo entra el texto de los chunks elegibles.\n\n`nivel`: `esquema` | `medio` | `profundo`.\n\nSe **cachea por el hash del material**: repetirlo no vuelve a pagar el modelo, y si el tema se reingiere, la caché se invalida sola.\n\n**422 `tema_sin_material_elegible`** si el tema no tiene chunks utilizables.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"tema_id\": \"{{tema_id}}\",\n  \"nivel\": \"medio\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2 · Generar flashcards del tema",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Clave de OpenAI de quien prueba."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/classroom/flashcards/generate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "classroom",
+                "flashcards",
+                "generate"
+              ]
+            },
+            "description": "Crea hasta `n` flashcards del tema. Es **idempotente**: repetirlo no duplica: las tarjetas se normalizan y se deduplican por su pregunta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"tema_id\": \"{{tema_id}}\",\n  \"n\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3 · Flashcards que tocan hoy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/classroom/flashcards/due?user_id={{user_id}}&course_id={{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "classroom",
+                "flashcards",
+                "due"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                },
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}"
+                }
+              ]
+            },
+            "description": "Las que el algoritmo de repaso espaciado (SM-2) pone para hoy. Crea el estado de repaso la primera vez que se pregunta por una tarjeta."
+          },
+          "response": []
+        },
+        {
+          "name": "4 · Repasar una flashcard",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/classroom/flashcards/review",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "classroom",
+                "flashcards",
+                "review"
+              ]
+            },
+            "description": "`calidad` de 0 a 5, como en SM-2: por debajo de 3 la tarjeta **reinicia** su intervalo y vuelve a caer pronto. Devuelve cuándo toca el siguiente repaso.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"flashcard_id\": \"{{flashcard_id}}\",\n  \"calidad\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5 · Preguntar al tutor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Clave de OpenAI de quien prueba."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/classroom/tutor",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "classroom",
+                "tutor"
+              ]
+            },
+            "description": "El tutor responde **citando el temario**: busca por RAG, cita los pasajes que usa y, si no encuentra material, se abstiene antes que inventarse la respuesta.\n\nPuede además lanzar herramientas (crear un test del tema, generar flashcards) cuando el alumno lo pide en lenguaje natural.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"curso_id\": \"{{curso_id}}\",\n  \"mensaje\": \"¿Qué plazo tengo para recurrir en alzada?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6 · Podcast del tema",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Clave de OpenAI de quien prueba."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/classroom/podcast",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "classroom",
+                "podcast"
+              ]
+            },
+            "description": "Guion locutable del tema y su audio (TTS). `duracion`: `corta` | `media`.\n\nEl guion sale del material del tema, igual que el resumen. Devuelve el nombre del fichero para descargarlo con la petición siguiente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"curso_id\": \"{{curso_id}}\",\n  \"tema_id\": \"{{tema_id}}\",\n  \"duracion\": \"corta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7 · Descargar el audio del podcast",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/classroom/podcast/{{audio}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "classroom",
+                "podcast",
+                "{{audio}}"
+              ]
+            },
+            "description": "Sirve el MP3 generado. `audio` es el nombre de fichero que devolvió la petición anterior; la ruta **no acepta rutas** (nada de `../`), solo un nombre de la carpeta de medios."
+          },
+          "response": []
+        },
+        {
+          "name": "8 · Ver el perfil de tono",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tone/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tone",
+                "{{user_id}}"
+              ]
+            },
+            "description": "Cómo le habla el motor a este opositor. Si no lo ha configurado, devuelve el perfil por defecto en vez de un 404."
+          },
+          "response": []
+        },
+        {
+          "name": "9 · Ajustar el perfil de tono",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/tone/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "tone",
+                "{{user_id}}"
+              ]
+            },
+            "description": "`personalidad`: `cercano` | `formal` | `directo` | `motivador`. `nivel_detalle`: `breve` | `medio` | `profundo`. `motivacion`: `alta` | `media` | `baja`.\n\n`pistas_directas` afecta al bloque 7: con `true` la Pista IA es más explícita —**sin dejar de respetar la regla de oro**: nunca revela la respuesta—.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personalidad\": \"cercano\",\n  \"nivel_detalle\": \"medio\",\n  \"pistas_directas\": false,\n  \"motivacion\": \"media\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 · Registrar biometría",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/fatigue/biometrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "fatigue",
+                "biometrics"
+              ]
+            },
+            "description": "Datos del wearable. Todos los campos salvo `user_id` son opcionales: se manda lo que haya.\n\n`hrv_ms` 0–400 · `fc_reposo` 20–220 · `horas_sueno` 0–24. Fuera de rango es **422**: un dato imposible contamina el cálculo de fatiga y es mejor rechazarlo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"hrv_ms\": 55,\n  \"fc_reposo\": 62,\n  \"horas_sueno\": 6.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 · Estado de fatiga",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/fatigue/status/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "fatigue",
+                "status",
+                "{{user_id}}"
+              ]
+            },
+            "description": "Nivel de fatiga a partir de la biometría y del ritmo de estudio."
+          },
+          "response": []
+        },
+        {
+          "name": "12 · Avisos de fatiga",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Vacío en dev (REQUIRE_API_KEY=0). En prod, la clave de servicio."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/fatigue/alerts/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "fatigue",
+                "alerts",
+                "{{user_id}}"
+              ]
+            },
+            "description": "Los avisos que el motor ha levantado (descansar, bajar el ritmo). Sirven para que la app no empuje a seguir a alguien que lleva horas y va cayendo."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Bloque 10 · Monitor del BOE",
+      "item": [
+        {
+          "name": "0 · Buscar una norma por su título",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/catalog?q=procedimiento administrativo&limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "catalog"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "procedimiento administrativo",
+                  "description": "Texto del título, sin importar tildes ni mayúsculas. También acepta el identificador."
+                },
+                {
+                  "key": "rank",
+                  "value": "",
+                  "description": "Filtro opcional por rango: Ley, Ley Orgánica, Real Decreto…",
+                  "disabled": true
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "description": "Filtro opcional por ámbito: Estatal | Autonómico",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "1–50; por defecto 20"
+                }
+              ]
+            },
+            "description": "Busca en la copia local del catálogo de legislación consolidada para no tener que saberse el identificador `BOE-A-AAAA-NNNNN`.\n\nLa API del BOE **no** busca por título (cualquier `query` responde 500), así que el motor cachea el catálogo con `POST /v1/boe/catalog/sync` y resuelve la búsqueda aquí.\n\n**Respuesta:** `sincronizado` (si el catálogo está poblado), `total`, `ultima_sincronizacion` y `resultados[]` con `identificador`, `titulo`, `rango`, `ambito`, `departamento`, `fecha_disposicion`, `url` y `vigente`.\n\nCon `sincronizado: false` no hay catálogo todavía: lanza antes la sincronización.\n\nEl identificador que devuelve es el que se manda a `POST /v1/boe/regulations`."
+          }
+        },
+        {
+          "name": "0b · Sincronizar el catálogo (job)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/catalog/sync",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "catalog",
+                "sync"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"desde\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Trae el catálogo del BOE a la base local. Devuelve `job_id`: se sigue con `GET /v1/jobs/{job_id}`.\n\n| Campo | Tipo | Descripción |\n|---|---|---|\n| `desde` | string | Opcional, `AAAAMMDD`. Solo lo actualizado desde esa fecha |\n\n**Sin `desde`** baja el catálogo entero: ~12.500 normas, 26 peticiones al BOE, unos dos minutos. Es lo que se hace una vez al desplegar.\n\n**Con `desde`** (p. ej. la fecha de ayer) es casi instantáneo: el BOE consolida unas once normas al día. Es la llamada que conviene programar en el cron diario, junto a `POST /v1/boe/check`.\n\nNo gasta modelo: solo lee el BOE. Resultado del job: `paginas`, `guardadas`, `descartadas` (diarios autonómicos que el alta no admite) y `total`."
+          }
+        },
+        {
+          "name": "1 · Seguir una norma",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/regulations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "regulations"
+              ]
+            },
+            "description": "Da de alta una norma del temario y **descarga su texto consolidado** como snapshot inicial.\n\n| Campo | Tipo | Descripción |\n|---|---|---|\n| `curso_id` | string | Curso al que se vincula el seguimiento |\n| `identificador_boe` | string | Identificador BOE-A-AAAA-NNNNN |\n| `titulo` | string | Opcional; si se omite, se toma el del BOE |\n\n**Respuestas:** `201` con la norma seguida · `422` identificador mal formado o norma sin texto consolidado · `404` curso o norma inexistente · `409` ya seguida · `502` el BOE no responde.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\",\n  \"identificador_boe\": \"{{identificador_boe}}\",\n  \"titulo\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 y snapshot guardado', () => pm.response.to.have.status(201));",
+                  "const n = pm.response.json();",
+                  "pm.collectionVariables.set('regulation_id', n.id);",
+                  "console.log('Norma:', n.identificador_boe, '·', n.texto_len, 'chars');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · Listar normas seguidas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/regulations?course_id={{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "regulations"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}"
+                }
+              ]
+            },
+            "description": "Normas **activas** del curso, en orden de alta. Las que se dejan de seguir no aparecen."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.code === 200);",
+                  "console.log(pm.response.json().length, 'norma(s) en seguimiento');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · Comprobar cambios (job)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/check",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "check"
+              ]
+            },
+            "description": "Comprueba las normas del curso contra el BOE. Resultado del job:\n\n- `cambios`: reformas reales (si el diff sale vacío no se registra nada).\n- `preguntas_afectadas`: preguntas que dejan de publicarse en el acto.\n- `contenido_afectado`: fragmentos del temario retirados por copiar la redacción derogada.\n- `resincronizadas`: snapshots puestos al día tras un cambio del parser, sin reforma detrás.\n- `fallidas`/`errores`: normas que se reintentan en el ciclo siguiente.\n- `corte`: presente si el job paró por el tope de coste.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 con job', () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);"
+                ]
+              }
+            }
+          ],
+          "description": "Comprueba las normas del curso. Para el barrido completo (cron diario) manda {\"todos\": true} en lugar del curso."
+        },
+        {
+          "name": "3b · Comprobar TODO (lo que hace el cron)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/check",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "check"
+              ]
+            },
+            "description": "Barrido completo de todas las normas de todos los cursos: es exactamente lo que manda el cron diario. Hay que pedirlo a propósito con `todos: true`; un cuerpo vacío se rechaza con 422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"todos\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 con job', () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);"
+                ]
+              }
+            }
+          ],
+          "description": "Comprueba las normas del curso. Para el barrido completo (cron diario) manda {\"todos\": true} en lugar del curso."
+        },
+        {
+          "name": "4 · Estado del job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/jobs/{{job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "jobs",
+                "{{job_id}}"
+              ]
+            },
+            "description": "Sondea hasta `estado: done`. El resultado trae `{revisadas, cambios, preguntas_afectadas, fallidas, errores}`.\n\nVale tanto para la comprobación como para la regeneración."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "console.log(j.estado, JSON.stringify(j.resultado), '$' + j.cost_usd);",
+                  "pm.test('el job no falló', () => pm.expect(j.estado).to.not.eql('error'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 · Ver cambios detectados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/changes?course_id={{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "changes"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}"
+                }
+              ]
+            },
+            "description": "Comparador antes/después. Cada cambio trae `fragmentos[{antes, despues, contexto}]`, las `preguntas_afectadas` con su similitud y estado, y el `contenido_afectado` (temario retirado). Los cambios de una norma que se dejó de seguir no se listan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cambios = pm.response.json();",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const pendiente = cambios.find(c => (c.preguntas_afectadas||[]).some(a => a.estado === 'marcada'));",
+                  "if (pendiente) { pm.collectionVariables.set('change_id', pendiente.id); }",
+                  "cambios.forEach(c => console.log(c.identificador_boe, '·', c.fragmentos.length, 'preceptos ·',",
+                  "  (c.preguntas_afectadas||[]).length, 'preguntas ·', (c.contenido_afectado||[]).length, 'fragmentos de temario'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 · Regenerar preguntas afectadas (job)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/changes/{{change_id}}/regenerate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "changes",
+                "{{change_id}}",
+                "regenerate"
+              ]
+            },
+            "description": "Reescribe cada pregunta marcada sobre el texto vigente y la republica SOLO si supera la validación completa (L0→L3). El job devuelve `regeneradas`, `marcadas` (siguen fuera), `fallidas` y `sesion_id` del mini-test de validación.\n\n- `409 regeneracion_en_curso`: ya hay un job en vuelo para ese cambio.\n- `409 norma_no_seguida`: la norma se dio de baja.\n- `404 cambio_no_encontrado`: no existe, o no es de ese curso.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso_id\": \"{{curso_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 con job', () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set('job_id', pm.response.json().job_id);"
+                ]
+              }
+            }
+          ],
+          "description": "Reescribe las preguntas afectadas por el cambio. Devuelve 409 si ya hay una regeneración en vuelo para ese cambio."
+        },
+        {
+          "name": "7 · Dejar de seguir una norma",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text",
+                "description": "Clave de servicio del motor. Vacía si el despliegue va abierto."
+              },
+              {
+                "key": "X-OpenAI-Key",
+                "value": "{{openai_key}}",
+                "type": "text",
+                "description": "Tu clave de OpenAI (sk-…). Necesaria en comprobar y regenerar."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/boe/regulations/{{regulation_id}}?course_id={{curso_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "boe",
+                "regulations",
+                "{{regulation_id}}"
+              ],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "{{curso_id}}",
+                  "description": "Curso al que pertenece la norma; sin él no se sabe sobre qué temario se actúa."
+                }
+              ]
+            },
+            "description": "Deja de seguir una norma del curso indicado. El curso es obligatorio: con solo el id de la norma se podía retirar la vigilancia de otro temario."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 sin cuerpo', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "default",
+      "description": "Dónde escucha el motor."
+    },
+    {
+      "key": "api_key",
+      "value": "",
+      "type": "default",
+      "description": "Clave de servicio (X-API-Key). Vacía en desarrollo."
+    },
+    {
+      "key": "openai_key",
+      "value": "",
+      "type": "default",
+      "description": "Clave de OpenAI de quien prueba (X-OpenAI-Key)."
+    },
+    {
+      "key": "user_id",
+      "value": "opositor-demo",
+      "type": "default",
+      "description": "Usuario con el que se prueba."
+    },
+    {
+      "key": "curso_id",
+      "value": "",
+      "type": "default",
+      "description": "Curso; lo deja el alta del temario."
+    },
+    {
+      "key": "documento_id",
+      "value": "",
+      "type": "default",
+      "description": "PDF dentro de un curso."
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "default",
+      "description": "Trabajo largo (ingesta, generación, regeneración)."
+    },
+    {
+      "key": "sesion_id",
+      "value": "",
+      "type": "default",
+      "description": "Sesión de test; activa el tope de 3 pistas."
+    },
+    {
+      "key": "pregunta_id",
+      "value": "",
+      "type": "default",
+      "description": "Pregunta concreta."
+    },
+    {
+      "key": "question_id",
+      "value": "",
+      "type": "default",
+      "description": "Idem, en las rutas que usan este nombre."
+    },
+    {
+      "key": "topic_id",
+      "value": "",
+      "type": "default",
+      "description": "Tema del temario."
+    },
+    {
+      "key": "tema_id",
+      "value": "",
+      "type": "default",
+      "description": "Tema del temario (aula, flashcards, podcast)."
+    },
+    {
+      "key": "tema_id_2",
+      "value": "",
+      "type": "default",
+      "description": "Segundo tema, para el reparto por tema del simulacro."
+    },
+    {
+      "key": "examen_id",
+      "value": "",
+      "type": "default",
+      "description": "Examen oficial del banco."
+    },
+    {
+      "key": "flashcard_id",
+      "value": "",
+      "type": "default",
+      "description": "Flashcard concreta, para repasarla."
+    },
+    {
+      "key": "audio",
+      "value": "",
+      "type": "default",
+      "description": "Fichero MP3 que devuelve el podcast."
+    },
+    {
+      "key": "regulation_id",
+      "value": "",
+      "type": "default",
+      "description": "Norma seguida en el Monitor BOE."
+    },
+    {
+      "key": "change_id",
+      "value": "",
+      "type": "default",
+      "description": "Cambio detectado en una norma."
+    },
+    {
+      "key": "identificador_boe",
+      "value": "",
+      "type": "default",
+      "description": "Identificador BOE de una norma (BOE-A-AAAA-NNNNN)."
+    }
+  ]
+}

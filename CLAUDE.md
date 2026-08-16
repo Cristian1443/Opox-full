@@ -194,13 +194,27 @@ precalculada — siempre se recalcula en `getBalance()`.
 **Marketplace**: `community_tests` con campo `is_free` generado (`price = 0`).
 Compra idempotente por unique constraint `(user_id, test_id)` en `community_test_purchases`.
 
-### Motor de IA del cliente (sin desplegar)
+### Motor de IA del cliente (DESPLEGADO y activo)
 
-El equipo IA entregó un microservicio RAG separado
-(`MotorIA_Ingesta_Tests.postman_collection.json`) que ingesta PDFs de temario y
-genera tests con evidencia verbatim + página. **No está hosteado todavía**;
-`MotorAiClient.ts` es esqueleto listo para el día que publiquen URL. Guía completa
-en `packages/ai/MOTOR_INTEGRATION.md`.
+Microservicio RAG del equipo IA, desplegado en producción:
+`https://ingesta-demo-1097036487734.us-east1.run.app`
+
+Ingesta PDFs de temario y genera tests con evidencia verbatim + página exacta.
+Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b`.
+
+**Integración activa (`CompositeAiClient.ts`):**
+- `generateQuestions` y `generateSurgicalTest` → Motor RAG (async job, ~50-70 s).
+- `analyzePhoto`, `generateHint`, Bloques 9/10 → OpenAI directo (sin cambios).
+- Para desactivar: vaciar `MOTOR_API_BASE_URL` en `.env`.
+
+**[INC-04] `correcta_idx` ausente en job result** — el Motor no expone el índice
+correcto en el job result. Workaround activo: `MotorAiClient` carga el banco de
+preguntas del curso (`GET /v1/courses/{id}/questions`) y cachea `correcta_idx` 30 min.
+Solución definitiva (Opción A del equipo IA): validar respuesta a respuesta vía
+`POST /v1/tests/{sesion_id}/answer` — pendiente de confirmación del equipo IA.
+Ver `packages/ai/MOTOR_INTEGRATION.md` para el detalle completo.
+
+**Smoke test E2E:** `scripts/smoke_bloques_0_6_7.js` — 30/30 PASS (bloques 0, 6 y 7).
 
 ---
 
