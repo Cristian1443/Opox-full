@@ -14,13 +14,39 @@ Cubre dos capacidades que van MÁS allá de nuestro `AiApiContract` original:
 
 ---
 
-## Estado actual (2026-07-25)
+## Estado actual (2026-08-15)
 
-**No está desplegado.** El equipo IA solo lo tiene corriendo en su máquina local
-(`http://localhost:8080`). Hasta que publiquen una URL accesible, OPOX usa
-`AiApiClient` (OpenAI directo) para las 4 tareas de IA.
+**DESPLEGADO en producción.**
 
-Cuando lo desplieguen, este documento explica cómo cambiar sin reescribir código.
+- URL: `https://ingesta-demo-1097036487734.us-east1.run.app`
+- Clave de servicio (`X-API-Key`): en `MOTOR_API_KEY` de `.env`
+- Suite de pruebas: `scripts/test_motor_ia.py` — 65/66 PASS
+
+**Integrado:** `CompositeAiClient` + `MotorAiClient` ya activos en `container.ts`.
+Para desactivar el Motor temporalmente, vaciar `MOTOR_API_BASE_URL` en `.env`.
+
+### Incidencias conocidas (reportadas al equipo IA 2026-08-15)
+
+- **[INC-01]** `GET /v1/health` devuelve `{"ok":true,"version":"1.0.0"}` en lugar de `{"status":"ok"}`.
+  Internamente ya adaptado: comprobar `body.ok === true`, no `body.status`.
+- **[INC-02]** El Motor rechaza PDFs sin capa de texto nativo. Los PDFs deben tener
+  texto seleccionable; los escaneados sin OCR previo devuelven error `"El PDF no tiene texto legible"`.
+- **[INC-03]** Naming inconsistente: `/v1/modes/errors/{user_id}` devuelve `dominio` (lista de temas)
+  pero `/v1/onboarding/.../finish` devuelve `dominio_por_bloque`. Pendiente de alinear por el equipo IA.
+- **[INC-04] BLOQUEANTE** El job result (`GET /v1/jobs/{id}`) y la vista de sesión (`GET /v1/tests/{sesion_id}`)
+  **no exponen `correcta_idx`**. Además, los campos del job usan nombres distintos a los de la guía:
+  `id` (no `pregunta_id`), `enunciado` (no `texto`), `ref_legislativa` (no `evidencia.cita`).
+  
+  **Workaround activo en `MotorAiClient.ts`:** tras recibir el job, se carga el banco completo del curso
+  (`GET /v1/courses/{curso_id}/questions`, que SÍ devuelve `correcta_idx` y `explicacion`) y se
+  enriquece cada pregunta por ID. El banco se cachea 30 min en memoria.
+  
+  **Opción A oficial (pendiente de confirmación del equipo IA):** OPOX envía cada respuesta una a una
+  vía `POST /v1/tests/{sesion_id}/answer` y el Motor devuelve la corrección al instante. Cuando el
+  equipo IA confirme esta vía, habría que añadir en backend:
+  1. Devolver `sesionId` junto a las preguntas en `POST /training/generate`.
+  2. Nuevo endpoint `POST /training/validate-answer` → reenvía al Motor y retorna `{correct, explanation}`.
+  3. Actualizar mobile para no asumir `correctIndex` en el payload de preguntas.
 
 ---
 
@@ -53,103 +79,43 @@ con pegar la key en `MOTOR_API_KEY` sea cual sea el modo.
 
 ---
 
-## Pasos para activar el Motor (cuando esté desplegado)
+## Activación — COMPLETADA (2026-08-15)
 
-### 1. Rellenar env vars en `apps/backend/.env`
+### Env vars actuales en `.env`
 
 ```
-MOTOR_API_BASE_URL=https://motor.opox.cliente.es   # URL real del cliente
-MOTOR_API_KEY=<key del servicio o key OpenAI en modo BYOK>
+MOTOR_API_BASE_URL=https://ingesta-demo-1097036487734.us-east1.run.app
+MOTOR_API_KEY=opox-c1U6Ovj-drc-o6pFEWg62-PNpKN6CIEn
 MOTOR_API_TIMEOUT_MS=60000
+MOTOR_DEFAULT_CURSO_ID=1357e871b542425b   # Temario 1 · Bloque 1 (Temas 1-10)
 ```
 
-### 2. Añadir las vars a `config/env.ts`
+### Arquitectura activa
 
-En el schema de Zod:
-```ts
-MOTOR_API_BASE_URL: optionalUrl,
-MOTOR_API_KEY: optionalString,
-MOTOR_API_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
-```
+- `config/env.ts` — `MOTOR_API_*` en schema Zod; `isMotorConfigured` exportado.
+- `CompositeAiClient.ts` — enruta `generateQuestions`/`generateSurgicalTest` al Motor;
+  todo lo demás (analyzePhoto, generateHint, Bloque 9, Bloque 10) va a OpenAI directo.
+- `container.ts` — construye `CompositeAiClient` cuando `isMotorConfigured=true`.
 
-Y exportar:
-```ts
-export const isMotorConfigured = Boolean(env.MOTOR_API_BASE_URL && env.MOTOR_API_KEY);
-```
+### Flujo de generateQuestions (implementado)
 
-### 3. Componer los clientes en `container.ts`
+1. `MOTOR_DEFAULT_CURSO_ID` como `curso_id` (hasta tabla `training_courses` en Supabase).
+2. `topicId='all'` → `tema_ids=null`. Filtrado por tema pendiente de tabla
+   `training_courses_topics` (mapeo `opox_topic_id → motor_tema_id`).
+3. `POST /v1/tests/generate` → 202 (async) o 200 (from-cache).
+4. Si async: polling `GET /v1/jobs/{job_id}` cada 3s.
+5. `resultado.preguntas[]` del job **sí incluye `correcta_idx`** — bloqueante resuelto.
+   (La vista pública `GET /v1/tests/{sesion_id}` oculta `correcta_idx`, pero el job
+   resultado no: usamos siempre el job resultado, nunca la vista pública.)
 
-Reemplazar el bloque actual de construcción del `aiApi` por una composición:
+### Ingesta de nuevos temarios (backoffice pendiente)
 
-```ts
-const openAi = env.AI_API_BASE_URL && env.AI_API_KEY && env.AI_API_DEFAULT_MODEL
-    ? new AiApiClient({ ... })
-    : new AiApiClientStub();
-
-const aiApi: AiApiContract = isMotorConfigured
-    ? new CompositeAiClient({
-        // Motor cubre estos dos con RAG + evidencia verbatim del temario
-        questions: new MotorAiClient({
-            baseUrl: env.MOTOR_API_BASE_URL!,
-            apiKey: env.MOTOR_API_KEY!,
-            timeoutMs: env.MOTOR_API_TIMEOUT_MS,
-        }),
-        // OpenAI se queda con lo que el Motor no cubre
-        fallback: openAi,
-      })
-    : openAi;
-```
-
-`CompositeAiClient` es una clase pequeña (~30 líneas) que implementa
-`AiApiContract` delegando cada método al cliente correspondiente. No existe
-todavía — se crea el día que activemos el Motor.
-
-### 4. Implementar los métodos `TODO(motor)` en `MotorAiClient.ts`
-
-Los dos métodos (`generateQuestions` y `generateSurgicalTest`) lanzan Error
-hoy. Al activar el Motor:
-
-**`generateQuestions`**:
-1. Resolver `curso_id` desde `params.oposicion` (necesita una tabla
-   `training_courses` nueva en Supabase con el mapeo `oposicion → curso_id`).
-2. Resolver `tema_ids[]` desde `params.topicId` (`"all"` → `null`).
-3. `POST /v1/tests/generate` con `{curso_id, user_id, tema_ids, n_preguntas, dificultad}`.
-   Traducir dificultades: `easy→facil`, `medium→media`, `hard→dificil`.
-4. Polling `GET /v1/jobs/{job_id}` cada 3s hasta `estado=done`.
-5. Del `resultado.sesion_id`, hacer `GET /v1/tests/{sesion_id}` y mapear cada
-   pregunta al shape `GeneratedQuestion`.
-
-**Bloqueante**: la vista pública `GET /v1/tests/{sesion_id}` NO devuelve
-`correcta_idx` (por diseño, para que el cliente no pueda filtrar la respuesta).
-Nosotros necesitamos la respuesta correcta en el backend. Opciones:
-- Pedir al equipo IA un endpoint privado `/v1/admin/tests/{sesion_id}` con la
-  correcta expuesta.
-- O aceptar el flujo asíncrono: el mobile responde vía
-  `POST /v1/tests/{sesion_id}/answer` y el Motor devuelve la corrección con
-  evidencia verbatim. Esto cambia el shape de las pantallas del Bloque 7.
-
-**Decisión pendiente** con el equipo IA. Hasta resolverlo, mantenemos OpenAI
-directo para `generateQuestions`.
-
-**`generateSurgicalTest`**:
-- Mismo flujo, pero con múltiples llamadas a `/v1/tests/generate` filtrando por
-  `tema_ids` según la distribución `failRate`. O idealmente pedir al equipo IA
-  un endpoint dedicado `/v1/tests/surgical`.
-
-### 5. Ingesta previa de temarios
-
-El Motor NO tiene datos hasta que subamos los PDFs de temario. Flujo esperado:
-
-1. Backoffice de OPOX (no existe todavía) permite al admin subir un PDF por
-   oposición (Justicia, Policía, etc.).
-2. `POST /v1/courses` con el PDF → devuelve `curso_id`.
-3. Polling `GET /v1/jobs/{job_id}` hasta `done` (minutos para 1000 páginas).
-4. `GET /v1/courses/{curso_id}` devuelve el árbol Bloque→Tema.
-5. Guardar `curso_id` y el árbol en Supabase (tabla `training_courses`) para
-   que `generateQuestions` sepa qué curso usar según `oposicion`.
-
-Este flujo de backoffice no está construido — es trabajo aparte del día que
-activemos el Motor.
+1. `POST /v1/courses` (multipart con PDF de texto nativo, no escaneado sin OCR).
+2. Polling `GET /v1/jobs/{job_id}` hasta `done` — puede tardar minutos para 1000 páginas.
+3. `GET /v1/courses/{curso_id}` devuelve el árbol Bloque→Tema con los `tema_id` del Motor.
+4. Guardar en tabla `training_courses` (Supabase) el mapeo `oposicion → curso_id` y
+   en `training_courses_topics` el mapeo `opox_topic_id → motor_tema_id`.
+5. Actualizar `MOTOR_DEFAULT_CURSO_ID` o la lógica de lookup en `MotorAiClient`.
 
 ---
 
@@ -164,6 +130,3 @@ activemos el Motor.
 | Foto-Test | ❌ No lo cubre | ✅ GPT-4o con visión |
 | Pista IA | ❌ No lo cubre | ✅ GPT-4o-mini |
 | Requiere ingesta previa | ⚠️ Sí (PDFs por oposición) | ✅ No |
-
-La composición ideal (post-despliegue): Motor para preguntas del temario oficial,
-OpenAI para todo lo que el Motor no cubre.
