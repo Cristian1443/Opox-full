@@ -1,4 +1,4 @@
-import { env, isSupabaseConfigured } from './config';
+import { env, isSupabaseConfigured, isMotorConfigured } from './config';
 import { logger } from '@opox/utils';
 import {
     RegisterUseCase,
@@ -128,6 +128,8 @@ import {
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
+    MotorAiClient,
+    CompositeAiClient,
     MotorBoeClient,
 } from './infrastructure';
 import {
@@ -207,7 +209,7 @@ export function buildContainer() {
         })
         : null;
 
-    const aiApi = env.AI_API_BASE_URL && env.AI_API_KEY && env.AI_API_DEFAULT_MODEL
+    const openAiClient = env.AI_API_BASE_URL && env.AI_API_KEY && env.AI_API_DEFAULT_MODEL
         ? new AiApiClient({
             baseUrl: env.AI_API_BASE_URL,
             apiKey: env.AI_API_KEY,
@@ -220,6 +222,29 @@ export function buildContainer() {
         logger.warn(
             '[container] IA no configurada — usando AiApiClientStub con datos mock. ' +
             'Rellena AI_API_BASE_URL / AI_API_KEY / AI_API_DEFAULT_MODEL en .env para usar IA real.',
+        );
+    }
+
+    // Si el Motor está configurado, lo usamos para generateQuestions/generateSurgicalTest
+    // (RAG + evidencia verbatim del temario). El cliente OpenAI se mantiene como fallback
+    // para Foto-Test, Pista IA, Bloque 9 y Bloque 10.
+    const aiApi = isMotorConfigured
+        ? new CompositeAiClient({
+            questions: new MotorAiClient({
+                baseUrl: env.MOTOR_API_BASE_URL!,
+                apiKey: env.MOTOR_API_KEY!,
+                openAiKey: env.AI_API_KEY ?? '',
+                timeoutMs: env.MOTOR_API_TIMEOUT_MS,
+                defaultCursoId: env.MOTOR_DEFAULT_CURSO_ID,
+            }),
+            fallback: openAiClient,
+          })
+        : openAiClient;
+
+    if (isMotorConfigured) {
+        logger.info(
+            '[container] Motor de IA activo — generateQuestions y generateSurgicalTest ' +
+            'usarán RAG con evidencia verbatim del temario oficial.',
         );
     }
 

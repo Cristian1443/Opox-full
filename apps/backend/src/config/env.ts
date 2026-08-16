@@ -43,6 +43,13 @@ const envSchema = z.object({
     AI_API_DEFAULT_MODEL: optionalString,
     AI_API_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
 
+    // Motor de IA del cliente (RAG + generación con evidencia verbatim)
+    MOTOR_API_BASE_URL: optionalUrl,
+    MOTOR_API_KEY: optionalString,
+    MOTOR_API_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
+    // ID del curso por defecto hasta que exista la tabla training_courses
+    MOTOR_DEFAULT_CURSO_ID: optionalString,
+
     // Motor BOE externo — opcional; sin él MotorBoeClient no se instancia
     MOTOR_BOE_BASE_URL: optionalUrl,
     MOTOR_BOE_API_KEY: optionalString,
@@ -77,3 +84,5 @@ export const corsOrigins = env.CORS_ORIGINS.split(',').map((s) => s.trim()).filt
 export const isSupabaseConfigured = Boolean(
     env.SUPABASE_URL && env.SUPABASE_ANON_KEY && env.SUPABASE_SERVICE_ROLE_KEY,
 );
+
+export const isMotorConfigured = Boolean(env.MOTOR_API_BASE_URL && env.MOTOR_API_KEY);
