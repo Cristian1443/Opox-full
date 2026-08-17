@@ -5,6 +5,118 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-17 — Bloque 12 · Configuración completo de punta a punta
+
+Rama de trabajo: `feat/bloque-11` (continuada). Se cierra el Bloque 12 íntegro:
+11 pantallas + 2 modales mobile, backend clean-architecture con 5 endpoints,
+2 tablas Supabase, smoke test de 10 requests / 31 assertions verde.
+
+### Frontend — Fase 1 (11 pantallas + 2 modales)
+
+Se implementaron todas las pantallas de Configuración en `apps/mobile/src/screens/settings/`:
+
+| Archivo | Pantalla |
+|---|---|
+| `SettingsScreen.js` (modificado) | Hub principal — refactorizado: modal inline de borrado → navegación a `ConfigDeleteAccount`; añadida entrada "Tu opinión" |
+| `ConfigPerfilScreen.js` | 12.1 · Perfil y Biometría — toggle biométrico real, editar nombre vía modal, flujo cambio contraseña |
+| `ConfigSubscriptionScreen.js` | 12.2 · Suscripción — Linking.openURL a OS stores (regla IAP Apple/Google) |
+| `ConfigDevicesScreen.js` | 12.3 · Dispositivos conectados |
+| `ConfigAccessibilityScreen.js` | 12.4 · Accesibilidad — tema auto/claro/oscuro, escala de fuente (slider), reducir movimiento |
+| `ConfigToneScreen.js` | 12.5 · Tono de la IA — tabs personalidad + slider nivel detalle + 2 toggles + preview lavanda |
+| `ConfigStatsScreen.js` | 12.7 · Estadísticas Pro — navega a ConfigExport |
+| `ConfigExportScreen.js` | 12.8 · Exportar informe — 3 periodos, stub 2s, lanza ReportSuccessModal |
+| `ReportSuccessModal.js` | Pop-up informe generado — animación spring+fade, botones Compartir/Guardar |
+| `ConfigHelpScreen.js` | 12.9 · Ayuda — FAQ accordion + búsqueda, botón chat soporte |
+| `ConfigFeedbackScreen.js` | 12.10 · Tu opinión — 3 tipos, textarea 500 chars, lanza FeedbackSuccessModal |
+| `FeedbackSuccessModal.js` | Pop-up feedback enviado — modal verde, cierra y vuelve atrás |
+| `ConfigDeleteAccountScreen.js` | 12.11 · Eliminar cuenta — animación slideUp personalizada, confirmación, logout/delete wired a authApi |
+
+**Bugs RN corregidos durante la implementación** (patrones recurrentes):
+- `<Ionicons>` dentro de `<Text>` → sustituido por `<View flexRow>` wrapper.
+- `marginLeft: 'auto'` → reemplazado por `flex: 1` en el contenedor izquierdo.
+- `display: 'flex'` en StyleSheet → eliminado (por defecto en RN).
+- `Animated.Value` sin `useRef` en cuerpo del componente → movido a `useRef(...).current`.
+- `paddingTop: 40` hardcoded → eliminado (SafeAreaView lo gestiona).
+- Switch `thumbColor` verde sobre track verde → corregido a `'#FFFFFF'` cuando ON.
+
+**Dependencia nueva**: `@react-native-community/slider` instalada para el slider
+de nivel de detalle en ConfigToneScreen (12.5).
+
+**ConfigToneScreen rediseñada** para coincidir con la referencia en
+`screenshots_bloque12/asemajarmas_12.5.png`: tabs de personalidad, slider numérico
+(0=Conciso/1=Medio/2=Extenso), 2 toggles, tarjeta de preview lavanda (`#EDE9FE`).
+
+Todas las preferencias de tono + accesibilidad se persisten en `AsyncStorage`
+con clave `opox.ai.tone` (tono) — pendiente de conectar al backend en integración.
+
+### Backend — Fase 2 (arquitectura limpia completa)
+
+**Contratos y tipos** (`packages/`):
+- `packages/constants/src/routes.js` + `index.d.ts` — 4 rutas `CONFIG.*` añadidas:
+  `PREFERENCES`, `PRO_STATS`, `PRO_STATS_EXPORT`, `FEEDBACK`.
+- `packages/types/src/config.ts` — DTOs compartidos: `UserPreferences`,
+  `UpdatePreferencesInput`, `ProStats`, `ProStatsTopicBreakdown`,
+  `ProStatsExportResult`, `SubmitFeedbackInput`.
+
+**Domain** (`apps/backend/src/domain/`):
+- Entidades: `UserPreferences` (tono + accesibilidad), `ProStats` + `ProStatsTopicRow`.
+- Errores: `PreferencesNotFoundError`, `FeedbackInvalidError`.
+- Interfaz: `IConfigRepository` con 4 métodos: `getPreferences`, `upsertPreferences`,
+  `submitFeedback`, `getProStats`.
+
+**Application** (`apps/backend/src/application/config/ConfigUseCases.ts`):
+- `GetPreferencesUseCase` — obtiene o crea con defaults en el primer acceso.
+- `UpdatePreferencesUseCase` — upsert parcial (patch con campos opcionales).
+- `GetProStatsUseCase` — delega en el repositorio (cálculo real en BD).
+- `ExportProStatsUseCase` — stub 202, downloadUrl null hasta implementar PDF.
+- `SubmitFeedbackUseCase` — valida longitud 1–500 y tipo.
+
+**Infrastructure** (`apps/backend/src/infrastructure/config/SupabaseConfigRepository.ts`):
+- `getPreferences` / `upsertPreferences` — upsert con `onConflict: 'user_id'`.
+- `submitFeedback` — insert en `user_feedback`.
+- `getProStats` — **agregación real** desde `training_attempt_responses`
+  (total/correct por `topic_id`) + streak desde `user_gamification`.
+  Calcula: `accuracyPct`, `passedProbabilityPct` (heurística accuracy×0.85 + streak×0.5),
+  `topicsStrong` (≥80%), `topicsWeak` (<50%), `topicBreakdown[]` con accuracy por tema.
+
+**Presentation**:
+- `ConfigController.ts` — 5 handlers (GET/PATCH preferences, GET pro-stats,
+  POST export, POST feedback).
+- `configValidators.ts` — Zod: `updatePreferencesBody`, `exportProStatsBody`,
+  `submitFeedbackBody`.
+- `configRoutes.ts` — 5 rutas bajo `/config/`.
+
+**Wiring**: `container.ts` añade `configRepo` + 5 use cases + `configController`.
+`server.ts` monta `createConfigRouter`. Stub proxy para arranque sin Supabase.
+
+**SQL**: `apps/backend/supabase/bloque12_config.sql`:
+- `user_preferences` — UNIQUE por `user_id`, defaults a `equilibrado/1/false/true/auto/1.0/false`, RLS owner all.
+- `user_feedback` — tipo CHECK (`suggestion|bug|other`), mensaje CHECK 1–500 chars, RLS insert+select owner.
+
+**Mobile**: `apps/mobile/src/api/settings.js` — 5 métodos (`getPreferences`,
+`updatePreferences`, `getProStats`, `exportProStats`, `submitFeedback`).
+Exportado desde `api/index.js` como `settingsApi`.
+(Nota: `config.js` ya estaba tomado por la utilidad de URL base del cliente HTTP.)
+
+### Smoke test (31/31 verde)
+
+Colección: `Bloque12_Config_Tests.postman_collection.json` (10 requests, 31 assertions).
+
+| Grupo | Request | Resultado |
+|---|---|---|
+| Auth | POST `/auth/login` | ✅ token generado |
+| Preferencias | GET /config/preferences (defaults) | ✅ personality/theme/detailLevel presentes |
+| Preferencias | PATCH /config/preferences → personality:exigente + theme:dark | ✅ campos actualizados |
+| Preferencias | GET /config/preferences (verifica persistencia) | ✅ cambio guardado en BD |
+| Pro Stats | GET /config/pro-stats | ✅ 38 preguntas, 53% accuracy, 5 temas desglosados |
+| Pro Stats | POST /config/pro-stats/export → period:month | ✅ 202 + downloadUrl:null |
+| Feedback | POST /config/feedback → suggestion | ✅ 201 submitted:true |
+| Feedback | POST /config/feedback → bug | ✅ 201 submitted:true |
+| Errores | PATCH preferences → campo inválido | ✅ 400 validation/failed |
+| Errores | GET preferences sin token | ✅ 401 unauthorized |
+
+---
+
 ## 2026-08-07 (cont.) — Motor BOE integrado + mejoras UX Generador Infinito
 
 Continuación de la misma rama `feat/bloque-10-monitor-boe`.
