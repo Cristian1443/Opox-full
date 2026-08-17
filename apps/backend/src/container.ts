@@ -100,6 +100,12 @@ import {
     CompleteBoeMiniTestUseCase,
     ListTopicsUseCase,
     SyncBoeChangesUseCase,
+    // Bloque 12 · Configuración
+    GetPreferencesUseCase,
+    UpdatePreferencesUseCase,
+    GetProStatsUseCase,
+    ExportProStatsUseCase,
+    SubmitFeedbackUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -112,6 +118,7 @@ import {
     SupabaseTutorRepository,
     SupabaseNotesRepository,
     SupabaseBoeRepository,
+    SupabaseConfigRepository,
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
@@ -126,9 +133,10 @@ import {
     TutorController,
     NotesController,
     BoeController,
+    ConfigController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IConfigRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -171,6 +179,10 @@ export function buildContainer() {
     const boeRepo: IBoeRepository = isSupabaseConfigured
         ? new SupabaseBoeRepository(getSupabaseAdmin())
         : createStubBoeRepository();
+
+    const configRepo: IConfigRepository = isSupabaseConfigured
+        ? new SupabaseConfigRepository(getSupabaseAdmin())
+        : createStubConfigRepository();
 
     if (!isSupabaseConfigured) {
         logger.warn(
@@ -336,6 +348,13 @@ export function buildContainer() {
         completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo),
         listTopics: new ListTopicsUseCase(boeRepo),
         syncBoeChanges: motorBoe ? new SyncBoeChangesUseCase(boeRepo, motorBoe) : undefined,
+
+        // Bloque 12 · Configuración
+        getPreferences:    new GetPreferencesUseCase(configRepo),
+        updatePreferences: new UpdatePreferencesUseCase(configRepo),
+        getProStats:       new GetProStatsUseCase(configRepo),
+        exportProStats:    new ExportProStatsUseCase(configRepo),
+        submitFeedback:    new SubmitFeedbackUseCase(configRepo),
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -419,6 +438,14 @@ export function buildContainer() {
         getSummary: useCases.getSummary,
     });
 
+    const configController = new ConfigController({
+        getPreferences:    useCases.getPreferences,
+        updatePreferences: useCases.updatePreferences,
+        getProStats:       useCases.getProStats,
+        exportProStats:    useCases.exportProStats,
+        submitFeedback:    useCases.submitFeedback,
+    });
+
     const motivationController = new MotivationController({
         getSummary: useCases.getMotivationSummary,
         getStreakDetail: useCases.getStreakDetail,
@@ -456,6 +483,7 @@ export function buildContainer() {
             tutor: tutorController,
             notes: notesController,
             boe: boeController,
+            config: configController,
         },
         middleware: {
             auth: authMiddleware,
@@ -521,4 +549,11 @@ function createStubBoeRepository(): IBoeRepository {
         throw new Error('[boe] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as IBoeRepository, { get: () => notConfigured });
+}
+
+function createStubConfigRepository(): IConfigRepository {
+    const notConfigured = (): never => {
+        throw new Error('[config] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IConfigRepository, { get: () => notConfigured });
 }

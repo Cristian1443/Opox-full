@@ -10,3 +10,4 @@ export * from './payments';
 export * from './tutor';
 export * from './notes';
 export * from './boe';
+export * from './config';

@@ -109,6 +109,13 @@ export const API_ROUTES = {
         GENERATE_TEST:     '/notes/:id/generate-test',
     },
 
+    CONFIG: {
+        PREFERENCES:       '/config/preferences',
+        PRO_STATS:         '/config/pro-stats',
+        PRO_STATS_EXPORT:  '/config/pro-stats/export',
+        FEEDBACK:          '/config/feedback',
+    },
+
     MOTIVATION: {
         SUMMARY: '/motivation/summary',
         STREAK: '/motivation/streak',

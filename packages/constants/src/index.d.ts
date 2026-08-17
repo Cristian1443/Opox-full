@@ -92,6 +92,13 @@ declare const API_ROUTES: {
         readonly GENERATE_TEST: string;
     };
 
+    readonly CONFIG: {
+        readonly PREFERENCES: string;
+        readonly PRO_STATS: string;
+        readonly PRO_STATS_EXPORT: string;
+        readonly FEEDBACK: string;
+    };
+
     readonly MOTIVATION: {
         readonly SUMMARY: string;
         readonly STREAK: string;

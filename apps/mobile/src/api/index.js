@@ -7,4 +7,5 @@ export { trainingApi } from './training';
 export { tutorApi } from './tutor';
 export { notesApi } from './notes';
 export { boeApi } from './boe';
+export { settingsApi } from './settings';
 export { API_BASE_URL } from './config';

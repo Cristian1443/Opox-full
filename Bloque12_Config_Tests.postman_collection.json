@@ -1,0 +1,353 @@
+{
+  "info": {
+    "name": "OPOX · Bloque 12 · Configuración",
+    "description": "Tests de humo para todos los endpoints del Bloque 12 (Configuración).\n\n## Variables de colección\n- `base_url`: http://localhost:3000\n- `token`: JWT del usuario (se rellena en el paso de login)\n\n## Endpoints cubiertos (5 requests · 10 assertions)\n1. Auth · Login → captura token\n2. GET /config/preferences → verifica shape y defaults\n3. PATCH /config/preferences → actualiza personality + theme\n4. GET /config/preferences → verifica que los cambios se guardaron\n5. GET /config/pro-stats → verifica shape ProStats\n6. POST /config/pro-stats/export → 202 + downloadUrl null\n7. POST /config/feedback → 201 suggestion\n8. POST /config/feedback → 201 bug\n9. PATCH /config/preferences → campo inválido → 400\n10. POST /config/feedback → sin token → 401",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "token",    "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 · Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.ok && res.data?.accessToken) {",
+                  "    pm.collectionVariables.set('token', res.data.accessToken);",
+                  "    console.log('✅ Token guardado');",
+                  "} else {",
+                  "    console.error('❌ Login fallido', res);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"santigarciavel33@gmail.com\",\n  \"password\": \"SantiGV@2005\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 · Preferencias",
+      "item": [
+        {
+          "name": "GET preferences — defaults",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok:true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('tiene personality', () => pm.expect(res.data.personality).to.be.a('string'));",
+                  "pm.test('tiene theme', () => pm.expect(res.data.theme).to.be.a('string'));",
+                  "pm.test('tiene detailLevel', () => pm.expect(res.data.detailLevel).to.be.a('number'));",
+                  "console.log('✅ GET preferences:', JSON.stringify(res.data, null, 2));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/config/preferences",
+              "host": ["{{base_url}}"],
+              "path": ["config", "preferences"]
+            }
+          }
+        },
+        {
+          "name": "PATCH preferences — actualizar personality y theme",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok:true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('personality actualizado a exigente', () => pm.expect(res.data.personality).to.equal('exigente'));",
+                  "pm.test('theme actualizado a dark', () => pm.expect(res.data.theme).to.equal('dark'));",
+                  "console.log('✅ PATCH preferences OK');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personality\": \"exigente\",\n  \"theme\": \"dark\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/config/preferences",
+              "host": ["{{base_url}}"],
+              "path": ["config", "preferences"]
+            }
+          }
+        },
+        {
+          "name": "GET preferences — verifica cambio persistido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('personality sigue siendo exigente', () => pm.expect(res.data.personality).to.equal('exigente'));",
+                  "pm.test('theme sigue siendo dark', () => pm.expect(res.data.theme).to.equal('dark'));",
+                  "console.log('✅ GET preferences persistido OK');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/config/preferences",
+              "host": ["{{base_url}}"],
+              "path": ["config", "preferences"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Pro Stats",
+      "item": [
+        {
+          "name": "GET pro-stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok:true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('tiene totalQuestions', () => pm.expect(res.data.totalQuestions).to.be.a('number'));",
+                  "pm.test('tiene accuracyPct', () => pm.expect(res.data.accuracyPct).to.be.a('number'));",
+                  "pm.test('tiene passedProbabilityPct', () => pm.expect(res.data.passedProbabilityPct).to.be.a('number'));",
+                  "pm.test('tiene topicBreakdown array', () => pm.expect(res.data.topicBreakdown).to.be.an('array'));",
+                  "console.log('✅ Pro Stats:', JSON.stringify(res.data, null, 2));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/config/pro-stats",
+              "host": ["{{base_url}}"],
+              "path": ["config", "pro-stats"]
+            }
+          }
+        },
+        {
+          "name": "POST pro-stats/export — period:month",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok:true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('period:month', () => pm.expect(res.data.period).to.equal('month'));",
+                  "pm.test('downloadUrl es null (stub)', () => pm.expect(res.data.downloadUrl).to.be.null);",
+                  "console.log('✅ Export pro-stats (stub) OK');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"period\": \"month\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/config/pro-stats/export",
+              "host": ["{{base_url}}"],
+              "path": ["config", "pro-stats", "export"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Feedback",
+      "item": [
+        {
+          "name": "POST feedback — sugerencia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok:true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('submitted:true', () => pm.expect(res.data.submitted).to.be.true);",
+                  "console.log('✅ Feedback sugerencia enviado OK');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"suggestion\",\n  \"message\": \"Sería genial tener un modo oscuro automático según la hora del día.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/config/feedback",
+              "host": ["{{base_url}}"],
+              "path": ["config", "feedback"]
+            }
+          }
+        },
+        {
+          "name": "POST feedback — bug",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok:true', () => pm.expect(res.ok).to.be.true);",
+                  "console.log('✅ Feedback bug enviado OK');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"bug\",\n  \"message\": \"La pantalla de estadísticas pro no carga los temas cuando no hay intentos registrados.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/config/feedback",
+              "host": ["{{base_url}}"],
+              "path": ["config", "feedback"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Casos de error",
+      "item": [
+        {
+          "name": "PATCH preferences — campo inválido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok:false', () => pm.expect(res.ok).to.be.false);",
+                  "console.log('✅ Validación 400 OK:', res.error?.code);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personality\": \"dictador\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/config/preferences",
+              "host": ["{{base_url}}"],
+              "path": ["config", "preferences"]
+            }
+          }
+        },
+        {
+          "name": "GET preferences — sin token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok:false', () => pm.expect(res.ok).to.be.false);",
+                  "console.log('✅ 401 sin token OK');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/config/preferences",
+              "host": ["{{base_url}}"],
+              "path": ["config", "preferences"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
