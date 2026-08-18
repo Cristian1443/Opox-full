@@ -4,7 +4,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import {
@@ -20,25 +19,30 @@ import { navigationRef } from './src/navigation/navigationRef';
 import useNetworkWatcher from './src/hooks/useNetworkWatcher';
 import { pushApi } from './src/api';
 
-// Tipografía de marca OPOX (Figma: familia Poppins en todas las pantallas).
-// Se mantiene la splash nativa visible hasta que las fuentes cargan para
-// evitar el parpadeo con la tipografía del sistema.
+// Tipografía de marca OPOX
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// Desde SDK 53, las push notifications remotas no funcionan en Expo Go.
-// En development build (EAS) sí funcionan. Este flag lo detecta.
+// Desde SDK 53, expo-notifications remoto NO funciona en Expo Go y lanza
+// un error en su propia inicialización de módulo antes de que podamos
+// interceptarlo. Por eso NO usamos import top-level — usamos require()
+// condicional para que Metro no lo evalúe al cargar el bundle.
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
-// Configurar el comportamiento de notificaciones en primer plano
-// Solo cuando no estamos en Expo Go para evitar el crash al arrancar.
+// Carga lazy: solo en development build / producción real
+let Notifications = null;
 if (!IS_EXPO_GO) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: false, // InAppNotificationBanner lo gestiona
-      shouldPlaySound: false,
-      shouldSetBadge: true,
-    }),
-  });
+  try {
+    Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: false, // InAppNotificationBanner lo gestiona
+        shouldPlaySound: false,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (_) {
+    Notifications = null;
+  }
 }
 
 /**
@@ -46,12 +50,10 @@ if (!IS_EXPO_GO) {
  * Llamar tras login exitoso. No-op en Expo Go (SDK 53+).
  */
 export async function registerForPushNotifications() {
-  if (IS_EXPO_GO || !Device.isDevice) return;
-
+  if (!Notifications || !Device.isDevice) return;
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
     let finalStatus = existing;
-
     if (existing !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
@@ -63,11 +65,8 @@ export async function registerForPushNotifications() {
 
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     const deviceId = token.replace('ExponentPushToken[', '').replace(']', '').slice(0, 32);
-
     await pushApi.registerToken(token, platform, deviceId).catch(() => {});
-  } catch {
-    // Silencioso: el registro de token no debe bloquear el flujo de login
-  }
+  } catch (_) {}
 }
 
 function NetworkWatcher() {
@@ -77,12 +76,11 @@ function NetworkWatcher() {
 
 /**
  * Escucha el tap en una notificación push y navega a la pantalla correcta.
- * data.screen debe coincidir con los nombres registrados en OnboardingNavigator.
  * No-op en Expo Go.
  */
 function PushNotificationHandler() {
   useEffect(() => {
-    if (IS_EXPO_GO) return;
+    if (!Notifications) return;
     try {
       const sub = Notifications.addNotificationResponseReceivedListener(response => {
         const data = response.notification.request.content.data ?? {};
@@ -92,7 +90,7 @@ function PushNotificationHandler() {
         }
       });
       return () => sub.remove();
-    } catch {
+    } catch (_) {
       return undefined;
     }
   }, []);
