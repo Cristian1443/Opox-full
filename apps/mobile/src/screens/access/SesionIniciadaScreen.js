@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 import { PENDING_OPOSICION_KEY } from '../onboarding/OppositionSelectorScreen';
+import { registerForPushNotifications } from '../../../App';
 
 export default function SesionIniciadaScreen({ navigation, route }) {
     const { email } = route.params || {};
@@ -29,6 +30,7 @@ export default function SesionIniciadaScreen({ navigation, route }) {
         // TODO: sustituir el timer por la carga real del perfil / token
         const timer = setTimeout(() => {
             applyPendingOposicion().finally(() => {
+                registerForPushNotifications().catch(() => {});
                 navigation.replace('Dashboard', { email });
             });
         }, 2000);
