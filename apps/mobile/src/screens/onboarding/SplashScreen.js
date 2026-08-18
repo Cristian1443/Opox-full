@@ -7,9 +7,46 @@ import {
     StatusBar,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import OpoxWordmark from '../../../assets/opoxLogo';
 import MasCopLogo from '../../../assets/masCopLogo';
 import camoImg from '../../imports/CargaInicial/3e43d7dd7590060c7fd1b2f8e506e66fc41fe1d7.jpg';
+import { api, authApi } from '../../api';
+import { PENDING_OPOSICION_KEY } from './OppositionSelectorScreen';
+import { PENDING_LEVEL_TEST_KEY } from './LevelTestInProgressScreen';
+
+// Restaura la sesión guardada en AsyncStorage (si existe) para no forzar
+// login + onboarding de nuevo cada vez que se cierra la app. `me()` valida
+// que el accessToken siga vivo; si expiró, se intenta un refresh antes de
+// darla por perdida.
+async function resolveSession() {
+    const session = await api.loadSession();
+    if (!session?.accessToken) return false;
+
+    const { error: meError } = await authApi.me();
+    if (!meError) return true;
+
+    if (session.refreshToken) {
+        const { error: refreshError } = await authApi.refresh(session.refreshToken);
+        if (!refreshError) return true;
+    }
+
+    await api.clearSession();
+    return false;
+}
+
+// Sin sesión todavía (usuario no ha creado cuenta), pero puede haber cerrado
+// la app a mitad del embudo de onboarding (Bloque 0). En vez de reiniciar
+// siempre en el slider, retoma el paso exacto donde se quedó.
+async function resolveOnboardingEntryRoute() {
+    const pendingLevelTest = await AsyncStorage.getItem(PENDING_LEVEL_TEST_KEY);
+    if (pendingLevelTest != null) return 'LevelTestInProgress';
+
+    const pendingOposicion = await AsyncStorage.getItem(PENDING_OPOSICION_KEY);
+    if (pendingOposicion) return 'LevelTestProposal';
+
+    return 'OnboardingSlider';
+}
 
 // ─── MásCOP badge ──────────────────────────────────────────────────────────────
 // Lockup vectorizado real "MásCOP · Formación Policial" (paths exactos extraídos
@@ -36,7 +73,14 @@ export default function SplashScreen({ navigation }) {
             if (cancelled) return;
             if (!hasConnection) return navigation.replace('SplashNoConnection');
             if (!isUpdated) return navigation.replace('SplashUpdate');
-            navigation.replace('OnboardingSlider');
+
+            const hasValidSession = await resolveSession();
+            if (cancelled) return;
+            if (hasValidSession) return navigation.replace('Dashboard');
+
+            const entryRoute = await resolveOnboardingEntryRoute();
+            if (cancelled) return;
+            navigation.replace(entryRoute);
         }, 2500);
 
         return () => {

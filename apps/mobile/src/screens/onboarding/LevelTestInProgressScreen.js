@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,7 +8,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing } from '../../theme';
+
+// Igual que PENDING_OPOSICION_KEY en OppositionSelectorScreen: esto corre
+// ANTES de que exista sesión, así que la única forma de no perder el
+// progreso al cerrar la app a mitad del test es guardar la pregunta actual
+// aquí. Se limpia solo al completar el test (ver handleConfirm).
+export const PENDING_LEVEL_TEST_KEY = 'opox.pendingLevelTestIndex';
 
 const QUESTIONS = [
     {
@@ -51,6 +58,25 @@ const TOTAL = 20;
 export default function LevelTestInProgressScreen({ navigation }) {
     const [qIndex, setQIndex] = useState(0);
     const [selected, setSelected] = useState(null);
+    const hasRestoredRef = useRef(false);
+
+    // Restaura la pregunta donde el usuario se quedó si cerró la app a
+    // mitad del test — sin esto, cada cierre reiniciaba las 20 preguntas.
+    useEffect(() => {
+        (async () => {
+            const saved = await AsyncStorage.getItem(PENDING_LEVEL_TEST_KEY);
+            const savedIndex = saved != null ? parseInt(saved, 10) : NaN;
+            if (Number.isInteger(savedIndex) && savedIndex > 0 && savedIndex < TOTAL) {
+                setQIndex(savedIndex);
+            }
+            hasRestoredRef.current = true;
+        })();
+    }, []);
+
+    useEffect(() => {
+        if (!hasRestoredRef.current) return;
+        AsyncStorage.setItem(PENDING_LEVEL_TEST_KEY, String(qIndex));
+    }, [qIndex]);
 
     const question = QUESTIONS[qIndex % QUESTIONS.length];
     const isFirst = qIndex === 0;
@@ -67,6 +93,7 @@ export default function LevelTestInProgressScreen({ navigation }) {
         if (!isLast) {
             goToQuestion(qIndex + 1);
         } else {
+            AsyncStorage.removeItem(PENDING_LEVEL_TEST_KEY);
             navigation.replace('LevelTestResult');
         }
     };
