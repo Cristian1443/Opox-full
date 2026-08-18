@@ -5,6 +5,78 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-17 — Bloque 13 · Notificaciones Push completo (3 fases)
+
+Rama de trabajo: `feat/bloque-13-notificaciones` (creada desde `feat/bloque-12`).
+Se cierra el Bloque 13 íntegro: infraestructura push, 3 triggers de backend,
+banner in-app, Supabase Realtime para chat de clanes y alertas BOE en vivo.
+
+### Fase 1 — Infraestructura base
+
+**SQL**: `apps/backend/supabase/bloque13_notifications.sql`:
+- `user_push_tokens` — `(id, user_id FK→auth.users CASCADE, token text, platform CHECK('ios','android'), device_id, created_at, updated_at)`.
+  UNIQUE por `(user_id, device_id)`, RLS owner-all, índice en `user_id`.
+
+**Contratos y tipos** (`packages/`):
+- `packages/types/src/notifications.ts` — `RegisterPushTokenInput`, `RegisterPushTokenResponse`, `PushNotificationData` con tipos: `boe_alert`, `note_ready`, `streak_warning`, `daily_reminder`.
+- `packages/constants/src/routes.js` — ruta `PUSH.REGISTER_TOKEN = '/push/token'`.
+
+**Domain** (`apps/backend/src/domain/`):
+- Entidad: `PushToken` + `UpsertPushTokenInput`.
+- Interfaz: `IPushRepository` — `upsertToken`, `getTokensByUser`, `getAllTokens`, `deleteToken`.
+- Error: `PushTokenInvalidError` (code: `notifications/invalid-token`, 400).
+
+**Application** (`apps/backend/src/application/notifications/NotificationUseCases.ts`):
+- `RegisterPushTokenUseCase` — valida formato `ExponentPushToken[...]`, llama `repo.upsertToken`.
+- `SendBoeAlertUseCase` — broadcast a todos los tokens cuando BOE sincroniza cambios.
+- `SendNoteReadyUseCase` — push dirigido al usuario propietario del apunte analizado.
+- `SendStreakWarningUseCase` — broadcast a las 01:00 UTC (20:00 Colombia).
+
+**Infrastructure**:
+- `SupabasePushRepository.ts` — upsert con `onConflict: 'user_id,device_id'`.
+- `ExpoPushService.ts` — batch de 100 msg por POST a `https://exp.host/--/api/v2/push/send`.
+- `NotificationScheduler.ts` — cron `0 1 * * * UTC` (20:00h Colombia sin DST).
+
+**Presentation**:
+- `PushTokenController.ts` + `pushTokenRoutes.ts` — `POST /push/token` autenticado.
+- `pushTokenValidators.ts` — Zod valida token, platform, deviceId.
+
+**Wiring**:
+- `container.ts`: use cases de notificaciones construidos como consts separados (antes de `useCases`) para evitar referencias circulares. `SyncBoeChangesUseCase` y `UploadNoteUseCase` reciben callbacks `onChanges` / `onNoteReady` que lanzan las notificaciones.
+- `server.ts`: monta `/push/token` y arranca `NotificationScheduler`.
+
+**Mobile** (`apps/mobile/`):
+- `src/api/push.js` — `pushApi.registerToken(token, platform, deviceId)`.
+- `App.js` — `registerForPushNotifications()` exportada. Usa `require()` lazy condicional (no `import` top-level) para evitar crash en Expo Go SDK 53+ donde el módulo `expo-notifications` lanza error al inicializarse.
+- `SesionIniciadaScreen.js` — llama `registerForPushNotifications()` fire-and-forget tras login, antes de navegar al Dashboard.
+- `InAppNotificationBanner.js` — banner animado (spring enter + fade exit), auto-dismiss 4 s, iconos por tipo de notificación.
+
+**Limitación Expo Go**: `IS_EXPO_GO = Constants.appOwnership === 'expo'`. Cuando es `true`, `registerForPushNotifications()` retorna inmediatamente sin registrar ningún token. Requiere EAS development build para prueba end-to-end.
+
+### Fase 2 — Hábito y retención
+
+- `SendDailyGoalCompletedUseCase` — push dirigido al usuario cuando completa todas sus tareas del día. Trigger: `ToggleTaskUseCase` al cruzar el umbral `plan.testsPerDay`.
+- `ToggleTaskUseCase` acepta callback opcional `onGoalCompleted?: (userId) => Promise<void>`. Se pasa desde `container.ts` sin romper el contrato público del use case.
+- `InAppNotificationBanner` montado en `App.js` con `useState(null)`. `PushNotificationHandler` escucha `addNotificationReceivedListener` (foreground) y `addNotificationResponseReceivedListener` (tap). Al llegar una notificación con la app abierta: muestra el banner; al tocar: navega a `data.screen`.
+
+### Fase 3 — Supabase Realtime
+
+**Dependencia nueva**: `@supabase/supabase-js` instalada en `apps/mobile`.
+
+- `apps/mobile/src/lib/supabase.js` — crea cliente Supabase con `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Si las vars no están, `supabase = null` y los consumidores hacen fallback.
+- `apps/mobile/.env.example` — documenta las dos vars EXPO_PUBLIC_SUPABASE_*.
+- `ClanChatScreen.js` — migrado de `setInterval(poll, 4000)` a canal Realtime `postgres_changes` INSERT en `clan_messages` filtrado por `clan_id`. Fallback automático a polling cuando `supabase === null`.
+- `BoeRealtimeWatcher` en `App.js` — suscripción a `boe_changes` INSERT. Cuando el backend inserta un cambio BOE, muestra el banner in-app sin necesidad de push externo (la app está abierta).
+
+### Pendientes conocidos del Bloque 13
+
+- **EAS development build**: prueba end-to-end de token Expo + push real. Expo Go (SDK 53+) no soporta push remotos.
+- **`EXPO_PUBLIC_SUPABASE_*` en `.env`**: añadir las vars al `.env` del mobile para activar Realtime. Los valores son los mismos que `SUPABASE_URL` / `SUPABASE_ANON_KEY` del backend.
+- **Filtrado por usuario en `SendStreakWarningUseCase`**: actualmente broadcast a todos los tokens; en Fase 4 filtrar solo usuarios sin actividad ese día (consultar `user_gamification.last_activity_at`).
+- **`POST /config/pro-stats/export` PDF**: stub devuelve 202 + `downloadUrl: null`. Implementar con pdfkit/puppeteer (marcador `TODO(bloque-12)`).
+
+---
+
 ## 2026-08-17 — Bloque 12 · Configuración completo de punta a punta
 
 Rama de trabajo: `feat/bloque-11` (continuada). Se cierra el Bloque 12 íntegro:
