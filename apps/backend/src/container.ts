@@ -1,4 +1,4 @@
-import { env, isSupabaseConfigured } from './config';
+import { env, isSupabaseConfigured, isMotorConfigured } from './config';
 import { logger } from '@opox/utils';
 import {
     RegisterUseCase,
@@ -100,6 +100,18 @@ import {
     CompleteBoeMiniTestUseCase,
     ListTopicsUseCase,
     SyncBoeChangesUseCase,
+    // Bloque 11 · Tienda
+    GetStoreBalanceUseCase,
+    ListStoreProductsUseCase,
+    GetStoreProductUseCase,
+    RedeemProductUseCase,
+    ListStoreDiscountsUseCase,
+    GetWalletUseCase,
+    GetWalletItemUseCase,
+    ListCommunityTestsUseCase,
+    GetCommunityTestUseCase,
+    PublishCommunityTestUseCase,
+    ObtainCommunityTestUseCase,
     // Bloque 12 · Configuración
     GetPreferencesUseCase,
     UpdatePreferencesUseCase,
@@ -124,12 +136,15 @@ import {
     SupabaseTutorRepository,
     SupabaseNotesRepository,
     SupabaseBoeRepository,
+    SupabaseStoreRepository,
     SupabaseConfigRepository,
     SupabasePushRepository,
     ExpoPushService,
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
+    MotorAiClient,
+    CompositeAiClient,
     MotorBoeClient,
 } from './infrastructure';
 import {
@@ -141,11 +156,12 @@ import {
     TutorController,
     NotesController,
     BoeController,
+    StoreController,
     ConfigController,
     PushTokenController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IConfigRepository, IPushRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository, IConfigRepository, IPushRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -189,6 +205,10 @@ export function buildContainer() {
         ? new SupabaseBoeRepository(getSupabaseAdmin())
         : createStubBoeRepository();
 
+    const storeRepo: IStoreRepository = isSupabaseConfigured
+        ? new SupabaseStoreRepository(getSupabaseAdmin())
+        : createStubStoreRepository();
+
     const configRepo: IConfigRepository = isSupabaseConfigured
         ? new SupabaseConfigRepository(getSupabaseAdmin())
         : createStubConfigRepository();
@@ -214,7 +234,7 @@ export function buildContainer() {
         })
         : null;
 
-    const aiApi = env.AI_API_BASE_URL && env.AI_API_KEY && env.AI_API_DEFAULT_MODEL
+    const openAiClient = env.AI_API_BASE_URL && env.AI_API_KEY && env.AI_API_DEFAULT_MODEL
         ? new AiApiClient({
             baseUrl: env.AI_API_BASE_URL,
             apiKey: env.AI_API_KEY,
@@ -227,6 +247,29 @@ export function buildContainer() {
         logger.warn(
             '[container] IA no configurada — usando AiApiClientStub con datos mock. ' +
             'Rellena AI_API_BASE_URL / AI_API_KEY / AI_API_DEFAULT_MODEL en .env para usar IA real.',
+        );
+    }
+
+    // Si el Motor está configurado, lo usamos para generateQuestions/generateSurgicalTest
+    // (RAG + evidencia verbatim del temario). El cliente OpenAI se mantiene como fallback
+    // para Foto-Test, Pista IA, Bloque 9 y Bloque 10.
+    const aiApi = isMotorConfigured
+        ? new CompositeAiClient({
+            questions: new MotorAiClient({
+                baseUrl: env.MOTOR_API_BASE_URL!,
+                apiKey: env.MOTOR_API_KEY!,
+                openAiKey: env.AI_API_KEY ?? '',
+                timeoutMs: env.MOTOR_API_TIMEOUT_MS,
+                defaultCursoId: env.MOTOR_DEFAULT_CURSO_ID,
+            }),
+            fallback: openAiClient,
+          })
+        : openAiClient;
+
+    if (isMotorConfigured) {
+        logger.info(
+            '[container] Motor de IA activo — generateQuestions y generateSurgicalTest ' +
+            'usarán RAG con evidencia verbatim del temario oficial.',
         );
     }
 
@@ -385,6 +428,19 @@ export function buildContainer() {
               )
             : undefined,
 
+        // Bloque 11 · Tienda
+        getStoreBalance: new GetStoreBalanceUseCase(storeRepo),
+        listStoreProducts: new ListStoreProductsUseCase(storeRepo),
+        getStoreProduct: new GetStoreProductUseCase(storeRepo),
+        redeemProduct: new RedeemProductUseCase(storeRepo),
+        listStoreDiscounts: new ListStoreDiscountsUseCase(storeRepo),
+        getWallet: new GetWalletUseCase(storeRepo),
+        getWalletItem: new GetWalletItemUseCase(storeRepo),
+        listCommunityTests: new ListCommunityTestsUseCase(storeRepo),
+        getCommunityTest: new GetCommunityTestUseCase(storeRepo),
+        publishCommunityTest: new PublishCommunityTestUseCase(storeRepo),
+        obtainCommunityTest: new ObtainCommunityTestUseCase(storeRepo),
+
         // Bloque 12 · Configuración
         getPreferences:    new GetPreferencesUseCase(configRepo),
         updatePreferences: new UpdatePreferencesUseCase(configRepo),
@@ -462,6 +518,20 @@ export function buildContainer() {
         syncChanges: useCases.syncBoeChanges,
     });
 
+    const storeController = new StoreController({
+        getBalance: useCases.getStoreBalance,
+        listProducts: useCases.listStoreProducts,
+        getProduct: useCases.getStoreProduct,
+        redeemProduct: useCases.redeemProduct,
+        listDiscounts: useCases.listStoreDiscounts,
+        getWallet: useCases.getWallet,
+        getWalletItem: useCases.getWalletItem,
+        listCommunityTests: useCases.listCommunityTests,
+        getCommunityTest: useCases.getCommunityTest,
+        publishCommunityTest: useCases.publishCommunityTest,
+        obtainCommunityTest: useCases.obtainCommunityTest,
+    });
+
     const tutorController = new TutorController({
         listConversations: useCases.listConversations,
         getConversation: useCases.getConversation,
@@ -532,6 +602,7 @@ export function buildContainer() {
             tutor: tutorController,
             notes: notesController,
             boe: boeController,
+            store: storeController,
             config: configController,
             push: pushTokenController,
         },
@@ -599,6 +670,13 @@ function createStubBoeRepository(): IBoeRepository {
         throw new Error('[boe] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as IBoeRepository, { get: () => notConfigured });
+}
+
+function createStubStoreRepository(): IStoreRepository {
+    const notConfigured = (): never => {
+        throw new Error('[store] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IStoreRepository, { get: () => notConfigured });
 }
 
 function createStubConfigRepository(): IConfigRepository {

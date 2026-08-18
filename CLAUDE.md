@@ -166,6 +166,34 @@ desplegado para detectar cambios en el BOE oficial. Integrado en:
   más checkboxes individuales acumulables. Múltiple selección → IDs separados por
   coma en `topicId`. Sin cambio en `GenerateQuestionsParams`.
 
+### Tienda OPOX (Bloque 11) — endpoints propios
+
+Canje de Opopoints por recompensas reales y virtuales + marketplace de tests
+de la comunidad. Rutas bajo `/store/`.
+
+Tipos en `packages/types/src/store.ts` (`StoreProductDTO`, `StoreDiscountDTO`,
+`WalletItemDTO`, `PurchaseResultDTO`, `CommunityTestDTO`, `CommunityTestDetailDTO`,
+`CommunityTestActionResultDTO`, `StoreBalanceDTO`).
+SQL en `apps/backend/supabase/bloque11_tienda.sql` (6 tablas con RLS).
+Cliente mobile en `apps/mobile/src/api/store.js`.
+Colección de tests en `Bloque11_Tienda_Tests.postman_collection.json`
+(20 requests, 65 assertions).
+
+**Saldo Opopoints**: calculado como suma neta del ledger `user_opopoints_ledger`
+(filas `type='earn'` suman, `type='spend'` restan). No hay columna de saldo
+precalculada — siempre se recalcula en `getBalance()`.
+
+**Canje de producto real** (`POST /store/products/:id/redeem`):
+1. Verifica stock > 0 e `isAvailable`.
+2. Verifica saldo >= coste (422 si no alcanza).
+3. Inserta fila `spend` en el ledger.
+4. Decrementa stock.
+5. Genera código con `generateCode(partner)` (prefijo 3 letras + 6 chars random).
+6. Crea item en `user_wallet` con `status='active'` y fecha de caducidad.
+
+**Marketplace**: `community_tests` con campo `is_free` generado (`price = 0`).
+Compra idempotente por unique constraint `(user_id, test_id)` en `community_test_purchases`.
+
 ### Configuración (Bloque 12) — endpoints propios
 
 Preferencias de tono IA + accesibilidad, estadísticas pro calculadas en tiempo real
@@ -235,13 +263,27 @@ Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, devic
 
 **Limitación Expo Go**: push remotos no funcionan en Expo Go SDK 53+. Requiere EAS development build (`eas build --profile development`) para prueba end-to-end de tokens reales.
 
-### Motor de IA del cliente (sin desplegar)
+### Motor de IA del cliente (DESPLEGADO y activo)
 
-El equipo IA entregó un microservicio RAG separado
-(`MotorIA_Ingesta_Tests.postman_collection.json`) que ingesta PDFs de temario y
-genera tests con evidencia verbatim + página. **No está hosteado todavía**;
-`MotorAiClient.ts` es esqueleto listo para el día que publiquen URL. Guía completa
-en `packages/ai/MOTOR_INTEGRATION.md`.
+Microservicio RAG del equipo IA, desplegado en producción:
+`https://ingesta-demo-1097036487734.us-east1.run.app`
+
+Ingesta PDFs de temario y genera tests con evidencia verbatim + página exacta.
+Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b`.
+
+**Integración activa (`CompositeAiClient.ts`):**
+- `generateQuestions` y `generateSurgicalTest` → Motor RAG (async job, ~50-70 s).
+- `analyzePhoto`, `generateHint`, Bloques 9/10 → OpenAI directo (sin cambios).
+- Para desactivar: vaciar `MOTOR_API_BASE_URL` en `.env`.
+
+**[INC-04] `correcta_idx` ausente en job result** — el Motor no expone el índice
+correcto en el job result. Workaround activo: `MotorAiClient` carga el banco de
+preguntas del curso (`GET /v1/courses/{id}/questions`) y cachea `correcta_idx` 30 min.
+Solución definitiva (Opción A del equipo IA): validar respuesta a respuesta vía
+`POST /v1/tests/{sesion_id}/answer` — pendiente de confirmación del equipo IA.
+Ver `packages/ai/MOTOR_INTEGRATION.md` para el detalle completo.
+
+**Smoke test E2E:** `scripts/smoke_bloques_0_6_7.js` — 30/30 PASS (bloques 0, 6 y 7).
 
 ---
 
@@ -271,7 +313,7 @@ pnpm lint                       # lint completo
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
 | 9 | Factoría de Apuntes | Frontend + backend completo (upload, pipeline OCR→tags→preguntas con AiApiClientStub, generación de tests, 10/10 smoke test verde). IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo (feed, detalle, comparativa con diff word-by-word, mini-test con AiApiClientStub, 14 requests / 61 assertions verde). IA real (`generateBoeMiniTest`) esperando entrega del prompt del `BRIEF_IA_BLOQUE10.md` |
-| 11 | Tienda OPOX | Frontend + backend completo (65/65 smoke test verde) |
+| 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
 | 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
 | 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |
 

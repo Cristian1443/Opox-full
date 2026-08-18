@@ -189,6 +189,171 @@ Colección: `Bloque12_Config_Tests.postman_collection.json` (10 requests, 31 ass
 
 ---
 
+## 2026-08-15 — Motor de IA integrado de punta a punta + smoke test E2E bloques 0, 6 y 7
+
+Rama de trabajo: `feat/bloque-11`.
+
+### Motor de IA — integración real completada
+
+El equipo IA del cliente desplegó su microservicio RAG en producción
+(`https://ingesta-demo-1097036487734.us-east1.run.app`). Esta sesión cierra la
+integración de extremo a extremo y la valida con un smoke test propio.
+
+**Arquitectura activa (`CompositeAiClient.ts` + `MotorAiClient.ts`):**
+
+- `CompositeAiClient` enruta `generateQuestions` y `generateSurgicalTest` al Motor;
+  el resto (`analyzePhoto`, `generateHint`, Bloque 9, Bloque 10) sigue en OpenAI directo.
+- `MotorAiClient` implementa `AiApiContract` completo contra el Motor:
+  - `POST /v1/tests/generate` → job 202 + polling `GET /v1/jobs/{id}` cada 3 s.
+  - Soporte for-cache (200 síncrono) + async job (202).
+  - `generateSurgicalTest` reutiliza `generateQuestions` (el Motor no tiene endpoint
+    /surgical propio) y calcula la distribución en base a los `failRate` del usuario.
+- `container.ts` construye `CompositeAiClient` cuando `isMotorConfigured=true`
+  (env vars: `MOTOR_API_BASE_URL`, `MOTOR_API_KEY`, `MOTOR_API_TIMEOUT_MS`, `MOTOR_DEFAULT_CURSO_ID`).
+- Curso por defecto: `1357e871b542425b` (Temario 1 · Bloque 1, temas 1-10).
+
+**Bug crítico encontrado y corregido en `MotorAiClient.ts` — schema del Motor:**
+
+El schema real devuelto por el Motor en el job result difiere de lo documentado
+inicialmente:
+
+| Campo esperado | Campo real del Motor | Fix |
+|---|---|---|
+| `pregunta_id` | `id` | Corregido en `MotorPreguntaJob` |
+| `texto` | `enunciado` | Corregido en `MotorPreguntaJob` |
+| `correcta_idx` | **No presente en job result** | Workaround: caché del banco |
+| `explicacion` | No presente en job result | Workaround: caché del banco |
+| `evidencia.cita` | `ref_legislativa` (string) | Corregido |
+
+**Workaround [INC-04] para `correcta_idx` ausente:**
+
+`GET /v1/courses/{curso_id}/questions` sí devuelve `correcta_idx` y `explicacion`
+(banco completo del curso). `MotorAiClient` lo carga lazily en la primera llamada
+y lo cachea 30 min en memoria. Cada pregunta del job se enriquece por `id` desde
+el caché. Si no se encuentra, `correctIndex` queda a 0 con warning de log.
+
+El equipo IA tiene reportado [INC-04] como bloqueante. La solución oficial será
+la Opción A: validar respuesta a respuesta vía `POST /v1/tests/{sesion_id}/answer`
+(el Motor valida y devuelve `correcto: true/false`). Cuando el equipo IA confirme,
+habrá que añadir en backend un endpoint `POST /training/validate-answer` y actualizar
+el mobile para no asumir `correctIndex` en el payload de preguntas. Detalle completo
+en `packages/ai/MOTOR_INTEGRATION.md`.
+
+**Incidencias adicionales documentadas en `MOTOR_INTEGRATION.md`:**
+- `GET /v1/jobs/{id}` usa `estado: 'running'` además de `'processing'` → interfaz `MotorJobResponse` ampliada.
+- `GET /v1/health` devuelve `{"ok":true}` no `{"status":"ok"}` [INC-01] — ya adaptado.
+
+### Smoke test E2E bloques 0, 6 y 7 — 30/30 PASS
+
+`scripts/smoke_bloques_0_6_7.js` — ejecutable con `node scripts/smoke_bloques_0_6_7.js`.
+
+| Bloque | Tests | Resultado |
+|---|---|---|
+| 0 · Health + Auth | GET /health, POST /auth/login, GET /auth/me | ✅ 5/5 |
+| 6 · Entrenamiento | Mocks, topics, generate (Motor ~50s), foto-test, surgical (Motor ~70s), error-patterns, attempts, bookmarks | ✅ 22/22 |
+| 7 · Sesión activa | Pista IA (OpenAI), report question (204), attempt con respuesta incorrecta | ✅ 3/3 |
+
+Confirmaciones clave:
+- `generateQuestions` vía Motor RAG: 200 en ~50 s, devuelve preguntas con `text`, `options[4]`, `correctIndex`, `topicId`.
+- `generateSurgicalTest` vía Motor: 200 en ~70 s, devuelve `{ questions, distribution }`.
+- `generateHint` (Pista IA) vía OpenAI directo: 200 con `hint` en el `data`.
+- `analyzePhoto` (Foto-Test) vía OpenAI GPT-4o: 200 o 422 (imagen de prueba mínima sin texto).
+
+### Nuevos archivos en el repo
+
+- `scripts/smoke_bloques_0_6_7.js` — smoke test E2E Node.js.
+- `MotorIA_Motor_completo.postman_collection.json` — colección completa del Motor IA (ingesta + tests + Bloque 7 + BOE + Classroom).
+- `Guia_Pruebas_Bloques_0_6_7.pdf` — guía de pruebas del cliente para bloques 0, 6 y 7.
+
+### Limpieza de archivos
+
+Eliminados screenshots de diseño que ya no son necesarios en el repo:
+`bloque6-cambio_diseño/`, `bloque7-cambio_diseño/`, `screenshots_bloque10/`, `screenshots_bloque11/`.
+
+---
+
+## 2026-08-12 — Bloque 11 · Tienda OPOX completo de punta a punta
+
+Rama de trabajo: `main`. Frontend del bloque ya existía; esta sesión cierra el
+backend completo y conecta ambas capas. Smoke test de 20 requests / 65 assertions
+pasa verde en primera ejecución real contra Supabase.
+
+### Frontend — correcciones previas
+
+Antes de pasar al backend se corrigieron 5 bugs del frontend del bloque:
+- **Error map undefined**: `(reward.conditions ?? []).map()` en `StoreRealRewardDetailScreen`.
+- **Filtros invisibles**: cambio de `ScrollView horizontal` a `View` con `flexWrap: 'wrap'`
+  en `StoreRealRewardsScreen`.
+- **Texto "Fase 2"**: eliminado de 5 pantallas (era marcador de wireframe).
+- **Acceso a Comunidad**: añadida 5ª pestaña en `StoreHomeScreen` con `navigateTo: 'StoreMarketplace'`
+  y scroll horizontal en la barra de tabs.
+- **Avatares de partner**: Ionicons sustituidos por View coloreado + abreviatura de 2 letras
+  (`partnerAbbr`) en todas las pantallas de la tienda.
+- **Cartera rediseñada**: sección activas/usadas/caducadas en lugar de tabs; cards
+  compactas con código inline + chip de acción.
+- **Marketplace**: footer sticky "Publicar mi test" en lugar de FAB.
+- **Widget en Dashboard**: widget "Tienda OPOX" añadido a `DashboardScreen`.
+
+### Tipos compartidos
+
+`packages/types/src/store.ts` — 7 DTOs:
+`StoreBalanceDTO`, `StoreProductDTO`, `StoreDiscountDTO`, `WalletItemDTO`,
+`PurchaseResultDTO`, `CommunityTestDTO`, `CommunityTestDetailDTO`,
+`CommunityTestActionResultDTO`.
+
+`packages/constants/src/routes.js` + `index.d.ts` — sección `STORE` con 10 rutas.
+
+### SQL (Supabase)
+
+`apps/backend/supabase/bloque11_tienda.sql` — 6 tablas con RLS:
+- `store_products` — catálogo de recompensas reales (seed: Uber Eats, Decathlon, Spotify, Amazon).
+- `store_discounts` — descuentos/vouchers virtuales (seed: FNAC, El Corte Inglés).
+- `user_wallet` — códigos canjeados por el usuario, estado active/used/expired.
+- `user_opopoints_ledger` — historial earn/spend de Opopoints; saldo calculado como suma neta.
+- `community_tests` — tests publicados por la comunidad.
+- `community_test_purchases` — registro de obtenciones (unique user+test).
+
+### Backend (Clean Architecture)
+
+Mismo patrón que BOE (Bloque 10):
+
+**Dominio:**
+- `StoreEntities.ts` — `StoreProduct`, `StoreDiscount`, `WalletItem`, `OpoLedgerEntry`, `CommunityTest`.
+- `StoreError.ts` — 6 errores de dominio (404 product/wallet, 409 out-of-stock/already-purchased, 422 insufficient-balance).
+- `IStoreRepository.ts` — contrato con 17 métodos.
+
+**Aplicación (11 use cases):**
+`GetStoreBalance`, `ListStoreProducts`, `GetStoreProduct`, `RedeemProduct`
+(genera código, deduce ledger, decrementa stock, crea wallet item),
+`ListStoreDiscounts`, `GetWallet`, `GetWalletItem`, `ListCommunityTests`,
+`GetCommunityTest`, `PublishCommunityTest`, `ObtainCommunityTest`.
+
+**Infraestructura:**
+`SupabaseStoreRepository` — 17 métodos, saldo calculado como suma reduce sobre el ledger,
+`decrementStock` con fallback manual si la RPC no existe.
+
+**Presentación:**
+- `StoreController` — 11 handlers con `ok<T>()` helper estándar.
+- `storeValidators.ts` — Zod para `publishCommunityTest` (título 5-120 chars).
+- `storeRoutes.ts` — 11 rutas bajo `/store/`.
+
+**DI / arranque:**
+- `container.ts` — `storeRepo`, 11 use cases, `storeController`, `createStubStoreRepository()`.
+- `server.ts` — `app.use(createStoreRouter(...))`.
+
+**Cliente mobile:**
+`apps/mobile/src/api/store.js` — `storeApi` con todas las llamadas HTTP, exportado desde `api/index.js`.
+
+### Smoke test
+
+`Bloque11_Tienda_Tests.postman_collection.json` — **20 requests / 65 assertions / 0 fallos**.
+
+Cubre: balance, listado + filtro de productos, detalle, canje (código generado,
+saldo actualizado), cartera (lista + detalle), descuentos, tests comunidad (listar,
+filtrar gratis, publicar, detalle, obtener), y 6 casos de error
+(401, 404×2, 409, 400 Zod, 422 saldo insuficiente).
+---
+
 ## 2026-08-07 (cont.) — Motor BOE integrado + mejoras UX Generador Infinito
 
 Continuación de la misma rama `feat/bloque-10-monitor-boe`.

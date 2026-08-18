@@ -147,6 +147,17 @@ function IconBoe() {
     );
 }
 
+function IconStore() {
+    return (
+        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+            <Path d="M3 3h18l-2 8H5L3 3z" stroke="#6C5CE7" strokeWidth={1.6} strokeLinejoin="round" />
+            <Path d="M5 11v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8" stroke="#6C5CE7" strokeWidth={1.6} />
+            <Circle cx={9} cy={16} r={1} fill="#6C5CE7" />
+            <Circle cx={15} cy={16} r={1} fill="#6C5CE7" />
+        </Svg>
+    );
+}
+
 function IconWarning() {
     return (
         <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
@@ -526,6 +537,21 @@ export default function DashboardScreen({ navigation }) {
                         <Text style={styles.chev}>›</Text>
                     </View>
                     <Text style={styles.tutorText}>Cambios legislativos que afectan a tu temario, al instante.</Text>
+                </TouchableOpacity>
+
+                {/* Bloque 11 · Tienda */}
+                <TouchableOpacity
+                    style={[styles.widget, { backgroundColor: '#EDE7F6' }]}
+                    onPress={() => navigation.navigate('StoreHome')}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Ir a la Tienda OPOX"
+                >
+                    <View style={styles.widgetHead}>
+                        <IconStore />
+                        <Text style={[styles.widgetHeadText, { color: '#6C5CE7' }]}>Tienda OPOX</Text>
+                        <Text style={styles.chev}>›</Text>
+                    </View>
+                    <Text style={styles.tutorText}>Canjea tus Opopoints por recompensas virtuales y reales.</Text>
                 </TouchableOpacity>
 
                 {/* Vista previa temporal de los nudges — quitar cuando cada motor real

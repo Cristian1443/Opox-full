@@ -1,0 +1,724 @@
+{
+  "info": {
+    "name": "OPOX · Bloque 11 · Tienda",
+    "description": "Tests de humo para todos los endpoints del Bloque 11 (Tienda OPOX).\n\n## Variables de colección\n- `base_url`: http://localhost:3000\n- `token`: JWT del usuario (se rellena automáticamente en el paso de Login)\n- `product_id`: UUID del primer producto disponible (se fija automáticamente)\n- `wallet_item_id`: UUID del item de cartera creado al canjear (se fija automáticamente)\n- `community_test_id`: UUID del test publicado en la comunidad (se fija automáticamente)\n\n## Orden de ejecución recomendado\n1. Auth · Login → captura token\n2. Tienda · Saldo → verifica campo balance (número)\n3. Productos · Listar todos → verifica array con seeds, captura product_id\n4. Productos · Filtrar por categoría → verifica filtro Food\n5. Productos · Detalle → verifica shape StoreProductDTO\n6. Productos · Canjear → verifica PurchaseResultDTO + captura wallet_item_id\n7. Cartera · Listar → verifica que el item aparece con status:active\n8. Cartera · Detalle item → verifica shape WalletItemDTO\n9. Descuentos · Listar → verifica array con seeds\n10. Comunidad · Listar → verifica array vacío o con datos\n11. Comunidad · Publicar test → verifica id + captura community_test_id\n12. Comunidad · Detalle test → verifica shape CommunityTestDetailDTO\n13. Comunidad · Obtener test → verifica CommunityTestActionResultDTO\n14. Errores → 401 sin token, 404 producto inexistente, 409 ya obtenido, 422 saldo insuficiente\n\n## Datos de seed\n- Los seeds están en bloque11_tienda.sql (Uber Eats, Decathlon, Spotify, Amazon, FNAC, El Corte Inglés)\n- El usuario debe tener Opopoints en el ledger para poder canjear. Insertar manualmente si es necesario:\n  INSERT INTO user_opopoints_ledger (user_id, type, amount, reason) VALUES ('<tu-user-id>', 'earn', 5000, 'Seed test Bloque11');",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "product_id", "value": "" },
+    { "key": "wallet_item_id", "value": "" },
+    { "key": "community_test_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 · Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "if (res.ok && res.data?.accessToken) {",
+                  "    pm.collectionVariables.set('token', res.data.accessToken);",
+                  "    console.log('✅ Token guardado');",
+                  "} else {",
+                  "    console.error('❌ Login fallido', JSON.stringify(res));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"santigarciavel33@gmail.com\",\n  \"password\": \"SantiGV@2005\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 · Saldo",
+      "item": [
+        {
+          "name": "GET /store/balance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('data tiene balance', () => {",
+                  "    pm.expect(res.data).to.have.property('balance');",
+                  "    pm.expect(res.data.balance).to.be.a('number');",
+                  "});",
+                  "console.log('Saldo actual:', res.data?.balance, 'Opopoints');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/balance",
+              "host": ["{{base_url}}"],
+              "path": ["store", "balance"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Productos",
+      "item": [
+        {
+          "name": "Listar todos los productos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('data es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "pm.test('al menos 3 productos del seed', () => pm.expect(res.data.length).to.be.at.least(3));",
+                  "if (res.data.length > 0) {",
+                  "    const p = res.data[0];",
+                  "    pm.test('shape StoreProductDTO', () => {",
+                  "        pm.expect(p).to.include.keys('id','partner','title','cost','stock','isAvailable','conditions');",
+                  "        pm.expect(p.cost).to.be.a('number').and.above(0);",
+                  "        pm.expect(p.conditions).to.be.an('array');",
+                  "    });",
+                  "    const available = res.data.find(x => x.isAvailable && x.category !== 'Test');",
+                  "    if (available) {",
+                  "        pm.collectionVariables.set('product_id', available.id);",
+                  "        console.log('✅ product_id fijado:', available.id, '|', available.partner, available.title);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/products",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products"]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por categoría Food",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('data es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "pm.test('todos son categoría Food', () => {",
+                  "    res.data.forEach(p => pm.expect(p.category).to.equal('Food'));",
+                  "});",
+                  "console.log('Productos Food:', res.data.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/products?category=Food",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products"],
+              "query": [{ "key": "category", "value": "Food" }]
+            }
+          }
+        },
+        {
+          "name": "Detalle producto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('shape StoreProductDTO completo', () => {",
+                  "    const p = res.data;",
+                  "    pm.expect(p).to.include.keys('id','partner','title','subtitle','description','cost','stock','icon','color','category','tag','isAvailable','conditions','expiry');",
+                  "    pm.expect(p.id).to.equal(pm.collectionVariables.get('product_id'));",
+                  "    pm.expect(p.conditions).to.be.an('array');",
+                  "    pm.expect(p.expiry).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products", "{{product_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Canjear producto",
+      "item": [
+        {
+          "name": "POST /store/products/:id/redeem",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('shape PurchaseResultDTO', () => {",
+                  "    pm.expect(res.data).to.include.keys('walletItemId','code','newBalance');",
+                  "    pm.expect(res.data.walletItemId).to.be.a('string').and.not.empty;",
+                  "    pm.expect(res.data.code).to.be.a('string').and.not.empty;",
+                  "    pm.expect(res.data.newBalance).to.be.a('number');",
+                  "});",
+                  "pm.collectionVariables.set('wallet_item_id', res.data.walletItemId);",
+                  "console.log('✅ Código generado:', res.data.code, '| Saldo nuevo:', res.data.newBalance);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{base_url}}/store/products/{{product_id}}/redeem",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products", "{{product_id}}", "redeem"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Cartera",
+      "item": [
+        {
+          "name": "Listar cartera",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('data es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "pm.test('contiene el item recién canjeado', () => {",
+                  "    const wid = pm.collectionVariables.get('wallet_item_id');",
+                  "    const found = res.data.find(i => i.id === wid);",
+                  "    pm.expect(found).to.exist;",
+                  "    pm.expect(found.status).to.equal('active');",
+                  "});",
+                  "if (res.data.length > 0) {",
+                  "    const item = res.data[0];",
+                  "    pm.test('shape WalletItemDTO', () => {",
+                  "        pm.expect(item).to.include.keys('id','partner','title','code','status','expiryDate','color','icon');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/wallet",
+              "host": ["{{base_url}}"],
+              "path": ["store", "wallet"]
+            }
+          }
+        },
+        {
+          "name": "Detalle item de cartera",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('shape WalletItemDTO completo', () => {",
+                  "    const item = res.data;",
+                  "    pm.expect(item).to.include.keys('id','partner','title','code','status','expiryDate','color','icon');",
+                  "    pm.expect(item.id).to.equal(pm.collectionVariables.get('wallet_item_id'));",
+                  "    pm.expect(item.status).to.equal('active');",
+                  "    pm.expect(item.code).to.be.a('string').and.not.empty;",
+                  "});",
+                  "console.log('Código en cartera:', res.data?.code);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/wallet/{{wallet_item_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["store", "wallet", "{{wallet_item_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Descuentos",
+      "item": [
+        {
+          "name": "Listar descuentos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('data es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "pm.test('al menos 2 descuentos del seed', () => pm.expect(res.data.length).to.be.at.least(2));",
+                  "if (res.data.length > 0) {",
+                  "    const d = res.data[0];",
+                  "    pm.test('shape StoreDiscountDTO', () => {",
+                  "        pm.expect(d).to.include.keys('id','partner','title','discount','category','color','icon','isNew','expiryDate','conditions');",
+                  "        pm.expect(d.conditions).to.be.an('array');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/discounts",
+              "host": ["{{base_url}}"],
+              "path": ["store", "discounts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · Comunidad — Listar",
+      "item": [
+        {
+          "name": "Listar tests de la comunidad",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('data es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "if (res.data.length > 0) {",
+                  "    const t = res.data[0];",
+                  "    pm.test('shape CommunityTestDTO', () => {",
+                  "        pm.expect(t).to.include.keys('id','title','author','avatar','rating','totalMade','price','isFree','category','questionCount');",
+                  "        pm.expect(t.rating).to.be.a('number');",
+                  "        pm.expect(t.isFree).to.be.a('boolean');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/community-tests",
+              "host": ["{{base_url}}"],
+              "path": ["store", "community-tests"]
+            }
+          }
+        },
+        {
+          "name": "Filtrar tests gratuitos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('data es array', () => pm.expect(res.data).to.be.an('array'));",
+                  "pm.test('todos son gratuitos', () => {",
+                  "    res.data.forEach(t => pm.expect(t.isFree).to.be.true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/community-tests?isFree=true",
+              "host": ["{{base_url}}"],
+              "path": ["store", "community-tests"],
+              "query": [{ "key": "isFree", "value": "true" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 · Comunidad — Publicar",
+      "item": [
+        {
+          "name": "POST /store/community-tests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('devuelve id del test publicado', () => {",
+                  "    pm.expect(res.data).to.have.property('id');",
+                  "    pm.expect(res.data.id).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('community_test_id', res.data.id);",
+                  "console.log('✅ Test publicado con id:', res.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test de Constitución — 20 preguntas de prueba\",\n  \"description\": \"Preguntas sobre los artículos 1-30 de la Constitución Española.\",\n  \"category\": \"Constitución\",\n  \"tags\": [\"constitución\", \"derechos\"],\n  \"price\": 0,\n  \"questionCount\": 20\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/community-tests",
+              "host": ["{{base_url}}"],
+              "path": ["store", "community-tests"]
+            }
+          }
+        },
+        {
+          "name": "Detalle test publicado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('shape CommunityTestDetailDTO', () => {",
+                  "    const t = res.data;",
+                  "    pm.expect(t).to.include.keys('id','title','author','rating','isFree','category','description','tags','questionCount');",
+                  "    pm.expect(t.id).to.equal(pm.collectionVariables.get('community_test_id'));",
+                  "    pm.expect(t.tags).to.be.an('array');",
+                  "    pm.expect(t.description).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/community-tests/{{community_test_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["store", "community-tests", "{{community_test_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 · Comunidad — Obtener",
+      "item": [
+        {
+          "name": "POST /store/community-tests/:id/purchase (obtener gratis)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = true', () => pm.expect(res.ok).to.be.true);",
+                  "pm.test('shape CommunityTestActionResultDTO', () => {",
+                  "    pm.expect(res.data).to.include.keys('id','newBalance');",
+                  "    pm.expect(res.data.id).to.equal(pm.collectionVariables.get('community_test_id'));",
+                  "    pm.expect(res.data.newBalance).to.be.a('number');",
+                  "});",
+                  "console.log('Test obtenido. Saldo nuevo:', res.data?.newBalance);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{base_url}}/store/community-tests/{{community_test_id}}/purchase",
+              "host": ["{{base_url}}"],
+              "path": ["store", "community-tests", "{{community_test_id}}", "purchase"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 · Errores",
+      "item": [
+        {
+          "name": "401 — Sin token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = false', () => pm.expect(res.ok).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/store/balance",
+              "host": ["{{base_url}}"],
+              "path": ["store", "balance"]
+            }
+          }
+        },
+        {
+          "name": "404 — Producto inexistente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = false', () => pm.expect(res.ok).to.be.false);",
+                  "pm.test('error code store/product-not-found', () => {",
+                  "    pm.expect(res.error?.code).to.equal('store/product-not-found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/products/00000000-0000-0000-0000-000000000000",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products", "00000000-0000-0000-0000-000000000000"]
+            }
+          }
+        },
+        {
+          "name": "404 — Wallet item inexistente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = false', () => pm.expect(res.ok).to.be.false);",
+                  "pm.test('error code store/wallet-item-not-found', () => {",
+                  "    pm.expect(res.error?.code).to.equal('store/wallet-item-not-found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/wallet/00000000-0000-0000-0000-000000000000",
+              "host": ["{{base_url}}"],
+              "path": ["store", "wallet", "00000000-0000-0000-0000-000000000000"]
+            }
+          }
+        },
+        {
+          "name": "409 — Test ya obtenido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = false', () => pm.expect(res.ok).to.be.false);",
+                  "pm.test('error code store/already-purchased', () => {",
+                  "    pm.expect(res.error?.code).to.equal('store/already-purchased');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{base_url}}/store/community-tests/{{community_test_id}}/purchase",
+              "host": ["{{base_url}}"],
+              "path": ["store", "community-tests", "{{community_test_id}}", "purchase"]
+            },
+            "description": "Segundo intento de obtener el mismo test — debe devolver 409."
+          }
+        },
+        {
+          "name": "400 — Publicar test con título demasiado corto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = false', () => pm.expect(res.ok).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"ab\",\n  \"price\": 0,\n  \"questionCount\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/community-tests",
+              "host": ["{{base_url}}"],
+              "path": ["store", "community-tests"]
+            },
+            "description": "Título de 2 caracteres — falla la validación Zod (mínimo 5)."
+          }
+        },
+        {
+          "name": "422 — Saldo insuficiente al canjear",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('422 Unprocessable', () => pm.response.to.have.status(422));",
+                  "const res = pm.response.json();",
+                  "pm.test('ok = false', () => pm.expect(res.ok).to.be.false);",
+                  "pm.test('error code store/insufficient-balance', () => {",
+                  "    pm.expect(res.error?.code).to.equal('store/insufficient-balance');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{base_url}}/store/products/1c8b8507-81ba-486b-8e74-2054dc3dced3/redeem",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products", "1c8b8507-81ba-486b-8e74-2054dc3dced3", "redeem"]
+            },
+            "description": "Producto con coste 999999 — siempre supera cualquier saldo de test. UUID fijo del seed de smoke test."
+          }
+        }
+      ]
+    }
+  ]
+}

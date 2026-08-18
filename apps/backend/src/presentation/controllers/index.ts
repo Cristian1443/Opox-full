@@ -9,3 +9,4 @@ export * from './NotesController';
 export * from './BoeController';
 export * from './ConfigController';
 export * from './PushTokenController';
+export * from './StoreController';

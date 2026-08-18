@@ -15,6 +15,7 @@ import {
     createBoeRouter,
     createConfigRouter,
     createPushRouter,
+    createStoreRouter,
     errorHandler,
 } from './presentation';
 import { NotificationScheduler } from './infrastructure';
@@ -42,6 +43,7 @@ export function createServer(): Express {
     app.use(createBoeRouter(container.controllers.boe, container.middleware.auth));
     app.use(createConfigRouter(container.controllers.config, container.middleware.auth));
     app.use(createPushRouter(container.controllers.push, container.middleware.auth));
+    app.use(createStoreRouter(container.controllers.store, container.middleware.auth));
 
     // Cron de notificaciones (racha diaria a las 20:00h Colombia = 01:00 UTC)
     const scheduler = new NotificationScheduler();

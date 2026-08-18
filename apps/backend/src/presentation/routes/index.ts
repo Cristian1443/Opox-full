@@ -9,3 +9,4 @@ export * from './notesRoutes';
 export * from './boeRoutes';
 export * from './configRoutes';
 export * from './pushTokenRoutes';
+export * from './storeRoutes';

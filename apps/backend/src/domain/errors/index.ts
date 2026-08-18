@@ -9,3 +9,4 @@ export * from './NotesError';
 export * from './BoeError';
 export * from './ConfigError';
 export * from './NotificationsError';
+export * from './StoreError';

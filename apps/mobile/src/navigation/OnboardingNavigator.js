@@ -88,6 +88,26 @@ import BoeComparisonScreen from '../screens/boe/BoeComparisonScreen';
 import BoeMiniTestScreen from '../screens/boe/BoeMiniTestScreen';
 import BoeUpdateSuccessScreen from '../screens/boe/BoeUpdateSuccessScreen';
 
+// Bloque 11 · Tienda
+import StoreHomeScreen from '../screens/store/StoreHomeScreen';
+import StoreHowToEarnScreen from '../screens/store/StoreHowToEarnScreen';
+import StoreProductDetailScreen from '../screens/store/StoreProductDetailScreen';
+import StoreConfirmRedeemScreen from '../screens/store/StoreConfirmRedeemScreen';
+import StoreRedeemSuccessScreen from '../screens/store/StoreRedeemSuccessScreen';
+import StoreMarketplaceScreen from '../screens/store/StoreMarketplaceScreen';
+import StoreTestDetailScreen from '../screens/store/StoreTestDetailScreen';
+import StorePublishTestScreen from '../screens/store/StorePublishTestScreen';
+import StoreSubscriptionScreen from '../screens/store/StoreSubscriptionScreen';
+import StoreSubscriptionSuccessScreen from '../screens/store/StoreSubscriptionSuccessScreen';
+import StoreAffiliateScreen from '../screens/store/StoreAffiliateScreen';
+import StoreDiscountsScreen from '../screens/store/StoreDiscountsScreen';
+import StoreRealRewardsScreen from '../screens/store/StoreRealRewardsScreen';
+import StoreRealRewardDetailScreen from '../screens/store/StoreRealRewardDetailScreen';
+import StoreRealRedeemConfirmScreen from '../screens/store/StoreRealRedeemConfirmScreen';
+import StoreRealRewardSuccessScreen from '../screens/store/StoreRealRewardSuccessScreen';
+import StoreWalletScreen from '../screens/store/StoreWalletScreen';
+import StoreCodeDetailScreen from '../screens/store/StoreCodeDetailScreen';
+
 // Bloque 12 · Configuración
 import ConfigPerfilScreen from '../screens/settings/ConfigPerfilScreen';
 import ConfigSubscriptionScreen from '../screens/settings/ConfigSubscriptionScreen';
@@ -204,6 +224,26 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="BoeComparison" component={BoeComparisonScreen} />
             <Stack.Screen name="BoeMiniTest" component={BoeMiniTestScreen} />
             <Stack.Screen name="BoeUpdateSuccess" component={BoeUpdateSuccessScreen} />
+
+            {/* Bloque 11 · Tienda */}
+            <Stack.Screen name="StoreHome" component={StoreHomeScreen} />
+            <Stack.Screen name="StoreHowToEarn" component={StoreHowToEarnScreen} />
+            <Stack.Screen name="StoreProductDetail" component={StoreProductDetailScreen} />
+            <Stack.Screen name="StoreConfirmRedeem" component={StoreConfirmRedeemScreen} />
+            <Stack.Screen name="StoreRedeemSuccess" component={StoreRedeemSuccessScreen} />
+            <Stack.Screen name="StoreMarketplace" component={StoreMarketplaceScreen} />
+            <Stack.Screen name="StoreTestDetail" component={StoreTestDetailScreen} />
+            <Stack.Screen name="StorePublishTest" component={StorePublishTestScreen} />
+            <Stack.Screen name="StoreSubscription" component={StoreSubscriptionScreen} />
+            <Stack.Screen name="StoreSubscriptionSuccess" component={StoreSubscriptionSuccessScreen} />
+            <Stack.Screen name="StoreAffiliate" component={StoreAffiliateScreen} />
+            <Stack.Screen name="StoreDiscounts" component={StoreDiscountsScreen} />
+            <Stack.Screen name="StoreRealRewards" component={StoreRealRewardsScreen} />
+            <Stack.Screen name="StoreRealRewardDetail" component={StoreRealRewardDetailScreen} />
+            <Stack.Screen name="StoreRealRedeemConfirm" component={StoreRealRedeemConfirmScreen} />
+            <Stack.Screen name="StoreRealRewardSuccess" component={StoreRealRewardSuccessScreen} />
+            <Stack.Screen name="StoreWallet" component={StoreWalletScreen} />
+            <Stack.Screen name="StoreCodeDetail" component={StoreCodeDetailScreen} />
 
             {/* Bloque 12 · Configuración */}
             <Stack.Screen name="ConfigPerfil" component={ConfigPerfilScreen} />
