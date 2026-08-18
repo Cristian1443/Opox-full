@@ -116,6 +116,10 @@ export const API_ROUTES = {
         FEEDBACK:          '/config/feedback',
     },
 
+    PUSH: {
+        REGISTER_TOKEN: '/push/token',
+    },
+
     MOTIVATION: {
         SUMMARY: '/motivation/summary',
         STREAK: '/motivation/streak',

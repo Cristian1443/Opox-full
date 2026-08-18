@@ -20,3 +20,4 @@ export * from './Note';
 export * from './BoeEntities';
 export * from './UserPreferences';
 export * from './ProStats';
+export * from './PushToken';

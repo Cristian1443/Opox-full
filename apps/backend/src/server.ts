@@ -14,8 +14,10 @@ import {
     createNotesRouter,
     createBoeRouter,
     createConfigRouter,
+    createPushRouter,
     errorHandler,
 } from './presentation';
+import { NotificationScheduler } from './infrastructure';
 
 export function createServer(): Express {
     const app = express();
@@ -39,6 +41,13 @@ export function createServer(): Express {
     app.use(createNotesRouter(container.controllers.notes, container.middleware.auth));
     app.use(createBoeRouter(container.controllers.boe, container.middleware.auth));
     app.use(createConfigRouter(container.controllers.config, container.middleware.auth));
+    app.use(createPushRouter(container.controllers.push, container.middleware.auth));
+
+    // Cron de notificaciones (racha diaria a las 20:00h Colombia = 01:00 UTC)
+    const scheduler = new NotificationScheduler();
+    scheduler
+        .registerStreakWarning(() => container.useCases.sendStreakWarning.execute())
+        .start();
 
     // 404 catch-all
     app.use((_req, res) => {

@@ -7,3 +7,4 @@ export * from './ITutorRepository';
 export * from './INotesRepository';
 export * from './IBoeRepository';
 export * from './IConfigRepository';
+export * from './IPushRepository';

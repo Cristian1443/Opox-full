@@ -244,6 +244,7 @@ export class SyncBoeChangesUseCase {
     constructor(
         private readonly repo: IBoeRepository,
         private readonly motor: MotorBoeContract,
+        private readonly onChanges?: (synced: number) => Promise<void>,
     ) {}
 
     async execute(cursoId: string): Promise<SyncBoeResult> {
@@ -275,6 +276,14 @@ export class SyncBoeChangesUseCase {
         }
 
         logger.info('[boe] syncChanges done', { synced, skipped });
+
+        // Notificación push si hay cambios reales
+        if (synced > 0 && this.onChanges) {
+            await this.onChanges(synced).catch(err =>
+                logger.warn('[boe] syncChanges notification error', { err }),
+            );
+        }
+
         return { synced, skipped };
     }
 
