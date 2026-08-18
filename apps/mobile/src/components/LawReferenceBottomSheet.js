@@ -22,12 +22,12 @@ function IconScalesBook() {
       {/* Libro */}
       <Path
         d="M8 40 v-24 a4 4 0 0 1 4 -4 h32 a4 4 0 0 1 4 4 v24"
-        stroke={colors.dark}
+        stroke={colors.textDark}
         strokeWidth={2}
         fill="none"
         strokeLinejoin="round"
       />
-      <Path d="M28 12 v28" stroke={colors.dark} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M28 12 v28" stroke={colors.textDark} strokeWidth={2} strokeLinecap="round" />
       {/* Balanza morada */}
       <Path d="M28 6 v6" stroke={colors.purple} strokeWidth={2.2} strokeLinecap="round" />
       <Path d="M16 12 h24" stroke={colors.purple} strokeWidth={2.2} strokeLinecap="round" />
@@ -242,33 +242,35 @@ const styles = StyleSheet.create({
 
   law: {
     fontSize: 22,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
     lineHeight: 26,
   },
   article: {
     fontSize: 22,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
     lineHeight: 26,
   },
   articleTitle: {
     fontSize: 12,
+    fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     marginTop: 4,
   },
 
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
   },
   quote: {
     fontSize: 13.5,
+    fontFamily: 'Poppins-Regular',
     lineHeight: 21,
-    color: colors.dark,
+    color: colors.textDark,
     fontStyle: 'italic',
     marginBottom: spacing.md,
   },
@@ -284,6 +286,6 @@ const styles = StyleSheet.create({
   btnText: {
     color: colors.white,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
   },
 });

@@ -114,7 +114,7 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityLabel="Cerrar sin reportar"
             >
-              <Ionicons name="close" size={22} color={colors.textSecondary} />
+              <Ionicons name="close" size={22} color={colors.gray} />
             </TouchableOpacity>
 
             <Text style={styles.title}>Reportar esta pregunta</Text>
@@ -200,12 +200,13 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 17,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 13,
+    fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     marginBottom: spacing.md,
   },
@@ -223,12 +224,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   optionSelected: {
-    borderColor: colors.purple,
+    borderColor: colors.selectionBorder,
     borderWidth: 2,
   },
   optionText: {
     fontSize: 13.5,
-    color: colors.dark,
+    fontFamily: 'Poppins-Regular',
+    color: colors.textDark,
     lineHeight: 18,
   },
 
@@ -240,11 +242,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendBtnDisabled: {
-    backgroundColor: colors.grayMid,
+    backgroundColor: colors.gray,
   },
   sendBtnText: {
     color: colors.white,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
   },
 });

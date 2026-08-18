@@ -23,20 +23,20 @@ function IconChatQuestion() {
       {/* Burbuja principal con ? */}
       <Path
         d="M6 10 a6 6 0 0 1 6 -6 h30 a6 6 0 0 1 6 6 v18 a6 6 0 0 1 -6 6 h-10 l-6 6 l0 -6 h-14 a6 6 0 0 1 -6 -6 z"
-        stroke={colors.dark}
+        stroke={colors.textDark}
         strokeWidth={2}
         fill="#FFFFFF"
         strokeLinejoin="round"
       />
       <Path
         d="M23 14 a4 4 0 1 1 4 4 v3"
-        stroke={colors.dark}
+        stroke={colors.textDark}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       />
-      <Circle cx={27} cy={26} r={1.4} fill={colors.dark} />
+      <Circle cx={27} cy={26} r={1.4} fill={colors.textDark} />
       {/* Tres puntos morados */}
       <Circle cx={20} cy={19} r={1.5} fill={colors.purple} />
       <Circle cx={27} cy={19} r={1.5} fill={colors.purple} />
@@ -235,23 +235,24 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontSize: 22,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
     marginTop: 6,
   },
   headerIcon: { marginLeft: spacing.md },
 
   hintText: {
     fontSize: 14,
+    fontFamily: 'Poppins-Regular',
     lineHeight: 21,
-    color: colors.dark,
+    color: colors.textDark,
     marginBottom: spacing.md,
   },
 
   disclaimer: {
     fontSize: 13,
+    fontFamily: 'Poppins-Medium',
     color: colors.purple,
-    fontWeight: '600',
     marginBottom: spacing.lg,
   },
 
@@ -266,6 +267,6 @@ const styles = StyleSheet.create({
   btnText: {
     color: colors.white,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
   },
 });

@@ -226,7 +226,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
           onPress={() => setShowAbandonModal(true)}
           accessibilityLabel="Salir de la sesión"
         >
-          <Ionicons name="chevron-back" size={20} color={colors.dark} />
+          <Ionicons name="chevron-back" size={20} color={colors.textDark} />
         </TouchableOpacity>
 
         <View style={styles.topHeaderTexts}>
@@ -241,7 +241,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
           onPress={() => { setIsPaused(true); setShowPauseModal(true); }}
           accessibilityLabel="Pausar sesión"
         >
-          <Ionicons name="pause" size={18} color={colors.dark} />
+          <Ionicons name="pause" size={18} color={colors.textDark} />
         </TouchableOpacity>
       </View>
 
@@ -294,11 +294,11 @@ export default function QuestionActiveScreen({ navigation, route }) {
                 <Ionicons
                   name="time-outline"
                   size={14}
-                  color={timeLeft <= TIMER_DANGER ? colors.error : '#FFFFFF'}
+                  color={timeLeft <= TIMER_DANGER ? colors.statRed : '#FFFFFF'}
                 />
                 <Text style={[
                   styles.timerText,
-                  timeLeft <= TIMER_DANGER && { color: colors.error },
+                  timeLeft <= TIMER_DANGER && { color: colors.statRed },
                 ]}>
                   {formatTime(timeLeft)}
                 </Text>
@@ -323,20 +323,20 @@ export default function QuestionActiveScreen({ navigation, route }) {
             let bg = colors.card;
             let border = '#E4E8F0';
             let borderW = 1.5;
-            let textColor = colors.dark;
+            let textColor = colors.textDark;
 
             if (!isSubmitted) {
               if (isSelected) {
-                border = colors.purple;
+                border = colors.selectionBorder;
                 borderW = 2;
               }
             } else if (option.correct) {
               bg = '#DCFCE7';
-              border = colors.success;
+              border = colors.statGreen;
               borderW = 1.5;
             } else if (isSelected) {
               bg = '#FCA5A5';
-              border = colors.error;
+              border = colors.statRed;
               borderW = 1.5;
             }
 
@@ -378,13 +378,13 @@ export default function QuestionActiveScreen({ navigation, route }) {
           >
             <View style={styles.feedbackHeader}>
               {isCorrectAnswer ? (
-                <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+                <Ionicons name="checkmark-circle" size={22} color={colors.statGreen} />
               ) : (
-                <Ionicons name="close-circle" size={22} color={colors.error} />
+                <Ionicons name="close-circle" size={22} color={colors.statRed} />
               )}
               <Text style={[
                 styles.feedbackTitle,
-                { color: isCorrectAnswer ? colors.success : colors.error },
+                { color: isCorrectAnswer ? colors.statGreen : colors.statRed },
               ]}>
                 {isTimeOut ? 'Tiempo agotado' : isCorrectAnswer ? '¡Correcto!' : 'Incorrecto'}
               </Text>
@@ -395,7 +395,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
             </Text>
 
             {!isCorrectAnswer && !isTimeOut && (
-              <Text style={styles.errorLabLink}>
+              <Text style={[styles.errorLabLink, { color: colors.statRed }]}>
                 + Esta pregunta irá a tu Laboratorio de Errores
               </Text>
             )}
@@ -434,7 +434,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
                 key={i}
                 name={i <= (question.difficulty ?? 3) ? 'star' : 'star-outline'}
                 size={13}
-                color={i <= (question.difficulty ?? 3) ? colors.primary : '#D4DAE6'}
+                color={i <= (question.difficulty ?? 3) ? colors.accentOrange : colors.gray}
               />
             ))}
             <Text style={styles.difficultyLabel}>Evalúa esta pregunta</Text>
@@ -446,8 +446,8 @@ export default function QuestionActiveScreen({ navigation, route }) {
               onPress={() => setShowReportModal(true)}
               accessibilityLabel="Reportar pregunta"
             >
-              <Ionicons name="warning-outline" size={22} color={isReported ? colors.error : colors.dark} />
-              <Text style={[styles.toolLabel, isReported && { color: colors.error }]}>
+              <Ionicons name="warning-outline" size={22} color={isReported ? colors.statRed : colors.textDark} />
+              <Text style={[styles.toolLabel, isReported && { color: colors.statRed }]}>
                 {isReported ? 'Reportado' : 'Reportar'}
               </Text>
             </TouchableOpacity>
@@ -467,9 +467,9 @@ export default function QuestionActiveScreen({ navigation, route }) {
               <Ionicons
                 name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
                 size={22}
-                color={isBookmarked ? colors.primary : colors.dark}
+                color={isBookmarked ? colors.purple : colors.textDark}
               />
-              <Text style={[styles.toolLabel, isBookmarked && { color: colors.primary }]}>
+              <Text style={[styles.toolLabel, isBookmarked && { color: colors.purple }]}>
                 Guardar
               </Text>
             </TouchableOpacity>
@@ -507,11 +507,11 @@ export default function QuestionActiveScreen({ navigation, route }) {
               <Ionicons
                 name="bulb-outline"
                 size={22}
-                color={isHintDisabled ? '#D4DAE6' : colors.primary}
+                color={isHintDisabled ? colors.gray : colors.purple}
               />
               <Text style={[
                 styles.toolLabel,
-                { color: isHintDisabled ? '#D4DAE6' : colors.primary, fontWeight: '700' },
+                { color: isHintDisabled ? colors.gray : colors.purple, fontWeight: '700' },
               ]}>
                 Pista IA
               </Text>
@@ -522,7 +522,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
               onPress={() => setShowLawSheet(true)}
               accessibilityLabel="Ver ley relacionada"
             >
-              <Ionicons name="library-outline" size={22} color={colors.dark} />
+              <Ionicons name="library-outline" size={22} color={colors.textDark} />
               <Text style={styles.toolLabel}>Ley</Text>
             </TouchableOpacity>
           </View>
@@ -639,11 +639,12 @@ const styles = StyleSheet.create({
   },
   topHeaderTitle: {
     fontSize: 16,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
   },
   topHeaderSub: {
     fontSize: 12,
+    fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -679,7 +680,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accentOrange,
     borderRadius: 3,
   },
   timerArea: {
@@ -703,9 +704,9 @@ const styles = StyleSheet.create({
   // ── Enunciado ──────────────────────────
   questionText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
     lineHeight: 22,
-    color: colors.dark,
+    color: colors.textDark,
     marginBottom: spacing.md,
     marginTop: 4,
   },
@@ -725,13 +726,14 @@ const styles = StyleSheet.create({
   },
   optionLetter: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins-SemiBold',
     width: 18,
     lineHeight: 18,
   },
   optionText: {
     flex: 1,
     fontSize: 13,
+    fontFamily: 'Poppins-Regular',
     lineHeight: 18,
   },
 
@@ -744,11 +746,11 @@ const styles = StyleSheet.create({
   },
   feedbackCardOk: {
     backgroundColor: '#F0FDF4',
-    borderColor: colors.success,
+    borderColor: colors.statGreen,
   },
   feedbackCardErr: {
     backgroundColor: '#FEF2F2',
-    borderColor: colors.error,
+    borderColor: colors.statRed,
   },
   feedbackHeader: {
     flexDirection: 'row',
@@ -758,35 +760,36 @@ const styles = StyleSheet.create({
   },
   feedbackTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: 'Poppins-SemiBold',
   },
   feedbackBody: {
     fontSize: 13,
+    fontFamily: 'Poppins-Regular',
     lineHeight: 18,
-    color: colors.dark,
+    color: colors.textDark,
   },
   errorLabLink: {
     fontSize: 12,
-    color: colors.error,
-    fontWeight: '600',
+    color: colors.statRed,
+    fontFamily: 'Poppins-Medium',
     marginTop: 8,
   },
 
   // ── Botón principal ────────────────────
   mainBtn: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.ctaGreen,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
     marginTop: spacing.sm,
   },
   mainBtnDisabled: {
-    backgroundColor: '#A7A9AD',
+    backgroundColor: colors.gray,
   },
   mainBtnText: {
     color: colors.white,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
     letterSpacing: 0.2,
   },
 
@@ -802,6 +805,7 @@ const styles = StyleSheet.create({
   },
   difficultyLabel: {
     fontSize: 10,
+    fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     marginLeft: 8,
   },
@@ -823,7 +827,7 @@ const styles = StyleSheet.create({
   },
   toolLabel: {
     fontSize: 10,
-    color: colors.dark,
-    fontWeight: '600',
+    color: colors.textDark,
+    fontFamily: 'Poppins-Medium',
   },
 });

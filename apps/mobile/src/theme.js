@@ -18,6 +18,7 @@ export const colors = {
     accentOrange: '#F69624',
     bannerPurple: '#804CC9',
     neutralGray: '#9D9B9B',
+    gray: '#A7ADB8',
 
     // Tokens semánticos (Bloque 3+)
     background: '#F2F2F7',
@@ -32,8 +33,9 @@ export const colors = {
     error: '#FF3B30',
     errorBg: '#FFEBEB',
 
-    // Acento IA / Bloque 7 — morado usado en bottom sheets, opciones seleccionadas y pausa
-    purple: '#7B4BC4',
+    // Acento IA / Bloque 7 — morado usado en bottom sheets, CTAs secundarios y pausa
+    // Figma (Bloque 7, inspección exhaustiva 2026-08): #7241B8 exacto.
+    purple: '#7241B8',
     purpleBg: '#F1ECFA',
 };
 

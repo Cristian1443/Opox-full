@@ -61,13 +61,13 @@ function TrophyIllustration() {
       <Path
         d="M50 90 Q30 60 55 45 Q60 65 70 80"
         fill="#86EFAC"
-        stroke={colors.success}
+        stroke={colors.statGreen}
         strokeWidth={1.5}
       />
       <Path
         d="M130 90 Q150 60 125 45 Q120 65 110 80"
         fill="#86EFAC"
-        stroke={colors.success}
+        stroke={colors.statGreen}
         strokeWidth={1.5}
       />
 
@@ -75,23 +75,23 @@ function TrophyIllustration() {
       <Path
         d="M65 40 Q65 90 90 100 Q115 90 115 40 Z"
         fill="#F5F7FA"
-        stroke={colors.dark}
+        stroke={colors.textDark}
         strokeWidth={2}
       />
       {/* Asas laterales */}
-      <Path d="M65 50 Q50 55 55 75" stroke={colors.dark} strokeWidth={2} fill="none" />
-      <Path d="M115 50 Q130 55 125 75" stroke={colors.dark} strokeWidth={2} fill="none" />
+      <Path d="M65 50 Q50 55 55 75" stroke={colors.textDark} strokeWidth={2} fill="none" />
+      <Path d="M115 50 Q130 55 125 75" stroke={colors.textDark} strokeWidth={2} fill="none" />
 
       {/* Base */}
-      <Rect x={80} y={100} width={20} height={14} fill="#F5F7FA" stroke={colors.dark} strokeWidth={2} />
-      <Rect x={70} y={114} width={40} height={8} rx={2} fill="#F5F7FA" stroke={colors.dark} strokeWidth={2} />
+      <Rect x={80} y={100} width={20} height={14} fill="#F5F7FA" stroke={colors.textDark} strokeWidth={2} />
+      <Rect x={70} y={114} width={40} height={8} rx={2} fill="#F5F7FA" stroke={colors.textDark} strokeWidth={2} />
 
       {/* Check verde central */}
-      <Circle cx={90} cy={65} r={16} fill={colors.success} />
+      <Circle cx={90} cy={65} r={16} fill={colors.statGreen} />
       <Path d="M83 65 l5 5 l10 -10" stroke="#FFFFFF" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
 
       {/* Cinta */}
-      <Path d="M50 122 h80 v14 h-80 z" fill="#86EFAC" stroke={colors.success} strokeWidth={1.5} />
+      <Path d="M50 122 h80 v14 h-80 z" fill="#86EFAC" stroke={colors.statGreen} strokeWidth={1.5} />
       <Path d="M50 122 l-8 8 l8 6 z" fill="#22C55E" />
       <Path d="M130 122 l8 8 l-8 6 z" fill="#22C55E" />
 
@@ -127,7 +127,7 @@ function DonutChart({ percentage }) {
           cx={DONUT_SIZE / 2}
           cy={DONUT_SIZE / 2}
           r={radius}
-          stroke={colors.success}
+          stroke={colors.statGreen}
           strokeWidth={STROKE_WIDTH}
           fill="transparent"
           strokeDasharray={circumference}
@@ -156,8 +156,8 @@ const donut = StyleSheet.create({
   },
   percentage: {
     fontSize: 34,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
     letterSpacing: -1,
   },
 });
@@ -219,7 +219,7 @@ export default function TrainingResultScreen({ navigation, route }) {
           <Text style={styles.congrats}>¡FELICIDADES!</Text>
           <Text style={styles.congratsSub}>
             Estás de racha, has superado este test con un{' '}
-            <Text style={{ fontWeight: '800', color: colors.dark }}>{percentage}%</Text>
+            <Text style={{ fontFamily: 'Poppins-SemiBold', color: colors.textDark }}>{percentage}%</Text>
             {' '}de aciertos. ¿Qué quieres hacer ahora?
           </Text>
 
@@ -259,15 +259,15 @@ export default function TrainingResultScreen({ navigation, route }) {
 
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: colors.success }]}>{correct}</Text>
+            <Text style={[styles.statValue, { color: colors.statGreen }]}>{correct}</Text>
             <Text style={styles.statLabel}>Aciertos</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: colors.error }]}>{incorrect}</Text>
+            <Text style={[styles.statValue, { color: colors.statRed }]}>{incorrect}</Text>
             <Text style={styles.statLabel}>Fallos</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: colors.dark }]}>{formatTime(elapsedSeconds)}</Text>
+            <Text style={[styles.statValue, { color: colors.textDark }]}>{formatTime(elapsedSeconds)}</Text>
             <Text style={styles.statLabel}>Tiempo</Text>
           </View>
         </View>
@@ -328,14 +328,15 @@ const styles = StyleSheet.create({
   },
   congrats: {
     fontSize: 26,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
     letterSpacing: -0.5,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
   congratsSub: {
     fontSize: 13,
+    fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
@@ -350,7 +351,7 @@ const styles = StyleSheet.create({
   ghostLinkText: {
     fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
   },
 
   // ── Resultados ───────────────────────────
@@ -363,8 +364,8 @@ const styles = StyleSheet.create({
   },
   correctCount: {
     fontSize: 13,
+    fontFamily: 'Poppins-Medium',
     color: colors.textSecondary,
-    fontWeight: '600',
     marginTop: spacing.sm,
   },
 
@@ -380,14 +381,14 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: 'Poppins-SemiBold',
     letterSpacing: -0.5,
   },
   statLabel: {
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 4,
-    fontWeight: '600',
+    fontFamily: 'Poppins-Medium',
   },
 
   errorChip: {
@@ -400,25 +401,26 @@ const styles = StyleSheet.create({
   },
   chipTitle: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins-SemiBold',
     color: colors.white,
   },
   chipSub: {
     fontSize: 11,
+    fontFamily: 'Poppins-Regular',
     color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
   },
 
   whatNow: {
     fontSize: 12,
+    fontFamily: 'Poppins-Medium',
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.sm,
-    fontWeight: '500',
   },
 
   primaryBtn: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.ctaGreen,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
@@ -427,6 +429,6 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: colors.white,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
   },
 });

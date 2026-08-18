@@ -61,7 +61,7 @@ export default function PauseSessionModal({
         <View style={styles.center}>
           {/* Círculo morado con play naranja */}
           <View style={styles.iconCircle}>
-            <Ionicons name="play" size={44} color={colors.primary} />
+            <Ionicons name="play" size={44} color={colors.accentOrange} />
           </View>
 
           <Text style={styles.title}>Test en pausa</Text>
@@ -121,14 +121,15 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: '800',
-    color: colors.dark,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
     letterSpacing: -0.3,
     marginBottom: 6,
     textAlign: 'center',
   },
   infoLine: {
     fontSize: 13,
+    fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
@@ -136,8 +137,8 @@ const styles = StyleSheet.create({
   },
   clockLine: {
     fontSize: 13,
-    color: colors.error,
-    fontWeight: '700',
+    color: colors.statRed,
+    fontFamily: 'Poppins-SemiBold',
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
   resumeBtnText: {
     color: colors.white,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
   },
   exitBtn: {
     backgroundColor: colors.card,
@@ -162,12 +163,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     borderWidth: 1.5,
-    borderColor: '#D4DAE6',
+    borderColor: colors.gray,
     marginTop: 10,
   },
   exitBtnText: {
-    color: colors.dark,
+    color: colors.textDark,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
   },
 });
