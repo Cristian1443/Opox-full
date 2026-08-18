@@ -76,7 +76,33 @@ export class SendNoteReadyUseCase {
     }
 }
 
-// ── 13.4 Recordatorio de racha diaria ─────────────────────────────────────────
+// ── 13.4 Meta diaria cumplida ─────────────────────────────────────────────
+// Notifica al usuario cuando completa todas sus tareas del día.
+
+export class SendDailyGoalCompletedUseCase {
+    constructor(
+        private readonly pushRepo: IPushRepository,
+        private readonly pushService: ExpoPushService,
+    ) {}
+
+    async execute(userId: string): Promise<void> {
+        const tokens = await this.pushRepo.getTokensByUser(userId);
+        if (tokens.length === 0) return;
+
+        const messages: PushMessage[] = tokens.map(t => ({
+            to: t.token,
+            title: '🎯 ¡Meta diaria cumplida!',
+            body: 'Has completado todas tus tareas de hoy. ¡Sigue así!',
+            data: { type: 'daily_reminder', screen: 'PlanningHome' },
+            sound: 'default',
+        }));
+
+        await this.pushService.send(messages);
+        logger.info('[notifications] daily-goal-completed enviado', { userId });
+    }
+}
+
+// ── 13.5 Recordatorio de racha diaria ─────────────────────────────────────────
 // Lanzado por el cron a las 20:00h Colombia (01:00 UTC).
 // Fase 1: notifica a todos los usuarios con token.
 // Fase 2: filtrar solo usuarios sin actividad registrada ese día.

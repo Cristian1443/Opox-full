@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import OnboardingNavigator from './src/navigation/OnboardingNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
 import useNetworkWatcher from './src/hooks/useNetworkWatcher';
 import { pushApi } from './src/api';
+import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 
 // Tipografía de marca OPOX
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -75,21 +76,26 @@ function NetworkWatcher() {
 }
 
 /**
- * Escucha el tap en una notificación push y navega a la pantalla correcta.
+ * Escucha notificaciones push en primer plano y el tap sobre ellas.
  * No-op en Expo Go.
  */
-function PushNotificationHandler() {
+function PushNotificationHandler({ onForegroundNotification }) {
   useEffect(() => {
     if (!Notifications) return;
     try {
-      const sub = Notifications.addNotificationResponseReceivedListener(response => {
+      // Notificación recibida con la app abierta → mostrar banner in-app
+      const receivedSub = Notifications.addNotificationReceivedListener(notification => {
+        const { title, body, data } = notification.request.content;
+        onForegroundNotification({ title, body, type: data?.type ?? 'daily_reminder', data });
+      });
+      // Tap sobre notificación → navegar a la pantalla indicada
+      const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
         const data = response.notification.request.content.data ?? {};
-        const screen = data.screen;
-        if (screen && navigationRef.isReady()) {
-          navigationRef.navigate(screen, data.params ?? {});
+        if (data.screen && navigationRef.isReady()) {
+          navigationRef.navigate(data.screen, data.params ?? {});
         }
       });
-      return () => sub.remove();
+      return () => { receivedSub.remove(); responseSub.remove(); };
     } catch (_) {
       return undefined;
     }
@@ -116,6 +122,8 @@ export default function App() {
     'Poppins-Bold': Poppins_700Bold,
   });
 
+  const [banner, setBanner] = useState(null);
+
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) await SplashScreen.hideAsync();
   }, [fontsLoaded]);
@@ -126,9 +134,22 @@ export default function App() {
     <SafeAreaProvider onLayout={onLayoutRootView}>
       <NavigationContainer ref={navigationRef} linking={linking}>
         <NetworkWatcher />
-        <PushNotificationHandler />
+        <PushNotificationHandler onForegroundNotification={setBanner} />
         <OnboardingNavigator />
       </NavigationContainer>
+      <InAppNotificationBanner
+        visible={!!banner}
+        title={banner?.title ?? ''}
+        body={banner?.body ?? ''}
+        type={banner?.type ?? 'daily_reminder'}
+        onPress={() => {
+          if (banner?.data?.screen && navigationRef.isReady()) {
+            navigationRef.navigate(banner.data.screen, banner.data.params ?? {});
+          }
+          setBanner(null);
+        }}
+        onDismiss={() => setBanner(null)}
+      />
     </SafeAreaProvider>
   );
 }

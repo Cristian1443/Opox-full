@@ -111,6 +111,7 @@ import {
     SendBoeAlertUseCase,
     SendNoteReadyUseCase,
     SendStreakWarningUseCase,
+    SendDailyGoalCompletedUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -232,10 +233,11 @@ export function buildContainer() {
     // ─── Expo Push Service + use cases de notificaciones ─────────────────────
     // Se construyen antes del objeto useCases para evitar referencias circulares.
     const pushService = new ExpoPushService(env.EXPO_ACCESS_TOKEN);
-    const registerPushToken   = new RegisterPushTokenUseCase(pushRepo);
-    const sendBoeAlert        = new SendBoeAlertUseCase(pushRepo, pushService);
-    const sendNoteReady       = new SendNoteReadyUseCase(pushRepo, pushService);
-    const sendStreakWarning   = new SendStreakWarningUseCase(pushRepo, pushService);
+    const registerPushToken        = new RegisterPushTokenUseCase(pushRepo);
+    const sendBoeAlert             = new SendBoeAlertUseCase(pushRepo, pushService);
+    const sendNoteReady            = new SendNoteReadyUseCase(pushRepo, pushService);
+    const sendStreakWarning        = new SendStreakWarningUseCase(pushRepo, pushService);
+    const sendDailyGoalCompleted   = new SendDailyGoalCompletedUseCase(pushRepo, pushService);
 
     const motorBoe = env.MOTOR_BOE_BASE_URL
         ? new MotorBoeClient({
@@ -290,7 +292,11 @@ export function buildContainer() {
         updatePlan: new UpdatePlanUseCase(planningRepo),
         listTasks: new ListTasksUseCase(planningRepo),
         createTask: new CreateTaskUseCase(planningRepo),
-        toggleTask: new ToggleTaskUseCase(planningRepo, dashboardRepo),
+        toggleTask: new ToggleTaskUseCase(
+            planningRepo,
+            dashboardRepo,
+            (userId) => sendDailyGoalCompleted.execute(userId),
+        ),
         getWeek,
         getMacro,
         listAgenda: new ListAgendaUseCase(planningRepo),
@@ -391,6 +397,7 @@ export function buildContainer() {
         sendBoeAlert,
         sendNoteReady,
         sendStreakWarning,
+        sendDailyGoalCompleted,
     };
 
     // ─── Controllers (presentation) ───────────────
