@@ -122,6 +122,13 @@ export const API_ROUTES = {
         COMMUNITY_TEST_PURCHASE:'/store/community-tests/:id/purchase',
     },
 
+    CONFIG: {
+        PREFERENCES:       '/config/preferences',
+        PRO_STATS:         '/config/pro-stats',
+        PRO_STATS_EXPORT:  '/config/pro-stats/export',
+        FEEDBACK:          '/config/feedback',
+    },
+
     MOTIVATION: {
         SUMMARY: '/motivation/summary',
         STREAK: '/motivation/streak',

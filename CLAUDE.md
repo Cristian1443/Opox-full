@@ -13,7 +13,7 @@ Opox-full/
 │   ├── mobile/          # React Native + Expo (JS, migrando a TS)
 │   │   ├── App.js
 │   │   ├── src/
-│   │   │   ├── api/         # Clientes HTTP: auth, dashboard, planning, motivation, training, tutor, notes, boe
+│   │   │   ├── api/         # Clientes HTTP: auth, dashboard, planning, motivation, training, tutor, notes, boe, settings
 │   │   │   ├── components/  # Componentes compartidos (ScreenHeader, modales, BoeAlertBanner, …)
 │   │   │   ├── hooks/       # Custom hooks de UI (useNetworkWatcher, …)
 │   │   │   ├── navigation/  # OnboardingNavigator.js, navigationRef.js
@@ -37,7 +37,7 @@ Opox-full/
 │   │   └── src/
 │   │       ├── contracts/   # AiApiContract.ts, ClientApiContract.ts
 │   │       ├── api.ts       # ApiResponse<T>, códigos de error
-│   │       ├── auth.ts, dashboard.ts, planning.ts, motivation.ts, training.ts, tutor.ts, notes.ts, boe.ts
+│   │       ├── auth.ts, dashboard.ts, planning.ts, motivation.ts, training.ts, tutor.ts, notes.ts, boe.ts, config.ts
 │   │       └── index.ts
 │   ├── constants/       # Constantes y rutas compartidas (routes.js)
 │   ├── utils/           # logger, result pattern (result.ts)
@@ -194,6 +194,39 @@ precalculada — siempre se recalcula en `getBalance()`.
 **Marketplace**: `community_tests` con campo `is_free` generado (`price = 0`).
 Compra idempotente por unique constraint `(user_id, test_id)` en `community_test_purchases`.
 
+### Configuración (Bloque 12) — endpoints propios
+
+Preferencias de tono IA + accesibilidad, estadísticas pro calculadas en tiempo real
+y feedback de usuario. Rutas bajo `/config/`.
+
+Tipos en `packages/types/src/config.ts` (`UserPreferences`, `UpdatePreferencesInput`,
+`ProStats`, `ProStatsTopicBreakdown`, `ProStatsExportResult`). SQL en
+`apps/backend/supabase/bloque12_config.sql` (2 tablas: `user_preferences` con UNIQUE
+por usuario, `user_feedback` con CHECK de tipo y longitud, ambas con RLS).
+Cliente mobile en `apps/mobile/src/api/settings.js` exportado como `settingsApi`.
+Colección de tests en `Bloque12_Config_Tests.postman_collection.json` (10 requests, 31 assertions).
+
+**`GET /config/preferences`**: devuelve las preferencias del usuario; si no existen
+las crea con defaults (`equilibrado`, `detailLevel:1`, `theme:auto`, `fontScale:1.0`).
+
+**`PATCH /config/preferences`**: upsert parcial — solo enviar los campos a cambiar.
+Valida `personality` ∈ `{cercano,equilibrado,exigente}`, `theme` ∈ `{auto,light,dark}`,
+`detailLevel` ∈ `{0,1,2}`.
+
+**`GET /config/pro-stats`**: calcula en tiempo real desde `training_attempt_responses`
+(agregación por `topic_id`) + streak desde `user_gamification`. Devuelve
+`accuracyPct`, `passedProbabilityPct` (heurística: accuracy×0.85 + streak×0.5),
+`topicsStrong` (≥80%), `topicsWeak` (<50%), `topicBreakdown[]` con accuracy por tema.
+
+**`POST /config/pro-stats/export`**: stub — devuelve 202 con `downloadUrl:null` y mensaje
+de notificación pendiente. `TODO(bloque-12)`: implementar PDF con pdfkit/puppeteer.
+
+**`POST /config/feedback`**: inserta en `user_feedback`. Tipo: `suggestion|bug|other`.
+Mensaje: 1–500 caracteres (validado con Zod y con CHECK en BD).
+
+**Nota sobre naming**: el cliente mobile se llama `settingsApi` (en `settings.js`)
+porque `config.js` ya está tomado por la utilidad de URL base del cliente HTTP.
+
 ### Motor de IA del cliente (DESPLEGADO y activo)
 
 Microservicio RAG del equipo IA, desplegado en producción:
@@ -245,5 +278,6 @@ pnpm lint                       # lint completo
 | 9 | Factoría de Apuntes | Frontend + backend completo (upload, pipeline OCR→tags→preguntas con AiApiClientStub, generación de tests, 10/10 smoke test verde). IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo (feed, detalle, comparativa con diff word-by-word, mini-test con AiApiClientStub, 14 requests / 61 assertions verde). IA real (`generateBoeMiniTest`) esperando entrega del prompt del `BRIEF_IA_BLOQUE10.md` |
 | 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
+| 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

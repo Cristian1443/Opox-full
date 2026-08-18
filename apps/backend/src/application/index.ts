@@ -7,3 +7,4 @@ export * from './tutor';
 export * from './notes';
 export * from './boe';
 export * from './store';
+export * from './config';

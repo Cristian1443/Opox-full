@@ -6,3 +6,4 @@ export * from './trainingValidators';
 export * from './tutorValidators';
 export * from './notesValidators';
 export * from './boeValidators';
+export * from './configValidators';

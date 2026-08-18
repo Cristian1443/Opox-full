@@ -105,6 +105,13 @@ declare const API_ROUTES: {
         readonly COMMUNITY_TEST_PURCHASE: string;
     };
 
+    readonly CONFIG: {
+        readonly PREFERENCES: string;
+        readonly PRO_STATS: string;
+        readonly PRO_STATS_EXPORT: string;
+        readonly FEEDBACK: string;
+    };
+
     readonly MOTIVATION: {
         readonly SUMMARY: string;
         readonly STREAK: string;

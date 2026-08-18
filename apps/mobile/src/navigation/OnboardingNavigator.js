@@ -108,6 +108,18 @@ import StoreRealRewardSuccessScreen from '../screens/store/StoreRealRewardSucces
 import StoreWalletScreen from '../screens/store/StoreWalletScreen';
 import StoreCodeDetailScreen from '../screens/store/StoreCodeDetailScreen';
 
+// Bloque 12 · Configuración
+import ConfigPerfilScreen from '../screens/settings/ConfigPerfilScreen';
+import ConfigSubscriptionScreen from '../screens/settings/ConfigSubscriptionScreen';
+import ConfigDevicesScreen from '../screens/settings/ConfigDevicesScreen';
+import ConfigToneScreen from '../screens/settings/ConfigToneScreen';
+import ConfigAccessibilityScreen from '../screens/settings/ConfigAccessibilityScreen';
+import ConfigStatsScreen from '../screens/settings/ConfigStatsScreen';
+import ConfigExportScreen from '../screens/settings/ConfigExportScreen';
+import ConfigHelpScreen from '../screens/settings/ConfigHelpScreen';
+import ConfigFeedbackScreen from '../screens/settings/ConfigFeedbackScreen';
+import ConfigDeleteAccountScreen from '../screens/settings/ConfigDeleteAccountScreen';
+
 // Bloque 6 · Entrenamiento
 import TrainingHomeScreen from '../screens/training/TrainingHomeScreen';
 import GeneratorConfigScreen from '../screens/training/GeneratorConfigScreen';
@@ -232,6 +244,18 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="StoreRealRewardSuccess" component={StoreRealRewardSuccessScreen} />
             <Stack.Screen name="StoreWallet" component={StoreWalletScreen} />
             <Stack.Screen name="StoreCodeDetail" component={StoreCodeDetailScreen} />
+
+            {/* Bloque 12 · Configuración */}
+            <Stack.Screen name="ConfigPerfil" component={ConfigPerfilScreen} />
+            <Stack.Screen name="ConfigSubscription" component={ConfigSubscriptionScreen} />
+            <Stack.Screen name="ConfigDevices" component={ConfigDevicesScreen} />
+            <Stack.Screen name="ConfigTone" component={ConfigToneScreen} />
+            <Stack.Screen name="ConfigAccessibility" component={ConfigAccessibilityScreen} />
+            <Stack.Screen name="ConfigStats" component={ConfigStatsScreen} />
+            <Stack.Screen name="ConfigExport" component={ConfigExportScreen} />
+            <Stack.Screen name="ConfigHelp" component={ConfigHelpScreen} />
+            <Stack.Screen name="ConfigFeedback" component={ConfigFeedbackScreen} />
+            <Stack.Screen name="ConfigDeleteAccount" component={ConfigDeleteAccountScreen} />
 
             {/* Bloque 6 · Entrenamiento */}
             <Stack.Screen name="TrainingHome" component={TrainingHomeScreen} />

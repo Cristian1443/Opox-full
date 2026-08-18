@@ -19,3 +19,5 @@ export * from './TutorSummary';
 export * from './Note';
 export * from './BoeEntities';
 export * from './StoreEntities';
+export * from './UserPreferences';
+export * from './ProStats';

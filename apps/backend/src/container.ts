@@ -112,6 +112,12 @@ import {
     GetCommunityTestUseCase,
     PublishCommunityTestUseCase,
     ObtainCommunityTestUseCase,
+    // Bloque 12 · Configuración
+    GetPreferencesUseCase,
+    UpdatePreferencesUseCase,
+    GetProStatsUseCase,
+    ExportProStatsUseCase,
+    SubmitFeedbackUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -125,6 +131,7 @@ import {
     SupabaseNotesRepository,
     SupabaseBoeRepository,
     SupabaseStoreRepository,
+    SupabaseConfigRepository,
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
@@ -142,9 +149,10 @@ import {
     NotesController,
     BoeController,
     StoreController,
+    ConfigController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository, IConfigRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -191,6 +199,10 @@ export function buildContainer() {
     const storeRepo: IStoreRepository = isSupabaseConfigured
         ? new SupabaseStoreRepository(getSupabaseAdmin())
         : createStubStoreRepository();
+
+    const configRepo: IConfigRepository = isSupabaseConfigured
+        ? new SupabaseConfigRepository(getSupabaseAdmin())
+        : createStubConfigRepository();
 
     if (!isSupabaseConfigured) {
         logger.warn(
@@ -392,6 +404,13 @@ export function buildContainer() {
         getCommunityTest: new GetCommunityTestUseCase(storeRepo),
         publishCommunityTest: new PublishCommunityTestUseCase(storeRepo),
         obtainCommunityTest: new ObtainCommunityTestUseCase(storeRepo),
+
+        // Bloque 12 · Configuración
+        getPreferences:    new GetPreferencesUseCase(configRepo),
+        updatePreferences: new UpdatePreferencesUseCase(configRepo),
+        getProStats:       new GetProStatsUseCase(configRepo),
+        exportProStats:    new ExportProStatsUseCase(configRepo),
+        submitFeedback:    new SubmitFeedbackUseCase(configRepo),
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -489,6 +508,14 @@ export function buildContainer() {
         getSummary: useCases.getSummary,
     });
 
+    const configController = new ConfigController({
+        getPreferences:    useCases.getPreferences,
+        updatePreferences: useCases.updatePreferences,
+        getProStats:       useCases.getProStats,
+        exportProStats:    useCases.exportProStats,
+        submitFeedback:    useCases.submitFeedback,
+    });
+
     const motivationController = new MotivationController({
         getSummary: useCases.getMotivationSummary,
         getStreakDetail: useCases.getStreakDetail,
@@ -527,6 +554,7 @@ export function buildContainer() {
             notes: notesController,
             boe: boeController,
             store: storeController,
+            config: configController,
         },
         middleware: {
             auth: authMiddleware,
@@ -599,4 +627,11 @@ function createStubStoreRepository(): IStoreRepository {
         throw new Error('[store] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as IStoreRepository, { get: () => notConfigured });
+}
+
+function createStubConfigRepository(): IConfigRepository {
+    const notConfigured = (): never => {
+        throw new Error('[config] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IConfigRepository, { get: () => notConfigured });
 }
