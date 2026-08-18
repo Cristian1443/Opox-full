@@ -97,6 +97,17 @@ export default function OtpScreen({ route, navigation }) {
         <SafeAreaView style={s.container}>
             <View style={s.content}>
                 <View style={s.topBlock}>
+                    {/* Volver */}
+                    <TouchableOpacity
+                        style={s.backRow}
+                        onPress={() => navigation.goBack()}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <Ionicons name="chevron-back" size={18} color={colors.textDark} />
+                        <Text style={s.backText}>Volver</Text>
+                    </TouchableOpacity>
+
                     {/* Header */}
                     <View style={s.header}>
                         <Text style={s.title}>Verifica tu email</Text>
@@ -119,6 +130,7 @@ export default function OtpScreen({ route, navigation }) {
                                             s.otpBox,
                                             digit && s.otpBoxFilled,
                                             isCurrent && s.otpBoxCurrent,
+                                            isComplete && !error && s.otpBoxComplete,
                                             !!error && s.otpBoxError,
                                         ]}
                                     >
@@ -148,7 +160,7 @@ export default function OtpScreen({ route, navigation }) {
                     {/* Error inline */}
                     {!!error && (
                         <View style={s.errorRow}>
-                            <Ionicons name="alert-circle" size={16} color="#dc2626" />
+                            <Ionicons name="alert-circle" size={16} color={colors.statRed} />
                             <Text style={s.errorText}>{error}</Text>
                         </View>
                     )}
@@ -197,41 +209,67 @@ export default function OtpScreen({ route, navigation }) {
     );
 }
 
+// Tokens confirmados contra Figma (frame VERIFICACION) que no tienen
+// equivalente exacto en theme.js — literales locales a esta pantalla.
+const FIGMA = {
+    background: '#F4F4F4',
+    inputBorder: '#B8B8D2',
+    inputText: '#1F1F39',
+    link: '#56A1DF',
+};
+
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: FIGMA.background,
     },
     content: {
         flex: 1,
-        padding: 24,
+        padding: 28,
         paddingBottom: 32,
         justifyContent: 'space-between',
     },
     topBlock: {
-        paddingTop: 24,
+        paddingTop: 8,
+    },
+    backRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 4,
+        marginBottom: 28,
+        paddingVertical: 4,
+    },
+    backText: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: 14,
+        color: colors.textDark,
+        opacity: 0.5,
     },
     header: {
-        marginBottom: 32,
+        marginBottom: 28,
         alignItems: 'center',
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
     },
     title: {
-        fontSize: 28,
-        fontWeight: '900',
-        color: colors.dark,
-        marginBottom: 12,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 22,
+        color: colors.textDark,
+        marginBottom: 10,
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: 16,
-        color: colors.grayText,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        lineHeight: 20,
+        color: colors.textDark,
+        opacity: 0.5,
         textAlign: 'center',
-        lineHeight: 24,
     },
     emailHighlight: {
-        fontWeight: '700',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
+        opacity: 1,
     },
     // Wrapper de las casillas + input oculto
     otpWrapper: {
@@ -240,35 +278,38 @@ const s = StyleSheet.create({
     },
     otpContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 4,
+        justifyContent: 'center',
+        gap: 12,
     },
     otpBox: {
-        width: 48,
-        height: 56,
+        width: 45,
+        height: 51,
         borderRadius: 12,
-        borderWidth: 1.5,
-        borderColor: colors.grayMid,
-        backgroundColor: colors.grayLight,
+        borderWidth: 1,
+        borderColor: FIGMA.inputBorder,
+        backgroundColor: colors.white,
         alignItems: 'center',
         justifyContent: 'center',
     },
     otpBoxFilled: {
-        borderColor: colors.primary,
-        backgroundColor: colors.white,
+        borderColor: colors.purple,
     },
     otpBoxCurrent: {
-        borderColor: colors.primary,
-        borderWidth: 2,
+        borderColor: colors.purple,
+        borderWidth: 1.5,
+    },
+    otpBoxComplete: {
+        borderColor: colors.purple,
+        borderWidth: 1.5,
     },
     otpBoxError: {
-        borderColor: '#fca5a5',
-        backgroundColor: '#fef2f2',
+        borderColor: colors.statRed,
+        backgroundColor: colors.errorBg,
     },
     otpDigit: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 20,
+        color: FIGMA.inputText,
     },
     // Input real, invisible pero foco-able
     hiddenInput: {
@@ -280,7 +321,7 @@ const s = StyleSheet.create({
         opacity: 0,
         // En web sin opacity 0.01 a veces el input no captura clics — dejamos 0
         color: 'transparent',
-        fontSize: 24,
+        fontSize: 22,
         textAlign: 'center',
     },
     errorRow: {
@@ -291,9 +332,9 @@ const s = StyleSheet.create({
         marginBottom: 12,
     },
     errorText: {
-        color: '#dc2626',
+        fontFamily: 'Poppins-Medium',
+        color: colors.statRed,
         fontSize: 14,
-        fontWeight: '600',
     },
     processingRow: {
         flexDirection: 'row',
@@ -301,18 +342,18 @@ const s = StyleSheet.create({
         gap: 10,
     },
     verifyButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 16,
+        backgroundColor: colors.purple,
+        paddingVertical: 18,
+        borderRadius: 24,
         alignItems: 'center',
     },
     buttonDisabled: {
         opacity: 0.5,
     },
     verifyButtonText: {
+        fontFamily: 'Poppins-SemiBold',
         color: colors.white,
-        fontSize: 17,
-        fontWeight: '700',
+        fontSize: 16,
     },
     resendButton: {
         paddingVertical: 6,
@@ -324,16 +365,15 @@ const s = StyleSheet.create({
         fontSize: 14,
     },
     resendLabel: {
-        color: colors.grayText,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
     resendText: {
-        color: colors.primary,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
+        color: FIGMA.link,
     },
     resendTextDisabled: {
-        color: colors.primary,
-        fontWeight: '700',
-        opacity: 0.5,
+        fontFamily: 'Poppins-SemiBold',
+        color: FIGMA.link,
     },
 });

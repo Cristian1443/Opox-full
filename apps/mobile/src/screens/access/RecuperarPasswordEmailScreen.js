@@ -49,13 +49,13 @@ export default function RecuperarPasswordEmailScreen({ navigation }) {
                 style={s.flex}
             >
                 <View style={s.content}>
-                    {/* Volver */}
+                    {/* Volver — Figma: "‹ Volver" morado #412950 al 50% opacidad */}
                     <TouchableOpacity
                         style={s.backButton}
                         onPress={() => navigation.goBack()}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="chevron-back" size={22} color={colors.primary} />
+                        <Ionicons name="chevron-back" size={20} color={colors.textDark} />
                         <Text style={s.backText}>Volver</Text>
                     </TouchableOpacity>
 
@@ -71,8 +71,8 @@ export default function RecuperarPasswordEmailScreen({ navigation }) {
                     <View style={s.form}>
                         <TextInput
                             style={[s.input, error && s.inputError]}
-                            placeholder="Tu email"
-                            placeholderTextColor={colors.grayText}
+                            placeholder="Escribe tu email"
+                            placeholderTextColor={colors.textDark}
                             keyboardType="email-address"
                             autoCapitalize="none"
                             autoCorrect={false}
@@ -91,7 +91,7 @@ export default function RecuperarPasswordEmailScreen({ navigation }) {
                         ) : null}
                     </View>
 
-                    {/* CTA anclada al bottom (thumb reach) */}
+                    {/* CTA anclada al bottom (thumb reach) — Figma: botón morado #7241B8 "Verificar" */}
                     <View style={s.spacer} />
                     <TouchableOpacity
                         style={[s.primaryButton, isSending && s.buttonDisabled]}
@@ -102,10 +102,10 @@ export default function RecuperarPasswordEmailScreen({ navigation }) {
                         {isSending ? (
                             <View style={s.processingRow}>
                                 <ActivityIndicator size="small" color={colors.white} />
-                                <Text style={s.primaryButtonText}>Enviando...</Text>
+                                <Text style={s.primaryButtonText}>Verificando...</Text>
                             </View>
                         ) : (
-                            <Text style={s.primaryButtonText}>Enviar enlace</Text>
+                            <Text style={s.primaryButtonText}>Verificar</Text>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -117,7 +117,7 @@ export default function RecuperarPasswordEmailScreen({ navigation }) {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: '#f4f4f4',
     },
     flex: { flex: 1 },
     content: {
@@ -133,39 +133,42 @@ const s = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 32,
         marginTop: 4,
+        opacity: 0.5,
     },
     backText: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: colors.primary,
+        fontSize: 19,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
     header: {
         marginBottom: 32,
     },
     title: {
         fontSize: 28,
-        fontWeight: '900',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: 12,
     },
     subtitle: {
-        fontSize: 16,
-        color: colors.grayText,
-        lineHeight: 24,
+        fontSize: 14,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
+        opacity: 0.5,
+        lineHeight: 21,
     },
     form: {
         gap: 16,
     },
     input: {
-        backgroundColor: colors.grayLight,
-        borderWidth: 1,
-        borderColor: colors.grayMid,
-        borderRadius: 12,
-        padding: 16,
-        fontSize: 16,
-        color: colors.dark,
+        backgroundColor: colors.white,
+        borderRadius: 20,
+        padding: 20,
+        fontSize: 17,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
     inputError: {
+        borderWidth: 1,
         borderColor: '#dc2626',
     },
     errorRow: {
@@ -177,12 +180,12 @@ const s = StyleSheet.create({
     errorText: {
         color: '#dc2626',
         fontSize: 14,
-        fontWeight: '600',
+        fontFamily: 'Poppins-SemiBold',
     },
     primaryButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 16,
+        backgroundColor: colors.purple,
+        paddingVertical: 20,
+        borderRadius: 19,
         alignItems: 'center',
     },
     buttonDisabled: {
@@ -195,7 +198,7 @@ const s = StyleSheet.create({
     },
     primaryButtonText: {
         color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 21,
+        fontFamily: 'Poppins-SemiBold',
     },
 });

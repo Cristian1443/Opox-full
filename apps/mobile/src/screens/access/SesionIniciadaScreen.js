@@ -6,11 +6,20 @@ import {
     StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 import { PENDING_OPOSICION_KEY } from '../onboarding/OppositionSelectorScreen';
+import { SesionCheckIcon } from '../../components/icons/AccessIcons';
+
+// Colores del frame Figma "PERMISO CONCEDIDO" (2349:911) sin equivalente
+// exacto en theme.js — se dejan literales aquí a propósito (otros agentes
+// tocan theme.js en paralelo para otras pantallas del mismo bloque).
+const FIGMA = {
+    backdrop: '#000000',
+    cardBorder: 'rgba(65, 41, 80, 0.3)',
+    checkGreen: '#3AB375',
+};
 
 export default function SesionIniciadaScreen({ navigation, route }) {
     const { email } = route.params || {};
@@ -38,15 +47,15 @@ export default function SesionIniciadaScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={s.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+            <StatusBar barStyle="light-content" backgroundColor={FIGMA.backdrop} />
 
+            {/* MODAL (2349:912) centrado sobre el fondo oscuro del frame */}
             <View style={s.content}>
-                <View style={s.iconContainer}>
-                    <Ionicons name="checkmark" size={52} color={colors.green} />
+                <View style={s.card}>
+                    <SesionCheckIcon width={72} color={FIGMA.checkGreen} />
+                    <Text style={s.title}>¡Estás dentro!</Text>
+                    <Text style={s.subtitle}>Preparando tu Centro de Mando…</Text>
                 </View>
-
-                <Text style={s.title}>¡Dentro!</Text>
-                <Text style={s.subtitle}>Preparando tu Centro de Mando…</Text>
             </View>
         </SafeAreaView>
     );
@@ -55,7 +64,7 @@ export default function SesionIniciadaScreen({ navigation, route }) {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: FIGMA.backdrop,
     },
     content: {
         flex: 1,
@@ -63,25 +72,29 @@ const s = StyleSheet.create({
         alignItems: 'center',
         padding: 24,
     },
-    iconContainer: {
-        width: 96,
-        height: 96,
-        borderRadius: 48,
-        backgroundColor: colors.greenLight,
+    card: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: colors.white,
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: FIGMA.cardBorder,
+        paddingVertical: 40,
+        paddingHorizontal: 24,
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 28,
     },
     title: {
-        fontSize: 32,
-        fontWeight: '900',
-        color: colors.dark,
-        marginBottom: 10,
-        letterSpacing: 0.5,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 28,
+        color: colors.textDark,
+        marginTop: 20,
+        marginBottom: 8,
+        textAlign: 'center',
     },
     subtitle: {
+        fontFamily: 'Poppins-Light',
         fontSize: 16,
-        color: colors.grayText,
+        color: colors.textDark,
         textAlign: 'center',
     },
 });

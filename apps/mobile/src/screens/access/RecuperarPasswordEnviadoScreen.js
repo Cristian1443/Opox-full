@@ -52,57 +52,58 @@ export default function RecuperarPasswordEnviadoScreen({ route, navigation }) {
     return (
         <SafeAreaView style={s.container}>
             <View style={s.content}>
-                {/* Icono email — mockup usa círculo verde claro con icono email */}
-                <View style={s.iconContainer}>
-                    <Ionicons name="mail-outline" size={40} color={colors.green} />
-                </View>
-
-                {/* Header */}
-                <View style={s.header}>
-                    <Text style={s.title}>Revisa tu correo</Text>
-                    <Text style={s.subtitle}>
-                        Hemos enviado un enlace a{'\n'}
-                        <Text style={s.emailDestino}>{email}</Text>. Caduca en 30 minutos.
-                    </Text>
-                </View>
-
-                {/* Abrir app de correo */}
-                <TouchableOpacity
-                    style={s.primaryButton}
-                    onPress={handleAbrirCorreo}
-                    activeOpacity={0.85}
-                >
-                    <Text style={s.primaryButtonText}>Abrir app de correo</Text>
-                </TouchableOpacity>
-
-                {/* Reenviar — mockup: "¿No llega? Reenviar" en una línea */}
-                <View style={s.resendContainer}>
-                    <TouchableOpacity
-                        onPress={handleReenviar}
-                        disabled={!reenviarHabilitado}
-                        activeOpacity={0.7}
-                        style={s.resendButton}
-                    >
-                        {reenviarHabilitado ? (
-                            <Text style={s.resendLabel}>
-                                ¿No llega? <Text style={s.resendText}>Reenviar</Text>
-                            </Text>
-                        ) : (
-                            <Text style={s.resendTextDisabled}>
-                                Reenviar en 0:{contador.toString().padStart(2, '0')}
-                            </Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
-
-                {/* Volver */}
+                {/* Volver — Figma: "‹ Volver" morado #412950 al 50% opacidad, arriba a la izquierda */}
                 <TouchableOpacity
                     style={s.backButton}
-                    onPress={() => navigation.popToTop()}
+                    onPress={() => navigation.goBack()}
                     activeOpacity={0.7}
                 >
-                    <Text style={s.backText}>Volver al inicio</Text>
+                    <Ionicons name="chevron-back" size={20} color={colors.textDark} />
+                    <Text style={s.backText}>Volver</Text>
                 </TouchableOpacity>
+
+                <View style={s.centerBlock}>
+                    {/* Header */}
+                    <View style={s.header}>
+                        <Text style={s.title}>Revisa tu correo</Text>
+                        <Text style={s.subtitle}>
+                            Hemos enviado un enlace a{' '}
+                            <Text style={s.emailDestino}>{email}</Text>. Caduca en 30 minutos.
+                        </Text>
+                    </View>
+
+                    {/* Abrir app de correo — Figma: botón morado #7241B8 */}
+                    <TouchableOpacity
+                        style={s.primaryButton}
+                        onPress={handleAbrirCorreo}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={s.primaryButtonText}>Abrir app de correo</Text>
+                    </TouchableOpacity>
+
+                    {/* Reenviar — Figma: "¿No te ha llegado? Reenviar" (link azul #56A1DF) */}
+                    <View style={s.resendContainer}>
+                        <TouchableOpacity
+                            onPress={handleReenviar}
+                            disabled={!reenviarHabilitado}
+                            activeOpacity={0.7}
+                            style={s.resendButton}
+                        >
+                            {reenviarHabilitado ? (
+                                <Text style={s.resendLabel}>
+                                    ¿No te ha llegado? <Text style={s.resendText}>Reenviar</Text>
+                                </Text>
+                            ) : (
+                                <Text style={s.resendLabel}>
+                                    ¿No te ha llegado?{' '}
+                                    <Text style={s.resendTextDisabled}>
+                                        Reenviar en 0:{contador.toString().padStart(2, '0')}
+                                    </Text>
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
             </View>
         </SafeAreaView>
     );
@@ -111,22 +112,28 @@ export default function RecuperarPasswordEnviadoScreen({ route, navigation }) {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: '#f4f4f4',
     },
     content: {
         flex: 1,
         padding: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
+        paddingBottom: 32,
     },
-    iconContainer: {
-        width: 96,
-        height: 96,
-        borderRadius: 48,
-        backgroundColor: colors.greenLight,
+    backButton: {
+        flexDirection: 'row',
         alignItems: 'center',
+        marginTop: 4,
+        opacity: 0.5,
+    },
+    backText: {
+        fontSize: 19,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
+    },
+    centerBlock: {
+        flex: 1,
         justifyContent: 'center',
-        marginBottom: 28,
+        alignItems: 'center',
     },
     header: {
         alignItems: 'center',
@@ -134,66 +141,61 @@ const s = StyleSheet.create({
         paddingHorizontal: 16,
     },
     title: {
-        fontSize: 26,
-        fontWeight: '900',
-        color: colors.dark,
+        fontSize: 28,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: 12,
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: 15,
-        color: colors.grayText,
+        fontSize: 14,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
+        opacity: 0.5,
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 21,
     },
     emailDestino: {
-        fontWeight: '800',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
     },
     primaryButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 10,
-        backgroundColor: colors.primary,
+        backgroundColor: colors.purple,
         width: '100%',
-        paddingVertical: 16,
-        borderRadius: 16,
+        paddingVertical: 20,
+        borderRadius: 19,
         marginBottom: 16,
     },
     primaryButtonText: {
         color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 21,
+        fontFamily: 'Poppins-SemiBold',
     },
     resendContainer: {
         width: '100%',
         alignItems: 'center',
-        marginBottom: 20,
     },
     resendButton: {
         paddingVertical: 10,
     },
     resendLabel: {
-        fontSize: 14,
-        color: colors.grayText,
-        fontWeight: '600',
+        fontSize: 13,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
     resendText: {
-        color: colors.primary,
-        fontWeight: '700',
+        fontSize: 14,
+        fontFamily: 'Poppins-SemiBold',
+        color: '#56A1DF',
     },
     resendTextDisabled: {
         fontSize: 14,
-        color: colors.grayText,
-        fontWeight: '600',
-    },
-    backButton: {
-        paddingVertical: 10,
-    },
-    backText: {
-        fontSize: 14,
-        color: colors.grayText,
-        fontWeight: '600',
+        fontFamily: 'Poppins-SemiBold',
+        color: '#56A1DF',
+        opacity: 0.5,
     },
 });

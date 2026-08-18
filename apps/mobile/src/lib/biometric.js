@@ -108,7 +108,11 @@ async function promptBiometric(reason) {
         cancelLabel: 'Cancelar',
         disableDeviceFallback: false,
     });
-    return result.success;
+    // `error` ya lo devuelve expo-local-authentication (p.ej. 'lockout' cuando
+    // el propio SO bloquea la biometría tras demasiados intentos fallidos) —
+    // antes se descartaba y no había forma de distinguir "no reconocido" de
+    // "cuenta/dispositivo bloqueado".
+    return { success: result.success, reason: result.success ? null : result.error };
 }
 
 // ─── Setup: activar biometría por primera vez ────
@@ -128,8 +132,11 @@ export async function setupBiometric() {
         return { ok: false, error: 'Este dispositivo no tiene biometría disponible.' };
     }
 
-    const authed = await promptBiometric('Confirma para activar el acceso rápido');
-    if (!authed) return { ok: false, error: 'Autenticación cancelada.' };
+    const { success, reason } = await promptBiometric('Confirma para activar el acceso rápido');
+    if (!success) {
+        if (reason === 'lockout') return { ok: false, error: 'lockout' };
+        return { ok: false, error: 'cancelada' };
+    }
 
     // Ed25519 keypair (v2 renombró randomPrivateKey → randomSecretKey)
     const privateKey = ed25519.utils.randomSecretKey();

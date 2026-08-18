@@ -15,6 +15,14 @@ import { authApi } from '../../api';
 import { TERMS_VERSION, PRIVACY_VERSION } from '@opox/constants';
 import { detectBiometricType, isBiometricLinked } from '../../lib/biometric';
 
+// Colores del frame Figma "TERMINOS Y PRIVACIDAD" (2349:491) sin equivalente
+// exacto en theme.js — se dejan literales aquí a propósito (otros agentes
+// tocan theme.js en paralelo para otras pantallas del mismo bloque).
+const FIGMA = {
+    pageBg: '#f4f4f4',
+    linkBlue: '#56a1df',
+};
+
 export default function TerminosScreen({ navigation, route }) {
     const { email } = route.params || { email: 'usuario@ejemplo.com' };
     const [aceptado, setAceptado] = useState(false);
@@ -58,6 +66,7 @@ export default function TerminosScreen({ navigation, route }) {
     };
 
     const canContinue = aceptado && !isLoading;
+    const canGoBack = navigation?.canGoBack?.();
 
     return (
         <SafeAreaView style={s.container}>
@@ -66,44 +75,39 @@ export default function TerminosScreen({ navigation, route }) {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header */}
+                {/* < Volver (2349:635) */}
+                {canGoBack && (
+                    <TouchableOpacity
+                        style={s.backButton}
+                        onPress={() => navigation.goBack()}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={s.backButtonText}>{'< Volver'}</Text>
+                    </TouchableOpacity>
+                )}
+
+                {/* Header (2349:495) */}
                 <View style={s.header}>
                     <Text style={s.title}>Antes de empezar</Text>
                 </View>
 
-                {/* Condiciones de uso */}
-                <View style={s.section}>
-                    <TouchableOpacity
-                        style={s.linkHeader}
-                        onPress={() => abrirEnlace('Condiciones de uso')}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={s.sectionTitle}>Condiciones de uso</Text>
-                        <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                    <Text style={s.sectionText}>
+                {/* Tarjeta blanca (2349:506 "Rectangle 3467704") con el texto legal
+                    real (2349:504) — Condiciones de uso + Protección de datos */}
+                <View style={s.card}>
+                    <Text style={s.cardText}>
+                        <Text style={s.cardHeading}>Condiciones de uso</Text>
+                        {'\n'}
                         Opox es una herramienta de apoyo al estudio. Los contenidos no sustituyen las fuentes oficiales…
-                    </Text>
-                </View>
-
-                {/* Protección de datos */}
-                <View style={s.section}>
-                    <TouchableOpacity
-                        style={s.linkHeader}
-                        onPress={() => abrirEnlace('Protección de datos')}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={s.sectionTitle}>Protección de datos</Text>
-                        <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                    <Text style={s.sectionText}>
+                        {'\n\n'}
+                        <Text style={s.cardHeading}>Protección de datos</Text>
+                        {'\n'}
                         Tratamos tus datos conforme al RGPD y la LOPDGDD. Los datos biométricos y de salud se procesan en tu dispositivo…
+                        {'\n\n'}
+                        Para más detalle consulta la política completa.
                     </Text>
                 </View>
 
-                <Text style={s.extraInfo}>Para más detalle consulta la política completa.</Text>
-
-                {/* Checkbox */}
+                {/* Checkbox + texto de aceptación (2349:512 "recordar mis datos") */}
                 <TouchableOpacity
                     style={s.checkboxContainer}
                     onPress={() => setAceptado(!aceptado)}
@@ -121,13 +125,12 @@ export default function TerminosScreen({ navigation, route }) {
                         <Text style={s.linkText} onPress={() => abrirEnlace('Protección de datos')}>
                             política de privacidad
                         </Text>
-                        .
                     </Text>
                 </TouchableOpacity>
 
                 <View style={s.spacer} />
 
-                {/* CTA anclada al bottom */}
+                {/* BOTON (2349:492/493/494) */}
                 <TouchableOpacity
                     style={[s.primaryButton, !canContinue && s.buttonDisabled]}
                     onPress={handleAceptar}
@@ -151,7 +154,7 @@ export default function TerminosScreen({ navigation, route }) {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: FIGMA.pageBg,
     },
     scrollContent: {
         padding: 24,
@@ -162,46 +165,43 @@ const s = StyleSheet.create({
         flex: 1,
         minHeight: 16,
     },
+    backButton: {
+        alignSelf: 'flex-start',
+        marginBottom: 12,
+        paddingVertical: 4,
+    },
+    backButtonText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 16,
+        color: colors.textDark,
+        opacity: 0.5,
+    },
     header: {
-        marginTop: 8,
-        marginBottom: 24,
+        marginTop: 4,
+        marginBottom: 20,
     },
     title: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 28,
-        fontWeight: '900',
-        color: colors.dark,
-    },
-    section: {
-        marginBottom: 16,
-        backgroundColor: colors.grayLight,
-        padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: colors.grayMid,
-    },
-    linkHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: colors.primary,
-    },
-    sectionText: {
-        fontSize: 14,
-        color: colors.grayText,
-        lineHeight: 20,
-    },
-    extraInfo: {
-        fontSize: 13,
-        color: colors.grayText,
-        fontStyle: 'italic',
-        marginBottom: 24,
-        marginTop: 8,
+        color: colors.textDark,
         textAlign: 'center',
+    },
+    card: {
+        backgroundColor: colors.white,
+        borderRadius: 28,
+        padding: 20,
+        marginBottom: 20,
+    },
+    cardText: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 14,
+        lineHeight: 21,
+        color: colors.textDark,
+    },
+    cardHeading: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 15,
+        color: colors.textDark,
     },
     checkboxContainer: {
         flexDirection: 'row',
@@ -214,7 +214,7 @@ const s = StyleSheet.create({
         height: 24,
         borderRadius: 6,
         borderWidth: 2,
-        borderColor: colors.grayMid,
+        borderColor: colors.gray,
         backgroundColor: colors.white,
         marginRight: 12,
         marginTop: 2,
@@ -222,24 +222,24 @@ const s = StyleSheet.create({
         justifyContent: 'center',
     },
     checkboxChecked: {
-        backgroundColor: colors.primary,
-        borderColor: colors.primary,
+        backgroundColor: colors.purple,
+        borderColor: colors.purple,
     },
     checkboxText: {
         flex: 1,
-        fontSize: 14,
-        color: colors.dark,
-        lineHeight: 20,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: colors.textDark,
+        lineHeight: 21,
     },
     linkText: {
-        color: colors.primary,
-        fontWeight: '700',
-        textDecorationLine: 'underline',
+        fontFamily: 'Poppins-SemiBold',
+        color: FIGMA.linkBlue,
     },
     primaryButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 16,
+        backgroundColor: colors.purple,
+        paddingVertical: 18,
+        borderRadius: 28,
         alignItems: 'center',
     },
     buttonDisabled: {
@@ -251,8 +251,8 @@ const s = StyleSheet.create({
         gap: 10,
     },
     primaryButtonText: {
+        fontFamily: 'Poppins-SemiBold',
         color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 18,
     },
 });

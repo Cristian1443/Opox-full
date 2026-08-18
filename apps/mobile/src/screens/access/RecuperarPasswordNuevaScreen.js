@@ -16,8 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 
-// 4 segmentos: uno por cada criterio cumplido, color según categoría del segmento
-const SEGMENT_COLORS = [colors.green, colors.green, colors.primary, colors.green];
+// 4 segmentos: uno por cada criterio cumplido. Colores por segmento — Figma:
+// verde/verde/rojo/verde (statGreen / statRed), gris cuando no se cumple aún.
+const SEGMENT_COLORS = [colors.statGreen, colors.statGreen, colors.statRed, colors.statGreen];
 
 const evaluarFuerza = (pass) => {
     if (!pass) return { fuerza: '', mensaje: '', segments: [false, false, false, false] };
@@ -31,12 +32,12 @@ const evaluarFuerza = (pass) => {
     const count = segments.filter(Boolean).length;
 
     if (count <= 1) {
-        return { fuerza: 'débil', mensaje: 'Fuerza: débil · usa al menos 8 caracteres.', segments };
+        return { fuerza: 'débil', mensaje: 'Fuerza débil: usa al menos 8 caracteres.', segments };
     }
     if (count <= 3) {
-        return { fuerza: 'media', mensaje: 'Fuerza: media · añade un número o símbolo.', segments };
+        return { fuerza: 'media', mensaje: 'Fuerza media: añade un número o símbolo.', segments };
     }
-    return { fuerza: 'fuerte', mensaje: 'Fuerza: fuerte. ¡Buena elección!', segments };
+    return { fuerza: 'fuerte', mensaje: 'Fuerza fuerte: ¡buena elección!', segments };
 };
 
 export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
@@ -111,6 +112,16 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
+                    {/* Volver — Figma: "‹ Volver" morado #412950 al 50% opacidad */}
+                    <TouchableOpacity
+                        style={s.backButton}
+                        onPress={() => navigation.goBack()}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="chevron-back" size={20} color={colors.textDark} />
+                        <Text style={s.backText}>Volver</Text>
+                    </TouchableOpacity>
+
                     {/* Header */}
                     <View style={s.header}>
                         <Text style={s.title}>Crea tu nueva clave</Text>
@@ -122,7 +133,7 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
                         <TextInput
                             style={s.input}
                             placeholder="Nueva contraseña"
-                            placeholderTextColor={colors.grayText}
+                            placeholderTextColor={colors.textDark}
                             secureTextEntry
                             value={password}
                             onChangeText={handlePasswordChange}
@@ -130,14 +141,14 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
 
                         <TextInput
                             style={s.input}
-                            placeholder="Repite contraseña"
-                            placeholderTextColor={colors.grayText}
+                            placeholder="Repite la contraseña"
+                            placeholderTextColor={colors.textDark}
                             secureTextEntry
                             value={confirmPassword}
                             onChangeText={handleConfirmChange}
                         />
 
-                        {/* Barra de fuerza segmentada (mockup 1.5c) */}
+                        {/* Barra de fuerza segmentada — Figma: 4 tramos verde/verde/rojo/gris */}
                         {password.length > 0 && (
                             <View>
                                 <View style={s.segmentBar}>
@@ -149,7 +160,7 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
                                                 {
                                                     backgroundColor: filled
                                                         ? SEGMENT_COLORS[i]
-                                                        : colors.grayMid,
+                                                        : colors.separator,
                                                 },
                                             ]}
                                         />
@@ -167,7 +178,7 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
                         ) : null}
                     </View>
 
-                    {/* CTA anclada al bottom */}
+                    {/* CTA anclada al bottom — Figma: botón morado #7241B8 "Guardar y entrar" */}
                     <View style={s.spacer} />
                     <TouchableOpacity
                         style={[s.primaryButton, isSaving && s.buttonDisabled]}
@@ -193,7 +204,7 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: '#f4f4f4',
     },
     flex: { flex: 1 },
     scroll: {
@@ -205,31 +216,43 @@ const s = StyleSheet.create({
         flex: 1,
         minHeight: 24,
     },
+    backButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+        opacity: 0.5,
+    },
+    backText: {
+        fontSize: 19,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
+    },
     header: {
         marginTop: 20,
         marginBottom: 32,
     },
     title: {
         fontSize: 28,
-        fontWeight: '900',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
-        color: colors.grayText,
+        fontSize: 14,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
+        opacity: 0.5,
     },
     form: {
         gap: 16,
     },
     input: {
-        backgroundColor: colors.grayLight,
-        borderWidth: 1,
-        borderColor: colors.grayMid,
-        borderRadius: 12,
-        padding: 16,
-        fontSize: 16,
-        color: colors.dark,
+        backgroundColor: colors.white,
+        borderRadius: 20,
+        padding: 20,
+        fontSize: 17,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
     segmentBar: {
         flexDirection: 'row',
@@ -238,14 +261,14 @@ const s = StyleSheet.create({
     },
     segment: {
         flex: 1,
-        height: 5,
-        borderRadius: 3,
+        height: 8,
+        borderRadius: 4,
     },
     feedbackText: {
         fontSize: 13,
         marginTop: 8,
-        color: colors.grayText,
-        fontWeight: '600',
+        color: colors.textDark,
+        fontFamily: 'Poppins-Regular',
     },
     errorContainer: {
         flexDirection: 'row',
@@ -260,12 +283,13 @@ const s = StyleSheet.create({
     errorText: {
         color: '#dc2626',
         fontSize: 14,
+        fontFamily: 'Poppins-Regular',
         flex: 1,
     },
     primaryButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 16,
+        backgroundColor: colors.purple,
+        paddingVertical: 20,
+        borderRadius: 19,
         alignItems: 'center',
     },
     buttonDisabled: {
@@ -278,7 +302,7 @@ const s = StyleSheet.create({
     },
     primaryButtonText: {
         color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 21,
+        fontFamily: 'Poppins-SemiBold',
     },
 });

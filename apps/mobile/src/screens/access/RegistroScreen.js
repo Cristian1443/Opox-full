@@ -10,17 +10,25 @@ import {
     Alert,
     ScrollView,
     ActivityIndicator,
-    Modal,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
+import OpoxWordmark from '../../../assets/opoxLogo';
+import { GoogleLogo, AppleLogo } from '../../components/icons/SocialAuthIcons';
+import EmailAlreadyRegisteredModal from '../../components/EmailAlreadyRegisteredModal';
+
+// Figma: elDJ7bHPEsMt5MMlSJ4BcI — frame "CREAR CUENTA" (node 2349:34).
+// Fondo de la pantalla (#f4f4f4) es literal de Figma: no coincide exactamente
+// con ningún token de theme.js (colors.grayLight = #f4f5f7), así que se deja
+// como hex directo en vez de reusar un token que no es idéntico.
+const SCREEN_BG = '#f4f4f4';
 
 const PASSWORD_COLORS = {
-    fuerte: colors.green,
-    media: colors.primary,
-    débil: '#dc2626',
+    fuerte: colors.statGreen,
+    media: colors.accentOrange,
+    débil: colors.statRed,
 };
 
 const validarPassword = (pass) => {
@@ -95,6 +103,27 @@ export default function RegistroScreen({ navigation }) {
         setTimeout(() => emailInputRef.current?.focus(), 50);
     };
 
+    // TODO(bloque1): cablear authApi.oauthLogin(provider) cuando el SDK nativo
+    // de Google/Meta/Apple esté integrado — de momento los botones sociales
+    // son solo visuales (igual que antes de este cambio, no había onPress).
+    const socialButtons = [
+        { key: 'google', label: 'Continuar con Google', icon: <GoogleLogo size={20} /> },
+        {
+            key: 'meta',
+            label: 'Continuar con Meta',
+            icon: (
+                <View style={s.metaLogoClip}>
+                    <Image
+                        source={require('../../../assets/logo-meta.png')}
+                        style={s.metaLogoImage}
+                        resizeMode="cover"
+                    />
+                </View>
+            ),
+        },
+        { key: 'apple', label: 'Continuar con Apple', icon: <AppleLogo size={19} /> },
+    ];
+
     const isDisabled = !nombre || !email || !password || isLoading;
 
     return (
@@ -111,38 +140,28 @@ export default function RegistroScreen({ navigation }) {
                     {/* Header */}
                     <View style={s.header}>
                         <Text style={s.title}>Crea tu cuenta</Text>
-                        <Text style={s.subtitle}>Tardas menos de un minuto.</Text>
+                        <Text style={s.subtitle}>Tardas menos de un minuto</Text>
                     </View>
 
                     {/* Botones sociales */}
                     <View style={s.socialContainer}>
-                        <TouchableOpacity style={s.socialButton} activeOpacity={0.8}>
-                            <Ionicons name="logo-google" size={20} color={colors.dark} />
-                            <Text style={s.socialText}>Continuar con Google</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={s.socialButton} activeOpacity={0.8}>
-                            <Ionicons name="logo-facebook" size={20} color={colors.dark} />
-                            <Text style={s.socialText}>Continuar con Meta</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={s.socialButton} activeOpacity={0.8}>
-                            <Ionicons name="logo-apple" size={20} color={colors.dark} />
-                            <Text style={s.socialText}>Continuar con Apple</Text>
-                        </TouchableOpacity>
+                        {socialButtons.map((btn) => (
+                            <TouchableOpacity key={btn.key} style={s.socialButton} activeOpacity={0.8}>
+                                {btn.icon}
+                                <Text style={s.socialText}>{btn.label}</Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
 
                     {/* Divisor */}
-                    <View style={s.dividerRow}>
-                        <View style={s.dividerLine} />
-                        <Text style={s.dividerText}>o con tu email</Text>
-                        <View style={s.dividerLine} />
-                    </View>
+                    <Text style={s.dividerText}>– o con tu email –</Text>
 
                     {/* Formulario */}
                     <View style={s.form}>
                         <TextInput
                             style={s.input}
                             placeholder="Nombre"
-                            placeholderTextColor={colors.grayText}
+                            placeholderTextColor={colors.textDark}
                             value={nombre}
                             onChangeText={setNombre}
                         />
@@ -151,7 +170,7 @@ export default function RegistroScreen({ navigation }) {
                             ref={emailInputRef}
                             style={[s.input, emailExistsError && s.inputError]}
                             placeholder="Email"
-                            placeholderTextColor={colors.grayText}
+                            placeholderTextColor={colors.textDark}
                             keyboardType="email-address"
                             autoCapitalize="none"
                             value={email}
@@ -162,7 +181,7 @@ export default function RegistroScreen({ navigation }) {
                             <TextInput
                                 style={s.input}
                                 placeholder="Contraseña"
-                                placeholderTextColor={colors.grayText}
+                                placeholderTextColor={colors.textDark}
                                 secureTextEntry
                                 value={password}
                                 onChangeText={handlePasswordChange}
@@ -181,7 +200,7 @@ export default function RegistroScreen({ navigation }) {
                         <TouchableOpacity
                             style={[s.primaryButton, isDisabled && s.primaryButtonDisabled]}
                             onPress={handleRegistro}
-                            activeOpacity={0.8}
+                            activeOpacity={0.85}
                             disabled={isDisabled}
                         >
                             {isLoading ? (
@@ -194,46 +213,30 @@ export default function RegistroScreen({ navigation }) {
                             )}
                         </TouchableOpacity>
                     </View>
+
+                    {/* Footer: wordmark + Ayuda / Aviso legal */}
+                    <View style={s.footerLogoWrap}>
+                        <OpoxWordmark width={96} />
+                    </View>
+                    <View style={s.footerRow}>
+                        <View style={s.footerLink}>
+                            <View style={s.helpBadge}>
+                                <Text style={s.helpBadgeText}>?</Text>
+                            </View>
+                            <Text style={s.footerLinkText}>Ayuda</Text>
+                        </View>
+                        <Text style={s.footerLinkText}>Aviso legal</Text>
+                    </View>
                 </ScrollView>
             </KeyboardAvoidingView>
 
             {/* 1.2 · err — Email ya registrado (modal) */}
-            <Modal
-                transparent
+            <EmailAlreadyRegisteredModal
                 visible={emailExistsError}
-                animationType="fade"
-                statusBarTranslucent
-                onRequestClose={() => setEmailExistsError(false)}
-            >
-                <View style={s.modalOverlay}>
-                    <View style={s.modalDialog}>
-                        <View style={s.modalIconBox}>
-                            <Ionicons name="mail-outline" size={26} color={colors.grayText} />
-                        </View>
-                        <Text style={s.modalTitle}>Ese email ya tiene cuenta</Text>
-                        <Text style={s.modalBody}>
-                            Parece que ya te registraste con{' '}
-                            <Text style={s.modalEmail}>{email}</Text>. ¿Quieres iniciar sesión?
-                        </Text>
-
-                        <TouchableOpacity
-                            style={s.modalPrimary}
-                            onPress={handleIrALogin}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={s.modalPrimaryText}>Ir a iniciar sesión</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={s.modalSecondary}
-                            onPress={handleUsarOtroEmail}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={s.modalSecondaryText}>Usar otro email</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+                email={email}
+                onGoToLogin={handleIrALogin}
+                onUseAnotherEmail={handleUsarOtroEmail}
+            />
         </SafeAreaView>
     );
 }
@@ -241,89 +244,95 @@ export default function RegistroScreen({ navigation }) {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: SCREEN_BG,
     },
     flex: { flex: 1 },
     scroll: {
         padding: 24,
-        paddingBottom: 40,
+        paddingBottom: 32,
     },
     header: {
-        marginTop: 20,
-        marginBottom: 28,
+        marginTop: 16,
+        marginBottom: 26,
+        alignItems: 'center',
     },
     title: {
-        fontSize: 28,
-        fontWeight: '900',
-        color: colors.dark,
+        fontSize: 26,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
+        textAlign: 'center',
     },
     subtitle: {
-        fontSize: 16,
-        color: colors.grayText,
-        marginTop: 8,
+        fontSize: 14,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
+        opacity: 0.5,
+        marginTop: 6,
+        textAlign: 'center',
     },
     socialContainer: {
         gap: 12,
-        marginBottom: 8,
+        marginBottom: 4,
     },
     socialButton: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 10,
+        gap: 12,
         backgroundColor: colors.white,
-        paddingVertical: 14,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
+        height: 58,
+        borderRadius: 18,
+    },
+    metaLogoClip: {
+        width: 22,
+        height: 15,
+        overflow: 'hidden',
+    },
+    metaLogoImage: {
+        width: 96,
+        height: 19,
     },
     socialText: {
         fontSize: 15,
-        fontWeight: '600',
-        color: colors.dark,
-    },
-    dividerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 20,
-        gap: 12,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: colors.grayMid,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
     },
     dividerText: {
-        color: colors.grayText,
+        color: colors.textDark,
         fontSize: 13,
+        fontFamily: 'Poppins-Light',
+        textAlign: 'center',
+        marginVertical: 18,
     },
     form: {
-        gap: 16,
+        gap: 14,
     },
     input: {
-        backgroundColor: colors.grayLight,
-        borderWidth: 1,
-        borderColor: colors.grayMid,
-        borderRadius: 12,
-        padding: 16,
-        fontSize: 16,
-        color: colors.dark,
+        backgroundColor: colors.white,
+        borderRadius: 16,
+        paddingHorizontal: 18,
+        height: 56,
+        fontSize: 15,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
     passwordFeedback: {
         fontSize: 12,
         marginTop: 6,
         marginLeft: 4,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Medium',
     },
     inputError: {
-        borderColor: '#f59e0b',
+        borderWidth: 1.5,
+        borderColor: colors.statRed,
     },
     primaryButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 16,
+        backgroundColor: colors.purple,
+        height: 60,
+        borderRadius: 20,
         alignItems: 'center',
-        marginTop: 10,
+        justifyContent: 'center',
+        marginTop: 8,
     },
     primaryButtonDisabled: {
         opacity: 0.5,
@@ -335,70 +344,41 @@ const s = StyleSheet.create({
     },
     primaryButtonText: {
         color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 17,
+        fontFamily: 'Poppins-SemiBold',
     },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    footerLogoWrap: {
+        alignItems: 'center',
+        marginTop: 40,
+        marginBottom: 14,
+    },
+    footerRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 22,
+    },
+    footerLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    helpBadge: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: colors.purple,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 32,
     },
-    modalDialog: {
-        width: '100%',
-        backgroundColor: colors.white,
-        borderRadius: 20,
-        padding: 24,
-        alignItems: 'center',
-    },
-    modalIconBox: {
-        width: 56,
-        height: 56,
-        borderRadius: 14,
-        backgroundColor: colors.grayLight,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: colors.dark,
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    modalBody: {
-        fontSize: 14,
-        color: colors.grayText,
-        textAlign: 'center',
-        lineHeight: 20,
-        marginBottom: 20,
-    },
-    modalEmail: {
-        fontWeight: '700',
-        color: colors.dark,
-    },
-    modalPrimary: {
-        width: '100%',
-        backgroundColor: colors.primary,
-        paddingVertical: 14,
-        borderRadius: 14,
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    modalPrimaryText: {
+    helpBadgeText: {
         color: colors.white,
-        fontWeight: '700',
-        fontSize: 15,
+        fontSize: 10,
+        fontFamily: 'Poppins-SemiBold',
     },
-    modalSecondary: {
-        paddingVertical: 12,
-        alignItems: 'center',
-    },
-    modalSecondaryText: {
-        color: colors.dark,
-        fontSize: 14,
-        fontWeight: '600',
+    footerLinkText: {
+        color: colors.textDark,
+        fontSize: 12,
+        fontFamily: 'Poppins-Medium',
     },
 });

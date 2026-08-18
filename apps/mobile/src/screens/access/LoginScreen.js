@@ -7,9 +7,9 @@ import {
     TouchableOpacity,
     KeyboardAvoidingView,
     Platform,
-    Alert,
     ScrollView,
     Modal,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,17 @@ import {
     isBiometricLinked,
     loginWithBiometric,
 } from '../../lib/biometric';
+import OpoxLogo from '../../../assets/opoxLogo';
+import { UserIcon, LockIcon, EyeOffIcon, FaceIdIcon, RememberToggleIcon } from '../../components/icons/LoginIcons';
+
+const HERO_BG = require('../../../assets/login/hero_bg.jpg');
+
+// Colores de marca puntuales de "LOGIN" / "ERROR CONTRASEÑA" (Figma
+// elDJ7bHPEsMt5MMlSJ4BcI, nodes 2293:572 y 2349:733) que no tienen token
+// exacto en theme.js (ver nota en la tarea: no se edita theme.js aquí).
+const LINK_BLUE = '#56A1DF';
+const PAGE_BG = '#F4F4F4';
+const ICON_GRAY = '#BDB6BF';
 
 const BLOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
@@ -29,6 +40,8 @@ export default function LoginScreen({ navigation, route }) {
     const prefillEmail = route?.params?.prefillEmail || '';
     const [email, setEmail] = useState(prefillEmail);
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(true);
     // error: null | { type: 'auth' | 'offline', message: string }
     const [error, setError] = useState(null);
     const [failedAttempts, setFailedAttempts] = useState(0);
@@ -99,6 +112,7 @@ export default function LoginScreen({ navigation, route }) {
         } else {
             setError({
                 type: 'auth',
+                // 1.3 · err "ERROR CONTRASEÑA" (Figma node 2349:733): copy exacta.
                 message: apiError?.message || 'Email o contraseña incorrectos.',
             });
         }
@@ -137,6 +151,11 @@ export default function LoginScreen({ navigation, route }) {
     };
 
     const isDisabled = !email || !password || isBlocked;
+    // 1.3 · err: cuando hay error de login, el formulario colapsa a la variante
+    // "ERROR CONTRASEÑA" (Figma node 2349:733) — desaparecen "recordar mis
+    // datos" / "olvidé contraseña" / FaceID y el botón sube justo debajo del
+    // mensaje de error.
+    const showAuthError = Boolean(authError);
 
     return (
         <SafeAreaView style={s.container}>
@@ -149,33 +168,45 @@ export default function LoginScreen({ navigation, route }) {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Header */}
+                    {/* Header / LOGO (Figma node 2293:573) */}
+                    <View style={s.hero}>
+                        <Image source={HERO_BG} style={s.heroBg} resizeMode="cover" />
+                        <View style={s.logoBlock}>
+                            <OpoxLogo width={196} />
+                            <Text style={s.tagline}>Tu APP de Oposiciones Inteligente</Text>
+                        </View>
+                    </View>
+
                     <View style={s.header}>
-                        <Text style={s.title}>Bienvenido de nuevo</Text>
-                        <Text style={s.subtitle}>Accede a tu preparación.</Text>
+                        <Text style={s.title}>Bienvenido/a de nuevo</Text>
+                        <Text style={s.subtitle}>Accede a tu preparación</Text>
                     </View>
 
                     {/* Formulario */}
                     <View style={s.form}>
-                        <TextInput
-                            style={[s.input, authError && s.inputError]}
-                            placeholder="juan@email.com"
-                            placeholderTextColor={colors.grayText}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            value={email}
-                            onChangeText={(text) => {
-                                setEmail(text);
-                                if (error) setError(null);
-                            }}
-                        />
-
-                        <View>
+                        <View style={[s.inputWrap, showAuthError && s.inputWrapError]}>
+                            <UserIcon size={22} color={showAuthError ? colors.statRed : ICON_GRAY} />
                             <TextInput
-                                style={[s.input, authError && s.inputError]}
+                                style={s.input}
+                                placeholder="Correo o usuario"
+                                placeholderTextColor={colors.textDark}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                value={email}
+                                onChangeText={(text) => {
+                                    setEmail(text);
+                                    if (error) setError(null);
+                                }}
+                            />
+                        </View>
+
+                        <View style={[s.inputWrap, showAuthError && s.inputWrapError]}>
+                            <LockIcon size={20} color={showAuthError ? colors.statRed : ICON_GRAY} />
+                            <TextInput
+                                style={s.input}
                                 placeholder="Contraseña"
-                                placeholderTextColor={colors.grayText}
-                                secureTextEntry
+                                placeholderTextColor={colors.textDark}
+                                secureTextEntry={!showPassword}
                                 value={password}
                                 onChangeText={(text) => {
                                     setPassword(text);
@@ -183,18 +214,36 @@ export default function LoginScreen({ navigation, route }) {
                                 }}
                             />
                             <TouchableOpacity
-                                style={s.forgotPassword}
-                                onPress={() => navigation.navigate('RecuperarPassword')}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                onPress={() => setShowPassword((v) => !v)}
                             >
-                                <Text style={s.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                                {showPassword ? (
+                                    <Ionicons name="eye-outline" size={22} color={ICON_GRAY} />
+                                ) : (
+                                    <EyeOffIcon size={22} color={ICON_GRAY} />
+                                )}
                             </TouchableOpacity>
                         </View>
 
-                        {/* 1.3 · err — inline, alineado izquierda con icono */}
-                        {authError && (
-                            <View style={s.errorRow}>
-                                <Ionicons name="alert-circle" size={16} color="#dc2626" />
-                                <Text style={s.errorRowText}>{authError}</Text>
+                        {showAuthError ? (
+                            // 1.3 · err — texto plano en rojo, sin icono (pixel-match Figma)
+                            <Text style={s.errorText}>{authError}</Text>
+                        ) : (
+                            <View style={s.optionsRow}>
+                                <TouchableOpacity
+                                    style={s.rememberRow}
+                                    onPress={() => setRememberMe((v) => !v)}
+                                    activeOpacity={0.7}
+                                >
+                                    <RememberToggleIcon size={22} checked={rememberMe} />
+                                    <Text style={s.rememberText}>Recordar mis datos</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity onPress={handleResetPassword}>
+                                    <Text style={s.forgotPasswordText}>
+                                        Olvidé mi <Text style={s.link}>contraseña</Text>
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
                         )}
 
@@ -205,42 +254,41 @@ export default function LoginScreen({ navigation, route }) {
                             disabled={isDisabled}
                         >
                             <Text style={s.primaryButtonText}>
-                                {isBlocked ? 'Cuenta bloqueada' : 'Entrar'}
+                                {isBlocked ? 'Cuenta bloqueada' : 'Acceder'}
                             </Text>
                         </TouchableOpacity>
                     </View>
 
-                    {!isBlocked && biometricAvailable && (
-                        <>
-                            {/* Divisor */}
-                            <View style={s.dividerRow}>
-                                <View style={s.dividerLine} />
-                                <Text style={s.dividerText}>o</Text>
-                                <View style={s.dividerLine} />
-                            </View>
-
-                            {/* Biometría (1.4 / atajo) — botón outline con borde dark */}
-                            <TouchableOpacity
-                                style={s.biometricButton}
-                                onPress={handleBiometricLogin}
-                                activeOpacity={0.85}
-                            >
-                                <Ionicons
-                                    name={biometricType === 'finger' ? 'finger-print' : 'scan-outline'}
-                                    size={20}
-                                    color={colors.primary}
-                                />
-                                <Text style={s.biometricText}>Entrar con {biometricLabelText}</Text>
-                            </TouchableOpacity>
-                        </>
+                    {!isBlocked && !showAuthError && biometricAvailable && (
+                        <TouchableOpacity
+                            style={s.biometricBlock}
+                            onPress={handleBiometricLogin}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={s.biometricLabel}>Accede con {biometricLabelText}</Text>
+                            {biometricType === 'finger' ? (
+                                <Ionicons name="finger-print" size={96} color={colors.textDark} />
+                            ) : (
+                                <FaceIdIcon size={96} />
+                            )}
+                        </TouchableOpacity>
                     )}
 
                     {/* Ir a Registro */}
                     <View style={s.bottomTextContainer}>
                         <Text style={s.bottomText}>¿No tienes cuenta? </Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Registro')}>
-                            <Text style={s.bottomLink}>Crear cuenta</Text>
+                            <Text style={s.bottomLink}>Regístrate.</Text>
                         </TouchableOpacity>
+                    </View>
+
+                    {/* Footer — ayuda + aviso legal (Figma node 2293:672) */}
+                    <View style={s.footerRow}>
+                        <View style={s.footerDot}>
+                            <Text style={s.footerDotText}>?</Text>
+                        </View>
+                        <Text style={s.footerText}>Ayuda</Text>
+                        <Text style={s.footerText}>Aviso legal</Text>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -266,7 +314,7 @@ export default function LoginScreen({ navigation, route }) {
                 <View style={s.modalOverlay}>
                     <View style={s.modalDialog}>
                         <View style={s.modalIconBox}>
-                            <Ionicons name="lock-closed" size={26} color="#dc2626" />
+                            <Ionicons name="lock-closed" size={26} color={colors.statRed} />
                         </View>
                         <Text style={s.modalTitle}>Cuenta bloqueada temporalmente</Text>
                         <Text style={s.modalBody}>
@@ -300,109 +348,142 @@ export default function LoginScreen({ navigation, route }) {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: PAGE_BG,
     },
     flex: { flex: 1 },
     scroll: {
-        padding: 24,
         paddingBottom: 40,
     },
+    hero: {
+        height: 210,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heroBg: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100%',
+        opacity: 0.8,
+    },
+    logoBlock: {
+        alignItems: 'center',
+        gap: 10,
+    },
+    tagline: {
+        fontFamily: 'Poppins-Bold',
+        fontSize: 12,
+        color: colors.textDark,
+        textAlign: 'center',
+        letterSpacing: 0.2,
+    },
     header: {
+        paddingHorizontal: 24,
         marginTop: 20,
-        marginBottom: 28,
+        marginBottom: 24,
     },
     title: {
-        fontSize: 28,
-        fontWeight: '900',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 26,
+        color: colors.textDark,
+        textAlign: 'center',
     },
     subtitle: {
-        fontSize: 16,
-        color: colors.grayText,
-        marginTop: 8,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: colors.textDark,
+        opacity: 0.5,
+        textAlign: 'center',
+        marginTop: 6,
     },
     form: {
-        gap: 16,
+        paddingHorizontal: 24,
+        gap: 14,
     },
-    input: {
-        backgroundColor: colors.grayLight,
-        borderWidth: 1,
-        borderColor: colors.grayMid,
-        borderRadius: 12,
-        padding: 16,
-        fontSize: 16,
-        color: colors.dark,
-    },
-    inputError: {
-        borderColor: '#fca5a5',
-        backgroundColor: '#fef2f2',
-    },
-    forgotPassword: {
-        alignSelf: 'flex-end',
-        marginTop: 8,
-    },
-    forgotPasswordText: {
-        color: colors.primary,
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    errorRow: {
+    inputWrap: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        marginTop: -6,
+        gap: 12,
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: 'transparent',
+        borderRadius: 18,
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
     },
-    errorRowText: {
-        color: '#dc2626',
+    inputWrapError: {
+        borderColor: colors.statRed,
+    },
+    input: {
+        flex: 1,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: colors.textDark,
+        padding: 0,
+    },
+    errorText: {
+        fontFamily: 'Poppins-Medium',
         fontSize: 14,
-        fontWeight: '600',
+        color: colors.statRed,
+        marginTop: -2,
+    },
+    optionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: -2,
+    },
+    rememberRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    rememberText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: colors.textDark,
+    },
+    forgotPasswordText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: colors.textDark,
+    },
+    link: {
+        color: LINK_BLUE,
     },
     primaryButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 16,
+        backgroundColor: colors.purple,
+        paddingVertical: 18,
+        borderRadius: 20,
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 8,
     },
     primaryButtonDisabled: {
         opacity: 0.5,
     },
     primaryButtonText: {
         color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 17,
     },
-    dividerRow: {
-        flexDirection: 'row',
+    biometricBlock: {
         alignItems: 'center',
-        marginVertical: 24,
-        gap: 12,
+        marginTop: 28,
+        gap: 14,
     },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: colors.grayMid,
-    },
-    dividerText: {
-        color: colors.grayText,
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    biometricButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        paddingVertical: 14,
-        backgroundColor: colors.white,
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: colors.dark,
-    },
-    biometricText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: colors.dark,
+    biometricLabel: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: colors.textDark,
     },
     bottomTextContainer: {
         flexDirection: 'row',
@@ -410,13 +491,41 @@ const s = StyleSheet.create({
         marginTop: 30,
     },
     bottomText: {
-        fontSize: 14,
-        color: colors.grayText,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: colors.textDark,
     },
     bottomLink: {
-        fontSize: 14,
-        color: colors.primary,
-        fontWeight: '700',
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: LINK_BLUE,
+    },
+    footerRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 24,
+    },
+    footerDot: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: colors.textDark,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    footerDotText: {
+        color: colors.white,
+        fontSize: 10,
+        fontFamily: 'Poppins-Medium',
+        lineHeight: 12,
+    },
+    footerText: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: 13,
+        color: colors.textDark,
+        marginLeft: 8,
     },
     // 1.x · err — toast offline
     toastWrapper: {
@@ -429,7 +538,7 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        backgroundColor: '#ef4444',
+        backgroundColor: colors.statRed,
         borderRadius: 14,
         paddingVertical: 14,
         paddingHorizontal: 16,
@@ -442,8 +551,8 @@ const s = StyleSheet.create({
     toastText: {
         flex: 1,
         color: colors.white,
+        fontFamily: 'Poppins-Medium',
         fontSize: 14,
-        fontWeight: '600',
         lineHeight: 20,
     },
     // 1.3 · err — modal bloqueo
@@ -471,26 +580,29 @@ const s = StyleSheet.create({
         marginBottom: 16,
     },
     modalTitle: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 18,
-        fontWeight: '900',
-        color: colors.dark,
+        color: colors.textDark,
         marginBottom: 8,
         textAlign: 'center',
     },
     modalBody: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 14,
-        color: colors.grayText,
+        color: colors.textDark,
+        opacity: 0.7,
         textAlign: 'center',
         lineHeight: 20,
         marginBottom: 20,
     },
     modalTimer: {
-        fontWeight: '800',
-        color: '#dc2626',
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.statRed,
+        opacity: 1,
     },
     modalPrimary: {
         width: '100%',
-        backgroundColor: colors.primary,
+        backgroundColor: colors.purple,
         paddingVertical: 14,
         borderRadius: 14,
         alignItems: 'center',
@@ -498,7 +610,7 @@ const s = StyleSheet.create({
     },
     modalPrimaryText: {
         color: colors.white,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 15,
     },
     modalSecondary: {
@@ -506,8 +618,9 @@ const s = StyleSheet.create({
         alignItems: 'center',
     },
     modalSecondaryText: {
-        color: colors.grayText,
+        fontFamily: 'Poppins-Medium',
         fontSize: 14,
-        fontWeight: '600',
+        color: colors.textDark,
+        opacity: 0.6,
     },
 });

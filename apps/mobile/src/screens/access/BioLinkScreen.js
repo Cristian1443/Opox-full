@@ -8,21 +8,21 @@ import {
     StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { detectBiometricType, biometricLabel, setupBiometric } from '../../lib/biometric';
+import { FaceScanIcon, LockIcon } from '../../components/icons/AccessIcons';
+import AlertCardModal from '../../components/AlertCardModal';
 
-const ICON_BY_TYPE = {
-    face: 'scan-outline',
-    finger: 'finger-print',
-    both: 'scan-outline',
-    none: 'scan-outline',
-};
+// Fondo confirmado contra Figma (frame FACE ID) — sin token exacto en theme.js.
+const FIGMA_BG = '#F4F4F4';
 
 export default function BioLinkScreen({ navigation, route }) {
     const [isProcessing, setIsProcessing] = useState(false);
-    // route.params.forceError lo usa el Dev Menu para saltar directo al estado 1.4 · err
-    const [showError, setShowError] = useState(!!route?.params?.forceError);
+    // route.params.forceError lo usa el Dev Menu para saltar directo al estado de error.
+    // null | 'not-recognized' | 'locked'
+    const [errorState, setErrorState] = useState(
+        route?.params?.forceError ? 'not-recognized' : null
+    );
     const [biometricType, setBiometricType] = useState(null);
 
     useEffect(() => {
@@ -37,99 +37,116 @@ export default function BioLinkScreen({ navigation, route }) {
     }, [navigation, route?.params?.forceError]);
 
     const BIOMETRIC_TYPE = biometricLabel(biometricType) || 'biometría';
-    const BIOMETRIC_ICON = ICON_BY_TYPE[biometricType] || 'scan-outline';
 
     const handleActivateBiometrics = async () => {
         setIsProcessing(true);
-        setShowError(false);
+        setErrorState(null);
 
         const { ok, error } = await setupBiometric();
         setIsProcessing(false);
 
         if (ok) {
             navigation.replace('SesionIniciada');
-        } else if (error && !error.includes('cancelada')) {
-            setShowError(true);
+        } else if (error === 'lockout') {
+            setErrorState('locked');
+        } else if (error && error !== 'cancelada') {
+            setErrorState('not-recognized');
         }
     };
 
     const handleSkip = () => navigation.replace('SesionIniciada');
 
     const handleRetry = () => {
-        setShowError(false);
+        setErrorState(null);
         handleActivateBiometrics();
+    };
+
+    const handleUsePassword = () => {
+        setErrorState(null);
+        navigation.navigate('Login');
+    };
+
+    const handleResetPassword = () => {
+        setErrorState(null);
+        navigation.navigate('RecuperarPassword');
     };
 
     return (
         <SafeAreaView style={s.container}>
-            <StatusBar barStyle="light-content" backgroundColor={colors.dark} />
+            <StatusBar barStyle="dark-content" backgroundColor={FIGMA_BG} />
+
+            <TouchableOpacity
+                style={s.backButton}
+                onPress={() => navigation.goBack()}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+                <Text style={s.backButtonText}>‹ Volver</Text>
+            </TouchableOpacity>
 
             <View style={s.content}>
-                <View style={[s.iconFrame, showError && s.iconFrameError]}>
-                    <Ionicons
-                        name={BIOMETRIC_ICON}
-                        size={72}
-                        color={showError ? '#f87171' : colors.primary}
-                    />
-                </View>
+                <FaceScanIcon size={100} color={colors.textDark} />
 
-                <Text style={s.title}>
-                    {showError ? 'No te hemos reconocido' : 'Activa el acceso rápido'}
-                </Text>
+                <Text style={s.title}>Activa el acceso rápido</Text>
                 <Text style={s.subtitle}>
-                    {showError
-                        ? 'Inténtalo otra vez o entra con tu contraseña.'
-                        : `Usa ${BIOMETRIC_TYPE} para entrar sin escribir la contraseña cada vez.`}
+                    Usa {BIOMETRIC_TYPE} para entrar sin escribir la contraseña cada vez.
                 </Text>
 
                 <View style={s.actions}>
-                    {showError ? (
-                        <>
-                            <TouchableOpacity
-                                style={s.primaryButton}
-                                onPress={handleRetry}
-                                activeOpacity={0.85}
-                            >
-                                <Text style={s.primaryButtonText}>Reintentar {BIOMETRIC_TYPE}</Text>
-                            </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[s.primaryButton, isProcessing && s.buttonDisabled]}
+                        onPress={handleActivateBiometrics}
+                        disabled={isProcessing}
+                        activeOpacity={0.85}
+                    >
+                        {isProcessing ? (
+                            <View style={s.processingRow}>
+                                <ActivityIndicator size="small" color={colors.white} />
+                                <Text style={s.primaryButtonText}>Verificando...</Text>
+                            </View>
+                        ) : (
+                            <Text style={s.primaryButtonText}>Activar {BIOMETRIC_TYPE}</Text>
+                        )}
+                    </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={s.darkButton}
-                                onPress={() => navigation.navigate('Login')}
-                                activeOpacity={0.85}
-                            >
-                                <Text style={s.darkButtonText}>Usar contraseña</Text>
-                            </TouchableOpacity>
-                        </>
-                    ) : (
-                        <>
-                            <TouchableOpacity
-                                style={[s.primaryButton, isProcessing && s.buttonDisabled]}
-                                onPress={handleActivateBiometrics}
-                                disabled={isProcessing}
-                                activeOpacity={0.85}
-                            >
-                                {isProcessing ? (
-                                    <View style={s.processingRow}>
-                                        <ActivityIndicator size="small" color={colors.white} />
-                                        <Text style={s.primaryButtonText}>Verificando...</Text>
-                                    </View>
-                                ) : (
-                                    <Text style={s.primaryButtonText}>Activar {BIOMETRIC_TYPE}</Text>
-                                )}
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={s.skipButton}
-                                onPress={handleSkip}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={s.skipText}>Ahora no</Text>
-                            </TouchableOpacity>
-                        </>
-                    )}
+                    <TouchableOpacity
+                        style={s.skipButton}
+                        onPress={handleSkip}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={s.skipText}>Ahora no</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
+
+            {/* Frame Figma "ERROR FACE ID" #1 (2349:851) — no reconocido */}
+            <AlertCardModal
+                visible={errorState === 'not-recognized'}
+                iconBg="transparent"
+                iconSize={70}
+                icon={<FaceScanIcon size={70} color={colors.statRed} />}
+                title="No te hemos reconocido"
+                description="Inténtalo otra vez o entra con tu contraseña."
+                primaryLabel={`Reintentar ${BIOMETRIC_TYPE}`}
+                primaryColor={colors.purple}
+                onPrimaryPress={handleRetry}
+                secondaryLabel="Usar contraseña"
+                onSecondaryPress={handleUsePassword}
+            />
+
+            {/* Frame Figma "ERROR FACE ID" #2 (2349:872) — cuenta bloqueada */}
+            <AlertCardModal
+                visible={errorState === 'locked'}
+                iconBg="transparent"
+                iconSize={70}
+                icon={<LockIcon size={70} color={colors.textDark} />}
+                title="Cuenta bloqueada temporalmente"
+                description="Demasiados intentos fallidos. Vuelve a probar en 15 minutos o restablece tu contraseña."
+                primaryLabel="Restablecer contraseña"
+                primaryColor={colors.purple}
+                onPrimaryPress={handleResetPassword}
+                secondaryLabel="Entendido"
+                onSecondaryPress={() => setErrorState(null)}
+            />
         </SafeAreaView>
     );
 }
@@ -137,50 +154,51 @@ export default function BioLinkScreen({ navigation, route }) {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.dark,
+        backgroundColor: FIGMA_BG,
+        paddingHorizontal: 24,
+    },
+    backButton: {
+        marginTop: 12,
+        alignSelf: 'flex-start',
+        paddingVertical: 8,
+    },
+    backButtonText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 14,
+        color: colors.textDark,
+        opacity: 0.5,
     },
     content: {
         flex: 1,
-        padding: 24,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    iconFrame: {
-        width: 140,
-        height: 140,
-        borderRadius: 28,
-        borderWidth: 2,
-        borderColor: 'rgba(242, 101, 53, 0.4)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 32,
-    },
-    iconFrameError: {
-        borderColor: 'rgba(248, 113, 113, 0.5)',
     },
     title: {
-        fontSize: 26,
-        fontWeight: '900',
-        color: colors.white,
+        marginTop: 32,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 22,
+        color: colors.textDark,
         textAlign: 'center',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     subtitle: {
-        fontSize: 15,
-        color: colors.grayText,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        lineHeight: 20,
+        color: colors.textDark,
+        opacity: 0.5,
         textAlign: 'center',
-        lineHeight: 22,
         maxWidth: 300,
-        marginBottom: 48,
+        marginBottom: 40,
     },
     actions: {
         width: '100%',
         gap: 12,
     },
     primaryButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 16,
+        backgroundColor: colors.purple,
+        paddingVertical: 18,
+        borderRadius: 24,
         alignItems: 'center',
     },
     buttonDisabled: {
@@ -194,26 +212,16 @@ const s = StyleSheet.create({
     primaryButtonText: {
         color: colors.white,
         fontSize: 16,
-        fontWeight: '700',
-    },
-    darkButton: {
-        backgroundColor: '#1a2a3f',
-        paddingVertical: 16,
-        borderRadius: 16,
-        alignItems: 'center',
-    },
-    darkButtonText: {
-        color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
     },
     skipButton: {
-        paddingVertical: 12,
+        marginTop: 12,
+        paddingVertical: 8,
         alignItems: 'center',
     },
     skipText: {
-        fontSize: 15,
-        color: colors.grayText,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Regular',
+        fontSize: 16,
+        color: colors.purple,
     },
 });
