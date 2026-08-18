@@ -19,6 +19,7 @@ import { navigationRef } from './src/navigation/navigationRef';
 import useNetworkWatcher from './src/hooks/useNetworkWatcher';
 import { pushApi } from './src/api';
 import InAppNotificationBanner from './src/components/InAppNotificationBanner';
+import { supabase } from './src/lib/supabase';
 
 // Tipografía de marca OPOX
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -103,6 +104,26 @@ function PushNotificationHandler({ onForegroundNotification }) {
   return null;
 }
 
+/**
+ * Escucha la tabla boe_changes en Realtime y muestra un banner in-app cuando
+ * el backend inserta un nuevo cambio BOE mientras la app está abierta.
+ * No-op si supabase no está configurado (EXPO_PUBLIC_SUPABASE_URL ausente).
+ */
+function BoeRealtimeWatcher({ onNewChange }) {
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel('boe-realtime-alerts')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'boe_changes' }, (payload) => {
+        const title = payload.new?.article_title ?? 'Cambio legislativo detectado';
+        onNewChange({ title, body: 'Hay una actualización en tu temario. Toca para verla.', type: 'boe_alert', data: { screen: 'BoeHome' } });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+  return null;
+}
+
 // Deep link de recuperación de contraseña: opox://reset-password?token_hash=...&type=recovery
 const linking = {
   prefixes: [Linking.createURL('/'), 'opox://'],
@@ -135,6 +156,7 @@ export default function App() {
       <NavigationContainer ref={navigationRef} linking={linking}>
         <NetworkWatcher />
         <PushNotificationHandler onForegroundNotification={setBanner} />
+        <BoeRealtimeWatcher onNewChange={setBanner} />
         <OnboardingNavigator />
       </NavigationContainer>
       <InAppNotificationBanner
