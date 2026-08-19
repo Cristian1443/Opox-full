@@ -86,7 +86,7 @@ const DIFF_FROM_MOTOR: Record<string, 'easy' | 'medium' | 'hard'> = {
 /**
  * Cliente HTTP para el Motor de IA del cliente (RAG + generación con
  * evidencia verbatim del temario oficial). URL de producción:
- * https://ingesta-demo-1097036487734.us-east1.run.app
+ * https://ingesta-demo.onrender.com
  *
  * Cubre generateQuestions y generateSurgicalTest vía los endpoints
  * /v1/tests/generate + /v1/jobs/{job_id}. Los métodos analyzePhoto,

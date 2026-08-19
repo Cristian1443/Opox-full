@@ -118,6 +118,12 @@ import {
     GetProStatsUseCase,
     ExportProStatsUseCase,
     SubmitFeedbackUseCase,
+    // Bloque 13 · Notificaciones
+    RegisterPushTokenUseCase,
+    SendBoeAlertUseCase,
+    SendNoteReadyUseCase,
+    SendStreakWarningUseCase,
+    SendDailyGoalCompletedUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -132,6 +138,8 @@ import {
     SupabaseBoeRepository,
     SupabaseStoreRepository,
     SupabaseConfigRepository,
+    SupabasePushRepository,
+    ExpoPushService,
     ClientApiClient,
     AiApiClient,
     AiApiClientStub,
@@ -150,9 +158,10 @@ import {
     BoeController,
     StoreController,
     ConfigController,
+    PushTokenController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository, IConfigRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository, IConfigRepository, IPushRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -203,6 +212,10 @@ export function buildContainer() {
     const configRepo: IConfigRepository = isSupabaseConfigured
         ? new SupabaseConfigRepository(getSupabaseAdmin())
         : createStubConfigRepository();
+
+    const pushRepo: IPushRepository = isSupabaseConfigured
+        ? new SupabasePushRepository(getSupabaseAdmin())
+        : createStubPushRepository();
 
     if (!isSupabaseConfigured) {
         logger.warn(
@@ -260,6 +273,15 @@ export function buildContainer() {
         );
     }
 
+    // ─── Expo Push Service + use cases de notificaciones ─────────────────────
+    // Se construyen antes del objeto useCases para evitar referencias circulares.
+    const pushService = new ExpoPushService(env.EXPO_ACCESS_TOKEN);
+    const registerPushToken        = new RegisterPushTokenUseCase(pushRepo);
+    const sendBoeAlert             = new SendBoeAlertUseCase(pushRepo, pushService);
+    const sendNoteReady            = new SendNoteReadyUseCase(pushRepo, pushService);
+    const sendStreakWarning        = new SendStreakWarningUseCase(pushRepo, pushService);
+    const sendDailyGoalCompleted   = new SendDailyGoalCompletedUseCase(pushRepo, pushService);
+
     const motorBoe = env.MOTOR_BOE_BASE_URL
         ? new MotorBoeClient({
             baseUrl: env.MOTOR_BOE_BASE_URL,
@@ -313,7 +335,11 @@ export function buildContainer() {
         updatePlan: new UpdatePlanUseCase(planningRepo),
         listTasks: new ListTasksUseCase(planningRepo),
         createTask: new CreateTaskUseCase(planningRepo),
-        toggleTask: new ToggleTaskUseCase(planningRepo, dashboardRepo),
+        toggleTask: new ToggleTaskUseCase(
+            planningRepo,
+            dashboardRepo,
+            (userId) => sendDailyGoalCompleted.execute(userId),
+        ),
         getWeek,
         getMacro,
         listAgenda: new ListAgendaUseCase(planningRepo),
@@ -375,7 +401,11 @@ export function buildContainer() {
         // Bloque 9 · Factoría de Apuntes
         listNotes: new ListNotesUseCase(notesRepo),
         getNote: new GetNoteUseCase(notesRepo),
-        uploadNote: new UploadNoteUseCase(notesRepo, aiApi),
+        uploadNote: new UploadNoteUseCase(
+            notesRepo,
+            aiApi,
+            (userId, noteId, count, title) => sendNoteReady.execute(userId, noteId, count, title),
+        ),
         getNoteStatus: new GetNoteStatusUseCase(notesRepo),
         updateNoteTags: new UpdateNoteTagsUseCase(notesRepo),
         deleteNote: new DeleteNoteUseCase(notesRepo),
@@ -390,7 +420,13 @@ export function buildContainer() {
         toggleBoeBookmark: new ToggleBoeBookmarkUseCase(boeRepo),
         completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo),
         listTopics: new ListTopicsUseCase(boeRepo),
-        syncBoeChanges: motorBoe ? new SyncBoeChangesUseCase(boeRepo, motorBoe) : undefined,
+        syncBoeChanges: motorBoe
+            ? new SyncBoeChangesUseCase(
+                boeRepo,
+                motorBoe,
+                (synced) => sendBoeAlert.execute(synced),
+              )
+            : undefined,
 
         // Bloque 11 · Tienda
         getStoreBalance: new GetStoreBalanceUseCase(storeRepo),
@@ -411,6 +447,13 @@ export function buildContainer() {
         getProStats:       new GetProStatsUseCase(configRepo),
         exportProStats:    new ExportProStatsUseCase(configRepo),
         submitFeedback:    new SubmitFeedbackUseCase(configRepo),
+
+        // Bloque 13 · Notificaciones
+        registerPushToken,
+        sendBoeAlert,
+        sendNoteReady,
+        sendStreakWarning,
+        sendDailyGoalCompleted,
     };
 
     // ─── Controllers (presentation) ───────────────
@@ -508,6 +551,10 @@ export function buildContainer() {
         getSummary: useCases.getSummary,
     });
 
+    const pushTokenController = new PushTokenController({
+        registerToken: useCases.registerPushToken,
+    });
+
     const configController = new ConfigController({
         getPreferences:    useCases.getPreferences,
         updatePreferences: useCases.updatePreferences,
@@ -544,6 +591,8 @@ export function buildContainer() {
         aiApi,
         motorBoe,
         useCases,
+        pushRepo,
+        pushService,
         controllers: {
             auth: authController,
             dashboard: dashboardController,
@@ -555,6 +604,7 @@ export function buildContainer() {
             boe: boeController,
             store: storeController,
             config: configController,
+            push: pushTokenController,
         },
         middleware: {
             auth: authMiddleware,
@@ -634,4 +684,11 @@ function createStubConfigRepository(): IConfigRepository {
         throw new Error('[config] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as IConfigRepository, { get: () => notConfigured });
+}
+
+function createStubPushRepository(): IPushRepository {
+    const notConfigured = (): never => {
+        throw new Error('[push] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IPushRepository, { get: () => notConfigured });
 }

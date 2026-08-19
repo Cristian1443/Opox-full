@@ -147,7 +147,7 @@ en `AiApiClientStub` hasta que el equipo IA entregue el prompt del
 etc.) distinto del `id` UUID. El mobile y el backend de generación de preguntas
 SIEMPRE usan `topicId`, nunca el UUID, para las llamadas a la IA.
 
-**Motor BOE externo** (`https://ingesta-demo-uadftnwmda-ue.a.run.app`): servicio
+**Motor BOE externo** (`https://ingesta-demo.onrender.com`): servicio
 desplegado para detectar cambios en el BOE oficial. Integrado en:
 - `infrastructure/boe/MotorBoeClient.ts` — cliente HTTP con auth `X-API-Key` +
   `X-OpenAI-Key`. Implementa `MotorBoeContract` (definido en `@opox/types`).
@@ -227,13 +227,51 @@ Mensaje: 1–500 caracteres (validado con Zod y con CHECK en BD).
 **Nota sobre naming**: el cliente mobile se llama `settingsApi` (en `settings.js`)
 porque `config.js` ya está tomado por la utilidad de URL base del cliente HTTP.
 
+### Notificaciones Push (Bloque 13) — endpoints propios
+
+Infraestructura completa de push notifications en 3 fases. Rutas bajo `/push/`.
+
+Tipos en `packages/types/src/notifications.ts` (`RegisterPushTokenInput`,
+`RegisterPushTokenResponse`, `PushNotificationData` con tipos `boe_alert`,
+`note_ready`, `streak_warning`, `daily_reminder`). SQL en
+`apps/backend/supabase/bloque13_notifications.sql` (tabla `user_push_tokens`
+con UNIQUE por `user_id+device_id`, RLS owner-all). Cliente mobile en
+`apps/mobile/src/api/push.js` exportado como `pushApi`.
+
+**`POST /push/token`**: registra o actualiza el token Expo del dispositivo.
+Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, device_id)`.
+
+**Triggers de notificación push** (backend):
+- `SendBoeAlertUseCase` — broadcast a todos los tokens cuando `SyncBoeChangesUseCase` detecta cambios (> 0 registros nuevos).
+- `SendNoteReadyUseCase` — push dirigido al owner del apunte cuando el pipeline OCR→tags→preguntas termina (`UploadNoteUseCase.onNoteReady`).
+- `SendStreakWarningUseCase` — broadcast diario a las 01:00 UTC (20:00h Colombia, sin DST), disparado por `NotificationScheduler` con cron `0 1 * * *`.
+- `SendDailyGoalCompletedUseCase` — push al usuario cuando `ToggleTaskUseCase` detecta que ha cruzado el umbral `plan.testsPerDay`.
+
+**Mobile — flujo de registro**:
+1. `App.js` — exporta `registerForPushNotifications()` que usa `require('expo-notifications')` lazy (no `import` top-level, para evitar crash en Expo Go SDK 53+). Guard `IS_EXPO_GO = Constants.appOwnership === 'expo'`.
+2. `SesionIniciadaScreen.js` — llama `registerForPushNotifications()` fire-and-forget tras login exitoso, antes de navegar al Dashboard.
+
+**Mobile — visualización**:
+- `InAppNotificationBanner.js` — banner animado, auto-dismiss 4 s, iconos por tipo.
+- Montado en `App.js` con `useState`. `PushNotificationHandler` escucha foreground + tap. En tap navega a `data.screen`.
+- `BoeRealtimeWatcher` en `App.js` — Supabase Realtime `postgres_changes` INSERT en `boe_changes`. Muestra el banner in-app sin latencia cuando el backend inserta un cambio BOE con la app abierta.
+
+**Mobile — Realtime chat de clanes**:
+- `ClanChatScreen.js` migrado de `setInterval(poll, 4000)` a canal Realtime `clan_messages` filtrado por `clan_id`.
+- Fallback automático a polling si `supabase === null` (vars EXPO_PUBLIC_SUPABASE_* no configuradas).
+- Cliente en `apps/mobile/src/lib/supabase.js` (requiere `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY` en `.env`).
+
+**Limitación Expo Go**: push remotos no funcionan en Expo Go SDK 53+. Requiere EAS development build (`eas build --profile development`) para prueba end-to-end de tokens reales.
+
 ### Motor de IA del cliente (DESPLEGADO y activo)
 
 Microservicio RAG del equipo IA, desplegado en producción:
-`https://ingesta-demo-1097036487734.us-east1.run.app`
+`https://ingesta-demo.onrender.com` (migrado desde GCP Cloud Run el 2026-08-18).
 
 Ingesta PDFs de temario y genera tests con evidencia verbatim + página exacta.
-Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b`.
+Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b` — es el
+id del Cloud Run viejo que sigue resolviendo en Render (datos migrados), pero
+está pendiente re-ingestar el temario oficial y actualizar `MOTOR_DEFAULT_CURSO_ID`.
 
 **Integración activa (`CompositeAiClient.ts`):**
 - `generateQuestions` y `generateSurgicalTest` → Motor RAG (async job, ~50-70 s).
@@ -279,5 +317,6 @@ pnpm lint                       # lint completo
 | 10 | Monitor BOE | Frontend + backend completo (feed, detalle, comparativa con diff word-by-word, mini-test con AiApiClientStub, 14 requests / 61 assertions verde). IA real (`generateBoeMiniTest`) esperando entrega del prompt del `BRIEF_IA_BLOQUE10.md` |
 | 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
 | 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
+| 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

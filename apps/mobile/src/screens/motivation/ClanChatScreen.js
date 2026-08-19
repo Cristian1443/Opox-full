@@ -5,7 +5,9 @@ import Svg, { Path } from 'react-native-svg';
 import AvatarPlaceholder from '../../components/AvatarPlaceholder';
 import { motivationApi, api } from '../../api';
 import { colors, spacing } from '../../theme';
+import { supabase } from '../../lib/supabase';
 
+// Usado solo como fallback cuando supabase no está configurado
 const POLL_INTERVAL_MS = 4000;
 
 // Figma (ENVIAR 2336:955): ícono de envío suelto (trazo naranja), sin círculo de
@@ -63,10 +65,41 @@ export default function ClanChatScreen({ navigation, route }) {
     }, [clanId]);
 
     useEffect(() => {
-        poll();
+        poll(); // carga inicial en ambos casos
+
+        if (supabase) {
+            // Realtime: recibir mensajes nuevos en tiempo real sin polling
+            const channel = supabase
+                .channel(`clan-messages-${clanId}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'clan_messages',
+                    filter: `clan_id=eq.${clanId}`,
+                }, (payload) => {
+                    const row = payload.new;
+                    const msg = {
+                        id: row.id,
+                        clanId: row.clan_id,
+                        userId: row.user_id,
+                        body: row.body,
+                        createdAt: row.created_at,
+                    };
+                    setMessages((prev) => {
+                        // evitar duplicados si el propio sender ya añadió el msg
+                        if (prev.some((m) => m.id === msg.id)) return prev;
+                        return [...prev, msg];
+                    });
+                    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+                })
+                .subscribe();
+            return () => { supabase.removeChannel(channel); };
+        }
+
+        // Fallback: polling cada 4 s cuando no hay cliente Supabase
         const id = setInterval(poll, POLL_INTERVAL_MS);
         return () => clearInterval(id);
-    }, [poll]);
+    }, [clanId, poll]);
 
     const handleSend = async () => {
         const body = draft.trim();

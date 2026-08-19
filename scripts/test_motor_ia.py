@@ -28,7 +28,7 @@ if sys.platform == "win32":
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuración
 # ─────────────────────────────────────────────────────────────────────────────
-BASE_URL = "https://ingesta-demo-1097036487734.us-east1.run.app"
+BASE_URL = "https://ingesta-demo.onrender.com"
 OPENAI_KEY = os.environ.get("AI_API_KEY", "")  # exportar AI_API_KEY antes de ejecutar
 PDF_PATH = os.path.join(os.path.dirname(__file__), "temario_prueba.pdf")
 USER_ID = "opositor-demo"

@@ -7,8 +7,8 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "https://ingesta-demo-uadftnwmda-ue.a.run.app",
-      "description": "Entorno de pruebas desplegado. En local: http://localhost:8080"
+      "value": "https://ingesta-demo.onrender.com",
+      "description": "Entorno de pruebas desplegado en Render (migrado 2026-08-18). En local: http://localhost:8080"
     },
     {
       "key": "api_key",

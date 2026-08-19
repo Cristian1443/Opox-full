@@ -112,6 +112,10 @@ declare const API_ROUTES: {
         readonly FEEDBACK: string;
     };
 
+    readonly PUSH: {
+        readonly REGISTER_TOKEN: string;
+    };
+
     readonly MOTIVATION: {
         readonly SUMMARY: string;
         readonly STREAK: string;

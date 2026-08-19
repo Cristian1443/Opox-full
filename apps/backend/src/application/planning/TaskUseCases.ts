@@ -49,6 +49,7 @@ export class ToggleTaskUseCase {
     constructor(
         private readonly planningRepo: IPlanningRepository,
         private readonly dashboardRepo: IDashboardRepository,
+        private readonly onGoalCompleted?: (userId: string) => Promise<void>,
     ) { }
 
     async execute(input: { userId: string; taskId: string; done: boolean }): Promise<ToggleTaskResult> {
@@ -69,6 +70,7 @@ export class ToggleTaskUseCase {
                 reason: 'daily_goal_completed',
                 points: DAILY_GOAL_POINTS,
             });
+            await this.onGoalCompleted?.(input.userId).catch(() => {});
             return { task, goalCompleted: true, gamification };
         }
 
