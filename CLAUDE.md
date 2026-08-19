@@ -147,7 +147,7 @@ en `AiApiClientStub` hasta que el equipo IA entregue el prompt del
 etc.) distinto del `id` UUID. El mobile y el backend de generación de preguntas
 SIEMPRE usan `topicId`, nunca el UUID, para las llamadas a la IA.
 
-**Motor BOE externo** (`https://ingesta-demo-uadftnwmda-ue.a.run.app`): servicio
+**Motor BOE externo** (`https://ingesta-demo.onrender.com`): servicio
 desplegado para detectar cambios en el BOE oficial. Integrado en:
 - `infrastructure/boe/MotorBoeClient.ts` — cliente HTTP con auth `X-API-Key` +
   `X-OpenAI-Key`. Implementa `MotorBoeContract` (definido en `@opox/types`).
@@ -266,10 +266,12 @@ Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, devic
 ### Motor de IA del cliente (DESPLEGADO y activo)
 
 Microservicio RAG del equipo IA, desplegado en producción:
-`https://ingesta-demo-1097036487734.us-east1.run.app`
+`https://ingesta-demo.onrender.com` (migrado desde GCP Cloud Run el 2026-08-18).
 
 Ingesta PDFs de temario y genera tests con evidencia verbatim + página exacta.
-Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b`.
+Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b` — es el
+id del Cloud Run viejo que sigue resolviendo en Render (datos migrados), pero
+está pendiente re-ingestar el temario oficial y actualizar `MOTOR_DEFAULT_CURSO_ID`.
 
 **Integración activa (`CompositeAiClient.ts`):**
 - `generateQuestions` y `generateSurgicalTest` → Motor RAG (async job, ~50-70 s).

@@ -5,6 +5,52 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-18 — Motor de IA migrado a Render y validado extremo a extremo
+
+El equipo IA cambió el despliegue del Motor de GCP Cloud Run a Render, unificando
+Motor RAG y Motor BOE bajo un único host: `https://ingesta-demo.onrender.com`.
+Esta sesión actualiza la configuración, ejecuta la batería completa de la
+`Guia_Pruebas_Bloques_0_6_7.pdf` contra el host nuevo y deja verde toda la
+integración.
+
+### Cambios de infra
+
+- `.env` — `MOTOR_API_BASE_URL` y `MOTOR_BOE_BASE_URL` apuntan al host nuevo.
+- `.env.example` — bloque `MOTOR_*` reescrito con la URL nueva y añadido bloque `MOTOR_BOE_*`.
+- Referencias en `CLAUDE.md`, `packages/ai/MOTOR_INTEGRATION.md`,
+  `packages/ai/BRIEF_IA_BLOQUE10.md`, `MotorAiClient.ts`, `MotorBoeClient.ts`
+  y `scripts/test_motor_ia.py` — todas actualizadas.
+- `MOTOR_DEFAULT_CURSO_ID = 1357e871b542425b` — mantenido; el equipo IA
+  confirmó que es un id migrado que sigue resolviendo. Marcado como TODO porque
+  el temario oficial hay que re-ingestarlo para producción.
+
+### Pruebas ejecutadas contra el Motor nuevo
+
+- `scripts/smoke_motor_directo.js` (nuevo) — sigue paso a paso el PDF de la guía:
+  salud, ingesta de PDF (BOE Ley 39/2015 descargado a `scripts/tmp/temario_real.pdf`),
+  árbol, RAG search, generate, respuesta y resultado (Bloque 6); placement-test,
+  responder todas, finish, idempotencia (Bloque 0); modes/surgical, 3 pistas útiles
+  con reglas (≤300 chars, no letra, no copia opción), 4ª pista → 429, reference (Bloque 7).
+  **Resultado: 53/53 PASS en 65.8 s.**
+- `scripts/smoke_bloques_0_6_7.js` — el smoke E2E del backend ya existente contra
+  el Motor nuevo tras reiniciar el backend para releer `.env`. **Resultado: 30/30 PASS.**
+
+### Incidencias con el Motor nuevo (documentadas en `MOTOR_INTEGRATION.md`)
+
+- **INC-01/02/03/04** — persisten desde el deploy anterior (esperado, no bloqueante).
+  El workaround INC-04 (enriquecer preguntas via `/v1/courses/{id}/questions`) sigue vivo
+  en `MotorAiClient.ts` y ha sido validado en las pruebas.
+- **INC-05** (nueva) — el banco rechaza `?limit=1000` con 422. Máximo ≤200.
+- **INC-06** (nueva) — cold start Render ~30 s tras inactividad; el timeout del cliente (60 s) queda con poco margen.
+- **INC-07** (nueva) — `curso_id` migrado del Cloud Run resuelve en Render (confirmado por el equipo IA).
+
+### Pendiente
+
+- Re-ingestar el temario oficial completo en el Motor nuevo y actualizar `MOTOR_DEFAULT_CURSO_ID`.
+- Evaluar si Render free-plan es viable para producción o si conviene upgrade (cold start).
+
+---
+
 ## 2026-08-17 — Bloque 13 · Notificaciones Push completo (3 fases)
 
 Rama de trabajo: `feat/bloque-13-notificaciones` (creada desde `feat/bloque-12`).

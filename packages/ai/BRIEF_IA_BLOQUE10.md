@@ -167,4 +167,4 @@ el backend usa `AiApiClientStub` con 3 preguntas mock para que el flujo sea func
 - ✅ **SQL seed**: `apps/backend/supabase/bloque10_boe.sql` con 3 cambios de ejemplo
 - ✅ **Stub ejecutable**: `AiApiClientStub.generateBoeMiniTest()` devuelve 3 preguntas plausibles
 - ⏳ **AiApiClient real**: delega al stub hasta que el equipo IA entregue el prompt. El día que llegue, se reemplaza la delegación por la llamada a OpenAI en `AiApiClient.ts` — sin tocar el resto de la arquitectura.
-- ✅ **Motor BOE externo**: `MotorBoeClient.ts` apunta a `https://ingesta-demo-uadftnwmda-ue.a.run.app`. Configurable con `MOTOR_BOE_BASE_URL` / `MOTOR_BOE_API_KEY` en `.env`.
+- ✅ **Motor BOE externo**: `MotorBoeClient.ts` apunta a `https://ingesta-demo.onrender.com` (migrado desde GCP Cloud Run el 2026-08-18). Configurable con `MOTOR_BOE_BASE_URL` / `MOTOR_BOE_API_KEY` en `.env`.
