@@ -31,6 +31,13 @@
         {
           "photosPermission": "OPOX necesita acceso a tu galería para que puedas elegir una foto de un apunte o pregunta."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#7C3AED"
+        }
       ]
     ],
     "ios": {
@@ -48,7 +55,8 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {

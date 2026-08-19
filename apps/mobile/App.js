@@ -50,25 +50,52 @@ if (!IS_EXPO_GO) {
 /**
  * Solicita permiso push y registra el token Expo en el backend.
  * Llamar tras login exitoso. No-op en Expo Go (SDK 53+).
+ *
+ * Instrumentado con logs `[push-reg]` para diagnosticar en Metro / adb logcat.
  */
 export async function registerForPushNotifications() {
-  if (!Notifications || !Device.isDevice) return;
+  console.log('[push-reg] start · IS_EXPO_GO=', IS_EXPO_GO, 'isDevice=', Device.isDevice, 'Notifications=', !!Notifications);
+  if (!Notifications) { console.warn('[push-reg] abort: expo-notifications no cargado (¿Expo Go?)'); return; }
+  if (!Device.isDevice) { console.warn('[push-reg] abort: no es dispositivo físico (emulador/simulador)'); return; }
+
   try {
+    // Android 8+ necesita un canal de notificación para MOSTRAR pushes
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+      });
+    }
+
     const { status: existing } = await Notifications.getPermissionsAsync();
+    console.log('[push-reg] permission existing=', existing);
     let finalStatus = existing;
     if (existing !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
+      console.log('[push-reg] permission requested → status=', status);
       finalStatus = status;
     }
-    if (finalStatus !== 'granted') return;
+    if (finalStatus !== 'granted') { console.warn('[push-reg] abort: permiso denegado por el usuario'); return; }
 
-    const { data: token } = await Notifications.getExpoPushTokenAsync();
-    if (!token) return;
+    // projectId es OBLIGATORIO en dev builds a partir de SDK 49+
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ||
+      Constants.easConfig?.projectId;
+    console.log('[push-reg] projectId=', projectId || '(vacío)');
+
+    const tokenRes = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+    const token = tokenRes?.data;
+    console.log('[push-reg] token=', token ? token.slice(0, 40) + '...' : '(vacío)');
+    if (!token) { console.warn('[push-reg] abort: getExpoPushTokenAsync no devolvió token'); return; }
 
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     const deviceId = token.replace('ExponentPushToken[', '').replace(']', '').slice(0, 32);
-    await pushApi.registerToken(token, platform, deviceId).catch(() => {});
-  } catch (_) {}
+    console.log('[push-reg] POST /push/token → platform=', platform, 'deviceId=', deviceId);
+    const res = await pushApi.registerToken(token, platform, deviceId);
+    console.log('[push-reg] backend response=', JSON.stringify(res).slice(0, 200));
+  } catch (err) {
+    console.error('[push-reg] ERROR:', err?.message || String(err), err?.stack);
+  }
 }
 
 function NetworkWatcher() {
