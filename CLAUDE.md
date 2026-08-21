@@ -88,6 +88,47 @@ Contratos en `packages/types/src/contracts/`:
 Flujo de integración: **mobile → nuestro backend → OpenAI**. La API key de IA
 nunca va al móvil; vive en `apps/backend/.env` (`AI_API_KEY`).
 
+### Motivación y Gamificación (Bloque 5) — endpoints propios
+
+Rutas bajo `/motivation/`. Cubre racha, rankings, clanes, retos de clan y Muro de la Gloria.
+
+**Racha y gamificación**:
+- `GET /motivation/summary` — devuelve `{ gamification, myClan }`. Es el endpoint de arranque de `MotivationHomeScreen`.
+- `GET /motivation/streak` — detalle de racha con `recentActivityDates`, `nextMilestone` y `longestStreak`.
+- La racha se actualiza con `registerActivity()` en tres eventos: completar tarea de planificación, completar reto de clan, **y guardar cualquier intento de test** (`SaveAttemptUseCase` llama `registerActivity({ points: 0 })`). Sin este último, "Hacer test rápido" no salvaba la racha.
+
+**Rankings**: `GET /motivation/ranking?scope=weekly|global|oposicion|topic&topicId=xxx`.
+- Scope `topic` agrega `training_attempt_responses.is_correct` por `topic_id` usando `supabaseAdmin` (bypasa RLS cross-user). Requiere `topicId`.
+
+**Clanes**:
+- `clan_challenges` tiene columna `topic_id TEXT` (nullable) añadida en `bloque5_motivacion.sql` (migration: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS topic_id text`). Correr en Supabase SQL Editor si la BD es anterior a 2026-08-21.
+- `ClanChallengeDTO` expone `topicId?: string`. `CreateClanChallengeRequest` acepta `topicId?: string`.
+- El insert de `createClanChallenge` en `SupabaseMotivationRepository` es **condicional**: solo incluye `topic_id` si `input.topicId != null` para no fallar en BDs que aún no corrieron la migración.
+- `ClanSummaryDTO` y `ClanDetailDTO` exponen `challengeCount: number` (retos activos con `expires_at IS NULL OR expires_at > NOW()`).
+- Join abierto (sin aprobación de líder) — decisión deliberada. GAP-05-05 documenta la ruta para clanes privados en Fase 2.
+
+**Flujo de retos de clan (mobile)**:
+1. `ChallengesScreen` wizard 2 pasos: Step 1 = selector de tema (`trainingApi.listTopics()`), Step 2 = nombre + steppers de preguntas (5–100 step 5) y Opopoints (10–500 step 10).
+2. "Iniciar →" navega a `GeneratorConfig` con `{ challengeId, clanId, topicId, questionCount }`.
+3. `GeneratorConfigScreen` acepta `route.params` del reto, pre-selecciona tema y cuenta, pasa `challengeId`/`clanId` a `TrainingSession`.
+4. `QuestionActiveScreen` propaga `challengeId`/`clanId` a `TrainingResult`.
+5. `TrainingResultScreen` llama `motivationApi.completeChallenge(clanId, challengeId)` si `percentage >= 60`.
+
+**Discoverabilidad de clanes (mobile)**:
+- `MotivationHomeScreen` muestra una tarjeta CTA "Únete a un clan" cuando `myClan === null`, navegando a `ClansList`.
+- Tras `joinClan` exitoso: si `clan.challengeCount > 0`, navega directo a `Challenges`.
+- Label EXPLORAR cambia de "Mis clanes" a "Ver clanes" cuando sin clan.
+
+**`RachaPeligroModal`** — 3 botones:
+- Primario: "Hacer test rápido" → `GeneratorConfig`.
+- Secundario: "Ver mis tareas" → `PlanningToday`.
+- Terciario: "En otro momento" → dismiss.
+`BaseModal` extendido con `tertiaryLabel`/`onTertiaryPress`.
+
+**Pips de racha** (`MotivationHomeScreen`): derivados de `currentStreak` sin llamada extra. Los últimos N pips (hasta 14) en verde desde la derecha; el resto en gris (`#DDE1EA`).
+
+**`useFocusEffect`** en `MotivationHomeScreen`: los datos se recargan cada vez que la pantalla recibe foco (volver de Challenges, Rankings, etc.).
+
 ### Tutor IA (Bloque 8) — endpoints propios
 
 El Aula Virtual tiene su propio conjunto de rutas bajo `/tutor/`. La entidad central

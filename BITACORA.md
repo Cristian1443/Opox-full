@@ -5,6 +5,72 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-21 — Bloque 5 · Motivación — Correcciones y mejoras post-testing en dispositivo
+
+Rama: `feat/bloque-13-notificaciones`. Sesión de corrección intensiva tras pruebas
+en dispositivo físico. Se resolvieron 9 bugs de UX/lógica, se cerraron 3 gaps de
+datos reales y se añadió la infraestructura para que los retos de clan sean jugables
+extremo a extremo.
+
+### Gaps de datos cerrados (sesión anterior completada)
+
+- **`challengeCount` real**: `ClanSummaryDTO` y `ClanDetailDTO` ahora incluyen el
+  conteo de retos activos (`expires_at IS NULL OR expires_at > NOW()`). Antes era
+  hardcodeado a 3 en el frontend.
+- **Ranking por tema**: nuevo scope `topic` en `GET /motivation/ranking`. Agrega
+  `training_attempt_responses` por `topic_id` vía `supabaseAdmin` (bypasa RLS).
+  Mobile muestra pills horizontales para seleccionar el tema.
+- **Presencia Supabase en chat**: `ClanChatScreen` muestra "X en línea" usando el
+  canal `clan-presence-{clanId}` con `supabase.channel().on('presence', ...)`.
+
+### Correcciones de bugs (dispositivo físico)
+
+**Bug 1+2 — Wizard de creación de retos**  
+Reemplazado el formulario libre por un wizard 2 pasos:
+- Paso 1: selector de temas cargado desde `trainingApi.listTopics()` (tapping a tema auto-rellena el nombre).
+- Paso 2: nombre editable + steppers para preguntas (5–100, step 5) y Opopoints (10–500, step 10).
+- Fix adicional: `handleTopicSelect(null)` ya no explota al tocar "Sin tema específico".
+
+**Bug 3+6 — "Iniciar" reto conectado al Generador**  
+El botón "Iniciar →" navega a `GeneratorConfigScreen` con `{ challengeId, clanId, topicId, questionCount }`. El generador pre-selecciona tema y cuenta. Al terminar el test, `TrainingResultScreen` llama `motivationApi.completeChallenge` si `percentage >= 60`. Antes, "Iniciar" marcaba el reto como completado sin preguntas y daba 510 puntos incorrectamente.
+
+**Bug 4 — Botón DEV eliminado** de `ChallengesScreen`.
+
+**Bug 5 — `RachaPeligroModal` con 3 acciones**  
+`BaseModal` extendido con `tertiaryLabel`/`onTertiaryPress`. El modal ahora ofrece:
+- "Hacer test rápido" → `GeneratorConfig`
+- "Ver mis tareas" → `PlanningToday`  
+- "En otro momento" → dismiss
+
+**Bug 7 — "Ver tienda"** navega a `StoreHome` (antes era no-op).
+
+**Bug 8 — Pips de racha** derivados de `currentStreak`: últimos N pips en verde desde la derecha, resto en gris (`#DDE1EA`). Sin llamada extra al backend.
+
+**Bug 9 — `useFocusEffect`** en `MotivationHomeScreen`: datos se recargan en cada foco de pantalla.
+
+### `topic_id` en retos de clan
+
+- SQL: `ALTER TABLE public.clan_challenges ADD COLUMN IF NOT EXISTS topic_id text` añadido a `bloque5_motivacion.sql`. Correr en Supabase SQL Editor si la BD es previa a hoy.
+- `ClanChallenge` (entidad), `IMotivationRepository`, `ChallengeUseCases`, `SupabaseMotivationRepository`, `motivationValidators`, `MotivationController` y `packages/types/src/motivation.ts` — todos actualizados.
+- Insert **condicional**: solo incluye `topic_id` si tiene valor para no fallar en BDs sin la migración.
+
+### Racha desde tests
+
+`SaveAttemptUseCase` inyecta `IDashboardRepository` y llama `registerActivity({ points: 0 })` en paralelo con `saveAttempt`. Cualquier test (generador, test rápido de racha, simulacro) ahora registra actividad del día y salva la racha. Antes solo la salvaban las tareas de planificación y los retos de clan.
+
+### Discoverabilidad de clanes
+
+- `MotivationHomeScreen`: tarjeta CTA "Únete a un clan" visible cuando `myClan === null`, con borde naranja y navegación a `ClansList`.
+- Label EXPLORAR: "Mis clanes" → "Ver clanes" cuando sin clan.
+- `ClansListScreen.handleJoin`: tras unirse, si `clan.challengeCount > 0`, navega directo a `Challenges`. Join abierto sin aprobación de líder (decisión deliberada, GAP-05-05 para Fase 2).
+
+### GAPS actualizados
+
+- `GAPS.md` creado con GAP-05-01 a 05-05, GAP-09-01, GAP-10-01, GAP-12-01, GAP-MOTOR-01/02.
+- GAP-05-05 nuevo: clanes privados con aprobación de líder (Fase 2).
+
+---
+
 ## 2026-08-18 — Motor de IA migrado a Render y validado extremo a extremo
 
 El equipo IA cambió el despliegue del Motor de GCP Cloud Run a Render, unificando
