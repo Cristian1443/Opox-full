@@ -167,15 +167,27 @@ const TTL_WARN_MS  = 15_000;
 const TTL_KILL_MS  = 60_000;
 
 // ─── Pantalla 6.2 · Generador infinito ───────────────────────────────────────
-export default function GeneratorConfigScreen({ navigation }) {
+export default function GeneratorConfigScreen({ navigation, route }) {
+    // Cuando se llega desde un reto de clan, estos params vienen precargados.
+    const {
+        challengeId = null,
+        clanId: challengeClanId = null,
+        topicId: challengeTopicId = null,
+        questionCount: challengeQuestionCount = null,
+    } = route?.params ?? {};
+
+    const isChallengeMode = !!challengeId;
+
     const [difficulty, setDifficulty] = useState(DEFAULTS.difficulty);
-    const [count, setCount] = useState(DEFAULTS.count);
+    const [count, setCount] = useState(challengeQuestionCount ?? DEFAULTS.count);
     const [fatigueMode, setFatigueMode] = useState(DEFAULTS.timed);
 
     // Multi-selección de temas — 'all' es el valor especial "Todos los temas"
-    const [selectedTopicIds, setSelectedTopicIds] = useState(new Set(['all']));
+    const [selectedTopicIds, setSelectedTopicIds] = useState(
+        challengeTopicId ? new Set([challengeTopicId]) : new Set(['all'])
+    );
     const [topics, setTopics] = useState([]);
-    const [topicOpen, setTopicOpen] = useState(true);
+    const [topicOpen, setTopicOpen] = useState(!isChallengeMode); // cerrado en modo reto
 
     const [exitOpen, setExitOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -307,9 +319,11 @@ export default function GeneratorConfigScreen({ navigation }) {
             navigation.navigate('TrainingSession', {
                 source: 'generator',
                 questions: adaptGeneratedQuestions(data),
-                examTitle: 'Generador infinito',
+                examTitle: isChallengeMode ? 'Reto de clan' : 'Generador infinito',
                 timedMode: fatigueMode,
                 oposicion,
+                ...(challengeId && { challengeId }),
+                ...(challengeClanId && { clanId: challengeClanId }),
             });
         } catch {
             clearTimeout(warnTimerRef.current);

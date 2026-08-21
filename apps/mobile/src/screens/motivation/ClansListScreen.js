@@ -4,11 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { motivationApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
-// DATA GAP: ni ClanSummaryDTO ni ClanDetailDTO (packages/types/src/motivation.ts) exponen un
-// conteo de retos activos por clan. Figma ("CLANES - LISTADO", 2334:489) muestra "3 retos
-// activos" como valor de ejemplo en la sección MIS CLANES — se hardcodea desde el diseño
-// hasta que el backend exponga el dato real (mismo criterio que ClanDetailScreen.js).
-const FIGMA_ACTIVE_CHALLENGES = 3;
 
 export default function ClansListScreen({ navigation }) {
     const [myClan, setMyClan] = useState(null);
@@ -23,9 +18,14 @@ export default function ClansListScreen({ navigation }) {
 
     useEffect(() => { load(); }, [load]);
 
-    const handleJoin = async (clanId) => {
-        const { error } = await motivationApi.joinClan(clanId);
-        if (!error) load();
+    const handleJoin = async (clan) => {
+        const { error } = await motivationApi.joinClan(clan.id);
+        if (!error) {
+            load();
+            if (clan.challengeCount > 0) {
+                navigation.navigate('Challenges', { clanId: clan.id });
+            }
+        }
     };
 
     const handleCreate = async () => {
@@ -70,7 +70,7 @@ export default function ClansListScreen({ navigation }) {
                             <View style={styles.myClanIcon}><Text style={styles.myClanIconText}>{myClan.initials}</Text></View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.clanName}>{myClan.name}</Text>
-                                <Text style={styles.clanCaption}>{myClan.memberCount} miembros · {FIGMA_ACTIVE_CHALLENGES} retos activos</Text>
+                                <Text style={styles.clanCaption}>{myClan.memberCount} miembros · {myClan.challengeCount} retos activos</Text>
                             </View>
                             <Text style={styles.chevron}>›</Text>
                         </TouchableOpacity>
@@ -91,7 +91,7 @@ export default function ClansListScreen({ navigation }) {
                                     <Text style={styles.clanCaption}>{c.memberCount} miembros</Text>
                                 </View>
                                 {!myClan && (
-                                    <TouchableOpacity style={styles.joinBtn} onPress={() => handleJoin(c.id)}>
+                                    <TouchableOpacity style={styles.joinBtn} onPress={() => handleJoin(c)}>
                                         <Text style={styles.joinBtnText}>Unirse</Text>
                                     </TouchableOpacity>
                                 )}

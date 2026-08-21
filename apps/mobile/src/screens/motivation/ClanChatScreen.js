@@ -36,6 +36,7 @@ export default function ClanChatScreen({ navigation, route }) {
     const [draft, setDraft] = useState('');
     const [myUserId, setMyUserId] = useState(null);
     const [clanInfo, setClanInfo] = useState(null);
+    const [onlineCount, setOnlineCount] = useState(null);
     const scrollRef = useRef(null);
     const lastCreatedAtRef = useRef(null);
 
@@ -113,13 +114,29 @@ export default function ClanChatScreen({ navigation, route }) {
         }
     };
 
-    // Nota: el diseño de Figma muestra "28 miembros · 3 en línea", pero la API
-    // (ClanDetailDTO) solo expone memberCount total; no hay conteo de miembros
-    // en línea en ningún endpoint de motivación. Se omite ese segmento en vez
-    // de inventar un dato.
-    const caption = clanInfo
+    // Presence: registrar al usuario en línea y escuchar cuántos hay activos.
+    // Solo cuando supabase está configurado y ya tenemos el userId de sesión.
+    useEffect(() => {
+        if (!supabase || !myUserId) return;
+        const presenceChannel = supabase
+            .channel(`clan-presence-${clanId}`, { config: { presence: { key: myUserId } } })
+            .on('presence', { event: 'sync' }, () => {
+                setOnlineCount(Object.keys(presenceChannel.presenceState()).length);
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await presenceChannel.track({ user_id: myUserId });
+                }
+            });
+        return () => { supabase.removeChannel(presenceChannel); };
+    }, [clanId, myUserId]);
+
+    const memberLabel = clanInfo
         ? `${clanInfo.memberCount} ${clanInfo.memberCount === 1 ? 'miembro' : 'miembros'}`
         : null;
+    const caption = onlineCount !== null && memberLabel
+        ? `${memberLabel} · ${onlineCount} en línea`
+        : memberLabel;
 
     return (
         <SafeAreaView style={styles.container}>

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import DestacadoBanner from '../../components/DestacadoBanner';
 import AvatarPlaceholder from '../../components/AvatarPlaceholder';
-import { motivationApi } from '../../api';
+import { motivationApi, trainingApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
 // Icono de chevron para el botón de volver (mismo patrón que MotivationHomeScreen.js / ClanDetailScreen.js).
@@ -70,23 +70,30 @@ function RankRow({ entry, index, isMe }) {
 export default function RankingsScreen({ navigation }) {
     const [tab, setTab] = useState('weekly');
     const [ranking, setRanking] = useState(null);
+    const [topics, setTopics] = useState([]);
+    const [selectedTopicId, setSelectedTopicId] = useState(null);
+
+    // Carga la lista de temas una sola vez al montar (para el tab "Tema")
+    useEffect(() => {
+        trainingApi.listTopics().then(({ data }) => {
+            if (data && data.length > 0) setSelectedTopicId(data[0].topicId);
+            setTopics(data ?? []);
+        });
+    }, []);
 
     useEffect(() => {
-        if (tab === 'topic') { setRanking(null); return; }
+        if (tab === 'topic' && !selectedTopicId) { setRanking(null); return; }
         let cancelled = false;
-        motivationApi.getRanking(tab).then(({ data }) => { if (!cancelled && data) setRanking(data); });
+        motivationApi.getRanking(tab, tab === 'topic' ? selectedTopicId : undefined)
+            .then(({ data }) => { if (!cancelled && data) setRanking(data); });
         return () => { cancelled = true; };
-    }, [tab]);
+    }, [tab, selectedTopicId]);
 
     const entries = ranking?.entries ?? [];
-    const meInTop = entries.some((e) => ranking.me && e.userId === ranking.me.userId);
+    const meInTop = entries.some((e) => ranking?.me && e.userId === ranking.me.userId);
 
-    // NOTA (gap de datos vs. Figma "DESTACADO"): RankingResultDTO solo expone `me.position`
-    // (posición del usuario dentro del scope consultado) y `me.points`; no existe un campo
-    // "globalRank"/"localRank" independiente del scope activo, ni esta pantalla llama a
-    // motivationApi.getSummary() (de donde saldría `gamification.opopointsBalance`). Para no
-    // inventar cifras: usamos los puntos del ranking como aproximación de opopoints, y solo
-    // mostramos rango global/local cuando el scope correspondiente está efectivamente cargado.
+    // Usamos los puntos del scope activo como proxy de opopoints (solo se muestra
+    // el rango global/local cuando ese scope está efectivamente cargado).
     const opopoints = ranking?.me?.points ?? 0;
     const globalRank = tab === 'global' ? (ranking?.me?.position ?? '—') : '—';
     const localRank = tab === 'oposicion' ? (ranking?.me?.position ?? '—') : '—';
@@ -125,11 +132,31 @@ export default function RankingsScreen({ navigation }) {
                 </ScrollView>
             </View>
 
+            {tab === 'topic' && topics.length > 0 && (
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.topicScroll}
+                >
+                    {topics.map((t) => (
+                        <TouchableOpacity
+                            key={t.topicId}
+                            style={[styles.topicPill, selectedTopicId === t.topicId && styles.topicPillActive]}
+                            onPress={() => setSelectedTopicId(t.topicId)}
+                        >
+                            <Text style={[styles.topicPillText, selectedTopicId === t.topicId && styles.topicPillTextActive]} numberOfLines={1}>
+                                {t.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            )}
+
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <DestacadoBanner opopoints={opopoints} globalRank={globalRank} localRank={localRank} />
 
-                {tab === 'topic' ? (
-                    <Text style={styles.empty}>El ranking por tema llegará cuando existan estadísticas por tema (Bloque 6/7).</Text>
+                {tab === 'topic' && topics.length === 0 ? (
+                    <Text style={styles.empty}>Completa al menos un test para ver el ranking por tema.</Text>
                 ) : entries.length === 0 ? (
                     <Text style={styles.empty}>
                         {tab === 'oposicion' ? 'Configura tu oposición para ver este ranking.' : 'Aún no hay datos suficientes.'}
@@ -218,4 +245,9 @@ const styles = StyleSheet.create({
     name: { fontSize: 16, fontWeight: '700', color: colors.textDark, flex: 1 },
     score: { fontSize: 16, fontWeight: '400', color: colors.textMuted, textAlign: 'right' },
     ellipsis: { textAlign: 'center', color: colors.textMuted, opacity: 0.5, fontSize: 14, marginVertical: 4 },
+    topicScroll: { flexDirection: 'row', gap: 7, paddingHorizontal: 27, paddingBottom: 10 },
+    topicPill: { paddingVertical: 5, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1.5, borderColor: 'transparent', backgroundColor: colors.grayLight },
+    topicPillActive: { borderColor: colors.textDark, backgroundColor: colors.white },
+    topicPillText: { fontSize: 13, fontWeight: '500', color: colors.textMuted },
+    topicPillTextActive: { fontWeight: '700', color: colors.textDark },
 });

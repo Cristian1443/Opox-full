@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
-import { trainingApi } from '../../api';
+import { trainingApi, motivationApi } from '../../api';
 
 const OPTION_ID_TO_INDEX = { A: 0, B: 1, C: 2, D: 3 };
 
@@ -169,6 +169,8 @@ export default function TrainingResultScreen({ navigation, route }) {
     questions = MOCK_DATA.questions,
     source = MOCK_DATA.source,
     elapsedSeconds = MOCK_DATA.elapsedSeconds,
+    challengeId = null,
+    clanId = null,
   } = route?.params ?? {};
 
   const total = questions.length;
@@ -194,9 +196,12 @@ export default function TrainingResultScreen({ navigation, route }) {
         durationSecs: elapsedSeconds,
         responses,
       })
-      .catch((_err) => {
-        // No bloqueamos la UI si Supabase falla — el usuario ya ve su resultado.
-      });
+      .catch(() => { /* no bloqueamos la UI si falla */ });
+
+    // Si venimos de un reto de clan y superamos el umbral del 60%, completamos el reto.
+    if (challengeId && clanId && percentage >= 60) {
+      motivationApi.completeChallenge(clanId, challengeId).catch(() => { });
+    }
   }, []);
 
   const formatTime = (s) => {

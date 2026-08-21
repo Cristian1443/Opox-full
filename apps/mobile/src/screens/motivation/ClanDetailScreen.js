@@ -33,11 +33,6 @@ function IconFlag() {
     );
 }
 
-// DATA GAP: ClanDetailDTO (packages/types/src/motivation.ts) has no `challengeCount` field
-// today, so the real count of open challenges for this clan cannot be fetched yet.
-// Figma frame "CLAN - DETALLE" (node 2334:667) shows "Retos (3)" as its example value —
-// hardcoded from the design until the backend exposes a real per-clan challenge count.
-const FIGMA_CHALLENGE_COUNT = 3;
 
 export default function ClanDetailScreen({ navigation, route }) {
     const { clanId } = route.params;
@@ -102,7 +97,7 @@ export default function ClanDetailScreen({ navigation, route }) {
                         activeOpacity={0.85}
                     >
                         <IconFlag />
-                        <Text style={styles.actionBtnText}>Retos ({FIGMA_CHALLENGE_COUNT})</Text>
+                        <Text style={styles.actionBtnText}>Retos ({detail.challengeCount})</Text>
                     </TouchableOpacity>
                 </View>
 

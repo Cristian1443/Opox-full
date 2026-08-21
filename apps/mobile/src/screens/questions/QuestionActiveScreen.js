@@ -60,6 +60,8 @@ export default function QuestionActiveScreen({ navigation, route }) {
     timedMode = true,
     secondsPerQuestion = 60,
     examTitle = 'Examen oficial 2021',
+    challengeId = null,
+    clanId = null,
   } = route?.params ?? {};
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
@@ -181,7 +183,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const handleNext = () => {
     const isLast = currentIndex + 1 >= total;
     if (isLast) {
-      navigation.replace('TrainingResult', { source, answers, questions, elapsedSeconds });
+      navigation.replace('TrainingResult', { source, answers, questions, elapsedSeconds, challengeId, clanId });
       return;
     }
     setCurrentIndex(prev => prev + 1);
@@ -545,7 +547,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
         visible={showTimeUpModal}
         onContinue={() => {
           setShowTimeUpModal(false);
-          navigation.replace('TrainingResult', { source, answers, questions, elapsedSeconds });
+          navigation.replace('TrainingResult', { source, answers, questions, elapsedSeconds, challengeId, clanId });
         }}
       />
 
