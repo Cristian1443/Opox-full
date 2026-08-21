@@ -78,6 +78,7 @@ export class MotivationController {
             initials: s.clan.initials,
             ...(s.clan.description && { description: s.clan.description }),
             memberCount: s.memberCount,
+            challengeCount: s.challengeCount,
         };
     }
 
@@ -88,6 +89,7 @@ export class MotivationController {
             initials: d.clan.initials,
             ...(d.clan.description && { description: d.clan.description }),
             memberCount: d.memberCount,
+            challengeCount: d.challengeCount,
             rankPosition: d.rankPosition,
             members: d.members,
         };
@@ -108,6 +110,7 @@ export class MotivationController {
             completedCount: c.completedCount,
             memberCount: c.memberCount,
             completedByMe: c.completedByMe,
+            ...(c.challenge.topicId && { topicId: c.challenge.topicId }),
         };
     }
 
@@ -155,7 +158,7 @@ export class MotivationController {
 
     getRanking = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const query = req.validatedQuery as { scope: 'weekly' | 'global' | 'oposicion'; limit?: number };
+            const query = req.validatedQuery as { scope: 'weekly' | 'global' | 'oposicion' | 'topic'; topicId?: string; limit?: number };
             const ranking = await this.deps.getRanking.execute({ userId: req.authUser!.id, ...query });
             this.ok(res, 200, this.serializeRanking(ranking));
         } catch (err) { next(err); }
@@ -170,8 +173,8 @@ export class MotivationController {
 
     getMyClan = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const clan = await this.deps.getMyClan.execute(req.authUser!.id);
-            this.ok(res, 200, clan ? this.serializeClanSummary({ clan, memberCount: 0 }) : null);
+            const summary = await this.deps.getMyClan.execute(req.authUser!.id);
+            this.ok(res, 200, summary ? this.serializeClanSummary(summary) : null);
         } catch (err) { next(err); }
     };
 
@@ -185,7 +188,7 @@ export class MotivationController {
     createClan = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const clan = await this.deps.createClan.execute({ userId: req.authUser!.id, ...req.body });
-            this.ok(res, 201, this.serializeClanSummary({ clan, memberCount: 1 }));
+            this.ok(res, 201, this.serializeClanSummary({ clan, memberCount: 1, challengeCount: 0 }));
         } catch (err) { next(err); }
     };
 
@@ -241,10 +244,23 @@ export class MotivationController {
 
     createClanChallenge = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
+            const { title, subtitle, questionCount, rewardPoints, expiresAt, topicId } = req.body as {
+                title: string;
+                subtitle?: string;
+                questionCount: number;
+                rewardPoints: number;
+                expiresAt?: string;
+                topicId?: string;
+            };
             const result = await this.deps.createClanChallenge.execute({
                 userId: req.authUser!.id,
                 clanId: req.params['id'] as string,
-                ...req.body,
+                title,
+                subtitle,
+                questionCount,
+                rewardPoints,
+                expiresAt,
+                topicId,
             });
             this.ok(res, 201, this.serializeChallenge(result));
         } catch (err) { next(err); }

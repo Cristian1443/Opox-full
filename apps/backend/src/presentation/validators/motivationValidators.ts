@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 export const rankingQuerySchema = z.object({
-    scope: z.enum(['weekly', 'global', 'oposicion']).default('global'),
+    scope: z.enum(['weekly', 'global', 'oposicion', 'topic']).default('global'),
+    topicId: z.string().min(1).max(80).optional(),
     limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 
@@ -26,4 +27,5 @@ export const createClanChallengeSchema = z.object({
     questionCount: z.coerce.number().int().min(1).max(500),
     rewardPoints: z.coerce.number().int().min(0).max(5000),
     expiresAt: z.string().datetime().optional(),
+    topicId: z.string().min(1).max(80).optional(),
 });

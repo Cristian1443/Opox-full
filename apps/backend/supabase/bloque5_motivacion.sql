@@ -127,6 +127,8 @@ alter table public.clan_challenges alter column created_by drop not null;
 alter table public.clan_challenges drop constraint if exists clan_challenges_created_by_fkey;
 alter table public.clan_challenges add constraint clan_challenges_created_by_fkey
     foreign key (created_by) references auth.users(id) on delete set null;
+-- Añade topic_id para vincular el reto con un tema del temario (optional).
+alter table public.clan_challenges add column if not exists topic_id text;
 
 create index if not exists clan_challenges_clan_idx
     on public.clan_challenges (clan_id, created_at desc);
