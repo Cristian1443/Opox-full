@@ -38,10 +38,33 @@
           "icon": "./assets/icon.png",
           "color": "#7C3AED"
         }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "OPOX necesita acceso a tus datos de salud para calcular tu nivel de fatiga y optimizar tus sesiones de estudio.",
+          "NSHealthUpdateUsageDescription": "OPOX no escribe datos de salud."
+        }
+      ],
+      [
+        "react-native-health-connect",
+        {
+          "healthConnectPermissions": [
+            "android.permission.health.READ_HEART_RATE",
+            "android.permission.health.READ_RESTING_HEART_RATE",
+            "android.permission.health.READ_OXYGEN_SATURATION",
+            "android.permission.health.READ_SLEEP",
+            "android.permission.health.READ_STEPS"
+          ]
+        }
       ]
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "OPOX necesita acceso a tus datos de salud para calcular tu nivel de fatiga y optimizar tus sesiones de estudio.",
+        "NSHealthUpdateUsageDescription": "OPOX no escribe datos de salud."
+      }
     },
     "android": {
       "package": "com.opox.app",
@@ -56,7 +79,12 @@
         "android.permission.USE_FINGERPRINT",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_STEPS"
       ]
     },
     "web": {

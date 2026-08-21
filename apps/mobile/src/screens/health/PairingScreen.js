@@ -1,4 +1,6 @@
 // Bloque 3 · Salud — Pantalla 3.3 · Flujo de emparejamiento
+// Solicita permisos de salud reales al SO (HealthKit iOS / Health Connect Android).
+// No-op en Expo Go — muestra aviso informativo.
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -7,18 +9,21 @@ import {
     TouchableOpacity,
     Animated,
     Easing,
+    Linking,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import { requestHealthPermissions, isHealthAvailable } from '../../services/HealthService';
 
-// Pasos que se van chequeando. Cuando entre el backend, los ticks los dispara el pairing real.
+// Pasos del flujo — ahora mapean a etapas reales del proceso de permisos
 const STEPS = [
-    { id: 'searching', label: 'Dispositivo encontrado', duration: 3000 },
-    { id: 'pairing', label: 'Emparejando…', duration: 2000 },
-    { id: 'permissions', label: 'Concediendo permisos de salud…', duration: 2000 },
+    { id: 'searching', label: 'Buscando fuentes de datos…' },
+    { id: 'pairing',   label: 'Solicitando permisos de salud…' },
+    { id: 'sync',      label: 'Primera sincronización…' },
 ];
 
 const RING_SIZE = 180;
@@ -28,14 +33,15 @@ export default function PairingScreen({ navigation, route }) {
     const device = route?.params?.device;
     const deviceName = device?.name ?? 'dispositivo';
 
+    // 'loading' | 'complete' | 'denied' | 'unavailable'
+    const [phase, setPhase] = useState('loading');
     const [stepIdx, setStepIdx] = useState(0);
-    const [isComplete, setIsComplete] = useState(false);
 
     const rotateAnim = React.useRef(new Animated.Value(0)).current;
 
-    // Animación de giro del anillo mientras se empareja.
+    // Anillo giratorio durante la carga
     useEffect(() => {
-        if (isComplete) return;
+        if (phase !== 'loading') return;
         const loop = Animated.loop(
             Animated.timing(rotateAnim, {
                 toValue: 1,
@@ -46,73 +52,170 @@ export default function PairingScreen({ navigation, route }) {
         );
         loop.start();
         return () => loop.stop();
-    }, [isComplete, rotateAnim]);
+    }, [phase, rotateAnim]);
 
+    // Flujo de permisos real al montar la pantalla
     useEffect(() => {
-        if (isComplete) return;
-        const timer = setTimeout(() => {
-            if (stepIdx < STEPS.length - 1) {
-                setStepIdx((i) => i + 1);
-            } else {
-                setIsComplete(true);
+        let cancelled = false;
+
+        async function run() {
+            // Si no hay módulos nativos (Expo Go) informar y terminar
+            if (!isHealthAvailable()) {
+                if (!cancelled) setPhase('unavailable');
+                return;
             }
-        }, STEPS[stepIdx].duration);
-        return () => clearTimeout(timer);
-    }, [stepIdx, isComplete]);
+
+            // Paso 1: "buscando"
+            if (!cancelled) setStepIdx(0);
+            await _wait(1200);
+
+            // Paso 2: solicitar permisos al SO
+            if (!cancelled) setStepIdx(1);
+            const granted = await requestHealthPermissions();
+
+            if (cancelled) return;
+
+            if (!granted) {
+                setPhase('denied');
+                return;
+            }
+
+            // Paso 3: primera lectura / sincronización visual
+            setStepIdx(2);
+            await _wait(1000);
+
+            if (!cancelled) setPhase('complete');
+        }
+
+        run();
+        return () => { cancelled = true; };
+    }, []);
 
     const rotate = rotateAnim.interpolate({
         inputRange: [0, 1],
         outputRange: ['0deg', '360deg'],
     });
 
-    const currentStep = STEPS[stepIdx];
+    // ── Estado: permisos denegados ───────────────────────────────────────────
+    if (phase === 'denied') {
+        return (
+            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+                <HealthScreenHeader title="Sin acceso" onBack={() => navigation.goBack()} />
+                <View style={styles.centeredContent}>
+                    <Ionicons name="alert-circle" size={64} color={colors.error} />
+                    <Text style={styles.deniedTitle}>Permiso denegado</Text>
+                    <Text style={styles.deniedSubtitle}>
+                        Sin datos de salud no podremos calcular tu nivel de fatiga.{'\n'}
+                        Puedes activarlo más tarde en Ajustes del dispositivo.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.settingsButton}
+                        onPress={() => Linking.openSettings()}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.settingsButtonText}>Ir a Ajustes</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.skipButton}
+                        onPress={() => navigation.navigate('HomeHealth')}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.skipButtonText}>Continuar igualmente</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ── Estado: Expo Go — módulos no disponibles ──────────────────────────────
+    if (phase === 'unavailable') {
+        return (
+            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+                <HealthScreenHeader title="No disponible" onBack={() => navigation.goBack()} />
+                <View style={styles.centeredContent}>
+                    <Ionicons name="information-circle" size={64} color={colors.primary} />
+                    <Text style={styles.deniedTitle}>Requiere EAS build</Text>
+                    <Text style={styles.deniedSubtitle}>
+                        La integración con HealthKit y Health Connect no está disponible en Expo Go.{'\n\n'}
+                        Instala la app con un EAS development build para acceder a los datos de tu wearable.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.settingsButton}
+                        onPress={() => navigation.navigate('HomeHealth')}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.settingsButtonText}>Volver al inicio</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ── Estado: completado ───────────────────────────────────────────────────
+    const isComplete = phase === 'complete';
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader
-                title={isComplete ? 'Listo' : 'Emparejando'}
+                title={isComplete ? 'Listo' : 'Conectando'}
                 onBack={() => navigation.goBack()}
             />
 
             <View style={styles.content}>
                 <View style={styles.ringWrapper}>
-                    <Animated.View style={{ transform: [{ rotate }] }}>
+                    {!isComplete ? (
+                        <Animated.View style={{ transform: [{ rotate }] }}>
+                            <Svg width={RING_SIZE} height={RING_SIZE}>
+                                <Circle
+                                    cx={RING_SIZE / 2}
+                                    cy={RING_SIZE / 2}
+                                    r={(RING_SIZE - RING_STROKE) / 2}
+                                    stroke={colors.grayLight}
+                                    strokeWidth={RING_STROKE}
+                                    fill="none"
+                                />
+                                <Circle
+                                    cx={RING_SIZE / 2}
+                                    cy={RING_SIZE / 2}
+                                    r={(RING_SIZE - RING_STROKE) / 2}
+                                    stroke={colors.primary}
+                                    strokeWidth={RING_STROKE}
+                                    fill="none"
+                                    strokeDasharray={`${Math.PI * (RING_SIZE - RING_STROKE) * 0.28} ${Math.PI * (RING_SIZE - RING_STROKE)}`}
+                                    strokeLinecap="round"
+                                />
+                            </Svg>
+                        </Animated.View>
+                    ) : (
                         <Svg width={RING_SIZE} height={RING_SIZE}>
                             <Circle
                                 cx={RING_SIZE / 2}
                                 cy={RING_SIZE / 2}
                                 r={(RING_SIZE - RING_STROKE) / 2}
-                                stroke={colors.grayLight}
+                                stroke={colors.success}
                                 strokeWidth={RING_STROKE}
                                 fill="none"
-                            />
-                            <Circle
-                                cx={RING_SIZE / 2}
-                                cy={RING_SIZE / 2}
-                                r={(RING_SIZE - RING_STROKE) / 2}
-                                stroke={colors.primary}
-                                strokeWidth={RING_STROKE}
-                                fill="none"
-                                strokeDasharray={`${Math.PI * (RING_SIZE - RING_STROKE) * 0.28} ${Math.PI * (RING_SIZE - RING_STROKE)}`}
-                                strokeLinecap="round"
                             />
                         </Svg>
-                    </Animated.View>
+                    )}
                     <View style={styles.deviceIconBox}>
-                        <Ionicons name="watch-outline" size={40} color={colors.primary} />
+                        <Ionicons
+                            name={isComplete ? 'checkmark' : 'watch-outline'}
+                            size={40}
+                            color={isComplete ? colors.success : colors.primary}
+                        />
                     </View>
                 </View>
 
                 <Text style={styles.title}>
-                    {isComplete ? `${deviceName} conectado` : `Buscando tu ${deviceName}…`}
+                    {isComplete ? `${deviceName} conectado` : `Conectando ${deviceName}…`}
                 </Text>
                 <Text style={styles.subtitle}>
                     {isComplete
                         ? 'Ya recibimos tus datos en tiempo real.'
-                        : 'Acerca el reloj y mantenlo desbloqueado.'}
+                        : 'El SO te pedirá permiso para leer tus datos de salud.'}
                 </Text>
 
-                {/* Lista de pasos con check dinámico */}
                 <View style={styles.stepsList}>
                     {STEPS.map((step, i) => {
                         const done = isComplete || i < stepIdx;
@@ -153,6 +256,10 @@ export default function PairingScreen({ navigation, route }) {
     );
 }
 
+function _wait(ms) {
+    return new Promise((res) => setTimeout(res, ms));
+}
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -163,6 +270,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: spacing.xl,
         paddingTop: spacing.xl,
+    },
+    centeredContent: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xl,
     },
     ringWrapper: {
         width: RING_SIZE,
@@ -220,5 +333,44 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '700',
+    },
+    deniedTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: colors.text,
+        textAlign: 'center',
+        marginTop: spacing.lg,
+        marginBottom: spacing.sm,
+    },
+    deniedSubtitle: {
+        fontSize: 15,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: spacing.xl,
+    },
+    settingsButton: {
+        backgroundColor: colors.primary,
+        paddingVertical: 14,
+        paddingHorizontal: spacing.xl,
+        borderRadius: 999,
+        alignSelf: 'stretch',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    settingsButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    skipButton: {
+        paddingVertical: 12,
+        alignSelf: 'stretch',
+        alignItems: 'center',
+    },
+    skipButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.textSecondary,
     },
 });

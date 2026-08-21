@@ -1,5 +1,7 @@
 // Bloque 3 · Salud — Pantalla 3.2 · Conexión de dispositivo
-import React, { useState } from 'react';
+// Todos los wearables sincronizan a través de HealthKit (iOS) o Health Connect (Android).
+// Seleccionar uno navega al flujo de permisos real en PairingScreen.
+import React from 'react';
 import {
     View,
     Text,
@@ -11,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
-import ConnectionErrorModal from '../../components/ConnectionErrorModal';
 
 // Datos simulados de dispositivos (mock hasta integrar backend)
 const devicesData = [
@@ -63,21 +64,8 @@ const devicesData = [
 ];
 
 export default function ConnectDeviceScreen({ navigation }) {
-    const [errorDevice, setErrorDevice] = useState(null);
-
-    // Mock determinista: Garmin (id '2') dispara error, el resto navega al flujo 3.3.
-    // Cuando exista pairing real, sustituir por el resultado del backend.
+    // Todos los dispositivos abren el flujo de permisos de salud del SO
     const handleConnect = (device) => {
-        if (device.id === '2') {
-            setErrorDevice(device);
-        } else {
-            navigation.navigate('Pairing', { device });
-        }
-    };
-
-    const handleRetry = () => {
-        const device = errorDevice;
-        setErrorDevice(null);
         navigation.navigate('Pairing', { device });
     };
 
@@ -148,11 +136,6 @@ export default function ConnectDeviceScreen({ navigation }) {
                 <View style={{ height: spacing.lg }} />
             </ScrollView>
 
-            <ConnectionErrorModal
-                visible={!!errorDevice}
-                onRetry={handleRetry}
-                onClose={() => setErrorDevice(null)}
-            />
         </SafeAreaView>
     );
 }
