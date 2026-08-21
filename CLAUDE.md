@@ -268,6 +268,44 @@ Mensaje: 1–500 caracteres (validado con Zod y con CHECK en BD).
 **Nota sobre naming**: el cliente mobile se llama `settingsApi` (en `settings.js`)
 porque `config.js` ya está tomado por la utilidad de URL base del cliente HTTP.
 
+### Salud (Bloque 3) — integración con plataformas de salud del SO
+
+Toda la UI del bloque está implementada (14 pantallas). Los datos reales vienen
+de HealthKit (iOS) y Health Connect (Android) a través de `HealthService.js`.
+
+**`apps/mobile/src/services/HealthService.js`** — abstracción multiplataforma:
+- `isHealthAvailable()` — false en Expo Go, false si módulos no cargados.
+- `requestHealthPermissions()` — llama `HealthKit.requestAuthorization` (iOS) o
+  `HealthConnect.requestPermission` (Android). Retorna boolean.
+- `getHealthMetrics()` — lee HR, FC reposo, HRV, SpO₂, sueño y pasos de las últimas 24 h.
+  Retorna `{ heartRate, restingHeartRate, hrv, spo2, sleepHours, steps }` o `null`.
+- Carga lazy (`require()` condicional, NO import) igual que expo-notifications en App.js.
+
+**Paquetes** (en `apps/mobile/package.json`):
+- `@kingstinct/react-native-healthkit ^13.0.0` — iOS HealthKit (Expo config plugin incluido).
+- `react-native-health-connect ^3.1.0` — Android Health Connect (Expo config plugin incluido).
+- Ambos requieren **EAS development build** (no funcionan en Expo Go).
+
+**`app.json` plugins**: `@kingstinct/react-native-healthkit` con `NSHealthShareUsageDescription`
+y `react-native-health-connect` con permisos `android.permission.health.*`.
+
+**Flujo pairing** (`PairingScreen.js`): monta pantalla → llama `requestHealthPermissions()`
+automáticamente. Estados: `loading → complete / denied / unavailable`.
+`denied`: "Ir a Ajustes" (`Linking.openSettings()`) + "Continuar igualmente".
+
+**Datos en HomeHealth** (`HomeHealthScreen.js`): `useFocusEffect` + `getHealthMetrics()`.
+Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.
+
+**Motor de fatiga** (`FatigueEngineScreen.js`): recibe `metrics` vía `route.params`.
+`buildSignals(metrics)` → status `ok/warning/critical/unknown` por señal.
+Nivel: `high` (≥2 críticas), `medium` (1 crítica o ≥2 warning), `low` (resto).
+
+**Permisos de notificaciones** (`PermissionsScreen.js`):
+- "¡A por más!" → `Notifications.requestPermissionsAsync()` real (lazy require).
+- Si denegado: `DeniedState` con texto correcto + "Ir a Ajustes" (`Linking.openSettings()`).
+- `App.js registerForPushNotifications()`: cuando `existing === 'denied'`, muestra
+  `Alert` con "Ir a Configuración" → `Linking.openSettings()` en vez de retornar silencio.
+
 ### Notificaciones Push (Bloque 13) — endpoints propios
 
 Infraestructura completa de push notifications en 3 fases. Rutas bajo `/push/`.

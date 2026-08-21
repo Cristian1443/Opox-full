@@ -5,6 +5,59 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-20 — Bloque 3 · Salud + GAP Notificaciones
+
+Rama: `feat/bloque-13-notificaciones`.
+
+### Bloque 3 · Salud — Integración real con HealthKit y Health Connect (Opción A)
+
+El bloque estaba 100% mock (datos hardcodeados, animaciones sin lógica real). Se implementó
+la capa de integración completa con las APIs de salud del SO sin necesidad de ejectar a bare workflow:
+
+- **`apps/mobile/src/services/HealthService.js`** (nuevo): abstracción multiplataforma.
+  - iOS: `@kingstinct/react-native-healthkit` con carga lazy (patrón Expo Go).
+  - Android: `react-native-health-connect`.
+  - Lee: HR, FC reposo, HRV, SpO₂, sueño y pasos de las últimas 24 h.
+  - `isHealthAvailable()` — false en Expo Go; require lazy para evitar crash.
+  - `requestHealthPermissions()` — solicita permisos al SO en la plataforma correcta.
+  - `getHealthMetrics()` — retorna las métricas o `null` sin permisos.
+
+- **`PairingScreen.js`**: reemplaza `setTimeout` por flujo real de permisos.
+  Fases: `loading → (SO pide permisos) → complete / denied / unavailable`.
+  Si deniegan: botón "Ir a Ajustes" + "Continuar igualmente".
+  Si Expo Go: pantalla informativa con instrucciones para EAS build.
+
+- **`ConnectDeviceScreen.js`**: eliminado el mock de error de Garmin (id '2').
+  Todos los dispositivos abren el flujo de permisos real.
+
+- **`HomeHealthScreen.js`**: carga métricas reales con `useFocusEffect`.
+  Heurística de energía: `HRV (50%) + sueño (30%) + FC reposo (20%)`.
+  Muestra `—` cuando no hay datos. CTA "Conectar wearable" cuando sin datos.
+  Chip de header muestra "Conectado" (verde) o "Conectar" (primario).
+
+- **`FatigueEngineScreen.js`**: señales dinámicas calculadas desde métricas reales.
+  `buildSignals(metrics)` calcula status (ok/warning/critical/unknown) para cada señal.
+  Nivel de fatiga derivado del conteo de señales activas.
+
+- **`app.json`**: plugins `@kingstinct/react-native-healthkit` y `react-native-health-connect`
+  con `NSHealthShareUsageDescription` (iOS) y permisos `android.permission.health.*`.
+
+- **`package.json`**: dependencias `@kingstinct/react-native-healthkit ^13.0.0` y
+  `react-native-health-connect ^3.1.0` instaladas. EAS build requerido para usar.
+
+### GAP Notificaciones — fix en dos frentes
+
+- **`PermissionsScreen.js`**: el botón "¡A por más!" ahora llama la API real
+  `Notifications.requestPermissionsAsync()` con el mismo patrón de carga lazy que App.js.
+  Si el usuario deniega → `DeniedState` con "Ir a Ajustes" (`Linking.openSettings()`).
+  Texto corregido: antes decía "Sin acceso a Salud", ahora habla de notificaciones.
+
+- **`App.js` `registerForPushNotifications()`**: si `existing === 'denied'`
+  (el usuario ya había denegado antes y el SO no muestra el diálogo),
+  se muestra `Alert.alert()` ofreciendo "Ir a Configuración" → `Linking.openSettings()`.
+
+---
+
 ## 2026-08-21 — Bloque 5 · Motivación — Correcciones y mejoras post-testing en dispositivo
 
 Rama: `feat/bloque-13-notificaciones`. Sesión de corrección intensiva tras pruebas
