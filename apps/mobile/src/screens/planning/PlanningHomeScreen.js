@@ -160,12 +160,13 @@ export default function PlanningHomeScreen({ navigation }) {
                     iconBg="#FDEBE9"
                     icon={<Svg width={24} height={24} viewBox="0 0 24 24" fill="none"><Path d="M3 5h18v16H3z" stroke="#E2483D" strokeWidth={1.6} /><Path d="M3 9h18M8 3v4M16 3v4" stroke="#E2483D" strokeWidth={1.6} /></Svg>}
                     title={`Tu examen es en ${summary.alerts.examSoonDays} días`}
-                    description="Entras en la recta final. La IA puede activar el modo simulacros intensivos."
+                    description="Entras en la recta final. Al activar, tu objetivo diario sube al 125% para simular el ritmo real del examen."
                     primaryLabel="Activar recta final"
                     secondaryLabel="Ahora no"
                     onPrimaryPress={async () => {
                         await planningApi.updatePlan({ intensity: 'high' });
                         setAlert(null);
+                        navigation.navigate('PlanningToday');
                     }}
                     onSecondaryPress={() => setAlert(null)}
                 />

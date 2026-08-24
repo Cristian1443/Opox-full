@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { useFocusEffect } from '@react-navigation/native';
 import ScreenHeader from '../../components/ScreenHeader';
 import NudgeModal from '../../components/NudgeModal';
 import { planningApi, boeApi } from '../../api';
@@ -83,13 +84,17 @@ export default function PlanningTodayScreen({ navigation }) {
     const [freeSubtitle, setFreeSubtitle] = useState('');
 
     const load = useCallback(() => {
-        Promise.all([planningApi.listTasks(), planningApi.getPlan()]).then(([t, p]) => {
+        let cancelled = false;
+        Promise.all([planningApi.listTasks(), planningApi.getSummary()]).then(([t, s]) => {
+            if (cancelled) return;
             if (t.data) setTasks(t.data);
-            if (p.data) setGoalCount(p.data.testsPerDay);
+            // getSummary aplica applyIntensity, igual que el hub y el ToggleTaskUseCase
+            if (s.data) setGoalCount(s.data.today.goalCount);
         });
+        return () => { cancelled = true; };
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useFocusEffect(load);
 
     const openModal = useCallback(() => {
         setTaskType('test');

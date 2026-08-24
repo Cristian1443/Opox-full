@@ -110,6 +110,11 @@ export default function PlanningEditScreen({ navigation }) {
             ? `${examYear}-${examMonth.padStart(2, '0')}-${examDay.padStart(2, '0')}`
             : '';
 
+    const effectiveGoal = Math.max(
+        1,
+        Math.round(testsPerDay * (intensity === 'low' ? 0.75 : intensity === 'high' ? 1.25 : 1)),
+    );
+
     const toggleDay = (weekday) => {
         setStudyDays((prev) =>
             prev.includes(weekday) ? prev.filter((d) => d !== weekday) : [...prev, weekday].sort(),
@@ -152,6 +157,12 @@ export default function PlanningEditScreen({ navigation }) {
                             <Text style={styles.stepperBtnText}>+</Text>
                         </TouchableOpacity>
                     </View>
+                    {effectiveGoal !== testsPerDay && (
+                        <Text style={styles.effectiveGoal}>
+                            Con intensidad {INTENSITY_LABELS[intensity].toLowerCase()}: objetivo real{' '}
+                            <Text style={styles.effectiveGoalBold}>{effectiveGoal} tests/día</Text>
+                        </Text>
+                    )}
                 </View>
 
                 <View style={styles.card}>
@@ -238,6 +249,8 @@ const styles = StyleSheet.create({
     dayCircTextActive: { color: '#fff' },
     intensityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     intensityPill: { fontSize: 11, fontWeight: '700', color: '#FF6B4A', backgroundColor: '#FFF1EC', paddingVertical: 5, paddingHorizontal: 11, borderRadius: 9 },
+    effectiveGoal: { fontSize: 10.5, color: '#8A92A0', textAlign: 'center', marginTop: 8 },
+    effectiveGoalBold: { fontWeight: '700', color: '#FF6B4A' },
     intensityHints: { marginTop: 6 },
     intensityHint: { fontSize: 10, color: '#AEB5C2' },
     dateHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
