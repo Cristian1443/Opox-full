@@ -88,6 +88,49 @@ Contratos en `packages/types/src/contracts/`:
 Flujo de integración: **mobile → nuestro backend → OpenAI**. La API key de IA
 nunca va al móvil; vive en `apps/backend/.env` (`AI_API_KEY`).
 
+### Onboarding / Acceso (Bloque 0 y 1) — sin backend propio
+
+El flujo de entrada usa AsyncStorage para gestionar el estado de onboarding. No hay
+endpoints nuevos — reutiliza `PATCH /planning/plan` para inicializar la intensidad.
+
+**Flags de AsyncStorage** (todos exportados desde su pantalla de origen):
+- `ONBOARDING_COMPLETED_KEY = 'opox.onboardingCompleted'` — exportado desde `SplashScreen.js`.
+  Escrito en `SesionIniciadaScreen` al completar login. Mientras exista, `SplashScreen`
+  manda al usuario a `Entrada` (login) en vez de al slider de bienvenida.
+- `PENDING_OPOSICION_KEY` — exportado desde `OppositionSelectorScreen.js`.
+  Guarda la oposición elegida para aplicarla en `SesionIniciadaScreen` via `authApi.updateProfile`.
+- `PENDING_LEVEL_TEST_KEY` — exportado desde `LevelTestInProgressScreen.js`.
+  Permite reanudar el test si la app se cierra a mitad.
+- `LEVEL_TEST_RESULT_KEY = 'opox.levelTestResult'` — exportado desde `LevelTestInProgressScreen.js`.
+  Guarda `{ score, level, intensity }` al completar el test. Leído en `SesionIniciadaScreen`
+  para llamar `planningApi.updatePlan({ intensity })`. Borrado tras aplicar.
+
+**`SplashScreen.resolveOnboardingEntryRoute()`** — árbol de decisión sin sesión:
+1. `ONBOARDING_COMPLETED_KEY` existe → `'Entrada'` (login directo).
+2. `PENDING_LEVEL_TEST_KEY` existe → `'LevelTestInProgress'` (reanudar test).
+3. `PENDING_OPOSICION_KEY` existe → `'LevelTestProposal'`.
+4. Ninguno → `'OnboardingSlider'` (usuario completamente nuevo).
+
+**Test de nivel (`LevelTestInProgressScreen.js`)**:
+- 20 preguntas únicas distribuidas en 4 temas: 8 Constitución, 8 Ley 39/2015, 2 Ley 40/2015, 2 Org. del Estado.
+- `calcLevelAndIntensity(percent)`: `≥75% → Avanzado/high`, `≥50% → Intermedio/medium`, else `Básico/low`.
+- `calcStrengthsAndWeaknesses(answers)`: hit rate por tema, ≥50% → fortaleza, <50% → a reforzar.
+- Cronómetro real con `startTimeRef = useRef(Date.now())`.
+- Navegación hacia atrás permitida dentro del test (array `answers` guarda la elección por pregunta).
+- Último botón dice "Ver resultado" en vez de "Confirmar respuesta".
+- Al finalizar: guarda en `LEVEL_TEST_RESULT_KEY`, borra `PENDING_LEVEL_TEST_KEY`, navega con `replace('LevelTestResult', { ...params reales })`.
+
+**`SesionIniciadaScreen.js`** — tres operaciones en `Promise.all` tras login:
+1. `applyPendingOposicion()` — aplica oposición guardada vía `authApi.updateProfile`.
+2. `applyLevelTestResult()` — aplica intensidad vía `planningApi.updatePlan({ intensity })`.
+3. `markOnboardingCompleted()` — escribe `ONBOARDING_COMPLETED_KEY = '1'`.
+
+**Navegación post-test** — usar siempre `replace` (no `navigate`) para evitar vuelta atrás:
+- `LevelTestProposalScreen`: "Ahora no" → `replace('Permissions')`.
+- `LevelTestResultScreen`: "Crear mi plan" → `replace('Permissions')`.
+
+---
+
 ### Planificación (Bloque 4) — endpoints propios
 
 Rutas bajo `/planning/`. Revisado y auditado post-testing (2026-08-23).
@@ -419,7 +462,7 @@ pnpm lint                       # lint completo
 
 | Bloque | Nombre | Estado |
 |---|---|---|
-| 1 | Acceso (Auth/Onboarding) | Frontend cerrado |
+| 1 | Acceso (Auth/Onboarding) | Frontend cerrado + Bloque 0 revisado: onboarding no repetido, test real de 20 preguntas, inicialización de intensidad del plan |
 | 2 | Dashboard | Frontend + backend completo |
 | 3 | Salud | Frontend cerrado |
 | 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |

@@ -82,6 +82,71 @@ La vista Macro mostraba 4 fases vacías sin distribución de temario.
 
 ---
 
+## 2026-08-23 — Bloque 0 · Onboarding — Revisión completa del flujo de entrada
+
+Rama: `feat/revision-bloque-0` (nacida de `main` tras merge de bloque 4).
+
+Auditoría y corrección del flujo de onboarding. Se identificaron 3 bugs críticos que
+hacían que el selector de oposición y el test de nivel aparecieran en **cada arranque**
+de la app, y que el test no tuviera ningún efecto sobre el plan de estudio.
+
+### Bug 1 · El onboarding se repetía en cada arranque o al cerrar sesión
+
+**Antes:** `SplashScreen.resolveOnboardingEntryRoute()` evaluaba `PENDING_OPOSICION_KEY`
+y `PENDING_LEVEL_TEST_KEY`, pero nunca existía un flag que marcara que el onboarding
+ya estaba completado. Resultado: cada arranque o logout volvía al slider de bienvenida
+y al selector de oposición.
+
+**Después:** Se añadió `ONBOARDING_COMPLETED_KEY = 'opox.onboardingCompleted'` (AsyncStorage).
+- `SplashScreen.resolveOnboardingEntryRoute()` lo comprueba primero. Si existe → `Entrada` (login directo).
+- `SesionIniciadaScreen` lo escribe (`'1'`) justo antes de navegar al Dashboard.
+- El selector de oposición y el test de nivel solo aparecen en instalación nueva o dispositivo sin sesión previa.
+
+### Bug 2 · El test de nivel no estaba conectado al plan de estudio
+
+**Antes:** `LevelTestInProgressScreen` era un flujo visual sin cálculo real. Navegaba a
+`LevelTestResult` sin parámetros reales. No persistía ningún resultado.
+
+**Después:**
+- 20 preguntas únicas (no cicladas) distribuidas en 4 temas: 8 Constitución, 8 Ley 39/2015, 2 Ley 40/2015, 2 Org. del Estado.
+- Cálculo real de puntuación y nivel: `≥75% → Avanzado/high`, `50-74% → Intermedio/medium`, `<50% → Básico/low`.
+- Análisis de fortalezas y debilidades por tema (hit rate ≥50% → fortaleza, <50% → a reforzar).
+- Cronómetro real con `useRef(Date.now())`.
+- Resultado guardado en `LEVEL_TEST_RESULT_KEY = 'opox.levelTestResult'` (AsyncStorage).
+- `LevelTestResultScreen` recibe y muestra los datos reales (porcentaje, aciertos, tiempo, chips de fortalezas/debilidades).
+
+### Bug 3 · El resultado del test no inicializaba la intensidad del plan
+
+**Antes:** El campo `intensity` del plan de estudio siempre arrancaba con el valor por defecto
+y ningún paso del onboarding lo modificaba.
+
+**Después:** `SesionIniciadaScreen` lee `LEVEL_TEST_RESULT_KEY`, extrae `intensity` (`low/medium/high`)
+y llama `planningApi.updatePlan({ intensity })` — reutilizando el endpoint existente `PATCH /planning/plan`.
+No se necesitó ningún endpoint ni tabla nueva en Supabase.
+
+### Flujo completo antes y después
+
+| Paso | Antes | Después |
+|---|---|---|
+| Arranque con sesión guardada | → Dashboard ✓ | → Dashboard ✓ (sin cambios) |
+| Arranque sin sesión, onboarding completado | → Slider → OppositionSelector cada vez | → Login directo (Entrada) |
+| Arranque sin sesión, usuario nuevo | → Slider → OppositionSelector | → Slider → OppositionSelector (igual) |
+| Test de nivel: preguntas | 3 preguntas cicladas (placeholder) | 20 preguntas únicas por tema |
+| Test de nivel: resultado | Pantalla de resultado vacía / valores hardcodeados | Resultado real con score, nivel, fortalezas y debilidades reales |
+| Test de nivel: efecto en el plan | Ninguno | Inicializa `intensity` del plan (`low/medium/high`) vía `PATCH /planning/plan` |
+| "Ahora no" en propuesta de test | `navigate('Permissions')` (puede volver atrás) | `replace('Permissions')` (sin vuelta atrás) |
+| CTA "Crear mi plan" en resultado | `navigate('Permissions')` (puede volver al test) | `replace('Permissions')` (sin vuelta al test) |
+
+### Archivos modificados
+
+- `apps/mobile/src/screens/onboarding/SplashScreen.js` — `ONBOARDING_COMPLETED_KEY`, lógica de `resolveOnboardingEntryRoute()`
+- `apps/mobile/src/screens/onboarding/LevelTestInProgressScreen.js` — reescritura completa: 20 preguntas, cálculo real, `LEVEL_TEST_RESULT_KEY`
+- `apps/mobile/src/screens/onboarding/LevelTestResultScreen.js` — `replace` en CTA
+- `apps/mobile/src/screens/onboarding/LevelTestProposalScreen.js` — `replace` en "Ahora no"
+- `apps/mobile/src/screens/access/SesionIniciadaScreen.js` — `applyLevelTestResult()`, `markOnboardingCompleted()`, `Promise.all` paralelo
+
+---
+
 ## 2026-08-20 — Bloque 3 · Salud + GAP Notificaciones
 
 Rama: `feat/bloque-13-notificaciones`.
