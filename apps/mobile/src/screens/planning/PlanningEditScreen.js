@@ -121,11 +121,6 @@ export default function PlanningEditScreen({ navigation }) {
         );
     };
 
-    const cycleIntensity = () => {
-        const i = INTENSITY_ORDER.indexOf(intensity);
-        setIntensity(INTENSITY_ORDER[(i + 1) % INTENSITY_ORDER.length]);
-    };
-
     const clearDate = () => { setExamYear(''); setExamMonth(''); setExamDay(''); };
 
     const handleSave = async () => {
@@ -184,18 +179,25 @@ export default function PlanningEditScreen({ navigation }) {
                     </View>
                 </View>
 
-                <TouchableOpacity style={styles.card} onPress={cycleIntensity} activeOpacity={0.7}>
-                    <View style={styles.intensityRow}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.cardTitle}>Intensidad</Text>
-                            <Text style={styles.muted}>Ajusta la carga diaria según tu energía</Text>
-                        </View>
-                        <Text style={styles.intensityPill}>{INTENSITY_LABELS[intensity]} ›</Text>
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Intensidad</Text>
+                    <Text style={styles.muted}>Ajusta la carga diaria según tu energía</Text>
+                    <View style={styles.intensityBtns}>
+                        {INTENSITY_ORDER.map((level) => (
+                            <TouchableOpacity
+                                key={level}
+                                style={[styles.intensityBtn, intensity === level && styles.intensityBtnActive]}
+                                onPress={() => setIntensity(level)}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={[styles.intensityBtnText, intensity === level && styles.intensityBtnTextActive]}>
+                                    {INTENSITY_LABELS[level]}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
-                    <View style={styles.intensityHints}>
-                        <Text style={styles.intensityHint}>Baja = 75% de tests · Media = 100% · Alta = 125%</Text>
-                    </View>
-                </TouchableOpacity>
+                    <Text style={styles.intensityHint}>Baja = 75% · Media = 100% · Alta = 125%</Text>
+                </View>
 
                 <View style={styles.card}>
                     <View style={styles.dateHeader}>
@@ -247,11 +249,13 @@ const styles = StyleSheet.create({
     dayCircActive: { backgroundColor: '#FF6B4A', borderColor: '#FF6B4A' },
     dayCircText: { fontSize: 11, fontWeight: '700', color: '#9AA2B1' },
     dayCircTextActive: { color: '#fff' },
-    intensityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    intensityPill: { fontSize: 11, fontWeight: '700', color: '#FF6B4A', backgroundColor: '#FFF1EC', paddingVertical: 5, paddingHorizontal: 11, borderRadius: 9 },
+    intensityBtns: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 8 },
+    intensityBtn: { flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: '#E4E8F0', alignItems: 'center' },
+    intensityBtnActive: { backgroundColor: '#FF6B4A', borderColor: '#FF6B4A' },
+    intensityBtnText: { fontSize: 12, fontWeight: '700', color: '#9AA2B1' },
+    intensityBtnTextActive: { color: '#fff' },
     effectiveGoal: { fontSize: 10.5, color: '#8A92A0', textAlign: 'center', marginTop: 8 },
     effectiveGoalBold: { fontWeight: '700', color: '#FF6B4A' },
-    intensityHints: { marginTop: 6 },
     intensityHint: { fontSize: 10, color: '#AEB5C2' },
     dateHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
     clearBtn: { backgroundColor: '#F4F6FA', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },

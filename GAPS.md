@@ -5,6 +5,17 @@ Actualizar este fichero al cerrar cada ítem.
 
 ---
 
+## Bloque 4 · Planificación
+
+### GAP-04-01 — Selector de fecha de examen: teclado numérico en vez de calendario
+**Estado**: Funcional, UX mejorable  
+**Pantalla**: `PlanningEditScreen.js` → campo "Fecha de examen"  
+**Contexto**: El selector actual usa tres `TextInput` (AAAA / MM / DD) con auto-avance de foco. Funciona correctamente pero no es tan intuitivo como un calendario.  
+**Solución propuesta**: Sustituir por un date-picker nativo. En React Native la opción estándar es `@react-native-community/datetimepicker` (ya disponible en Expo). Requiere manejar `DateTimePickerEvent` y formatear la fecha resultante al formato `YYYY-MM-DD` que espera el backend.  
+**Complejidad**: Baja (~1 h). No desbloquea nada crítico.
+
+---
+
 ## Bloque 5 · Motivación
 
 ### GAP-05-01 — Verificación real de aprobación (Muro de la Gloria 5.4)

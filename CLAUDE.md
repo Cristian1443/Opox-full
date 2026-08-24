@@ -88,6 +88,41 @@ Contratos en `packages/types/src/contracts/`:
 Flujo de integración: **mobile → nuestro backend → OpenAI**. La API key de IA
 nunca va al móvil; vive en `apps/backend/.env` (`AI_API_KEY`).
 
+### Planificación (Bloque 4) — endpoints propios
+
+Rutas bajo `/planning/`. Revisado y auditado post-testing (2026-08-23).
+
+**Zona horaria — patrón crítico**:
+- `todayIso()` en backend usa UTC. Para evitar desfase horario, el mobile envía siempre
+  `localDate = new Date().toLocaleDateString('sv')` (locale sueco → `YYYY-MM-DD` en la TZ del dispositivo).
+- `getSummary`, `listTasks` y `getWeek` aceptan `?localDate=` opcional; si viene, lo usan en vez de `todayIso()`.
+
+**Intensidad — `applyIntensity(base, intensity)`**:
+- Helper en `application/planning/dateUtils.ts`. `low=0.75×`, `medium=1×`, `high=1.25×`. `Math.max(1, Math.round(...))`.
+- Aplicado en 3 sitios: `GetPlanningSummaryUseCase` (goalCount), `ToggleTaskUseCase` (umbral de meta completada), `PlanningTodayScreen` (preview cliente).
+- `PlanningEditScreen` muestra "objetivo real N tests/día" cuando la intensidad modifica el número base.
+
+**Modal de tareas (PlanningToday)**:
+- Tab "Test de práctica": carga temas con `boeApi.listTopics('justicia-tramitacion')` (NO `trainingApi.listTopics()` — sin `oposicion` devuelve 0 filas).
+- `TrainingTopic` usa campo `label` (no `name`).
+- Subtitle de tarea test: `JSON.stringify({ topicId, count })`. `tryParseTestParams(subtitle)` lo decodifica.
+- Al pulsar "Empezar": `navigation.navigate('GeneratorConfig', { topicId, questionCount })`.
+
+**Macro con temas reales**:
+- `PlanningController.getMacro` llama `listTopics` en paralelo. `enrichMacroWithTopics()` distribuye temas por fase con pesos `[0.35, 0.30, 0.25, 0.10]`.
+- `container.ts` pasa `listTopics: useCases.listTopics` al `PlanningController`.
+
+**Alertas del hub (PlanningHome)**:
+- `let _alertsShownThisSession = false` a nivel de módulo (no `useRef`) — persiste aunque el componente se desmonte y remonte al navegar.
+- Solo muestra el pop-up de "examen próximo" o "días sin estudiar" una vez por sesión de app.
+- "Activar recta final": llama `planningApi.updatePlan({ intensity: 'high' })` y navega a `PlanningToday`.
+
+**Patrón de recarga en pantallas de planificación**:
+- Todas usan `useFocusEffect(useCallback(load, []))` de `@react-navigation/native`, no `useEffect`.
+- `DashboardScreen` carga `planningApi.getSummary()` para la tarjeta de plan (sin esto muestra 0%).
+
+---
+
 ### Motivación y Gamificación (Bloque 5) — endpoints propios
 
 Rutas bajo `/motivation/`. Cubre racha, rankings, clanes, retos de clan y Muro de la Gloria.
@@ -387,7 +422,7 @@ pnpm lint                       # lint completo
 | 1 | Acceso (Auth/Onboarding) | Frontend cerrado |
 | 2 | Dashboard | Frontend + backend completo |
 | 3 | Salud | Frontend cerrado |
-| 4 | Planificación | Frontend + backend completo |
+| 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |
 | 5 | Motivación | Frontend + backend completo |
 | 6 | Entrenamiento | Frontend + backend + IA completo (los 4 flujos cableados a OpenAI real) |
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
