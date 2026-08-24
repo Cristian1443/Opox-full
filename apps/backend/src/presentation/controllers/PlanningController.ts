@@ -8,6 +8,7 @@ import type {
     MacroResultDTO,
     PlanningSummaryDTO,
     ToggleTaskResultDTO,
+    TrainingTopic,
 } from '@opox/types';
 import type {
     GetPlanningSummaryUseCase,
@@ -21,11 +22,30 @@ import type {
     ListAgendaUseCase,
     CreateAgendaDateUseCase,
     ToggleTaskResult,
+    ListTopicsUseCase,
 } from '../../application';
 import type { StudyPlan, StudyTask, PlanDate } from '../../domain';
 import type { WeekResult } from '../../application/planning/WeekUseCase';
-import type { MacroResult } from '../../application/planning/MacroUseCase';
+import type { MacroResult, MacroPhase } from '../../application/planning/MacroUseCase';
 import type { PlanningSummary } from '../../application/planning/GetPlanningSummaryUseCase';
+
+// Pesos de las fases — deben coincidir con los de MacroUseCase.PHASE_DEFS
+const PHASE_WEIGHTS = [0.35, 0.30, 0.25, 0.10];
+
+/** Enriquece las fases macro con los temas del temario distribuidos proporcionalmente. */
+function enrichMacroWithTopics(
+    macro: MacroResult,
+    topics: TrainingTopic[],
+): MacroResult & { phases: Array<MacroPhase & { topics: { topicId: string; name: string }[] }> } {
+    let idx = 0;
+    const phases = macro.phases.map((phase, i) => {
+        const count = Math.max(1, Math.round(topics.length * (PHASE_WEIGHTS[i] ?? 0.1)));
+        const phaseTopics = topics.slice(idx, Math.min(idx + count, topics.length));
+        idx += count;
+        return { ...phase, topics: phaseTopics.map((t) => ({ topicId: t.topicId, name: t.label })) };
+    });
+    return { ...macro, phases };
+}
 
 /** Controller del Bloque 4 · Planificación. Mismo patrón que Auth/Dashboard. */
 export class PlanningController {
@@ -39,6 +59,7 @@ export class PlanningController {
             toggleTask: ToggleTaskUseCase;
             getWeek: GetWeekUseCase;
             getMacro: GetMacroUseCase;
+            listTopics: ListTopicsUseCase;
             listAgenda: ListAgendaUseCase;
             createAgendaDate: CreateAgendaDateUseCase;
         },
@@ -123,7 +144,8 @@ export class PlanningController {
 
     getSummary = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const summary = await this.deps.getSummary.execute(req.authUser!.id);
+            const localDate = req.query['localDate'] as string | undefined;
+            const summary = await this.deps.getSummary.execute(req.authUser!.id, { localDate });
             this.ok(res, 200, this.serializeSummary(summary));
         } catch (err) { next(err); }
     };
@@ -144,8 +166,12 @@ export class PlanningController {
 
     listTasks = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const query = req.validatedQuery as { date?: string };
-            const tasks = await this.deps.listTasks.execute({ userId: req.authUser!.id, date: query.date });
+            const query = req.validatedQuery as { date?: string; localDate?: string };
+            const tasks = await this.deps.listTasks.execute({
+                userId: req.authUser!.id,
+                date: query.date,
+                localDate: query.localDate,
+            });
             this.ok(res, 200, tasks.map((t) => this.serializeTask(t)));
         } catch (err) { next(err); }
     };
@@ -170,7 +196,7 @@ export class PlanningController {
 
     getWeek = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const query = req.validatedQuery as { weekStart?: string; selectedDate?: string };
+            const query = req.validatedQuery as { weekStart?: string; selectedDate?: string; localDate?: string };
             const week = await this.deps.getWeek.execute({ userId: req.authUser!.id, ...query });
             this.ok(res, 200, this.serializeWeek(week));
         } catch (err) { next(err); }
@@ -178,8 +204,13 @@ export class PlanningController {
 
     getMacro = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const macro = await this.deps.getMacro.execute(req.authUser!.id);
-            this.ok(res, 200, this.serializeMacro(macro));
+            const oposicion = (req.query['oposicion'] as string) || 'justicia-tramitacion';
+            const [macro, topics] = await Promise.all([
+                this.deps.getMacro.execute(req.authUser!.id),
+                this.deps.listTopics.execute(oposicion),
+            ]);
+            const enriched = macro ? enrichMacroWithTopics(macro, topics) : null;
+            this.ok(res, 200, enriched);
         } catch (err) { next(err); }
     };
 

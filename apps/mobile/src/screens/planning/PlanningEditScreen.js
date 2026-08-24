@@ -13,8 +13,6 @@ export default function PlanningEditScreen({ navigation }) {
     const [studyDays, setStudyDays] = useState([1, 2, 3, 4, 5]);
     const [intensity, setIntensity] = useState('medium');
     const [examDate, setExamDate] = useState('');
-    const [saved, setSaved] = useState(false);
-
     useEffect(() => {
         planningApi.getPlan().then(({ data }) => {
             if (!data) return;
@@ -36,14 +34,13 @@ export default function PlanningEditScreen({ navigation }) {
 
     const handleSave = async () => {
         const examDateValid = /^\d{4}-\d{2}-\d{2}$/.test(examDate);
-        await planningApi.updatePlan({
+        const { error } = await planningApi.updatePlan({
             testsPerDay,
             studyDays,
             intensity,
             examDate: examDateValid ? examDate : examDate === '' ? null : undefined,
         });
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        if (!error) navigation.goBack();
     };
 
     return (
@@ -116,7 +113,7 @@ export default function PlanningEditScreen({ navigation }) {
 
             <View style={styles.btnRow}>
                 <TouchableOpacity style={styles.btn} onPress={handleSave} activeOpacity={0.85}>
-                    <Text style={styles.btnText}>{saved ? 'Guardado ✓' : 'Guardar cambios'}</Text>
+                    <Text style={styles.btnText}>Guardar cambios</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>

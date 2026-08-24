@@ -21,8 +21,8 @@ export interface WeekResult {
 export class GetWeekUseCase {
     constructor(private readonly planningRepo: IPlanningRepository) { }
 
-    async execute(input: { userId: string; weekStart?: string; selectedDate?: string }): Promise<WeekResult> {
-        const today = todayIso();
+    async execute(input: { userId: string; weekStart?: string; selectedDate?: string; localDate?: string }): Promise<WeekResult> {
+        const today = input.localDate ?? todayIso();
         const weekStart = input.weekStart ?? mondayOf(today);
         const weekEnd = addDays(weekStart, 6);
         const selectedDate = input.selectedDate ?? today;
