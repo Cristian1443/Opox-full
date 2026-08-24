@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import NudgeModal from '../../components/NudgeModal';
@@ -53,17 +54,23 @@ function DayCircle({ weekday, status }) {
 export default function PlanningHomeScreen({ navigation }) {
     const [summary, setSummary] = useState(null);
     const [alert, setAlert] = useState(null); // 'skipped' | 'examSoon' | null
+    const alertShownRef = useRef(false);
 
-    useEffect(() => {
+    const load = useCallback(() => {
         let cancelled = false;
         planningApi.getSummary().then(({ data }) => {
             if (cancelled || !data) return;
             setSummary(data);
-            if (data.alerts.examSoonDays !== null) setAlert('examSoon');
-            else if (data.alerts.daysSinceLastActivity !== null && data.alerts.daysSinceLastActivity >= 3) setAlert('skipped');
+            if (!alertShownRef.current) {
+                alertShownRef.current = true;
+                if (data.alerts.examSoonDays !== null) setAlert('examSoon');
+                else if (data.alerts.daysSinceLastActivity !== null && data.alerts.daysSinceLastActivity >= 3) setAlert('skipped');
+            }
         });
         return () => { cancelled = true; };
     }, []);
+
+    useFocusEffect(load);
 
     const today = summary?.today ?? { completedCount: 0, goalCount: 3, percent: 0 };
     const days = summary?.week.days ?? [];
@@ -156,7 +163,10 @@ export default function PlanningHomeScreen({ navigation }) {
                     description="Entras en la recta final. La IA puede activar el modo simulacros intensivos."
                     primaryLabel="Activar recta final"
                     secondaryLabel="Ahora no"
-                    onPrimaryPress={() => setAlert(null)}
+                    onPrimaryPress={async () => {
+                        await planningApi.updatePlan({ intensity: 'high' });
+                        setAlert(null);
+                    }}
                     onSecondaryPress={() => setAlert(null)}
                 />
             )}

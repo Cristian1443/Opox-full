@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -7,24 +7,113 @@ import { planningApi } from '../../api';
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const INTENSITY_LABELS = { low: 'Baja', medium: 'Media', high: 'Alta' };
 const INTENSITY_ORDER = ['low', 'medium', 'high'];
+const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+function DateInput({ year, month, day, onYearChange, onMonthChange, onDayChange }) {
+    const monthRef = useRef(null);
+    const dayRef = useRef(null);
+
+    const hasDate = year.length === 4 && month && day;
+    const displayLabel = hasDate
+        ? `${day.padStart(2, '0')} ${MONTH_NAMES[(parseInt(month, 10) - 1) % 12]} ${year}`
+        : null;
+
+    return (
+        <View>
+            {displayLabel && (
+                <Text style={styles.datePreview}>{displayLabel}</Text>
+            )}
+            <View style={styles.dateRow}>
+                <View style={styles.dateField}>
+                    <TextInput
+                        style={styles.dateInput}
+                        placeholder="AAAA"
+                        placeholderTextColor="#AEB5C2"
+                        value={year}
+                        onChangeText={(v) => {
+                            const cleaned = v.replace(/\D/g, '').slice(0, 4);
+                            onYearChange(cleaned);
+                            if (cleaned.length === 4) monthRef.current?.focus();
+                        }}
+                        keyboardType="numeric"
+                        maxLength={4}
+                        returnKeyType="next"
+                        onSubmitEditing={() => monthRef.current?.focus()}
+                    />
+                    <Text style={styles.dateFieldLabel}>Año</Text>
+                </View>
+                <Text style={styles.dateSep}>/</Text>
+                <View style={styles.dateField}>
+                    <TextInput
+                        ref={monthRef}
+                        style={styles.dateInput}
+                        placeholder="MM"
+                        placeholderTextColor="#AEB5C2"
+                        value={month}
+                        onChangeText={(v) => {
+                            const cleaned = v.replace(/\D/g, '').slice(0, 2);
+                            onMonthChange(cleaned);
+                            if (cleaned.length === 2) dayRef.current?.focus();
+                        }}
+                        keyboardType="numeric"
+                        maxLength={2}
+                        returnKeyType="next"
+                        onSubmitEditing={() => dayRef.current?.focus()}
+                    />
+                    <Text style={styles.dateFieldLabel}>Mes</Text>
+                </View>
+                <Text style={styles.dateSep}>/</Text>
+                <View style={styles.dateField}>
+                    <TextInput
+                        ref={dayRef}
+                        style={styles.dateInput}
+                        placeholder="DD"
+                        placeholderTextColor="#AEB5C2"
+                        value={day}
+                        onChangeText={(v) => onDayChange(v.replace(/\D/g, '').slice(0, 2))}
+                        keyboardType="numeric"
+                        maxLength={2}
+                        returnKeyType="done"
+                    />
+                    <Text style={styles.dateFieldLabel}>Día</Text>
+                </View>
+            </View>
+        </View>
+    );
+}
 
 export default function PlanningEditScreen({ navigation }) {
     const [testsPerDay, setTestsPerDay] = useState(3);
     const [studyDays, setStudyDays] = useState([1, 2, 3, 4, 5]);
     const [intensity, setIntensity] = useState('medium');
-    const [examDate, setExamDate] = useState('');
+    const [examYear, setExamYear] = useState('');
+    const [examMonth, setExamMonth] = useState('');
+    const [examDay, setExamDay] = useState('');
+
     useEffect(() => {
         planningApi.getPlan().then(({ data }) => {
             if (!data) return;
             setTestsPerDay(data.testsPerDay);
             setStudyDays(data.studyDays);
             setIntensity(data.intensity);
-            setExamDate(data.examDate || '');
+            if (data.examDate) {
+                const [y = '', m = '', d = ''] = data.examDate.split('-');
+                setExamYear(y);
+                setExamMonth(m);
+                setExamDay(d);
+            }
         });
     }, []);
 
+    const examDate =
+        examYear.length === 4 && examMonth && examDay
+            ? `${examYear}-${examMonth.padStart(2, '0')}-${examDay.padStart(2, '0')}`
+            : '';
+
     const toggleDay = (weekday) => {
-        setStudyDays((prev) => (prev.includes(weekday) ? prev.filter((d) => d !== weekday) : [...prev, weekday].sort()));
+        setStudyDays((prev) =>
+            prev.includes(weekday) ? prev.filter((d) => d !== weekday) : [...prev, weekday].sort(),
+        );
     };
 
     const cycleIntensity = () => {
@@ -32,13 +121,15 @@ export default function PlanningEditScreen({ navigation }) {
         setIntensity(INTENSITY_ORDER[(i + 1) % INTENSITY_ORDER.length]);
     };
 
+    const clearDate = () => { setExamYear(''); setExamMonth(''); setExamDay(''); };
+
     const handleSave = async () => {
         const examDateValid = /^\d{4}-\d{2}-\d{2}$/.test(examDate);
         const { error } = await planningApi.updatePlan({
             testsPerDay,
             studyDays,
             intensity,
-            examDate: examDateValid ? examDate : examDate === '' ? null : undefined,
+            examDate: examDateValid ? examDate : null,
         });
         if (!error) navigation.goBack();
     };
@@ -53,17 +144,11 @@ export default function PlanningEditScreen({ navigation }) {
                 <View style={styles.card}>
                     <Text style={styles.cardTitle}>Tests por día</Text>
                     <View style={styles.stepperRow}>
-                        <TouchableOpacity
-                            style={styles.stepperBtn}
-                            onPress={() => setTestsPerDay((n) => Math.max(1, n - 1))}
-                        >
+                        <TouchableOpacity style={styles.stepperBtn} onPress={() => setTestsPerDay((n) => Math.max(1, n - 1))}>
                             <Text style={styles.stepperBtnText}>−</Text>
                         </TouchableOpacity>
                         <Text style={styles.stepperValue}>{testsPerDay} test{testsPerDay === 1 ? '' : 's'}</Text>
-                        <TouchableOpacity
-                            style={styles.stepperBtn}
-                            onPress={() => setTestsPerDay((n) => Math.min(6, n + 1))}
-                        >
+                        <TouchableOpacity style={styles.stepperBtn} onPress={() => setTestsPerDay((n) => Math.min(6, n + 1))}>
                             <Text style={styles.stepperBtnText}>+</Text>
                         </TouchableOpacity>
                     </View>
@@ -92,21 +177,34 @@ export default function PlanningEditScreen({ navigation }) {
                     <View style={styles.intensityRow}>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.cardTitle}>Intensidad</Text>
-                            <Text style={styles.muted}>Reparte la carga entre tus días de estudio</Text>
+                            <Text style={styles.muted}>Ajusta la carga diaria según tu energía</Text>
                         </View>
                         <Text style={styles.intensityPill}>{INTENSITY_LABELS[intensity]} ›</Text>
+                    </View>
+                    <View style={styles.intensityHints}>
+                        <Text style={styles.intensityHint}>Baja = 75% de tests · Media = 100% · Alta = 125%</Text>
                     </View>
                 </TouchableOpacity>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Fecha de examen (opcional)</Text>
-                    <Text style={[styles.muted, { marginBottom: 8 }]}>Se usa para la cuenta atrás del horizonte macro.</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor="#AEB5C2"
-                        value={examDate}
-                        onChangeText={setExamDate}
+                    <View style={styles.dateHeader}>
+                        <View>
+                            <Text style={styles.cardTitle}>Fecha de examen</Text>
+                            <Text style={styles.muted}>Activa la cuenta atrás y el horizonte macro</Text>
+                        </View>
+                        {(examYear || examMonth || examDay) && (
+                            <TouchableOpacity onPress={clearDate} style={styles.clearBtn}>
+                                <Text style={styles.clearBtnText}>Quitar</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    <DateInput
+                        year={examYear}
+                        month={examMonth}
+                        day={examDay}
+                        onYearChange={setExamYear}
+                        onMonthChange={setExamMonth}
+                        onDayChange={setExamDay}
                     />
                 </View>
             </ScrollView>
@@ -140,7 +238,17 @@ const styles = StyleSheet.create({
     dayCircTextActive: { color: '#fff' },
     intensityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     intensityPill: { fontSize: 11, fontWeight: '700', color: '#FF6B4A', backgroundColor: '#FFF1EC', paddingVertical: 5, paddingHorizontal: 11, borderRadius: 9 },
-    input: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: '#1B2A4A' },
+    intensityHints: { marginTop: 6 },
+    intensityHint: { fontSize: 10, color: '#AEB5C2' },
+    dateHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
+    clearBtn: { backgroundColor: '#F4F6FA', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
+    clearBtnText: { fontSize: 11, fontWeight: '700', color: '#8A92A0' },
+    datePreview: { fontSize: 16, fontWeight: '800', color: '#FF6B4A', textAlign: 'center', marginBottom: 10 },
+    dateRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+    dateField: { flex: 1, alignItems: 'center' },
+    dateInput: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 10, fontSize: 15, fontWeight: '700', color: '#1B2A4A', textAlign: 'center', width: '100%' },
+    dateFieldLabel: { fontSize: 9, color: '#AEB5C2', fontWeight: '600', marginTop: 4, textAlign: 'center' },
+    dateSep: { fontSize: 18, fontWeight: '300', color: '#D4DAE6', marginBottom: 22 },
     btnRow: { position: 'absolute', bottom: 16, left: 18, right: 18 },
     btn: { backgroundColor: '#FF6B4A', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
     btnText: { color: '#fff', fontSize: 13.5, fontWeight: '700' },

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import NudgeModal from '../../components/NudgeModal';
-import { planningApi, trainingApi } from '../../api';
+import { planningApi, boeApi } from '../../api';
 
 const localDate = () => new Date().toLocaleDateString('sv');
 
@@ -76,6 +76,7 @@ export default function PlanningTodayScreen({ navigation }) {
     const [addVisible, setAddVisible] = useState(false);
     const [taskType, setTaskType] = useState('test');
     const [topics, setTopics] = useState([]);
+    const [topicsError, setTopicsError] = useState(false);
     const [selectedTopicId, setSelectedTopicId] = useState('');
     const [questionCount, setQuestionCount] = useState(20);
     const [freeTitle, setFreeTitle] = useState('');
@@ -98,8 +99,13 @@ export default function PlanningTodayScreen({ navigation }) {
         setFreeSubtitle('');
         setAddVisible(true);
         if (topics.length === 0) {
-            trainingApi.listTopics().then((res) => {
-                if (res.data) setTopics(res.data);
+            setTopicsError(false);
+            boeApi.listTopics('justicia-tramitacion').then((res) => {
+                if (res.data && res.data.length > 0) {
+                    setTopics(res.data);
+                } else {
+                    setTopicsError(true);
+                }
             });
         }
     }, [topics.length]);
@@ -130,7 +136,7 @@ export default function PlanningTodayScreen({ navigation }) {
         if (taskType === 'test') {
             if (!selectedTopicId) return;
             const topic = topics.find((t) => t.topicId === selectedTopicId);
-            const topicName = topic?.name ?? 'Test';
+            const topicName = topic?.label ?? 'Test';
             payload = {
                 taskDate: today,
                 title: `Test · ${topicName}`,
@@ -263,8 +269,11 @@ export default function PlanningTodayScreen({ navigation }) {
                             <>
                                 <Text style={styles.fieldLabel}>Tema</Text>
                                 <ScrollView style={styles.topicList} showsVerticalScrollIndicator={false}>
-                                    {topics.length === 0 && (
+                                    {topics.length === 0 && !topicsError && (
                                         <Text style={styles.topicLoading}>Cargando temas…</Text>
+                                    )}
+                                    {topicsError && (
+                                        <Text style={styles.topicLoading}>No se pudieron cargar los temas. Verifica tu conexión.</Text>
                                     )}
                                     {topics.map((topic) => (
                                         <TouchableOpacity
@@ -302,7 +311,7 @@ export default function PlanningTodayScreen({ navigation }) {
 
                                 {selectedTopic && (
                                     <Text style={styles.previewText}>
-                                        Se creará: «Test · {selectedTopic.name}» — {questionCount} preguntas
+                                        Se creará: «Test · {selectedTopic.label}» — {questionCount} preguntas
                                     </Text>
                                 )}
                             </>
