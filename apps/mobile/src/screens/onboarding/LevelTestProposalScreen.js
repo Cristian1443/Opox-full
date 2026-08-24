@@ -54,7 +54,7 @@ export default function LevelTestProposalScreen({ navigation }) {
 
                     <TouchableOpacity
                         style={styles.secondaryLink}
-                        onPress={() => navigation.navigate('Permissions')}
+                        onPress={() => navigation.replace('Permissions')}
                         activeOpacity={0.6}
                     >
                         <Text style={styles.secondaryLinkText}>Ahora no, en otro momento</Text>

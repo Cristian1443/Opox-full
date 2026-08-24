@@ -170,7 +170,7 @@ export default function LevelTestResultScreen({ navigation, route }) {
                 {/* CTA */}
                 <TouchableOpacity
                     style={styles.btnPrimary}
-                    onPress={() => navigation.navigate('Permissions')}
+                    onPress={() => navigation.replace('Permissions')}
                     activeOpacity={0.85}
                 >
                     <Text style={styles.btnPrimaryText}>Crear mi plan de estudio</Text>
