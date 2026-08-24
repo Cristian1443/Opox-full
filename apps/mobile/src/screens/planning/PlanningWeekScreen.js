@@ -1,18 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ScreenHeader from '../../components/ScreenHeader';
+import { Ionicons } from '@expo/vector-icons';
 import { planningApi } from '../../api';
+import { colors, spacing } from '../../theme';
 
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const WEEKDAY_NAMES = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO'];
 
-const KIND_COLORS = { test: '#2D6FB0', tutor: '#7B4BC4', simulacro: '#1f9d6b', other: '#9AA2B1' };
+// Colores confirmados contra Figma (frame SEMANA, Bloque 4) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    dayOutline: '#D9D9D9',
+    separator: 'rgba(65,41,80,0.5)',
+    textNote: '#343A3D',
+};
 
 const DAY_COLORS = {
-    completed: { bg: '#1f9d6b', color: '#fff', border: 'transparent' },
-    partial: { bg: '#fff', color: '#1f9d6b', border: '#C7E6D6' },
-    today: { bg: '#FF6B4A', color: '#fff', border: 'transparent' },
-    upcoming: { bg: '#fff', color: '#9AA2B1', border: '#E4E8F0' },
+    completed: { bg: colors.ctaGreen, number: colors.white },
+    partial: { bg: colors.white, number: colors.ctaGreen, border: colors.ctaGreen },
+    today: { bg: colors.accentOrange, number: colors.white },
+    upcoming: { bg: colors.white, number: colors.textDark, border: FIGMA.dayOutline },
 };
 
 function formatDayNumber(dateIso) {
@@ -44,27 +52,36 @@ export default function PlanningWeekScreen({ navigation }) {
     const days = week?.days ?? [];
     const tasks = week?.selectedTasks ?? [];
     const ritmoPercent = week?.ritmoPercent ?? null;
+    const selectedDay = days.find((d) => d.date === selectedDate);
+    const planLabel = selectedDay
+        ? `${WEEKDAY_NAMES[selectedDay.weekday - 1]} ${formatDayNumber(selectedDay.date)} - PLAN`
+        : 'PLAN DEL DÍA';
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
-            <ScreenHeader
-                title="Semana"
-                onBack={() => navigation.goBack()}
-                right={<Text style={styles.weekLabel}>{formatWeekLabel(days)}</Text>}
-            />
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.iconBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Semana {formatWeekLabel(days)}</Text>
+                <View style={styles.iconBtn} />
+            </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <View style={styles.weekRow}>
                     {days.map((d) => {
                         const c = DAY_COLORS[d.status] || DAY_COLORS.upcoming;
+                        const isToday = d.status === 'today';
                         return (
-                            <TouchableOpacity key={d.date} style={styles.dayCol} onPress={() => load(d.date)}>
-                                <View style={[styles.dayCirc, { backgroundColor: c.bg, borderColor: c.border, borderWidth: c.border === 'transparent' ? 0 : 1.5 }]}>
-                                    <Text style={{ color: c.color, fontSize: 12, fontWeight: '700' }}>{formatDayNumber(d.date)}</Text>
+                            <TouchableOpacity key={d.date} style={styles.dayCol} onPress={() => load(d.date)} activeOpacity={0.7}>
+                                <View style={[styles.dayCirc, { backgroundColor: c.bg, borderColor: c.border || 'transparent', borderWidth: c.border ? 0.44 : 0 }]}>
+                                    <Text style={[styles.dayNumber, { color: c.number }]}>{formatDayNumber(d.date)}</Text>
                                 </View>
-                                <Text style={[styles.dayLabel, d.date === selectedDate && styles.dayLabelActive]}>
+                                <Text style={[styles.dayLabel, isToday && styles.dayLabelToday]}>
                                     {WEEKDAY_LABELS[d.weekday - 1]}
                                 </Text>
                             </TouchableOpacity>
@@ -72,19 +89,21 @@ export default function PlanningWeekScreen({ navigation }) {
                     })}
                 </View>
 
-                <Text style={styles.groupTitle}>PLAN DEL DÍA</Text>
+                <Text style={styles.sectionLabel}>{planLabel}</Text>
                 {tasks.length === 0 ? (
                     <Text style={styles.empty}>Sin tareas planificadas este día.</Text>
                 ) : (
-                    tasks.map((t) => (
-                        <View key={t.id} style={styles.task}>
-                            <View style={[styles.taskBar, { backgroundColor: KIND_COLORS[t.kind] || KIND_COLORS.other }]} />
-                            <View>
-                                <Text style={styles.taskTitle}>{t.title}</Text>
-                                {t.subtitle && <Text style={styles.taskSubtitle}>{t.subtitle}</Text>}
+                    <View style={styles.planList}>
+                        {tasks.map((t, index) => (
+                            <View key={t.id} style={[styles.planRow, index < tasks.length - 1 && styles.planRowSeparator]}>
+                                <View style={styles.bullet} />
+                                <View style={styles.planTextWrap}>
+                                    <Text style={styles.planTitle}>{t.title}</Text>
+                                    {t.subtitle && <Text style={styles.planSubtitle}>{t.subtitle}</Text>}
+                                </View>
                             </View>
-                        </View>
-                    ))
+                        ))}
+                    </View>
                 )}
 
                 {ritmoPercent !== null && (
@@ -98,23 +117,39 @@ export default function PlanningWeekScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
-    weekLabel: { fontSize: 11, color: '#7A8290' },
+    container: { flex: 1, backgroundColor: colors.white },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: 4,
+    },
+    iconBtn: { width: 32, padding: 4 },
+    headerTitle: {
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21,
+        color: colors.textDark,
+        textAlign: 'center',
+    },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 16, paddingBottom: 24 },
-    weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-    dayCol: { alignItems: 'center', gap: 4 },
-    dayCirc: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    dayLabel: { fontSize: 8, color: '#8A92A0' },
-    dayLabelActive: { color: '#FF6B4A', fontWeight: '700' },
-    groupTitle: { fontSize: 10.5, fontWeight: '700', color: '#5A6373', letterSpacing: 0.4, marginBottom: 8 },
-    empty: { textAlign: 'center', color: '#8A92A0', fontSize: 12.5, marginTop: 20 },
-    task: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 10 },
-    taskBar: { width: 4, height: 30, borderRadius: 3 },
-    taskTitle: { fontSize: 12, fontWeight: '700', color: '#1B2A4A' },
-    taskSubtitle: { fontSize: 10, color: '#8A92A0' },
-    ritmo: { textAlign: 'center', marginTop: 6, fontSize: 11, color: '#8A92A0' },
-    ritmoValue: { color: '#1f9d6b', fontWeight: '700' },
+    body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 24 },
+    weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
+    dayCol: { alignItems: 'center' },
+    dayCirc: { width: 43, height: 43, borderRadius: 21.5, alignItems: 'center', justifyContent: 'center' },
+    dayNumber: { fontFamily: 'Poppins-SemiBold', fontSize: 18.7 },
+    dayLabel: { marginTop: 6, fontFamily: 'Poppins-Regular', fontSize: 9, color: colors.textDark },
+    dayLabelToday: { color: colors.accentOrange },
+    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, marginBottom: 8 },
+    empty: { textAlign: 'center', fontFamily: 'Poppins-Regular', color: FIGMA.textNote, fontSize: 12.5, marginTop: 20 },
+    planList: { marginBottom: 16 },
+    planRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 16 },
+    planRowSeparator: { borderBottomWidth: 0.44, borderBottomColor: FIGMA.separator },
+    bullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accentOrange, marginTop: 8, marginRight: 10 },
+    planTextWrap: { flex: 1 },
+    planTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
+    planSubtitle: { marginTop: 2, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote },
+    ritmo: { textAlign: 'center', marginTop: 8, fontFamily: 'Poppins-Light', fontSize: 13.8, color: colors.textDark },
+    ritmoValue: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
 });

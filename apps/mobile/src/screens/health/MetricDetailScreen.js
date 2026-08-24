@@ -8,12 +8,48 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
+// Colores confirmados contra Figma (frame METRICA GENERICA, Bloque 3) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    tabInactive: 'rgba(65,41,80,0.5)',
+    infoCardBg: 'rgba(159,110,228,0.75)',
+};
+
 // Puntos simulados. Cuando entre el backend, sustituir por serie temporal real.
 const mockChartPoints = [10, 25, 15, 30, 20, 40, 35, 50, 45, 60, 55, 40, 65];
+
+const CHART_WIDTH = 331;
+const CHART_HEIGHT = 60;
+
+// Construye un trazo suave (curvas cuadráticas punto a punto) a partir de la
+// serie mock — mismo espíritu que el "Vector 9" de Figma, pero data-driven
+// en vez de un decorativo fijo, para que se vea distinto según la métrica.
+function buildTrendPath(points, max) {
+    const stepX = CHART_WIDTH / (points.length - 1);
+    const coords = points.map((p, i) => ({
+        x: i * stepX,
+        y: CHART_HEIGHT - (p / max) * CHART_HEIGHT,
+    }));
+    return coords.reduce((d, point, i) => {
+        if (i === 0) return `M ${point.x} ${point.y}`;
+        const prev = coords[i - 1];
+        const midX = (prev.x + point.x) / 2;
+        return `${d} Q ${prev.x} ${prev.y} ${midX} ${(prev.y + point.y) / 2} T ${point.x} ${point.y}`;
+    }, '');
+}
+
+function TrendLineChart({ points, max, color }) {
+    const path = buildTrendPath(points, max);
+    return (
+        <Svg width={CHART_WIDTH} height={CHART_HEIGHT} viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}>
+            <Path d={path} stroke={color} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
 
 export default function MetricDetailScreen({ navigation, route }) {
     const {
@@ -26,7 +62,7 @@ export default function MetricDetailScreen({ navigation, route }) {
         lowerIsBetter = false, // Para métricas donde bajar de la base es mejor (ej. FC reposo).
     } = route?.params || {};
 
-    const [timeRange, setTimeRange] = useState('Semana');
+    const [timeRange, setTimeRange] = useState('Día');
     const ranges = ['Día', 'Semana', 'Mes'];
 
     // Delta signed (positivo = subió respecto a base).
@@ -34,104 +70,56 @@ export default function MetricDetailScreen({ navigation, route }) {
     const isStable = trend === 'stable';
     // "Bueno" si es estable o si el cambio va en la dirección correcta según la métrica.
     const isBetter = isStable || (lowerIsBetter ? deltaRaw < 0 : deltaRaw > 0);
-    const trendColor = isBetter ? colors.success : colors.warning;
-    const trendIcon = deltaRaw === 0 ? 'remove' : (deltaRaw < 0 ? 'arrow-down' : 'arrow-up');
+    const trendColor = isBetter ? colors.ctaGreen : colors.statRed;
     const delta = Math.abs(deltaRaw);
-    const deltaSign = deltaRaw < 0 ? '−' : (deltaRaw > 0 ? '+' : '');
+    const deltaWord = deltaRaw < 0 ? 'por debajo' : deltaRaw > 0 ? 'por encima' : 'igual a';
+    const deltaText = isStable
+        ? `Estable respecto a tu línea base (${baseValue} ${unit})`
+        : `${delta} ${unit} ${deltaWord} de tu línea base (${baseValue} ${unit})`;
 
-    // Escala del gráfico basada en el max de la serie mock + valores reales para posicionar
-    // los puntos y la línea base proporcionalmente en vez de hardcodear.
-    const CHART_HEIGHT = 150;
     const chartMax = Math.max(...mockChartPoints, currentValue, baseValue) || 1;
-    const baseLineBottom = (baseValue / chartMax) * CHART_HEIGHT;
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title={title} onBack={() => navigation.goBack()} />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Valor principal + base */}
-                <View style={styles.valueContainer}>
-                    <Text style={styles.valueLabel}>{title}</Text>
-                    <View style={styles.valueRow}>
-                        <Text style={styles.currentValue}>
-                            {currentValue} <Text style={styles.unit}>{unit}</Text>
-                        </Text>
-                        <Text style={[styles.trendText, { color: trendColor }]}>
-                            <Ionicons name={trendIcon} size={16} />
-                            <Text>{` ${deltaSign}${delta} vs tu base`}</Text>
-                        </Text>
-                    </View>
-
-                    <View style={styles.baseInfo}>
-                        <Text style={styles.baseLabel}>Base personal: </Text>
-                        <Text style={styles.baseValue}>{baseValue} {unit}</Text>
-                    </View>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Valor grande */}
+                <View style={styles.valueRow}>
+                    <Text style={styles.valueNumber}>{currentValue}</Text>
+                    <Text style={styles.valueUnit}> {unit}</Text>
                 </View>
+                <Text style={[styles.deltaText, { color: trendColor }]}>{deltaText}</Text>
 
-                {/* Gráfico placeholder — reemplazar por react-native-svg-charts en producción */}
-                <View style={styles.chartContainer}>
-                    <View style={styles.chartPlaceholder}>
-                        <View style={styles.chartLines}>
-                            {mockChartPoints.map((point, index) => {
-                                const height = (point / chartMax) * CHART_HEIGHT;
-                                const left = (index / (mockChartPoints.length - 1)) * 100;
-                                return (
-                                    <View
-                                        key={index}
-                                        style={{
-                                            position: 'absolute',
-                                            left: `${left}%`,
-                                            bottom: height,
-                                            width: 4,
-                                            height: 4,
-                                            borderRadius: 2,
-                                            backgroundColor: isBetter ? colors.success : colors.warning,
-                                        }}
-                                    />
-                                );
-                            })}
-                            <View style={[styles.baseLine, { bottom: baseLineBottom }]} />
-                        </View>
-                    </View>
-
-                    <View style={styles.chartLabels}>
-                        <Text style={styles.label}>Lun</Text>
-                        <Text style={styles.label}>Mar</Text>
-                        <Text style={styles.label}>Mié</Text>
-                        <Text style={styles.label}>Jue</Text>
-                        <Text style={styles.label}>Vie</Text>
-                        <Text style={styles.label}>Sáb</Text>
-                        <Text style={styles.label}>Dom</Text>
-                    </View>
+                {/* Gráfico */}
+                <View style={styles.chartWrap}>
+                    <Text style={styles.baseLabel}>base {baseValue}{unit}</Text>
+                    <TrendLineChart points={mockChartPoints} max={chartMax} color={trendColor} />
                 </View>
 
                 {/* Selector de rango temporal */}
-                <View style={styles.timeSelector}>
-                    {ranges.map((range) => (
-                        <TouchableOpacity
-                            key={range}
-                            style={[styles.timeButton, timeRange === range && styles.timeButtonActive]}
-                            onPress={() => setTimeRange(range)}
-                        >
-                            <Text style={[styles.timeText, timeRange === range && styles.timeTextActive]}>
-                                {range}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                <View style={styles.tabsRow}>
+                    {ranges.map((range) => {
+                        const active = range === timeRange;
+                        return (
+                            <TouchableOpacity
+                                key={range}
+                                activeOpacity={0.7}
+                                onPress={() => setTimeRange(range)}
+                                style={active ? styles.tabActive : styles.tabInactive}
+                            >
+                                <Text style={active ? styles.tabActiveText : styles.tabInactiveText}>{range}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
-                {/* Sección educativa */}
+                {/* Tarjeta explicativa */}
                 <View style={styles.infoCard}>
-                    <View style={styles.infoHeader}>
-                        <Ionicons name="information-circle" size={20} color={colors.primary} />
-                        <Text style={styles.infoTitle}>¿Qué significa?</Text>
-                    </View>
-                    <Text style={styles.infoText}>{description}</Text>
-                    <TouchableOpacity style={styles.learnMoreBtn}>
-                        <Text style={styles.learnMoreText}>Leer más sobre {title}</Text>
-                        <Ionicons name="arrow-forward" size={16} color={colors.primary} />
-                    </TouchableOpacity>
+                    <Text style={styles.infoCardText}>
+                        <Text style={styles.infoCardTitle}>¿Qué significa? </Text>
+                        {description}
+                    </Text>
                 </View>
 
                 <View style={{ height: spacing.lg }} />
@@ -143,157 +131,83 @@ export default function MetricDetailScreen({ navigation, route }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     scrollContent: {
-        padding: spacing.md,
-    },
-    valueContainer: {
-        backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: spacing.lg,
-        marginBottom: spacing.md,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    valueLabel: {
-        fontSize: 16,
-        color: colors.textSecondary,
-        marginBottom: spacing.xs,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
     },
     valueRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
-        marginBottom: spacing.sm,
     },
-    currentValue: {
-        fontSize: 48,
-        fontWeight: '700',
-        color: colors.text,
-        marginRight: 4,
+    valueNumber: {
+        fontFamily: 'Poppins-Bold',
+        fontSize: 31,
+        color: colors.textDark,
     },
-    unit: {
-        fontSize: 20,
-        fontWeight: '500',
-        color: colors.textSecondary,
-    },
-    trendText: {
+    valueUnit: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 16,
-        fontWeight: '600',
+        color: colors.textDark,
     },
-    baseInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: spacing.sm,
-        paddingTop: spacing.sm,
-        borderTopWidth: 1,
-        borderTopColor: colors.separator,
+    deltaText: {
+        marginTop: 2,
+        fontFamily: 'Poppins-Medium',
+        fontSize: 10.5,
+    },
+    chartWrap: {
+        marginTop: 24,
     },
     baseLabel: {
-        fontSize: 14,
-        color: colors.textSecondary,
+        fontFamily: 'Poppins-Light',
+        fontSize: 10.5,
+        letterSpacing: 0.4,
+        color: colors.textDark,
+        marginBottom: 6,
     },
-    baseValue: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.text,
-    },
-    chartContainer: {
-        backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: spacing.md,
-        marginBottom: spacing.md,
-        height: 220,
-        justifyContent: 'flex-end',
-    },
-    chartPlaceholder: {
-        flex: 1,
-        position: 'relative',
-        justifyContent: 'flex-end',
-    },
-    chartLines: {
-        flex: 1,
-        width: '100%',
-        position: 'relative',
-    },
-    baseLine: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        height: 1,
-        borderStyle: 'dashed',
-        borderBottomWidth: 1,
-        borderBottomColor: colors.textSecondary,
-        opacity: 0.5,
-    },
-    chartLabels: {
+    tabsRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: spacing.sm,
+        gap: 12,
+        marginTop: 28,
     },
-    label: {
-        fontSize: 12,
-        color: colors.textSecondary,
-    },
-    timeSelector: {
-        flexDirection: 'row',
-        backgroundColor: colors.card,
-        borderRadius: 12,
-        padding: 4,
-        marginBottom: spacing.md,
-    },
-    timeButton: {
-        flex: 1,
+    tabActive: {
+        borderWidth: 1.3,
+        borderColor: colors.textDark,
+        borderRadius: 10,
+        paddingHorizontal: 18,
         paddingVertical: 8,
-        alignItems: 'center',
-        borderRadius: 8,
     },
-    timeButtonActive: {
-        backgroundColor: colors.background,
+    tabActiveText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 15.5,
+        color: colors.textDark,
     },
-    timeText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textSecondary,
+    tabInactive: {
+        paddingHorizontal: 18,
+        paddingVertical: 8,
     },
-    timeTextActive: {
-        color: colors.text,
+    tabInactiveText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15.5,
+        color: FIGMA.tabInactive,
     },
     infoCard: {
-        backgroundColor: colors.card,
+        marginTop: 20,
+        backgroundColor: FIGMA.infoCardBg,
         borderRadius: 16,
-        padding: spacing.md,
-        marginBottom: spacing.md,
+        padding: 16,
     },
-    infoHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: spacing.sm,
+    infoCardText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.5,
+        lineHeight: 16,
+        color: colors.white,
+        textAlign: 'center',
     },
-    infoTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: colors.text,
-        marginLeft: spacing.sm,
-    },
-    infoText: {
-        fontSize: 15,
-        color: colors.textSecondary,
-        lineHeight: 22,
-        marginBottom: spacing.md,
-    },
-    learnMoreBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-    },
-    learnMoreText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: colors.primary,
-        marginRight: spacing.xs,
+    infoCardTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 11.5,
+        color: colors.white,
     },
 });

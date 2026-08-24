@@ -1,12 +1,22 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { colors } from '../theme';
+
+// Tokens confirmados contra Figma (frames NUDGE FATIGA / TEMA FLOJO / ALERTA
+// BOE, Bloque 2) sin equivalente exacto en theme.js.
+const FIGMA = {
+    overlay: 'rgba(0, 0, 0, 0.45)',
+    handle: '#D9D9D9',
+};
 
 // ─── Nudge flotante genérico (wireframe 2.4 a/b/c) ───────────────────────────
 // Bottom-sheet que puede aparecer sobre cualquier pantalla. El contenido
-// (icono, textos, acciones) lo define quien lo invoca.
+// (icono, textos, acciones) lo define quien lo invoca. `iconBg` ya no se usa
+// visualmente (Figma no lleva chip de color detrás del icono) — se mantiene
+// en la firma solo por compatibilidad con quien ya lo pasa.
 export default function NudgeModal({
     visible,
-    iconBg,
+    iconBg: _iconBg,
     icon,
     title,
     description,
@@ -27,112 +37,102 @@ export default function NudgeModal({
                 <View style={styles.sheet}>
                     <View style={styles.grip} />
 
-                    <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+                    <View style={styles.iconWrap}>
                         {icon}
                     </View>
 
                     <Text style={styles.title}>{title}</Text>
                     <Text style={styles.description}>{description}</Text>
 
-                    <View style={styles.actions}>
-                        <TouchableOpacity
-                            style={styles.btnPrimary}
-                            onPress={onPrimaryPress}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={styles.btnPrimaryText}>{primaryLabel}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.btnGhost}
-                            onPress={onSecondaryPress}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.btnGhostText}>{secondaryLabel}</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                        style={styles.btnPrimary}
+                        onPress={onPrimaryPress}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.btnPrimaryText}>{primaryLabel}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.btnGhost}
+                        onPress={onSecondaryPress}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.btnGhostText}>{secondaryLabel}</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </Modal>
     );
 }
 
-// ─── Estilos (overlay-bg + .nudge del wireframe) ─────────────────────────────
+// ─── Estilos (bottom-sheet, tokens confirmados de Figma) ─────────────────────
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(15, 27, 51, 0.5)',
+        backgroundColor: FIGMA.overlay,
         justifyContent: 'flex-end',
     },
     sheet: {
-        backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        backgroundColor: colors.white,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
         width: '100%',
-        paddingTop: 20,
-        paddingHorizontal: 18,
-        paddingBottom: 22,
-        shadowColor: '#0F1B33',
-        shadowOffset: { width: 0, height: -8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 30,
-        elevation: 20,
+        paddingTop: 12,
+        paddingHorizontal: 24,
+        paddingBottom: 32,
+        alignItems: 'center',
     },
     grip: {
-        width: 38,
+        width: 64,
         height: 4,
-        borderRadius: 3,
-        backgroundColor: '#E4E8F0',
-        alignSelf: 'center',
-        marginBottom: 16,
+        borderRadius: 2,
+        backgroundColor: FIGMA.handle,
+        marginBottom: 20,
     },
-    iconBox: {
-        width: 54,
-        height: 54,
-        borderRadius: 15,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 13,
+    iconWrap: {
+        marginBottom: 16,
     },
     title: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#0F1B33',
-        marginBottom: 7,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 22,
+        color: colors.textDark,
+        textAlign: 'center',
     },
     description: {
-        fontSize: 12,
-        color: '#5A6373',
-        marginBottom: 16,
-        lineHeight: 18,
-    },
-    actions: {
-        flexDirection: 'column',
-        gap: 8,
+        marginTop: 12,
+        fontFamily: 'Poppins-Light',
+        fontSize: 16,
+        lineHeight: 22,
+        color: colors.textDark,
+        textAlign: 'center',
     },
     btnPrimary: {
-        backgroundColor: '#34C759',
-        borderRadius: 12,
-        paddingVertical: 13,
-        alignItems: 'center',
         width: '100%',
+        height: 61,
+        borderRadius: 14,
+        backgroundColor: colors.accentOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 24,
     },
     btnPrimaryText: {
-        color: '#FFFFFF',
-        fontSize: 13.5,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.white,
     },
     btnGhost: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1.5,
-        borderColor: '#D4DAE6',
-        borderRadius: 12,
-        paddingVertical: 13,
-        alignItems: 'center',
         width: '100%',
+        height: 61,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: colors.purple,
+        backgroundColor: colors.white,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 12,
     },
     btnGhostText: {
-        color: '#1B2A4A',
-        fontSize: 13.5,
-        fontWeight: '700',
+        fontFamily: 'Poppins-Regular',
+        fontSize: 16,
+        color: colors.purple,
     },
 });

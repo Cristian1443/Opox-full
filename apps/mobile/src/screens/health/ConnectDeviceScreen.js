@@ -8,67 +8,107 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Path, Rect, Circle, Line } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 import ConnectionErrorModal from '../../components/ConnectionErrorModal';
 
-// Datos simulados de dispositivos (mock hasta integrar backend)
+// Colores confirmados contra Figma (frame CONEXION DISPOSITIVO, Bloque 3)
+// sin equivalente exacto en theme.js.
+const FIGMA = {
+    subtitleMuted: 'rgba(65,41,80,0.5)',
+    cardBorder: 'rgba(65,41,80,0.3)',
+    cardHighlightFill: 'rgba(235,235,235,0.5)',
+    textNote: '#343A3D',
+    greenBadgeBg: 'rgba(36,189,144,0.15)',
+};
+
+// Datos de dispositivos (mock hasta integrar backend). Solo Apple Watch
+// llega "connected"; Garmin dispara el mock de error de emparejamiento;
+// el resto ofrece "Conectar", salvo "Solo smartphone" que ofrece "Usar".
 const devicesData = [
     {
-        id: '1',
+        id: 'apple-watch',
         name: 'Apple Watch',
-        model: 'Series 9',
+        sublabel: 'Series 9 · sincronizado hace 2 min',
         status: 'connected',
-        lastSync: 'hace 2 min',
-        icon: 'logo-apple',
-        iconColor: '#333',
-        type: 'watch',
-    },
-    {
-        id: '2',
-        name: 'Garmin',
-        model: 'Connect',
-        status: 'available',
         icon: 'watch',
-        iconColor: '#FF5722',
-        type: 'watch',
     },
     {
-        id: '3',
-        name: 'Fitbit / Pixel Watch',
-        model: 'Google Health',
-        status: 'available',
-        icon: 'watch-outline',
-        iconColor: '#4285F4',
-        type: 'watch',
+        id: 'garmin',
+        name: 'Garmin',
+        sublabel: 'Connect',
+        status: 'connect',
+        icon: 'roundWatch',
     },
     {
-        id: '4',
+        id: 'fitbit',
+        name: 'Fitbit/Pixel Watch',
+        sublabel: 'Google Health',
+        status: 'connect',
+        icon: 'phone',
+    },
+    {
+        id: 'samsung',
         name: 'Samsung Galaxy Watch',
-        model: 'Samsung Health',
-        status: 'available',
-        icon: 'logo-android',
-        iconColor: '#14B7A0',
-        type: 'watch',
+        sublabel: 'Samsung Health',
+        status: 'connect',
+        icon: 'phone',
     },
     {
-        id: '5',
+        id: 'solo-smartphone',
         name: 'Solo smartphone',
-        model: 'Sensores del móvil (limitado)',
-        status: 'available',
-        iconColor: '#8E8E93',
-        type: 'phone',
+        sublabel: 'Sensores del móvil (limitado)',
+        status: 'use',
+        icon: 'phone',
     },
 ];
+
+// ─── Iconos aproximados (ver nota: no son el asset exportado) ───────────────
+function WatchIcon({ size = 28, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size * 1.15} viewBox="0 0 24 28">
+            <Rect x="4" y="1" width="10" height="4" rx="1.5" stroke={color} strokeWidth={1.6} fill="none" />
+            <Rect x="4" y="23" width="10" height="4" rx="1.5" stroke={color} strokeWidth={1.6} fill="none" />
+            <Rect x="2.5" y="6" width="13" height="16" rx="4" stroke={color} strokeWidth={1.8} fill="none" />
+            <Line x1="18" y1="11" x2="20.5" y2="11" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+            <Line x1="18" y1="17" x2="20.5" y2="17" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function RoundWatchIcon({ size = 28, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Circle cx="12" cy="12" r="8.5" stroke={color} strokeWidth={1.8} fill="none" />
+            <Path d="M12 7.5V12L15 14" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Line x1="12" y1="1.8" x2="12" y2="3.4" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function PhoneIcon({ size = 24, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size * 1.4} viewBox="0 0 20 28">
+            <Rect x="1.5" y="1.5" width="17" height="25" rx="3.5" stroke={color} strokeWidth={1.8} fill="none" />
+            <Line x1="7" y1="23" x2="13" y2="23" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function DeviceIcon({ type }) {
+    if (type === 'watch') return <WatchIcon />;
+    if (type === 'roundWatch') return <RoundWatchIcon />;
+    return <PhoneIcon />;
+}
 
 export default function ConnectDeviceScreen({ navigation }) {
     const [errorDevice, setErrorDevice] = useState(null);
 
-    // Mock determinista: Garmin (id '2') dispara error, el resto navega al flujo 3.3.
+    // Mock determinista: Garmin dispara error, el resto navega al flujo 3.3.
     // Cuando exista pairing real, sustituir por el resultado del backend.
     const handleConnect = (device) => {
-        if (device.id === '2') {
+        if (device.id === 'garmin') {
             setErrorDevice(device);
         } else {
             navigation.navigate('Pairing', { device });
@@ -85,50 +125,29 @@ export default function ConnectDeviceScreen({ navigation }) {
         const isConnected = device.status === 'connected';
 
         return (
-            <TouchableOpacity
+            <View
                 key={device.id}
-                style={[styles.deviceCard, isConnected && styles.deviceCardConnected]}
-                onPress={() => handleConnect(device)}
-                disabled={isConnected}
-                activeOpacity={isConnected ? 1 : 0.7}
+                style={[styles.card, isConnected && styles.cardHighlighted]}
             >
-                <View style={styles.deviceHeader}>
-                    <View style={styles.iconContainer}>
-                        {device.type === 'watch' ? (
-                            <Ionicons name={device.icon} size={28} color={device.iconColor} />
-                        ) : (
-                            <MaterialCommunityIcons name="cellphone" size={28} color={device.iconColor} />
-                        )}
-                    </View>
-
-                    <View style={styles.deviceInfo}>
-                        <Text style={[styles.deviceName, isConnected && styles.deviceNameConnected]}>
-                            {device.name}
-                        </Text>
-                        <Text style={styles.deviceModel}>{device.model}</Text>
-                    </View>
-
-                    <View style={styles.actionContainer}>
-                        {isConnected ? (
-                            <View style={styles.connectedBadge}>
-                                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                                <Text style={styles.connectedText}>Conectado</Text>
-                            </View>
-                        ) : (
-                            <View style={styles.connectButton}>
-                                <Text style={styles.connectButtonText}>Conectar</Text>
-                            </View>
-                        )}
-                    </View>
+                <View style={styles.iconWrap}>
+                    <DeviceIcon type={device.icon} />
                 </View>
 
-                {isConnected && (
-                    <View style={styles.syncInfo}>
-                        <Ionicons name="refresh-outline" size={14} color={colors.success} />
-                        <Text style={styles.syncText}>{device.lastSync}</Text>
+                <View style={styles.deviceTextWrap}>
+                    <Text style={styles.deviceName}>{device.name}</Text>
+                    <Text style={styles.deviceSublabel}>{device.sublabel}</Text>
+                </View>
+
+                {isConnected ? (
+                    <View style={styles.connectedBadge}>
+                        <Text style={styles.connectedBadgeText}>Conectado</Text>
                     </View>
+                ) : (
+                    <TouchableOpacity activeOpacity={0.7} onPress={() => handleConnect(device)}>
+                        <Text style={styles.actionText}>{device.status === 'use' ? 'Usar' : 'Conectar'}</Text>
+                    </TouchableOpacity>
                 )}
-            </TouchableOpacity>
+            </View>
         );
     };
 
@@ -136,12 +155,12 @@ export default function ConnectDeviceScreen({ navigation }) {
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title="Conectar dispositivo" onBack={() => navigation.goBack()} />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Text style={styles.subtitle}>
                     Sincroniza tu wearable para el control de fatiga en tiempo real.
                 </Text>
 
-                <View style={styles.listContainer}>
+                <View style={styles.devicesList}>
                     {devicesData.map((device) => renderDeviceItem(device))}
                 </View>
 
@@ -160,104 +179,70 @@ export default function ConnectDeviceScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     scrollContent: {
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
     },
     subtitle: {
-        fontSize: 16,
-        color: colors.textSecondary,
+        textAlign: 'center',
+        fontFamily: 'Poppins-Regular',
+        fontSize: 10.5,
+        color: FIGMA.subtitleMuted,
         marginBottom: spacing.lg,
-        lineHeight: 22,
+        paddingHorizontal: spacing.sm,
     },
-    listContainer: {
-        gap: spacing.sm,
+    devicesList: {
+        gap: 14,
     },
-    deviceCard: {
-        backgroundColor: colors.card,
-        borderRadius: 12,
-        padding: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.separator,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    deviceCardConnected: {
-        borderColor: colors.success,
-        backgroundColor: colors.successBg,
-    },
-    deviceHeader: {
+    card: {
         flexDirection: 'row',
         alignItems: 'center',
+        height: 119,
+        paddingHorizontal: spacing.md,
+        borderWidth: 0.3,
+        borderColor: FIGMA.cardBorder,
     },
-    iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: 'rgba(0,0,0,0.03)',
-        justifyContent: 'center',
+    cardHighlighted: {
+        backgroundColor: FIGMA.cardHighlightFill,
+    },
+    iconWrap: {
+        width: 40,
         alignItems: 'center',
-        marginRight: spacing.md,
+        justifyContent: 'center',
+        marginRight: 14,
     },
-    deviceInfo: {
+    deviceTextWrap: {
         flex: 1,
     },
     deviceName: {
-        fontSize: 17,
-        fontWeight: '600',
-        color: colors.text,
-        marginBottom: 2,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
     },
-    deviceNameConnected: {
-        color: colors.success,
-    },
-    deviceModel: {
-        fontSize: 14,
-        color: colors.textSecondary,
-    },
-    actionContainer: {
-        marginLeft: spacing.sm,
+    deviceSublabel: {
+        marginTop: 2,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.5,
+        color: FIGMA.textNote,
     },
     connectedBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(52, 199, 89, 0.1)',
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 6,
+        backgroundColor: FIGMA.greenBadgeBg,
+        borderWidth: 0.4,
+        borderColor: colors.ctaGreen,
         borderRadius: 20,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
     },
-    connectedText: {
-        color: colors.success,
-        fontWeight: '600',
-        fontSize: 13,
-        marginLeft: 4,
+    connectedBadgeText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 9.8,
+        color: colors.ctaGreen,
     },
-    connectButton: {
-        backgroundColor: colors.primary,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 8,
-        borderRadius: 20,
-    },
-    connectButtonText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
-        fontSize: 14,
-    },
-    syncInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: spacing.sm,
-        paddingTop: spacing.sm,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(52, 199, 89, 0.2)',
-    },
-    syncText: {
-        fontSize: 13,
-        color: colors.success,
-        marginLeft: 6,
+    actionText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 9.8,
+        color: colors.textDark,
     },
 });

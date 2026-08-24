@@ -10,18 +10,19 @@ import {
     StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 
 // Ejercicio 4-4 (inspira 4s + espira 4s).
 const PHASE_DURATION = 4000;
 const TOTAL_SECONDS = 600; // 10 minutos
 
-// Fondo navy oscuro + acentos verde para casar con el mockup.
-const NAVY_BG = colors.dark;
-const GREEN_INNER = '#22c55e';
-const GREEN_MID = 'rgba(34,197,94,0.35)';
-const GREEN_OUTER = 'rgba(34,197,94,0.15)';
+// Colores confirmados contra Figma (frame RESPIRACION, Bloque 3): fondo
+// morado de marca (mismo que colors.textDark) + los 3 círculos en el
+// MISMO verde ctaGreen a distinta opacidad, no verdes distintos.
+const SCREEN_BG = colors.textDark;
+const GREEN_INNER = colors.ctaGreen;
+const GREEN_MID = 'rgba(36,189,144,0.5)';
+const GREEN_OUTER = 'rgba(36,189,144,0.25)';
 
 export default function BreathingExerciseScreen({ navigation }) {
     const [timeLeft, setTimeLeft] = useState(TOTAL_SECONDS);
@@ -92,17 +93,7 @@ export default function BreathingExerciseScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="light-content" backgroundColor={NAVY_BG} />
-
-            {/* Header minimal — solo botón cerrar */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Ionicons name="close" size={26} color="#FFFFFF" />
-                </TouchableOpacity>
-            </View>
+            <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
 
             <View style={styles.content}>
                 {/* Círculos concéntricos: outer + middle + inner solid. Tap para pausar. */}
@@ -149,19 +140,14 @@ export default function BreathingExerciseScreen({ navigation }) {
     );
 }
 
-const RING_SIZE = 240;
-const RING_INNER = 110;
-const RING_MID = 175;
+const RING_SIZE = 265;
+const RING_INNER = 109;
+const RING_MID = 185;
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: NAVY_BG,
-    },
-    header: {
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.md,
+        backgroundColor: SCREEN_BG,
     },
     content: {
         flex: 1,
@@ -200,38 +186,41 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     phaseText: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '700',
+        color: colors.white,
+        fontSize: 19,
+        fontFamily: 'Poppins-SemiBold',
     },
     title: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#FFFFFF',
+        fontSize: 21,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.white,
         marginBottom: 4,
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.6)',
+        fontSize: 13.8,
+        fontFamily: 'Poppins-Light',
+        color: 'rgba(255,255,255,0.7)',
         marginBottom: spacing.lg,
         textAlign: 'center',
     },
     timer: {
-        fontSize: 40,
-        fontWeight: '800',
+        fontSize: 43.5,
+        fontFamily: 'Poppins-Bold',
         color: GREEN_INNER,
         marginBottom: spacing.xl,
     },
     finishButton: {
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        paddingHorizontal: spacing.xl,
-        paddingVertical: 12,
-        borderRadius: 999,
+        width: '100%',
+        height: 61,
+        borderRadius: 14,
+        backgroundColor: colors.purple,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     finishButtonText: {
-        color: '#FFFFFF',
-        fontSize: 15,
-        fontWeight: '700',
+        color: colors.white,
+        fontSize: 16,
+        fontFamily: 'Poppins-SemiBold',
     },
 });

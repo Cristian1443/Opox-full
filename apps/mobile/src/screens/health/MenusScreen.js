@@ -8,139 +8,111 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
+// Colores confirmados contra Figma (frame MENUS EQUILIBRADOS, Bloque 3)
+// sin equivalente exacto en theme.js. El gris del tab inactivo es el mismo
+// que en AlimentacionScreen (no es el morado-muted de otros controles).
+const FIGMA = {
+    tabInactive: 'rgba(52,58,61,0.5)',
+    cardBorderNormal: 'rgba(65,41,80,0.3)',
+    textBody: 'rgba(52,58,61,0.5)',
+};
+
+// El Figma solo muestra 3 tabs (Todos/Concentración/Energía) — "Día de
+// examen" es un filtro real que ya existía en el código, se mantiene con
+// el mismo lenguaje visual del resto de tabs.
 const FILTERS = ['Todos', 'Concentración', 'Energía', 'Día de examen'];
 
+// bodyLines: mismo bloque de texto que en Figma (comidas o info del
+// dietista, una línea por elemento, unidas con salto de línea al pintar).
 const MENUS_DATA = [
     {
         id: 'm1',
         title: 'Día de concentración máxima',
-        type: 'AI',
-        author: 'IA',
-        authorId: null,
-        description: 'Optimizado para mantener la glucosa estable y mejorar el flujo sanguíneo al cerebro.',
-        calories: '1800 kcal',
-        meals: ['Desayuno', 'Comida', 'Cena'],
-        time: 'Generado hoy',
+        badgeLabel: 'IA',
+        highlighted: true,
+        bodyLines: [
+            'Desayuno · Avena con arándanos y nueces',
+            'Comida · Salmón, quinoa y verduras',
+            'Cena · Tortilla y aguacate',
+        ],
+        filterKey: 'Concentración',
     },
     {
         id: 'm2',
         title: 'Energía sostenida',
-        type: 'Human',
-        author: 'Dietista',
-        authorId: 'Laura M. (col. nº 1234)',
-        description: 'Diseñado para deportistas y sesiones largas de estudio que requieren resistencia.',
-        calories: '2100 kcal',
-        meals: ['Desayuno', 'Media mañana', 'Comida', 'Merienda', 'Cena'],
-        time: 'Por Laura M.',
+        badgeLabel: 'Dietista',
+        highlighted: false,
+        bodyLines: ['Por Laura M., dietista col. nº 1234'],
+        filterKey: 'Energía',
     },
     {
         id: 'm3',
         title: 'Recuperación post-examen',
-        type: 'Human',
-        author: 'Dietista',
-        authorId: 'Carlos R. (col. nº 5678)',
-        description: 'Menú relajante y antiinflamatorio para después de un periodo de estrés intenso.',
-        calories: '1950 kcal',
-        meals: ['Desayuno', 'Comida', 'Cena'],
-        time: 'Por Carlos R.',
+        badgeLabel: 'Dietista',
+        highlighted: false,
+        bodyLines: ['Por Carlos R., dietista col. nº 5678'],
+        filterKey: 'Día de examen',
     },
 ];
 
-const getAuthorBadge = (type, author, id) => (
-    <View style={[styles.authorBadge, { borderColor: type === 'AI' ? colors.primary : colors.success }]}>
-        {type === 'AI' ? (
-            <Ionicons name="sparkles" size={14} color={colors.primary} />
-        ) : (
-            <Ionicons name="person" size={14} color={colors.success} />
-        )}
-        <Text style={[styles.authorText, { color: type === 'AI' ? colors.primary : colors.success }]}>
-            {author}
-        </Text>
-        {type === 'Human' && id && (
-            <Text style={styles.authorIdText}>({id})</Text>
-        )}
-    </View>
-);
+function MenuCardItem({ menu, onViewRecipe }) {
+    return (
+        <View style={[styles.card, menu.highlighted ? styles.cardHighlighted : styles.cardNormal]}>
+            <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{menu.title}</Text>
+                <Text style={styles.cardBadge}>{menu.badgeLabel}</Text>
+            </View>
+            <Text style={styles.cardBody}>{menu.bodyLines.join('\n')}</Text>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => onViewRecipe?.(menu)}>
+                <Text style={styles.cardLink}>Ver receta y lista de la compra ›</Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
 
 export default function MenusScreen({ navigation }) {
     const [activeFilter, setActiveFilter] = useState('Todos');
 
     const filteredMenus = activeFilter === 'Todos'
         ? MENUS_DATA
-        : MENUS_DATA.filter((m) =>
-            (activeFilter === 'Concentración' && m.title.includes('concentración')) ||
-            (activeFilter === 'Energía' && m.title.includes('Energía')) ||
-            (activeFilter === 'Día de examen' && m.title.includes('examen'))
-        );
+        : MENUS_DATA.filter((m) => m.filterKey === activeFilter);
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <HealthScreenHeader title="Menús" onBack={() => navigation.goBack()} />
+            <HealthScreenHeader title="MENÚS" onBack={() => navigation.goBack()} />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.filterContainer}>
-                    {FILTERS.map((filter) => (
-                        <TouchableOpacity
-                            key={filter}
-                            style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
-                            onPress={() => setActiveFilter(filter)}
-                        >
-                            <Text
-                                style={[
-                                    styles.filterChipText,
-                                    activeFilter === filter && styles.filterChipTextActive,
-                                ]}
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.tabsRow}>
+                    {FILTERS.map((filter) => {
+                        const active = filter === activeFilter;
+                        return (
+                            <TouchableOpacity
+                                key={filter}
+                                activeOpacity={0.7}
+                                onPress={() => setActiveFilter(filter)}
+                                style={active ? styles.tabActive : styles.tabInactive}
                             >
-                                {filter}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                                <Text style={active ? styles.tabActiveText : styles.tabInactiveText}>{filter}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
-                <View style={styles.listContainer}>
+                <View style={styles.menusList}>
                     {filteredMenus.map((menu) => (
-                        <TouchableOpacity
+                        <MenuCardItem
                             key={menu.id}
-                            style={styles.menuCard}
-                            onPress={() => navigation.navigate('MenuDetail', { menu })}
-                        >
-                            <View style={styles.cardHeader}>
-                                {getAuthorBadge(menu.type, menu.author, menu.authorId)}
-                                <View style={styles.cardMeta}>
-                                    <Text style={styles.cardMetaText}>{menu.time}</Text>
-                                    <Text style={styles.cardMetaText}>{menu.calories}</Text>
-                                </View>
-                            </View>
-
-                            <Text style={styles.menuTitle}>{menu.title}</Text>
-                            <Text style={styles.menuDescription}>{menu.description}</Text>
-
-                            <View style={styles.mealsRow}>
-                                {menu.meals.map((meal, index) => (
-                                    <View key={index} style={styles.mealTag}>
-                                        <Text style={styles.mealTagText}>{meal}</Text>
-                                    </View>
-                                ))}
-                            </View>
-
-                            <View style={styles.actionButton}>
-                                <Text style={styles.actionButtonText}>
-                                    Ver receta y lista de la compra ›
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
+                            menu={menu}
+                            onViewRecipe={(m) => navigation.navigate('MenuDetail', { menu: m })}
+                        />
                     ))}
                 </View>
 
                 {filteredMenus.length === 0 && (
-                    <View style={styles.emptyState}>
-                        <Ionicons name="search-outline" size={48} color={colors.textSecondary} />
-                        <Text style={styles.emptyText}>No hay menús para este filtro.</Text>
-                    </View>
+                    <Text style={styles.emptyText}>No hay menús para este filtro.</Text>
                 )}
 
                 <View style={{ height: spacing.lg }} />
@@ -152,136 +124,88 @@ export default function MenusScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     scrollContent: {
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
     },
-    filterContainer: {
+    tabsRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: spacing.sm,
-        rowGap: spacing.sm,
-        marginBottom: spacing.lg,
+        gap: 12,
+        marginBottom: 20,
     },
-    filterChip: {
-        paddingHorizontal: spacing.md,
+    tabActive: {
+        borderWidth: 1.3,
+        borderColor: colors.textDark,
+        borderRadius: 9.8,
+        paddingHorizontal: 16,
         paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.separator,
     },
-    filterChipActive: {
-        backgroundColor: colors.primary,
-        borderColor: colors.primary,
+    tabActiveText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 15.5,
+        color: colors.textDark,
     },
-    filterChipText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textSecondary,
+    tabInactive: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
     },
-    filterChipTextActive: {
-        color: '#FFFFFF',
+    tabInactiveText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15.5,
+        color: FIGMA.tabInactive,
     },
-    listContainer: {
-        gap: spacing.md,
+    menusList: {
+        gap: 16,
     },
-    menuCard: {
-        backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.separator,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 3,
+    card: {
+        padding: 16,
     },
-    cardHeader: {
+    cardHighlighted: {
+        borderWidth: 2.2,
+        borderColor: colors.ctaGreen,
+    },
+    cardNormal: {
+        borderWidth: 0.44,
+        borderColor: FIGMA.cardBorderNormal,
+    },
+    cardHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.sm,
+        alignItems: 'flex-start',
     },
-    authorBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        backgroundColor: 'rgba(0,0,0,0.03)',
-        borderWidth: 1,
+    cardTitle: {
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14.7,
+        color: colors.textDark,
     },
-    authorText: {
-        fontSize: 12,
-        fontWeight: '700',
-        marginLeft: 4,
+    cardBadge: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13.3,
+        color: colors.purple,
+        marginLeft: 8,
     },
-    authorIdText: {
-        fontSize: 10,
-        color: colors.textSecondary,
-        marginLeft: 2,
+    cardBody: {
+        marginTop: 6,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.5,
+        lineHeight: 18,
+        color: FIGMA.textBody,
     },
-    cardMeta: {
-        alignItems: 'flex-end',
-    },
-    cardMetaText: {
-        fontSize: 11,
-        color: colors.textSecondary,
-        marginBottom: 2,
-    },
-    menuTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: colors.text,
-        marginBottom: spacing.xs,
-    },
-    menuDescription: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        lineHeight: 20,
-        marginBottom: spacing.md,
-    },
-    mealsRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: spacing.xs,
-        marginBottom: spacing.md,
-    },
-    mealTag: {
-        backgroundColor: colors.background,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-    },
-    mealTagText: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        fontWeight: '500',
-    },
-    actionButton: {
-        alignItems: 'center',
-        paddingVertical: 10,
-        borderRadius: 12,
-        backgroundColor: colors.primary + '10',
-        borderWidth: 1,
-        borderColor: colors.primary,
-    },
-    actionButtonText: {
-        color: colors.primary,
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    emptyState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: spacing.xl,
+    cardLink: {
+        marginTop: 10,
+        fontFamily: 'Poppins-Medium',
+        fontSize: 9.8,
+        color: colors.accentOrange,
     },
     emptyText: {
-        fontSize: 16,
-        color: colors.textSecondary,
-        marginTop: spacing.md,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: FIGMA.textBody,
+        textAlign: 'center',
+        paddingVertical: spacing.xl,
     },
 });

@@ -1,49 +1,59 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
-import ScreenHeader from '../../components/ScreenHeader';
-import NudgeModal from '../../components/NudgeModal';
+import PlanningPopupModal, { CheckBadgeIcon } from '../../components/PlanningPopupModal';
 import { planningApi } from '../../api';
+import { colors, spacing } from '../../theme';
+
+// Colores confirmados contra Figma (frame HOY, Bloque 4) sin equivalente
+// exacto en theme.js.
+const FIGMA = {
+    ringTrack: 'rgba(65,41,80,0.15)',
+    separator: 'rgba(65,41,80,0.5)',
+    textNote: '#343A3D',
+    checkboxBorder: '#D9D9D9',
+};
 
 function IconCheck() {
     return (
-        <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-            <Path d="M5 12l4 4 10-10" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M5 13l4.5 4.5L19 7" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
 
-function IconPlus() {
+function TaskRow({ task, isLast, onToggle }) {
     return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M12 5v14M5 12h14" stroke="#FF6B4A" strokeWidth={2} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function TaskRow({ task, onToggle }) {
-    return (
-        <TouchableOpacity style={styles.task} onPress={() => onToggle(task)} activeOpacity={0.7}>
+        <TouchableOpacity style={[styles.task, !isLast && styles.taskSeparator]} onPress={() => onToggle(task)} activeOpacity={0.7}>
             <View style={[styles.chk, task.done && styles.chkOn]}>{task.done && <IconCheck />}</View>
             <View style={{ flex: 1 }}>
-                <Text style={[styles.taskTitle, task.done && styles.taskTitleDone]}>{task.title}</Text>
+                <Text style={styles.taskTitle}>{task.title}</Text>
                 {task.subtitle && <Text style={styles.taskSubtitle}>{task.subtitle}</Text>}
             </View>
         </TouchableOpacity>
     );
 }
 
-function BigDonut({ percent }) {
-    const dash = (Math.min(percent, 100) / 100) * 176;
+function ProgressRing({ percent, size = 150 }) {
+    const strokeWidth = size * 0.13;
+    const radius = (size - strokeWidth) / 2;
+    const c = size / 2;
+    const circumference = 2 * Math.PI * radius;
+    const dash = (Math.min(percent, 100) / 100) * circumference;
     return (
-        <Svg width={70} height={70} viewBox="0 0 70 70">
-            <Circle cx={35} cy={35} r={28} fill="none" stroke="#33405E" strokeWidth={7} />
-            <Circle
-                cx={35} cy={35} r={28} fill="none" stroke="#FF6B4A" strokeWidth={7}
-                strokeDasharray={`${dash} 200`} strokeLinecap="round" transform="rotate(-90 35 35)"
-            />
-        </Svg>
+        <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                <Circle cx={c} cy={c} r={radius} fill="none" stroke={FIGMA.ringTrack} strokeWidth={strokeWidth} />
+                <Circle
+                    cx={c} cy={c} r={radius} fill="none" stroke={colors.ctaGreen} strokeWidth={strokeWidth}
+                    strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round" transform={`rotate(-90 ${c} ${c})`}
+                />
+            </Svg>
+            {/* Única fuente no-Poppins confirmada en todo el sistema — ver nota de Figma. */}
+            <Text style={styles.ringLabel}>{Math.round(percent)}%</Text>
+        </View>
     );
 }
 
@@ -51,9 +61,6 @@ export default function PlanningTodayScreen({ navigation }) {
     const [tasks, setTasks] = useState([]);
     const [goalCount, setGoalCount] = useState(3);
     const [completedPopup, setCompletedPopup] = useState(null); // { streak, points } | null
-    const [addVisible, setAddVisible] = useState(false);
-    const [newTitle, setNewTitle] = useState('');
-    const [newSubtitle, setNewSubtitle] = useState('');
 
     const load = useCallback(() => {
         Promise.all([planningApi.listTasks(), planningApi.getPlan()]).then(([t, p]) => {
@@ -73,129 +80,136 @@ export default function PlanningTodayScreen({ navigation }) {
         }
     };
 
-    const handleAddTask = async () => {
-        if (!newTitle.trim()) return;
-        const today = new Date().toISOString().slice(0, 10);
-        const { data } = await planningApi.createTask({
-            taskDate: today,
-            title: newTitle.trim(),
-            subtitle: newSubtitle.trim() || undefined,
-            kind: 'test',
-        });
-        if (data) {
-            setTasks((prev) => [...prev, data]);
-            setNewTitle('');
-            setNewSubtitle('');
-            setAddVisible(false);
-        }
-    };
-
     const completedCount = tasks.filter((t) => t.done).length;
-    const percent = goalCount > 0 ? Math.min(Math.round((completedCount / goalCount) * 100), 100) : 0;
+    const percent = goalCount > 0 ? Math.min((completedCount / goalCount) * 100, 100) : 0;
+    const remaining = goalCount - completedCount;
     const pending = tasks.find((t) => !t.done);
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
-            <ScreenHeader
-                title="Hoy"
-                onBack={() => navigation.goBack()}
-                right={<TouchableOpacity onPress={() => setAddVisible(true)}><IconPlus /></TouchableOpacity>}
-            />
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.iconBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Hoy</Text>
+                <View style={styles.iconBtn} />
+            </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                <View style={styles.card}>
-                    <BigDonut percent={percent} />
-                    <Text style={styles.cardTitle}>Objetivo diario: {goalCount} tests</Text>
-                    <Text style={styles.cardCaption}>
-                        {completedCount >= goalCount
+                <View style={styles.goalBlock}>
+                    <ProgressRing percent={percent} />
+                    <Text style={styles.goalLabel}>Objetivo diario: {goalCount} tests</Text>
+                    <Text style={styles.goalNote}>
+                        {remaining <= 0
                             ? '¡Objetivo cumplido!'
-                            : `Te queda${goalCount - completedCount === 1 ? '' : 'n'} ${goalCount - completedCount} para completarlo`}
+                            : `Te falta${remaining === 1 ? '' : 'n'} ${remaining} test${remaining === 1 ? '' : 's'} para completar tu objetivo diario recomendado.`}
                     </Text>
                 </View>
 
-                <Text style={styles.groupTitle}>TAREAS DE HOY</Text>
+                <Text style={styles.sectionLabel}>TAREAS DE HOY</Text>
                 {tasks.length === 0 ? (
                     <Text style={styles.empty}>No tienes tareas planificadas hoy.</Text>
                 ) : (
-                    tasks.map((t) => <TaskRow key={t.id} task={t} onToggle={handleToggle} />)
-                )}
-
-                {pending && (
-                    <TouchableOpacity style={styles.btn} onPress={() => handleToggle(pending)} activeOpacity={0.85}>
-                        <Text style={styles.btnText}>Empezar tarea pendiente</Text>
-                    </TouchableOpacity>
+                    <View style={styles.tasksList}>
+                        {tasks.map((t, index) => (
+                            <TaskRow key={t.id} task={t} isLast={index === tasks.length - 1} onToggle={handleToggle} />
+                        ))}
+                    </View>
                 )}
             </ScrollView>
 
+            {pending && (
+                <TouchableOpacity style={styles.ctaButton} onPress={() => handleToggle(pending)} activeOpacity={0.85}>
+                    <Text style={styles.ctaButtonText}>Empezar tarea pendiente</Text>
+                </TouchableOpacity>
+            )}
+
             {completedPopup && (
-                <NudgeModal
+                <PlanningPopupModal
                     visible
-                    iconBg="#E3F6EE"
-                    icon={<Svg width={26} height={26} viewBox="0 0 24 24" fill="none"><Circle cx={12} cy={12} r={10} stroke="#2BB673" strokeWidth={1.8} /><Path d="M7.5 12.5l3 3 6-6.5" stroke="#2BB673" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" /></Svg>}
+                    icon={<CheckBadgeIcon />}
                     title="¡Objetivo cumplido!"
                     description={`${goalCount} de ${goalCount} tests hoy. Tu racha sube a ${completedPopup.streak} días y ganas ${completedPopup.points} Opopoints.`}
                     primaryLabel="¡Genial!"
-                    secondaryLabel="Cerrar"
                     onPrimaryPress={() => setCompletedPopup(null)}
-                    onSecondaryPress={() => setCompletedPopup(null)}
                 />
             )}
-
-            <Modal transparent visible={addVisible} animationType="fade" onRequestClose={() => setAddVisible(false)}>
-                <View style={styles.overlay}>
-                    <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>Nueva tarea de hoy</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Título (ej. Test de Constitución)"
-                            placeholderTextColor="#AEB5C2"
-                            value={newTitle}
-                            onChangeText={setNewTitle}
-                        />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Detalle (opcional, ej. 20 preguntas)"
-                            placeholderTextColor="#AEB5C2"
-                            value={newSubtitle}
-                            onChangeText={setNewSubtitle}
-                        />
-                        <TouchableOpacity style={styles.btn} onPress={handleAddTask} activeOpacity={0.85}>
-                            <Text style={styles.btnText}>Añadir</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setAddVisible(false)} style={{ marginTop: 8 }}>
-                            <Text style={styles.cancel}>Cancelar</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
+    container: { flex: 1, backgroundColor: colors.white },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: 4,
+    },
+    iconBtn: { width: 32, padding: 4 },
+    headerTitle: {
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21,
+        color: colors.textDark,
+        textAlign: 'center',
+    },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 16, paddingBottom: 24 },
-    card: { backgroundColor: '#1B2A4A', borderRadius: 14, padding: 13, alignItems: 'center', marginBottom: 11 },
-    cardTitle: { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 6 },
-    cardCaption: { color: '#9AA7C2', fontSize: 11 },
-    groupTitle: { fontSize: 10.5, fontWeight: '700', color: '#5A6373', letterSpacing: 0.4, marginVertical: 8 },
-    empty: { textAlign: 'center', color: '#8A92A0', fontSize: 12.5, marginTop: 20 },
-    task: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 11, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 12, marginBottom: 8 },
-    chk: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: '#D4DAE6', alignItems: 'center', justifyContent: 'center' },
-    chkOn: { backgroundColor: '#2BB673', borderColor: '#2BB673' },
-    taskTitle: { fontSize: 12, fontWeight: '700', color: '#1B2A4A' },
-    taskTitleDone: { textDecorationLine: 'line-through', color: '#9AA2B1' },
-    taskSubtitle: { fontSize: 10, color: '#8A92A0' },
-    btn: { backgroundColor: '#FF6B4A', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 6 },
-    btnText: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
-    overlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-    modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 18, width: '100%' },
-    modalTitle: { fontSize: 15, fontWeight: '800', color: '#0F1B33', marginBottom: 12 },
-    input: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: '#1B2A4A', marginBottom: 10 },
-    cancel: { textAlign: 'center', color: '#8A92A0', fontSize: 12, fontWeight: '700' },
+    body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 24 },
+    goalBlock: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    ringLabel: {
+        position: 'absolute',
+        fontFamily: 'Arial',
+        fontWeight: '700',
+        fontSize: 41.8,
+        color: colors.textDark,
+    },
+    goalLabel: {
+        marginTop: 20,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
+        textAlign: 'center',
+    },
+    goalNote: {
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 10.5,
+        lineHeight: 13.9,
+        color: colors.textDark,
+        textAlign: 'center',
+        maxWidth: 260,
+    },
+    sectionLabel: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
+        marginBottom: 8,
+    },
+    empty: { textAlign: 'center', fontFamily: 'Poppins-Regular', color: FIGMA.textNote, fontSize: 12.5, marginTop: 20 },
+    tasksList: { marginBottom: 8 },
+    task: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16 },
+    taskSeparator: { borderBottomWidth: 0.44, borderBottomColor: FIGMA.separator },
+    chk: { width: 29, height: 29, borderRadius: 2.7, borderWidth: 0.44, borderColor: FIGMA.checkboxBorder, alignItems: 'center', justifyContent: 'center' },
+    chkOn: { backgroundColor: colors.ctaGreen, borderWidth: 0 },
+    taskTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
+    taskSubtitle: { marginTop: 2, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote },
+    ctaButton: {
+        marginHorizontal: 40,
+        marginBottom: spacing.md,
+        height: 61,
+        borderRadius: 14,
+        backgroundColor: colors.ctaGreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    ctaButtonText: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.white },
 });

@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ScreenHeader from '../../components/ScreenHeader';
+import { Ionicons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 import { planningApi } from '../../api';
+import { colors, spacing } from '../../theme';
 
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const INTENSITY_LABELS = { low: 'Baja', medium: 'Media', high: 'Alta' };
 const INTENSITY_ORDER = ['low', 'medium', 'high'];
+
+// Colores confirmados contra Figma (frame EDITAR PLAN, Bloque 4) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    sliderTrackFaded: 'rgba(246,150,36,0.15)',
+    dayOutline: '#D9D9D9',
+    textNote: '#343A3D',
+};
 
 export default function PlanningEditScreen({ navigation }) {
     const [testsPerDay, setTestsPerDay] = useState(3);
@@ -47,104 +57,137 @@ export default function PlanningEditScreen({ navigation }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
-            <ScreenHeader title="Ajustar mi plan" onBack={() => navigation.goBack()} />
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.iconBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Ajustar mi plan</Text>
+                <View style={styles.iconBtn} />
+            </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Tests por día</Text>
-                    <View style={styles.stepperRow}>
-                        <TouchableOpacity
-                            style={styles.stepperBtn}
-                            onPress={() => setTestsPerDay((n) => Math.max(1, n - 1))}
-                        >
-                            <Text style={styles.stepperBtnText}>−</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.stepperValue}>{testsPerDay} test{testsPerDay === 1 ? '' : 's'}</Text>
-                        <TouchableOpacity
-                            style={styles.stepperBtn}
-                            onPress={() => setTestsPerDay((n) => Math.min(6, n + 1))}
-                        >
-                            <Text style={styles.stepperBtnText}>+</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Días de estudio a la semana</Text>
-                    <View style={styles.daysRow}>
-                        {WEEKDAY_LABELS.map((label, i) => {
-                            const weekday = i + 1;
-                            const active = studyDays.includes(weekday);
-                            return (
-                                <TouchableOpacity
-                                    key={weekday}
-                                    style={[styles.dayCirc, active && styles.dayCircActive]}
-                                    onPress={() => toggleDay(weekday)}
-                                >
-                                    <Text style={[styles.dayCircText, active && styles.dayCircTextActive]}>{label}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
-
-                <TouchableOpacity style={styles.card} onPress={cycleIntensity} activeOpacity={0.7}>
-                    <View style={styles.intensityRow}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.cardTitle}>Intensidad</Text>
-                            <Text style={styles.muted}>Reparte la carga entre tus días de estudio</Text>
-                        </View>
-                        <Text style={styles.intensityPill}>{INTENSITY_LABELS[intensity]} ›</Text>
-                    </View>
-                </TouchableOpacity>
-
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Fecha de examen (opcional)</Text>
-                    <Text style={[styles.muted, { marginBottom: 8 }]}>Se usa para la cuenta atrás del horizonte macro.</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor="#AEB5C2"
-                        value={examDate}
-                        onChangeText={setExamDate}
+                {/* Nota: en Figma esta sección repite "RUTAS POR FASES" (copiado
+                    de "Rumbo a la plaza") aunque aquí el contenido real es el
+                    selector de tests diarios. Se usa una etiqueta funcional
+                    propia en vez de propagar el mismo texto equivocado. */}
+                <Text style={styles.sectionLabel}>TESTS DIARIOS</Text>
+                <View style={styles.sliderBlock}>
+                    <Slider
+                        style={styles.slider}
+                        minimumValue={1}
+                        maximumValue={6}
+                        step={1}
+                        value={testsPerDay}
+                        onValueChange={setTestsPerDay}
+                        minimumTrackTintColor={colors.accentOrange}
+                        maximumTrackTintColor={FIGMA.sliderTrackFaded}
+                        thumbTintColor={colors.accentOrange}
                     />
+                    <View style={styles.sliderLabelsRow}>
+                        <Text style={styles.sliderMinMaxLabel}>1</Text>
+                        <Text style={styles.sliderValueLabel}>{testsPerDay} test{testsPerDay === 1 ? '' : 's'}</Text>
+                        <Text style={styles.sliderMinMaxLabel}>6</Text>
+                    </View>
                 </View>
-            </ScrollView>
 
-            <View style={styles.btnRow}>
-                <TouchableOpacity style={styles.btn} onPress={handleSave} activeOpacity={0.85}>
-                    <Text style={styles.btnText}>{saved ? 'Guardado ✓' : 'Guardar cambios'}</Text>
+                <Text style={[styles.sectionLabel, styles.sectionSpacingTop]}>DÍAS DE ESTUDIO A LA SEMANA</Text>
+                <View style={styles.daysRow}>
+                    {WEEKDAY_LABELS.map((label, i) => {
+                        const weekday = i + 1;
+                        const active = studyDays.includes(weekday);
+                        return (
+                            <TouchableOpacity
+                                key={weekday}
+                                style={[styles.dayCirc, active && styles.dayCircActive]}
+                                onPress={() => toggleDay(weekday)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.dayCircText, active && styles.dayCircTextActive]}>{label}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                <Text style={[styles.sectionLabel, styles.sectionSpacingTop]}>INTENSIDAD</Text>
+                <View style={styles.intensityRow}>
+                    <Text style={styles.intensitySubtitle}>La IA reparte la carga</Text>
+                    <TouchableOpacity style={styles.intensityLink} onPress={cycleIntensity} activeOpacity={0.7}>
+                        <Text style={styles.intensityLinkText}>{INTENSITY_LABELS[intensity]}</Text>
+                        <Ionicons name="chevron-forward" size={14} color={colors.selectionBorder} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* No presente en el frame de Figma inspeccionado, pero es la
+                    única pantalla real donde se puede fijar la fecha de examen
+                    que usa el horizonte macro — quitarla dejaría el CTA "Añádela
+                    en el ajuste del plan" de PlanningMacroScreen sin destino. */}
+                <Text style={styles.examDateLabel}>Fecha de examen (opcional)</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={FIGMA.textNote}
+                    value={examDate}
+                    onChangeText={setExamDate}
+                />
+
+                <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85}>
+                    <Text style={styles.saveButtonText}>{saved ? 'Guardado ✓' : 'Guardar cambios'}</Text>
                 </TouchableOpacity>
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
+    container: { flex: 1, backgroundColor: colors.white },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: 4,
+    },
+    iconBtn: { width: 32, padding: 4 },
+    headerTitle: {
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21,
+        color: colors.textDark,
+        textAlign: 'center',
+    },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 16, paddingBottom: 90 },
-    card: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 14, padding: 13, marginBottom: 11 },
-    cardTitle: { fontSize: 12, fontWeight: '700', color: '#1B2A4A' },
-    muted: { fontSize: 11, color: '#8A92A0' },
-    stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: 12 },
-    stepperBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#FFF1EC', alignItems: 'center', justifyContent: 'center' },
-    stepperBtnText: { fontSize: 18, fontWeight: '800', color: '#FF6B4A' },
-    stepperValue: { fontSize: 13, fontWeight: '800', color: '#FF6B4A', minWidth: 70, textAlign: 'center' },
-    daysRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-    dayCirc: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: '#E4E8F0', alignItems: 'center', justifyContent: 'center' },
-    dayCircActive: { backgroundColor: '#FF6B4A', borderColor: '#FF6B4A' },
-    dayCircText: { fontSize: 11, fontWeight: '700', color: '#9AA2B1' },
-    dayCircTextActive: { color: '#fff' },
-    intensityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    intensityPill: { fontSize: 11, fontWeight: '700', color: '#FF6B4A', backgroundColor: '#FFF1EC', paddingVertical: 5, paddingHorizontal: 11, borderRadius: 9 },
-    input: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: '#1B2A4A' },
-    btnRow: { position: 'absolute', bottom: 16, left: 18, right: 18 },
-    btn: { backgroundColor: '#FF6B4A', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-    btnText: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
+    body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 40 },
+    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, marginBottom: 16 },
+    sectionSpacingTop: { marginTop: 40 },
+    sliderBlock: {},
+    slider: { width: '100%', height: 32 },
+    sliderLabelsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+    sliderMinMaxLabel: { fontFamily: 'Poppins-Regular', fontSize: 12.7, color: colors.textDark },
+    sliderValueLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 12.7, color: colors.accentOrange },
+    daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    dayCirc: { width: 42.9, height: 42.9, borderRadius: 21.45, borderWidth: 0.44, borderColor: FIGMA.dayOutline, alignItems: 'center', justifyContent: 'center' },
+    dayCircActive: { backgroundColor: colors.selectionBorder, borderWidth: 0 },
+    dayCircText: { fontFamily: 'Poppins-SemiBold', fontSize: 18.7, color: colors.textDark },
+    dayCircTextActive: { color: colors.white },
+    intensityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    intensitySubtitle: { fontFamily: 'Poppins-Regular', fontSize: 11.6, color: FIGMA.textNote },
+    intensityLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    intensityLinkText: { fontFamily: 'Poppins-Regular', fontSize: 14.2, color: colors.selectionBorder },
+    examDateLabel: { marginTop: 40, marginBottom: 8, fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
+    input: { borderWidth: 0.44, borderColor: FIGMA.dayOutline, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontFamily: 'Poppins-Regular', fontSize: 13, color: colors.textDark, marginBottom: 40 },
+    saveButton: {
+        width: 322,
+        height: 61,
+        borderRadius: 14.2,
+        backgroundColor: colors.ctaGreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'center',
+    },
+    saveButtonText: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.white },
 });

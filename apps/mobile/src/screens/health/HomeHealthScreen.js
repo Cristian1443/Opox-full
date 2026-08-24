@@ -14,47 +14,58 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
-// Anillo circular de energía usado en la energyCard.
-function EnergyRing({ percent = 84 }) {
-    const size = 64;
-    const stroke = 6;
+// Colores confirmados contra Figma (frame DASHBOARD SALUD, Bloque 3) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    cardFill: 'rgba(255,255,255,0.5)',
+    cardBorder: 'rgba(65,41,80,0.3)',
+    ringTrack: 'rgba(65,41,80,0.15)',
+    subtitleMuted: 'rgba(255,255,255,0.8)',
+};
+
+// Anillo circular de energía usado en la energyCard — pista + arco de
+// progreso + círculo interior "hueco" del color de la tarjeta.
+function EnergyRing({ percent = 85, size = 91, stroke = 10, holeColor }) {
     const r = (size - stroke) / 2;
     const circ = 2 * Math.PI * r;
     const dash = (percent / 100) * circ;
     return (
-        <Svg width={size} height={size}>
-            <Circle
-                cx={size / 2}
-                cy={size / 2}
-                r={r}
-                stroke="rgba(255,255,255,0.15)"
-                strokeWidth={stroke}
-                fill="none"
-            />
-            <Circle
-                cx={size / 2}
-                cy={size / 2}
-                r={r}
-                stroke={colors.success}
-                strokeWidth={stroke}
-                fill="none"
-                strokeDasharray={`${dash} ${circ}`}
-                strokeLinecap="round"
-                transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
-        </Svg>
+        <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width={size} height={size}>
+                <Circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    stroke={FIGMA.ringTrack}
+                    strokeWidth={stroke}
+                    fill="none"
+                />
+                <Circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    stroke={colors.ctaGreen}
+                    strokeWidth={stroke}
+                    fill="none"
+                    strokeDasharray={`${dash} ${circ}`}
+                    strokeLinecap="round"
+                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                />
+                <Circle cx={size / 2} cy={size / 2} r={r - stroke / 2 - 2} fill={holeColor} />
+            </Svg>
+            <Text style={styles.energyRingText}>{percent}%</Text>
+        </View>
     );
 }
 
 export default function HomeHealthScreen({ navigation }) {
     const wearableIndicator = (
         <TouchableOpacity
-            style={styles.wearableChip}
+            style={styles.watchIconWrap}
             onPress={() => navigation.navigate('ConnectDevice')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-            <View style={styles.dotOnline} />
-            <Text style={styles.wearableName}>Apple Watch</Text>
+            <Ionicons name="watch-outline" size={24} color={colors.accentOrange} />
         </TouchableOpacity>
     );
 
@@ -75,10 +86,7 @@ export default function HomeHealthScreen({ navigation }) {
                     onPress={() => navigation.navigate('FatigueEngine')}
                     activeOpacity={0.9}
                 >
-                    <View style={styles.energyRing}>
-                        <EnergyRing percent={84} />
-                        <Text style={styles.energyRingText}>84%</Text>
-                    </View>
+                    <EnergyRing percent={85} holeColor={colors.bannerPurple} />
                     <View style={styles.energyTextBlock}>
                         <Text style={styles.energyTitle}>Energía buena</Text>
                         <Text style={styles.energySubtitle}>Estás listo para una sesión exigente.</Text>
@@ -100,13 +108,13 @@ export default function HomeHealthScreen({ navigation }) {
                         })}
                     >
                         <View style={styles.metricTop}>
-                            <Ionicons name="pulse" size={16} color={colors.primary} />
+                            <Ionicons name="pulse" size={16} color={colors.accentOrange} />
                             <Text style={styles.metricLabel}>Ritmo cardíaco</Text>
                         </View>
                         <Text style={styles.metricValue}>
                             68 <Text style={styles.unit}>ppm</Text>
                         </Text>
-                        <Text style={[styles.metricCaption, { color: colors.success }]}>
+                        <Text style={[styles.metricCaption, { color: colors.ctaGreen }]}>
                             En reposo · normal
                         </Text>
                     </TouchableOpacity>
@@ -124,7 +132,7 @@ export default function HomeHealthScreen({ navigation }) {
                         })}
                     >
                         <View style={styles.metricTop}>
-                            <Ionicons name="heart-outline" size={16} color={colors.primary} />
+                            <Ionicons name="heart-outline" size={16} color={colors.accentOrange} />
                             <Text style={styles.metricLabel}>FC reposo</Text>
                         </View>
                         <Text style={styles.metricValue}>
@@ -154,7 +162,7 @@ export default function HomeHealthScreen({ navigation }) {
                         <Text style={styles.metricValue}>
                             42 <Text style={styles.unit}>ms</Text>
                         </Text>
-                        <Text style={[styles.metricCaption, { color: colors.warning }]}>
+                        <Text style={[styles.metricCaption, { color: colors.statRed }]}>
                             −8 vs tu base
                         </Text>
                     </TouchableOpacity>
@@ -164,17 +172,17 @@ export default function HomeHealthScreen({ navigation }) {
                             <Text style={styles.metricLabel}>Nivel de estrés</Text>
                         </View>
                         <Text style={styles.metricValue}>Medio</Text>
-                        <Text style={[styles.metricCaption, { color: colors.warning }]}>
+                        <Text style={[styles.metricCaption, { color: colors.statRed }]}>
                             Subiendo
                         </Text>
                     </View>
                 </View>
 
-                {/* RESPIRACIÓN Y SUEÑO (3 columnas) */}
+                {/* RESPIRACIÓN Y SUEÑO (3 columnas, sin tarjetas — solo texto) */}
                 <Text style={styles.sectionTitle}>RESPIRACIÓN Y SUEÑO</Text>
                 <View style={styles.rowThree}>
                     <TouchableOpacity
-                        style={styles.metricCardSmall}
+                        style={styles.breathColumn}
                         onPress={() => navigation.navigate('MetricDetail', {
                             title: 'SpO₂',
                             currentValue: 97,
@@ -190,7 +198,7 @@ export default function HomeHealthScreen({ navigation }) {
                         </Text>
                     </TouchableOpacity>
 
-                    <View style={styles.metricCardSmall}>
+                    <View style={styles.breathColumn}>
                         <Text style={styles.metricLabelSmall}>Resp.</Text>
                         <Text style={styles.metricValueSmall}>
                             14<Text style={styles.unitSmall}>/m</Text>
@@ -198,7 +206,7 @@ export default function HomeHealthScreen({ navigation }) {
                     </View>
 
                     <TouchableOpacity
-                        style={styles.metricCardSmall}
+                        style={styles.breathColumn}
                         onPress={() => navigation.navigate('MetricDetail', {
                             title: 'Sueño',
                             currentValue: 7,
@@ -221,14 +229,14 @@ export default function HomeHealthScreen({ navigation }) {
                     onPress={() => navigation.navigate('AdviceHome')}
                     activeOpacity={0.85}
                 >
-                    <View style={[styles.tipsIcon, { backgroundColor: colors.primary + '15' }]}>
-                        <Ionicons name="bulb-outline" size={24} color={colors.primary} />
+                    <View style={[styles.tipsIcon, { backgroundColor: colors.accentOrange + '15' }]}>
+                        <Ionicons name="bulb-outline" size={24} color={colors.accentOrange} />
                     </View>
                     <View style={styles.tipsText}>
                         <Text style={styles.tipsTitle}>Consejos</Text>
                         <Text style={styles.tipsSubtitle}>Estudio, alimentación, meditación</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                    <Ionicons name="chevron-forward" size={20} color={colors.textDark} />
                 </TouchableOpacity>
 
                 <View style={{ height: spacing.lg }} />
@@ -240,71 +248,54 @@ export default function HomeHealthScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     scrollContent: {
         paddingHorizontal: spacing.md,
         paddingBottom: spacing.md,
     },
-    wearableChip: {
-        flexDirection: 'row',
+    watchIconWrap: {
+        width: 36,
+        height: 36,
         alignItems: 'center',
-        gap: 6,
-    },
-    dotOnline: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: colors.success,
-    },
-    wearableName: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.success,
+        justifyContent: 'center',
     },
     energyCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.dark,
-        borderRadius: 20,
+        backgroundColor: colors.bannerPurple,
+        borderRadius: 24,
         padding: spacing.md,
         marginBottom: spacing.lg,
         gap: spacing.md,
     },
-    energyRing: {
-        width: 64,
-        height: 64,
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-    },
     energyRingText: {
         position: 'absolute',
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '800',
+        color: colors.white,
+        fontSize: 15,
+        fontFamily: 'Poppins-Bold',
     },
     energyTextBlock: {
         flex: 1,
     },
     energyTitle: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#FFFFFF',
-        marginBottom: 2,
+        fontSize: 19,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.white,
+        marginBottom: 4,
     },
     energySubtitle: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.7)',
+        fontSize: 11.5,
+        lineHeight: 14.7,
+        fontFamily: 'Poppins-Light',
+        color: FIGMA.subtitleMuted,
     },
     sectionTitle: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: colors.textSecondary,
-        textTransform: 'uppercase',
+        fontSize: 16,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: spacing.sm,
         marginTop: spacing.md,
-        letterSpacing: 0.5,
     },
     rowTwo: {
         flexDirection: 'row',
@@ -312,15 +303,15 @@ const styles = StyleSheet.create({
     },
     rowThree: {
         flexDirection: 'row',
-        gap: spacing.sm,
+        justifyContent: 'space-between',
     },
     metricCard: {
         flex: 1,
-        backgroundColor: colors.card,
-        borderRadius: 14,
+        backgroundColor: FIGMA.cardFill,
+        borderRadius: 16,
         padding: spacing.md,
         borderWidth: 1,
-        borderColor: colors.separator,
+        borderColor: FIGMA.cardBorder,
     },
     metricTop: {
         flexDirection: 'row',
@@ -329,50 +320,46 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     metricLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: colors.textSecondary,
+        fontSize: 10.5,
+        letterSpacing: 0.4,
+        fontFamily: 'Poppins-Light',
+        color: colors.textDark,
     },
     metricValue: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: colors.text,
+        fontSize: 31,
+        fontFamily: 'Poppins-Bold',
+        color: colors.textDark,
         marginBottom: 4,
     },
     unit: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: colors.textSecondary,
+        fontSize: 14,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
     metricCaption: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        fontWeight: '600',
+        fontSize: 10.5,
+        fontFamily: 'Poppins-Medium',
+        color: colors.textDark,
     },
-    metricCardSmall: {
-        flex: 1,
-        backgroundColor: colors.card,
-        borderRadius: 14,
-        padding: spacing.sm + 2,
-        borderWidth: 1,
-        borderColor: colors.separator,
+    breathColumn: {
         alignItems: 'flex-start',
     },
     metricLabelSmall: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: colors.textSecondary,
+        fontSize: 10.5,
+        letterSpacing: 0.4,
+        fontFamily: 'Poppins-Light',
+        color: colors.textDark,
         marginBottom: 4,
     },
     metricValueSmall: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: colors.text,
+        fontSize: 31,
+        fontFamily: 'Poppins-Bold',
+        color: colors.textDark,
     },
     unitSmall: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: colors.textSecondary,
+        fontSize: 14,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
     tipsCard: {
         flexDirection: 'row',
@@ -397,12 +384,13 @@ const styles = StyleSheet.create({
     },
     tipsTitle: {
         fontSize: 17,
-        fontWeight: '700',
-        color: colors.text,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
         marginBottom: 2,
     },
     tipsSubtitle: {
         fontSize: 13,
-        color: colors.textSecondary,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
     },
 });

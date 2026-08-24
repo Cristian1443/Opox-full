@@ -1,54 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
-import ScreenHeader from '../../components/ScreenHeader';
 import { planningApi } from '../../api';
+import { colors, spacing } from '../../theme';
 
-function IconCheck() {
+// Colores confirmados contra Figma (frame OPOSICION, Bloque 4) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    cardFaltan: '#F5F5F5',
+    pendingOutline: '#D9D9D9',
+    separator: 'rgba(65,41,80,0.5)',
+    textNote: '#343A3D',
+};
+
+function CheckIcon() {
     return (
-        <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-            <Path d="M5 12l4 4 10-10" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M5 13l4.5 4.5L19 7" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
 
-const PHASE_SUBTITLES = {
-    base: 'Base del temario',
-    profundizacion: 'Profundización',
-    simulacros: 'Simulacros intensivos',
-    repaso: 'Repaso final',
-};
+// La API solo expone el status por fase (done/current/upcoming), no un
+// rango de meses por fase — Figma muestra rangos ilustrativos ("Oct-Dic",
+// "Ene-Mar"...) que no existen como dato real; se mantiene el subtítulo
+// dinámico ya existente en vez de fabricar fechas.
+function phaseSubtitle(status, index) {
+    if (status === 'done') return 'Completada';
+    if (status === 'current') return 'En curso';
+    return `Fase ${index + 1}`;
+}
 
-function PhaseRow({ phase, index }) {
-    if (phase.status === 'done') {
-        return (
-            <View style={styles.task}>
-                <View style={styles.chkOn}><IconCheck /></View>
-                <View>
-                    <Text style={styles.taskTitle}>{phase.title}</Text>
-                    <Text style={styles.taskSubtitle}>Completada</Text>
-                </View>
-            </View>
-        );
-    }
-    if (phase.status === 'current') {
-        return (
-            <View style={[styles.task, styles.taskCurrent]}>
-                <View style={styles.dotOuter}><View style={styles.dotInner} /></View>
-                <View>
-                    <Text style={styles.taskTitle}>{phase.title}</Text>
-                    <Text style={styles.taskSubtitle}>En curso</Text>
-                </View>
-            </View>
-        );
-    }
+function PhaseRow({ phase, index, isLast }) {
     return (
-        <View style={styles.task}>
-            <View style={styles.chk} />
-            <View>
-                <Text style={styles.taskTitle}>{phase.title}</Text>
-                <Text style={styles.taskSubtitle}>Fase {index + 1}</Text>
+        <View style={[styles.phaseRow, index === 0 && styles.phaseRowTop, isLast && styles.phaseRowSeparator]}>
+            {phase.status === 'done' ? (
+                <View style={[styles.phaseIcon, styles.phaseIconCompleted]}><CheckIcon /></View>
+            ) : phase.status === 'current' ? (
+                <View style={[styles.phaseIcon, styles.phaseIconInProgress]}><View style={styles.phaseIconDot} /></View>
+            ) : (
+                <View style={[styles.phaseIcon, styles.phaseIconPending]} />
+            )}
+            <View style={styles.phaseTextWrap}>
+                <Text style={styles.phaseTitle}>{phase.title}</Text>
+                <Text style={styles.phaseSubtitle}>{phaseSubtitle(phase.status, index)}</Text>
             </View>
         </View>
     );
@@ -56,30 +53,46 @@ function PhaseRow({ phase, index }) {
 
 export default function PlanningMacroScreen({ navigation }) {
     const [macro, setMacro] = useState(null);
+    const [goalCount, setGoalCount] = useState(3);
     const [loaded, setLoaded] = useState(false);
 
     useEffect(() => {
-        planningApi.getMacro().then(({ data }) => { setMacro(data); setLoaded(true); });
+        Promise.all([planningApi.getMacro(), planningApi.getPlan()]).then(([m, p]) => {
+            setMacro(m.data);
+            if (p.data) setGoalCount(p.data.testsPerDay);
+            setLoaded(true);
+        });
     }, []);
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
-            <ScreenHeader title="Camino a la plaza" onBack={() => navigation.goBack()} />
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.iconBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Rumbo a la plaza</Text>
+                <View style={styles.iconBtn} />
+            </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 {!loaded ? null : macro ? (
                     <>
                         <View style={styles.card}>
-                            <Text style={styles.cardCaption}>Faltan</Text>
-                            <Text style={styles.cardTitle}>{macro.monthsLeft} meses</Text>
-                            <Text style={styles.cardExam}>
-                                Examen estimado: {new Date(`${macro.examDate}T00:00:00Z`).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                            </Text>
+                            <Text style={styles.cardFaltan}>Faltan</Text>
+                            <Text style={styles.cardTime}>{macro.monthsLeft} meses</Text>
+                            <Text style={styles.cardGoal}>Objetivo diario: {goalCount} tests</Text>
                         </View>
-                        <Text style={styles.groupTitle}>RUTA POR FASES</Text>
-                        {macro.phases.map((p, i) => <PhaseRow key={p.key} phase={p} index={i} />)}
+
+                        <Text style={styles.sectionLabel}>RUTAS POR FASES</Text>
+                        <View style={styles.phasesList}>
+                            {macro.phases.map((p, i) => (
+                                <PhaseRow key={p.key} phase={p} index={i} isLast={i === macro.phases.length - 1} />
+                            ))}
+                        </View>
                     </>
                 ) : (
                     <View style={styles.emptyCard}>
@@ -96,27 +109,54 @@ export default function PlanningMacroScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
+    container: { flex: 1, backgroundColor: colors.white },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: 4,
+    },
+    iconBtn: { width: 32, padding: 4 },
+    headerTitle: {
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21,
+        color: colors.textDark,
+        textAlign: 'center',
+    },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 16, paddingBottom: 24 },
-    card: { backgroundColor: '#1B2A4A', borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 14 },
-    cardCaption: { color: '#9AA7C2', fontSize: 11 },
-    cardTitle: { color: '#fff', fontSize: 32, fontWeight: '800', lineHeight: 36 },
-    cardExam: { color: '#FF6B4A', fontSize: 11, fontWeight: '700' },
-    groupTitle: { fontSize: 10.5, fontWeight: '700', color: '#5A6373', letterSpacing: 0.4, marginBottom: 8 },
-    task: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 11, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 12, marginBottom: 8 },
-    taskCurrent: { borderColor: '#FF6B4A', backgroundColor: '#FFF6F3' },
-    taskTitle: { fontSize: 12, fontWeight: '700', color: '#1B2A4A' },
-    taskSubtitle: { fontSize: 10, color: '#8A92A0' },
-    chk: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: '#D4DAE6' },
-    chkOn: { width: 20, height: 20, borderRadius: 6, backgroundColor: '#2BB673', alignItems: 'center', justifyContent: 'center' },
-    dotOuter: { width: 20, height: 20, borderRadius: 6, backgroundColor: '#FF6B4A', alignItems: 'center', justifyContent: 'center' },
-    dotInner: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
-    emptyCard: { backgroundColor: '#fff', borderRadius: 14, padding: 20, alignItems: 'center', marginTop: 20 },
-    emptyTitle: { fontSize: 14, fontWeight: '700', color: '#0F1B33', marginBottom: 6, textAlign: 'center' },
-    emptyText: { fontSize: 11.5, color: '#5A6373', textAlign: 'center', marginBottom: 16, lineHeight: 17 },
-    btn: { backgroundColor: '#FF6B4A', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20 },
-    btnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 24 },
+    card: {
+        backgroundColor: colors.bannerPurple,
+        borderRadius: 20,
+        paddingVertical: 24,
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    cardFaltan: { fontFamily: 'Poppins-Light', fontSize: 14.3, color: FIGMA.cardFaltan, textAlign: 'center' },
+    cardTime: { marginTop: 4, fontFamily: 'Poppins-SemiBold', fontSize: 42.7, color: colors.white, textAlign: 'center' },
+    cardGoal: { marginTop: 4, fontFamily: 'Poppins-SemiBold', fontSize: 14.2, color: colors.accentOrange, textAlign: 'center' },
+    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, marginBottom: 8 },
+    phasesList: { marginBottom: 24 },
+    phaseRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+    },
+    phaseRowTop: { borderTopWidth: 0.44, borderTopColor: FIGMA.separator },
+    phaseRowSeparator: { borderBottomWidth: 0.44, borderBottomColor: FIGMA.separator },
+    phaseIcon: { width: 29, height: 29, borderRadius: 2.7, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+    phaseIconCompleted: { backgroundColor: colors.ctaGreen },
+    phaseIconInProgress: { backgroundColor: colors.accentOrange },
+    phaseIconDot: { width: 13, height: 13, borderRadius: 6.5, backgroundColor: colors.white },
+    phaseIconPending: { borderWidth: 0.44, borderColor: FIGMA.pendingOutline },
+    phaseTextWrap: { flex: 1 },
+    phaseTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
+    phaseSubtitle: { marginTop: 2, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote },
+    emptyCard: { backgroundColor: colors.white, borderRadius: 14, padding: 20, alignItems: 'center', marginTop: 20 },
+    emptyTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: colors.textDark, marginBottom: 6, textAlign: 'center' },
+    emptyText: { fontFamily: 'Poppins-Regular', fontSize: 11.5, color: FIGMA.textNote, textAlign: 'center', marginBottom: 16, lineHeight: 17 },
+    btn: { backgroundColor: colors.ctaGreen, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20 },
+    btnText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: colors.white },
 });

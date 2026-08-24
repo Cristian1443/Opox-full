@@ -8,43 +8,62 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
+// Colores confirmados contra Figma (frame CONSEJOS DE ESTUDIO, Bloque 3)
+// sin equivalente exacto en theme.js.
+const FIGMA = {
+    separator: 'rgba(65,41,80,0.5)',
+    textNote: '#343A3D',
+    bannerBorder: 'rgba(255,255,255,0.25)',
+    offWhite: '#F5F5F5',
+};
+
+// ─── Iconos aproximados (ver nota: no son el asset exportado) ───────────────
+function ClockIcon({ size = 24, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={1.8} fill="none" />
+            <Path d="M12 7v5l3.5 2" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function RepeatLinesIcon({ size = 24, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Line x1="4" y1="7" x2="20" y2="7" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+            <Line x1="4" y1="12" x2="20" y2="12" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+            <Line x1="4" y1="17" x2="14" y2="17" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function PersonIcon({ size = 24, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Circle cx="12" cy="8" r="3.4" stroke={color} strokeWidth={1.8} fill="none" />
+            <Path d="M5.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function TrendUpIcon({ size = 24, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Polyline points="4,17 10,10 14,13 20,6" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M15 6h5v5" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
 const STUDY_TECHNIQUES = [
-    {
-        id: '1',
-        title: 'Técnica Pomodoro',
-        subtitle: '25 min foco / 5 descanso',
-        icon: 'time-outline',
-        bg: '#EAF3FB',
-        iconColor: '#2D6FB0',
-    },
-    {
-        id: '2',
-        title: 'Repetición espaciada',
-        subtitle: 'Repasa justo antes de olvidar',
-        icon: 'repeat-outline',
-        bg: '#FEEDE4',
-        iconColor: colors.primary,
-    },
-    {
-        id: '3',
-        title: 'Active recall',
-        subtitle: 'Recupera de memoria, no releas',
-        icon: 'checkbox-outline',
-        bg: '#E9F7EF',
-        iconColor: '#1f9d6b',
-    },
-    {
-        id: '4',
-        title: 'Curva del olvido',
-        subtitle: 'Por qué repasar a las 24h',
-        icon: 'trending-down-outline',
-        bg: '#F0E9F7',
-        iconColor: '#7B4BC4',
-    },
+    { id: '1', title: 'Técnica Pomodoro', subtitle: '25 min foco / 5 descanso', Icon: ClockIcon },
+    { id: '2', title: 'Repetición espaciada', subtitle: 'Repasa justo antes de olvidar', Icon: RepeatLinesIcon },
+    { id: '3', title: 'Active recall', subtitle: 'Recupera de memoria, no releas', Icon: PersonIcon },
+    { id: '4', title: 'Curva del olvido', subtitle: 'Por qué repasar a las 24h', Icon: TrendUpIcon },
 ];
 
 export default function StudyTipsScreen({ navigation }) {
@@ -52,29 +71,36 @@ export default function StudyTipsScreen({ navigation }) {
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title="Cómo estudiar mejor" onBack={() => navigation.goBack()} />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {STUDY_TECHNIQUES.map((tech) => (
-                    <View key={tech.id} style={styles.card}>
-                        <View style={[styles.iconBox, { backgroundColor: tech.bg }]}>
-                            <Ionicons name={tech.icon} size={22} color={tech.iconColor} />
-                        </View>
-                        <View style={styles.cardText}>
-                            <Text style={styles.cardTitle}>{tech.title}</Text>
-                            <Text style={styles.cardSubtitle}>{tech.subtitle}</Text>
-                        </View>
-                    </View>
-                ))}
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.list}>
+                    {STUDY_TECHNIQUES.map((tech, index) => {
+                        const { Icon } = tech;
+                        return (
+                            <View key={tech.id} style={[styles.row, index > 0 && styles.rowSeparator]}>
+                                <View style={styles.iconWrap}>
+                                    <Icon />
+                                </View>
+                                <View style={styles.rowTextWrap}>
+                                    <Text style={styles.rowTitle}>{tech.title}</Text>
+                                    <Text style={styles.rowSubtitle}>{tech.subtitle}</Text>
+                                </View>
+                            </View>
+                        );
+                    })}
+                </View>
 
-                {/* CTA final al Tutor IA (fondo navy + botón naranja pill) */}
+                {/* Espacio grande antes del banner, tal como aparece en el frame de Figma */}
+                <View style={styles.bannerSpacer} />
+
+                {/* CTA final al Tutor IA */}
                 <View style={styles.ctaCard}>
                     <View style={styles.ctaText}>
                         <Text style={styles.ctaTitle}>¿Lo aplicamos a tu temario?</Text>
-                        <Text style={styles.ctaSubtitle}>
-                            El Tutor IA te hace un plan con estas técnicas.
-                        </Text>
+                        <Text style={styles.ctaSubtitle}>El Tutor IA te hace un plan con estas técnicas</Text>
                     </View>
                     <TouchableOpacity
                         style={styles.ctaButton}
+                        activeOpacity={0.75}
                         onPress={() => navigation.navigate('AITutor')}
                     >
                         <Text style={styles.ctaButtonText}>Tutor IA</Text>
@@ -90,75 +116,85 @@ export default function StudyTipsScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     scrollContent: {
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
     },
-    card: {
+    list: {
+        marginTop: 8,
+    },
+    row: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: spacing.md,
-        marginBottom: spacing.sm,
-        borderWidth: 1,
-        borderColor: colors.separator,
+        paddingVertical: 16,
     },
-    iconBox: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        justifyContent: 'center',
+    rowSeparator: {
+        borderTopWidth: 0.44,
+        borderTopColor: FIGMA.separator,
+    },
+    iconWrap: {
+        width: 32,
+        height: 32,
         alignItems: 'center',
-        marginRight: spacing.md,
+        justifyContent: 'center',
+        marginRight: 14,
     },
-    cardText: {
+    rowTextWrap: {
         flex: 1,
     },
-    cardTitle: {
+    rowTitle: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
-        fontWeight: '700',
-        color: colors.text,
-        marginBottom: 2,
+        color: colors.textDark,
     },
-    cardSubtitle: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        fontWeight: '500',
+    rowSubtitle: {
+        marginTop: 2,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 9,
+        color: FIGMA.textNote,
+    },
+    bannerSpacer: {
+        height: 200,
     },
     ctaCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.dark,
-        borderRadius: 16,
-        padding: spacing.md,
-        marginTop: spacing.md,
-        gap: spacing.md,
+        backgroundColor: colors.ctaGreen,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: FIGMA.bannerBorder,
+        paddingVertical: 18,
+        paddingHorizontal: 18,
     },
     ctaText: {
         flex: 1,
+        marginRight: 12,
     },
     ctaTitle: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#FFFFFF',
-        marginBottom: 4,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 17.8,
+        color: colors.white,
     },
     ctaSubtitle: {
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.7)',
-        lineHeight: 18,
+        marginTop: 4,
+        fontFamily: 'Poppins-Light',
+        fontSize: 14.3,
+        color: FIGMA.offWhite,
     },
     ctaButton: {
-        backgroundColor: colors.primary,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 10,
-        borderRadius: 999,
+        width: 88,
+        height: 36,
+        borderRadius: 9.8,
+        borderWidth: 1.3,
+        borderColor: colors.white,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     ctaButtonText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '700',
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.4,
+        color: colors.white,
     },
 });

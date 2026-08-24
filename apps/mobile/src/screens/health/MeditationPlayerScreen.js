@@ -11,11 +11,63 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Polygon } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 
 const { width } = Dimensions.get('window');
-const PURPLE_BG = '#3A1F5D';
-const PURPLE_LIGHT = 'rgba(255,255,255,0.15)';
+
+// Colores confirmados contra Figma (segundo frame "RESPIRACION", cuyo
+// contenido real es este reproductor, Bloque 3) sin equivalente exacto en
+// theme.js.
+const FIGMA = {
+    moonCircleBg: 'rgba(36,189,144,0.25)', // colors.ctaGreen @ 25%
+    subtitleGray: '#C4C4C4',
+    progressTrack: '#F1F1F1',
+    timeLabel: '#919097',
+    outlineIcon: '#E0DFE6',
+    secondaryButtonBg: '#EDEDED',
+    playTriangle: '#65C681',
+};
+
+function ShuffleIcon({ size = 18, color = FIGMA.outlineIcon }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M3 6h4l10 12h4" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M3 18h4l2.5-3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M14.5 6H21m0 0l-3-3m3 3l-3 3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M21 18h-6.5m6.5 0l-3 3m3-3l-3-3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function RepeatIcon({ size = 18, color = FIGMA.outlineIcon }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M4 9a5 5 0 0 1 5-5h9" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+            <Path d="M18 4l3 3-3 3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M20 15a5 5 0 0 1-5 5H6" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+            <Path d="M6 20l-3-3 3-3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function SkipIcon({ size = 14, color = colors.textDark, direction = 'next' }) {
+    const isNext = direction === 'next';
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Polygon points={isNext ? '5,4 17,12 5,20' : '19,4 7,12 19,20'} fill={color} />
+            <Path d={isNext ? 'M18 4v16' : 'M6 4v16'} stroke={color} strokeWidth={2.4} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function PlayTriangleIcon({ size = 20, color = FIGMA.playTriangle }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Polygon points="6,4 20,12 6,20" fill={color} />
+        </Svg>
+    );
+}
 
 const DEFAULT_SESSION = {
     title: 'Calma antes del examen',
@@ -84,7 +136,7 @@ export default function MeditationPlayerScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="light-content" backgroundColor={PURPLE_BG} />
+            <StatusBar barStyle="light-content" backgroundColor={colors.textDark} />
 
             <View style={styles.header}>
                 <TouchableOpacity
@@ -98,16 +150,17 @@ export default function MeditationPlayerScreen({ navigation, route }) {
             <View style={styles.content}>
                 {/* Ícono grande dentro del círculo semitransparente */}
                 <View style={styles.moonCircle}>
-                    <Ionicons name="moon-outline" size={72} color="#FFFFFF" />
+                    <Ionicons name="moon-outline" size={56} color="#FFFFFF" />
                 </View>
 
                 <Text style={styles.title}>{session.title}</Text>
                 <Text style={styles.subtitle}>{session.subtitle}</Text>
 
-                {/* Barra de progreso lineal + tiempos */}
+                {/* Barra de progreso lineal + manija + tiempos */}
                 <View style={styles.progressWrap}>
                     <View style={styles.progressBg}>
                         <View style={[styles.progressFg, { width: `${progressPct}%` }]} />
+                        <View style={[styles.progressThumb, { left: `${progressPct}%` }]} />
                     </View>
                     <View style={styles.timesRow}>
                         <Text style={styles.timeText}>{formatTime(progressed)}</Text>
@@ -115,26 +168,37 @@ export default function MeditationPlayerScreen({ navigation, route }) {
                     </View>
                 </View>
 
-                {/* Controles: rewind 15s / play·pause naranja / forward 15s */}
+                {/* Controles: aleatorio / anterior (-15s) / play·pause / siguiente (+15s) / repetir */}
                 <View style={styles.controls}>
-                    <TouchableOpacity style={styles.skipBtn} onPress={() => skipBy(15)}>
-                        <Ionicons name="play-back" size={26} color="#FFFFFF" />
+                    <TouchableOpacity activeOpacity={0.7}>
+                        <ShuffleIcon />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.75} onPress={() => skipBy(15)}>
+                        <SkipIcon direction="previous" />
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.playBtn}
+                        activeOpacity={0.85}
                         onPress={() => setIsPlaying((v) => !v)}
                     >
-                        <Ionicons
-                            name={isPlaying ? 'pause' : 'play'}
-                            size={34}
-                            color="#FFFFFF"
-                            style={isPlaying ? null : { marginLeft: 4 }}
-                        />
+                        {isPlaying ? (
+                            <View style={styles.pauseIconWrap}>
+                                <View style={styles.pauseBar} />
+                                <View style={styles.pauseBar} />
+                            </View>
+                        ) : (
+                            <PlayTriangleIcon />
+                        )}
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.skipBtn} onPress={() => skipBy(-15)}>
-                        <Ionicons name="play-forward" size={26} color="#FFFFFF" />
+                    <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.75} onPress={() => skipBy(-15)}>
+                        <SkipIcon direction="next" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity activeOpacity={0.7}>
+                        <RepeatIcon />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -164,7 +228,7 @@ export default function MeditationPlayerScreen({ navigation, route }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PURPLE_BG,
+        backgroundColor: colors.textDark,
     },
     header: {
         paddingHorizontal: spacing.md,
@@ -178,24 +242,25 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.xl,
     },
     moonCircle: {
-        width: 160,
-        height: 160,
-        borderRadius: 80,
-        backgroundColor: PURPLE_LIGHT,
+        width: 249,
+        height: 249,
+        borderRadius: 249 / 2,
+        backgroundColor: FIGMA.moonCircleBg,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: spacing.xl,
     },
     title: {
-        fontSize: 22,
-        fontWeight: '800',
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21,
         color: '#FFFFFF',
         textAlign: 'center',
         marginBottom: 4,
     },
     subtitle: {
-        fontSize: 15,
-        color: 'rgba(255,255,255,0.7)',
+        fontFamily: 'Poppins-Light',
+        fontSize: 13.8,
+        color: FIGMA.subtitleGray,
         textAlign: 'center',
         marginBottom: spacing.xl * 2,
     },
@@ -204,49 +269,68 @@ const styles = StyleSheet.create({
         marginBottom: spacing.xl,
     },
     progressBg: {
-        height: 4,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 2,
-        overflow: 'hidden',
-        marginBottom: spacing.xs,
+        height: 7.3,
+        backgroundColor: FIGMA.progressTrack,
+        borderRadius: 1.8,
+        marginBottom: spacing.sm,
     },
     progressFg: {
-        height: '100%',
-        backgroundColor: '#FFFFFF',
+        height: 7.3,
+        borderRadius: 1.8,
+        backgroundColor: colors.accentOrange,
+        position: 'absolute',
+        left: 0,
+        top: 0,
+    },
+    progressThumb: {
+        position: 'absolute',
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: colors.accentOrange,
+        top: -6.3,
+        marginLeft: -10,
     },
     timesRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
     timeText: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 12,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Regular',
+        fontSize: 5.3,
+        letterSpacing: 1,
+        color: FIGMA.timeLabel,
     },
     controls: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.xl,
+        gap: 20,
     },
-    skipBtn: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+    secondaryButton: {
+        width: 33,
+        height: 33,
+        borderRadius: 33 / 2,
+        backgroundColor: FIGMA.secondaryButtonBg,
         alignItems: 'center',
         justifyContent: 'center',
     },
     playBtn: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: colors.primary,
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: colors.ctaGreen,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.45,
-        shadowRadius: 14,
-        elevation: 10,
+    },
+    pauseIconWrap: {
+        flexDirection: 'row',
+        gap: 4,
+    },
+    pauseBar: {
+        width: 3.5,
+        height: 16,
+        borderRadius: 1.5,
+        backgroundColor: FIGMA.playTriangle,
     },
     modalOverlay: {
         flex: 1,

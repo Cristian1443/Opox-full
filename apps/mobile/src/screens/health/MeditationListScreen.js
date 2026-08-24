@@ -8,92 +8,70 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
-const PURPLE = '#7B4BC4';
+// Colores confirmados contra Figma (frame "DETALLE MENÚ/RECETA" #1, cuyo
+// contenido real es la pantalla de Meditación, Bloque 3) sin equivalente
+// exacto en theme.js.
+const FIGMA = {
+    cardBorder: 'rgba(255,255,255,0.15)',
+    cardLabel: '#F5F5F5',
+    separator: 'rgba(65,41,80,0.5)',
+    textNote: '#343A3D',
+};
 
-const SESSIONS = [
-    {
-        id: '1',
-        title: 'Calma antes del examen',
-        subtitle: '8 min · gestión de la ansiedad',
-        duration: '8 min',
-        type: 'recommended',
-        icon: 'moon-outline',
-        bg: PURPLE,
-    },
-    {
-        id: '2',
-        title: 'Respiración 4-7-8',
-        subtitle: '5 min · relajación rápida',
-        duration: '5 min',
-        icon: 'moon-outline',
-        bg: '#F0E9F7',
-        iconColor: '#7B4BC4',
-    },
-    {
-        id: '3',
-        title: 'Bajar la activación',
-        subtitle: '7 min · tras una sesión intensa',
-        duration: '7 min',
-        icon: 'pulse-outline',
-        bg: '#EAF3FB',
-        iconColor: '#2D6FB0',
-    },
-    {
-        id: '4',
-        title: 'Foco en 3 minutos',
-        subtitle: 'antes de empezar a estudiar',
-        duration: '3 min',
-        icon: 'locate-outline',
-        bg: '#E9F7EF',
-        iconColor: '#1f9d6b',
-    },
+function CheckMarkIcon({ size = 16, color = colors.white }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M4 13l5 5L20 6" stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+const RECOMMENDED = { id: '1', title: 'Calma antes del examen', note: 'gestión de la ansiedad', duration: '8 min' };
+
+const EXERCISES = [
+    { id: '2', title: 'Respiración 4-7-8', note: 'relajación rápida', duration: '5 min' },
+    { id: '3', title: 'Bajar la activación', note: 'tras una sesión intensa', duration: '7 min' },
+    { id: '4', title: 'Foco en 3 minutos', note: 'antes de empezar a estudiar', duration: '3 min' },
 ];
 
 export default function MeditationListScreen({ navigation }) {
     const handlePlay = (session) => {
-        navigation.navigate('MeditationPlayer', { session });
+        navigation.navigate('MeditationPlayer', { session: { title: session.title, subtitle: session.note, duration: session.duration } });
     };
-
-    const recommended = SESSIONS[0];
-    const others = SESSIONS.slice(1);
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title="Meditación" onBack={() => navigation.goBack()} />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Recomendada del día — card morada grande */}
-                <TouchableOpacity
-                    style={styles.recommendedCard}
-                    onPress={() => handlePlay(recommended)}
-                    activeOpacity={0.9}
-                >
-                    <Text style={styles.recommendedTag}>RECOMENDADA HOY</Text>
-                    <Text style={styles.recommendedTitle}>{recommended.title}</Text>
-                    <Text style={styles.recommendedSubtitle}>{recommended.subtitle}</Text>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9} onPress={() => handlePlay(RECOMMENDED)}>
+                    <Text style={styles.featuredEyebrow}>RECOMENDADA HOY</Text>
+                    <Text style={styles.featuredTitle}>{RECOMMENDED.title}</Text>
+                    <Text style={styles.featuredSubtitle}>{RECOMMENDED.duration} · {RECOMMENDED.note}</Text>
                 </TouchableOpacity>
 
-                {/* Resto de sesiones */}
-                {others.map((session) => (
-                    <TouchableOpacity
-                        key={session.id}
-                        style={styles.sessionCard}
-                        onPress={() => handlePlay(session)}
-                        activeOpacity={0.85}
-                    >
-                        <View style={[styles.sessionIcon, { backgroundColor: session.bg }]}>
-                            <Ionicons name={session.icon} size={22} color={session.iconColor} />
-                        </View>
-                        <View style={styles.sessionText}>
-                            <Text style={styles.sessionTitle}>{session.title}</Text>
-                            <Text style={styles.sessionSubtitle}>{session.subtitle}</Text>
-                        </View>
-                    </TouchableOpacity>
-                ))}
+                <View style={styles.exercisesList}>
+                    {EXERCISES.map((exercise, index) => (
+                        <TouchableOpacity
+                            key={exercise.id}
+                            style={[styles.exerciseRow, index > 0 && styles.exerciseRowSeparator]}
+                            activeOpacity={0.7}
+                            onPress={() => handlePlay(exercise)}
+                        >
+                            <View style={styles.badge}>
+                                <CheckMarkIcon />
+                            </View>
+                            <View style={styles.exerciseTextWrap}>
+                                <Text style={styles.exerciseTitle}>{exercise.title}</Text>
+                                <Text style={styles.exerciseNote}>{exercise.duration} · {exercise.note}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </View>
 
                 <View style={{ height: spacing.lg }} />
             </ScrollView>
@@ -104,65 +82,77 @@ export default function MeditationListScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     scrollContent: {
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.md,
     },
-    recommendedCard: {
-        backgroundColor: PURPLE,
+    featuredCard: {
+        backgroundColor: colors.bannerPurple,
         borderRadius: 20,
-        padding: spacing.lg,
-        marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: FIGMA.cardBorder,
+        paddingVertical: 20,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        marginBottom: 24,
     },
-    recommendedTag: {
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 11,
-        fontWeight: '800',
-        letterSpacing: 1,
-        marginBottom: spacing.sm,
+    featuredEyebrow: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 14.3,
+        color: FIGMA.cardLabel,
+        textAlign: 'center',
+        letterSpacing: 0.5,
     },
-    recommendedTitle: {
-        color: '#FFFFFF',
-        fontSize: 22,
-        fontWeight: '800',
-        marginBottom: 4,
+    featuredTitle: {
+        marginTop: 6,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 18.2,
+        color: colors.white,
+        textAlign: 'center',
     },
-    recommendedSubtitle: {
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 14,
-        fontWeight: '500',
+    featuredSubtitle: {
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: colors.accentOrange,
+        textAlign: 'center',
     },
-    sessionCard: {
+    exercisesList: {
+        marginTop: 8,
+    },
+    exerciseRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: spacing.md,
-        marginBottom: spacing.sm,
-        borderWidth: 1,
-        borderColor: colors.separator,
+        paddingVertical: 14,
     },
-    sessionIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        justifyContent: 'center',
+    exerciseRowSeparator: {
+        borderTopWidth: 0.44,
+        borderTopColor: FIGMA.separator,
+    },
+    badge: {
+        width: 29,
+        height: 29,
+        borderRadius: 2.7,
+        backgroundColor: colors.ctaGreen,
         alignItems: 'center',
-        marginRight: spacing.md,
+        justifyContent: 'center',
+        marginRight: 14,
     },
-    sessionText: {
+    exerciseTextWrap: {
         flex: 1,
     },
-    sessionTitle: {
+    exerciseTitle: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
-        fontWeight: '700',
-        color: colors.text,
-        marginBottom: 2,
+        color: colors.textDark,
     },
-    sessionSubtitle: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        fontWeight: '500',
+    exerciseNote: {
+        marginTop: 2,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 9,
+        color: FIGMA.textNote,
     },
 });

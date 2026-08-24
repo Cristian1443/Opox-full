@@ -1,4 +1,10 @@
 // Bloque 3 · Salud — Pop-up "Error de conexión" (estado 3.2 · err)
+//
+// NOTA: en el archivo de Figma esta capa está guardada como "POP-UP TE
+// SALTASTE DIAS" (sugiere un nudge de racha/hábito), pero su contenido
+// real es este modal de error de conexión Bluetooth. Se implementa el
+// contenido real, no el nombre de la capa — si en algún momento se
+// necesita el pop-up real de "racha/hábito", ese diseño no existe todavía.
 import React from 'react';
 import {
     Modal,
@@ -8,10 +14,24 @@ import {
     StyleSheet,
     Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Rect } from 'react-native-svg';
 import { colors, spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
+
+// Color confirmado contra Figma: naranja de advertencia ligeramente
+// distinto al accentOrange del resto del sistema (#F77D27 vs #F69624).
+const WARNING_ORANGE = '#F77D27';
+
+function WarningIcon({ size = 73, color = WARNING_ORANGE }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 73 73">
+            <Circle cx="36.5" cy="36.5" r="30" stroke={color} strokeWidth={6.8} fill="none" />
+            <Rect x="32.5" y="18" width="8" height="26" rx="4" fill={color} />
+            <Circle cx="36.5" cy="53" r="4.2" fill={color} />
+        </Svg>
+    );
+}
 
 export default function ConnectionErrorModal({ visible, onClose, onRetry }) {
     return (
@@ -23,9 +43,7 @@ export default function ConnectionErrorModal({ visible, onClose, onRetry }) {
         >
             <View style={styles.overlay}>
                 <View style={styles.modalContent}>
-                    <View style={styles.iconContainer}>
-                        <Ionicons name="alert-circle" size={48} color={colors.error} />
-                    </View>
+                    <WarningIcon />
 
                     <Text style={styles.title}>No encontramos el dispositivo</Text>
 
@@ -33,15 +51,13 @@ export default function ConnectionErrorModal({ visible, onClose, onRetry }) {
                         Comprueba que el Bluetooth está activo y el reloj cerca y desbloqueado.
                     </Text>
 
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-                            <Text style={styles.retryButtonText}>Reintentar</Text>
-                        </TouchableOpacity>
+                    <TouchableOpacity style={styles.retryButton} activeOpacity={0.85} onPress={onRetry}>
+                        <Text style={styles.retryButtonText}>Reintentar</Text>
+                    </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.cancelLink} onPress={onClose}>
-                            <Text style={styles.cancelLinkText}>Cancelar</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity style={styles.cancelLink} activeOpacity={0.7} onPress={onClose}>
+                        <Text style={styles.cancelLinkText}>Cancelar</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </Modal>
@@ -51,69 +67,57 @@ export default function ConnectionErrorModal({ visible, onClose, onRetry }) {
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: spacing.lg,
     },
     modalContent: {
         width: width * 0.85,
-        backgroundColor: colors.card,
-        borderRadius: 20,
-        padding: spacing.xl,
+        maxWidth: 348,
+        backgroundColor: colors.white,
+        paddingVertical: 32,
+        paddingHorizontal: 24,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    iconContainer: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: colors.errorBg,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: spacing.lg,
     },
     title: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: colors.text,
+        marginTop: 16,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21,
+        color: colors.textDark,
         textAlign: 'center',
-        marginBottom: spacing.md,
     },
     message: {
-        fontSize: 16,
-        color: colors.textSecondary,
+        marginTop: 8,
+        fontFamily: 'Poppins-Light',
+        fontSize: 13.8,
+        color: colors.textDark,
         textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: spacing.xl,
-    },
-    buttonContainer: {
-        width: '100%',
-        gap: spacing.sm,
+        lineHeight: 18,
     },
     retryButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 14,
-        borderRadius: 999,
+        marginTop: 24,
+        width: '100%',
+        height: 61,
+        borderRadius: 14,
+        backgroundColor: colors.ctaGreen,
         alignItems: 'center',
         justifyContent: 'center',
     },
     retryButtonText: {
-        color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.white,
     },
     cancelLink: {
-        paddingVertical: 12,
+        marginTop: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
     cancelLinkText: {
-        color: colors.textSecondary,
-        fontSize: 15,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Medium',
+        fontSize: 13.8,
+        color: colors.textDark,
+        textAlign: 'center',
     },
 });

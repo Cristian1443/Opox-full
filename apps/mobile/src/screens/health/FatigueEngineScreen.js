@@ -8,155 +8,100 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
-// Las 5 señales del motor de fatiga (mock — cuando entre la IA, esto viene del backend)
+// Colores confirmados contra Figma (frame MOTOR DE FATIGA, Bloque 3) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    textNote: '#343A3D',
+    separator: 'rgba(65,41,80,0.5)',
+    featuredBgHigh: 'rgba(255,38,56,0.5)',
+    featuredBgLow: 'rgba(36,189,144,0.5)',
+};
+
+// Las 5 señales del motor de fatiga (mock — cuando entre la IA, esto viene
+// del backend). En Figma solo hay 2 estados de badge: activada (roja) o
+// resuelta (verde) — sin nivel intermedio de "warning".
 const SIGNALS = [
-    {
-        id: 1,
-        title: 'HRV por debajo de tu base',
-        subtitle: 'Señal principal',
-        value: '42 / 50',
-        status: 'critical',
-        icon: 'pulse',
-        description: 'Tu variabilidad cardíaca está muy por debajo de tu media habitual.',
-    },
-    {
-        id: 2,
-        title: 'Frecuencia cardíaca en reposo elevada',
-        subtitle: 'Cuerpo no recuperado',
-        value: '+6 ppm',
-        status: 'warning',
-        icon: 'heart',
-        description: 'Tu corazón late más rápido de lo normal en reposo.',
-    },
-    {
-        id: 3,
-        title: 'Estrés sostenido en la sesión',
-        subtitle: 'Alto',
-        value: 'Nivel 4/5',
-        status: 'critical',
-        icon: 'flame',
-        description: 'Has mantenido un nivel de actividad mental alta por mucho tiempo.',
-    },
-    {
-        id: 4,
-        title: 'Energía corporal',
-        subtitle: 'Batería disponible',
-        value: 'OK',
-        status: 'ok',
-        icon: 'battery-full',
-        description: 'Tu nivel de energía física sigue siendo alto.',
-    },
-    {
-        id: 5,
-        title: 'Sueño la noche anterior',
-        subtitle: 'Recuperación',
-        value: '7h',
-        status: 'ok',
-        icon: 'moon',
-        description: 'Dormiste la cantidad recomendada.',
-    },
+    { id: 1, label: 'HRV por debajo de tu base', note: 'Señal principal', value: '42/50', status: 'alert' },
+    { id: 2, label: 'FC reposo elevada', note: 'Cuerpo no recuperado', value: '+6', status: 'alert' },
+    { id: 3, label: 'Estrés sostenido en la sesión', value: 'Alto', status: 'alert' },
+    { id: 4, label: 'Energía corporal', value: 'OK', status: 'ok' },
+    { id: 5, label: 'Sueño noche anterior', value: '7h', status: 'ok' },
 ];
 
-const getStatusColor = (status) => {
-    switch (status) {
-        case 'critical': return colors.error;
-        case 'warning': return colors.warning;
-        case 'ok': return colors.success;
-        default: return colors.textSecondary;
-    }
-};
+function XMarkIcon({ size = 14, color = colors.white }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M6 6L18 18" stroke={color} strokeWidth={3} strokeLinecap="round" />
+            <Path d="M18 6L6 18" stroke={color} strokeWidth={3} strokeLinecap="round" />
+        </Svg>
+    );
+}
 
-const getStatusIcon = (status) => {
-    switch (status) {
-        case 'critical': return 'alert-circle';
-        case 'warning': return 'alert';
-        case 'ok': return 'checkmark-circle';
-        default: return 'help-circle';
-    }
-};
+function CheckMarkIcon({ size = 14, color = colors.white }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M4 13l5 5L20 6" stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function SignalRow({ signal, isFirst }) {
+    const isAlert = signal.status === 'alert';
+    const badgeColor = isAlert ? colors.statRed : colors.ctaGreen;
+
+    return (
+        <View style={[styles.signalRow, !isFirst && styles.signalRowSeparator]}>
+            <View style={[styles.badge, { backgroundColor: badgeColor }]}>
+                {isAlert ? <XMarkIcon /> : <CheckMarkIcon />}
+            </View>
+            <View style={styles.signalTextWrap}>
+                <Text style={styles.signalLabel}>{signal.label}</Text>
+                {signal.note ? <Text style={styles.signalNote}>{signal.note}</Text> : null}
+            </View>
+            <Text style={[styles.signalValue, { color: badgeColor }]}>{signal.value}</Text>
+        </View>
+    );
+}
 
 export default function FatigueEngineScreen({ navigation }) {
     const fatigueLevel = 'high'; // mock: 'low' | 'medium' | 'high'
-    const activeSignalsCount = 3;
+    const activeSignalsCount = SIGNALS.filter((s) => s.status === 'alert').length;
+    const isHigh = fatigueLevel === 'high';
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title="Estado de fatiga" onBack={() => navigation.goBack()} />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Tarjeta principal: estado de fatiga */}
-                <View style={[styles.fatigueCard, fatigueLevel === 'high' && styles.fatigueCardHigh]}>
-                    <View style={styles.fatigueHeader}>
-                        <Ionicons
-                            name={fatigueLevel === 'high' ? 'alert-circle' : 'checkmark-circle'}
-                            size={40}
-                            color={fatigueLevel === 'high' ? colors.error : colors.success}
-                        />
-                        <Text
-                            style={[
-                                styles.fatigueTitle,
-                                fatigueLevel === 'high' && { color: colors.error },
-                            ]}
-                        >
-                            {fatigueLevel === 'high' ? 'Fatiga alta detectada' : 'Fatiga baja'}
-                        </Text>
-                    </View>
-
-                    <Text style={styles.fatigueSubtitle}>
-                        {activeSignalsCount} de 5 señales activadas
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Tarjeta destacada */}
+                <View style={[styles.featuredCard, { backgroundColor: isHigh ? FIGMA.featuredBgHigh : FIGMA.featuredBgLow }]}>
+                    <Text style={styles.featuredTitle}>
+                        {isHigh ? 'Fatiga alta detectada' : 'Fatiga baja'}
                     </Text>
-
-                    <Text style={styles.explanation}>
-                        Ningún reloj mide "fatiga" directa. Cruzamos estas 5 señales para calcular tu estado.
+                    <Text style={styles.featuredSubtitle}>
+                        {activeSignalsCount} de {SIGNALS.length} señales activadas
                     </Text>
                 </View>
 
                 {/* Lista de señales */}
-                <Text style={styles.sectionTitle}>SEÑALES QUE LO DISPARAN</Text>
+                <Text style={styles.sectionHeader}>SEÑALES QUE LO DISPARAN</Text>
+                <View style={styles.signalsList}>
+                    {SIGNALS.map((signal, index) => (
+                        <SignalRow key={signal.id} signal={signal} isFirst={index === 0} />
+                    ))}
+                </View>
 
-                {SIGNALS.map((signal) => (
-                    <View key={signal.id} style={styles.signalCard}>
-                        <View style={styles.signalHeader}>
-                            <View style={styles.signalIconContainer}>
-                                <Ionicons
-                                    name={signal.icon}
-                                    size={24}
-                                    color={getStatusColor(signal.status)}
-                                />
-                            </View>
-
-                            <View style={styles.signalInfo}>
-                                <Text style={styles.signalTitle}>{signal.title}</Text>
-                                <Text style={styles.signalSubtitle}>{signal.subtitle}</Text>
-                            </View>
-
-                            <View style={styles.signalValueContainer}>
-                                <Text style={[styles.signalValue, { color: getStatusColor(signal.status) }]}>
-                                    {signal.value}
-                                </Text>
-                                <Ionicons
-                                    name={getStatusIcon(signal.status)}
-                                    size={20}
-                                    color={getStatusColor(signal.status)}
-                                />
-                            </View>
-                        </View>
-
-                        <Text style={styles.signalDescription}>{signal.description}</Text>
-                    </View>
-                ))}
-
-                {/* CTA principal — navega a 3.5 (aún no creada) */}
+                {/* CTA */}
                 <TouchableOpacity
-                    style={styles.actionButton}
+                    style={styles.ctaButton}
+                    activeOpacity={0.85}
                     onPress={() => navigation.navigate('BreathingExercise')}
                 >
-                    <Ionicons name="leaf" size={24} color="#FFFFFF" />
-                    <Text style={styles.actionButtonText}>Hacer pausa guiada</Text>
+                    <Text style={styles.ctaButtonText}>Hacer pausa guiada</Text>
                 </TouchableOpacity>
 
                 <View style={{ height: spacing.lg }} />
@@ -168,122 +113,84 @@ export default function FatigueEngineScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     scrollContent: {
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
     },
-    fatigueCard: {
-        backgroundColor: colors.card,
-        borderRadius: 16,
-        padding: spacing.lg,
-        marginBottom: spacing.lg,
+    featuredCard: {
+        borderRadius: 24,
+        paddingVertical: 24,
+        paddingHorizontal: 20,
         alignItems: 'center',
-        borderWidth: 2,
-        borderColor: colors.separator,
+        marginBottom: 24,
     },
-    fatigueCardHigh: {
-        borderColor: colors.error,
-        backgroundColor: colors.errorBg,
+    featuredTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 19,
+        color: colors.white,
     },
-    fatigueHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: spacing.sm,
+    featuredSubtitle: {
+        marginTop: 4,
+        fontFamily: 'Poppins-Light',
+        fontSize: 11.5,
+        color: colors.white,
     },
-    fatigueTitle: {
-        fontSize: 24,
-        fontWeight: '800',
-        marginLeft: spacing.sm,
-        color: colors.text,
-    },
-    fatigueSubtitle: {
+    sectionHeader: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
-        fontWeight: '600',
-        color: colors.textSecondary,
-        marginBottom: spacing.md,
+        color: colors.textDark,
+        marginBottom: 4,
     },
-    explanation: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        lineHeight: 20,
+    signalsList: {
+        marginBottom: 28,
     },
-    sectionTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textSecondary,
-        textTransform: 'uppercase',
-        marginBottom: spacing.sm,
-        letterSpacing: 0.5,
-    },
-    signalCard: {
-        backgroundColor: colors.card,
-        borderRadius: 12,
-        padding: spacing.md,
-        marginBottom: spacing.sm,
-        borderWidth: 1,
-        borderColor: colors.separator,
-    },
-    signalHeader: {
+    signalRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: spacing.sm,
+        paddingVertical: 14,
     },
-    signalIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 8,
-        backgroundColor: 'rgba(0,0,0,0.03)',
-        justifyContent: 'center',
+    signalRowSeparator: {
+        borderTopWidth: 0.5,
+        borderTopColor: FIGMA.separator,
+    },
+    badge: {
+        width: 29,
+        height: 29,
+        borderRadius: 3,
         alignItems: 'center',
-        marginRight: spacing.md,
+        justifyContent: 'center',
+        marginRight: 12,
     },
-    signalInfo: {
+    signalTextWrap: {
         flex: 1,
     },
-    signalTitle: {
+    signalLabel: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
-        fontWeight: '600',
-        color: colors.text,
-        marginBottom: 2,
+        color: colors.textDark,
     },
-    signalSubtitle: {
-        fontSize: 14,
-        color: colors.textSecondary,
-    },
-    signalValueContainer: {
-        alignItems: 'flex-end',
+    signalNote: {
+        marginTop: 2,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 9,
+        color: FIGMA.textNote,
     },
     signalValue: {
-        fontSize: 16,
-        fontWeight: '700',
-        marginBottom: 2,
+        fontFamily: 'Poppins-Bold',
+        fontSize: 10.5,
     },
-    signalDescription: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        lineHeight: 18,
-        marginLeft: 48,
-    },
-    actionButton: {
-        backgroundColor: colors.primary,
-        flexDirection: 'row',
+    ctaButton: {
+        height: 61,
+        borderRadius: 14,
+        backgroundColor: colors.accentOrange,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: 16,
-        marginTop: spacing.md,
-        gap: spacing.sm,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
     },
-    actionButtonText: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '700',
+    ctaButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.white,
     },
 });
