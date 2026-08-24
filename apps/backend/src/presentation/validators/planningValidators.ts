@@ -13,6 +13,7 @@ export const updatePlanSchema = z.object({
 
 export const listTasksQuerySchema = z.object({
     date: dateSchema.optional(),
+    localDate: dateSchema.optional(),
 });
 
 export const createTaskSchema = z.object({
@@ -30,6 +31,7 @@ export const toggleTaskSchema = z.object({
 export const weekQuerySchema = z.object({
     weekStart: dateSchema.optional(),
     selectedDate: dateSchema.optional(),
+    localDate: dateSchema.optional(),
 });
 
 export const createAgendaDateSchema = z.object({

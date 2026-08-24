@@ -5,6 +5,83 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-23 — Bloque 4 · Planificación — Revisión post-testing (10 fixes)
+
+Rama: `feat/revision-bloque-4-planificacion` (nacida de `feat/bloque-13-notificaciones` tras merge a `main`).
+
+Auditoría y corrección completa del Bloque 4. Se identificaron y cerraron 10 bugs/gaps
+detectados en pruebas reales en dispositivo, distribuidos entre backend y mobile.
+
+### Gap 1 · Bug de zona horaria (hub muestra día incorrecto)
+
+`todayIso()` usaba `new Date().toISOString().slice(0,10)` → devuelve fecha UTC.
+En Colombia (UTC-5) una sesión a las 20:00h mostraba el día siguiente.
+
+- **`dateUtils.ts`**: se mantiene `todayIso()` para uso interno del backend.
+- **`apps/mobile/src/api/planning.js`**: `localDate()` usa `new Date().toLocaleDateString('sv')` (locale sueco → `YYYY-MM-DD` en la zona horaria del dispositivo). Todos los endpoints planificación (`getSummary`, `listTasks`, `getWeek`) envían `?localDate=<hoy-local>`.
+- **Backend** (`GetPlanningSummaryUseCase`, `ListTasksUseCase`, `GetWeekUseCase`): aceptan `localDate?` opcional; si viene, lo usan en vez de `todayIso()`.
+
+### Gap 2 · Campo intensidad era código muerto
+
+`intensity` se guardaba en BD pero nunca afectaba el objetivo diario.
+
+- **`apps/backend/src/application/planning/dateUtils.ts`**: nuevo helper `applyIntensity(base, intensity)` — `low=0.75×`, `medium=1×`, `high=1.25×` con `Math.max(1, Math.round(...))`.
+- Aplicado en 3 lugares: `GetPlanningSummaryUseCase` (goalCount del hub), `ToggleTaskUseCase` (umbral de meta completada), `PlanningTodayScreen` (vista previa cliente).
+- **`PlanningEditScreen`**: muestra el "objetivo real" cuando `effectiveGoal ≠ testsPerDay` y navega atrás tras guardar.
+
+### Gap 3 · Modal de añadir tarea rediseñado con flujo a Generador
+
+El modal de crear tarea no tenía forma de crear tareas de tipo "Test de práctica" vinculadas al Generador.
+
+- **`PlanningTodayScreen.js`**: modal con dos tabs (Test de práctica / Tarea libre).
+  - Tab Test: selector de tema (cargado de `boeApi.listTopics('justicia-tramitacion')`), stepper de preguntas (5-50, step 5).
+  - Subtitle se guarda como `JSON.stringify({ topicId, count })` para que `TaskRow` pueda renderizar "N preguntas" y badge "Empezar".
+  - Al pulsar "Empezar": `navigation.navigate('GeneratorConfig', { topicId, questionCount })`.
+- `tryParseTestParams(subtitle)` helper que decodifica el JSON guardado.
+- `useFocusEffect` (no `useEffect`) para recargar tareas al volver del Generador.
+
+### Gap 4 · Pantalla Macro enriquecida con temas reales
+
+La vista Macro mostraba 4 fases vacías sin distribución de temario.
+
+- **`PlanningController.ts`** `getMacro`: llama `listTopics` en paralelo y enriquece fases con `enrichMacroWithTopics()`.
+  - `PHASE_WEIGHTS = [0.35, 0.30, 0.25, 0.10]`.
+  - Usa `t.label` (campo correcto de `TrainingTopic`, no `t.name`).
+  - `container.ts`: pasa `listTopics: useCases.listTopics` al constructor de `PlanningController`.
+- **`PlanningMacroScreen.js`**: `TopicLine` muestra temas de la fase; CTA "Estudiar esta fase →" navega a `GeneratorConfig` con los `topicId` de la fase.
+
+### Fixes post-testing
+
+| Bug | Causa | Fix |
+|---|---|---|
+| HOY MICRO no se actualizaba | `useEffect(fn,[])` no se dispara al volver | `useFocusEffect(load)` en `PlanningTodayScreen` |
+| "Activar recta final" no hacía nada | `onPrimaryPress` era `() => {}` | Llama `planningApi.updatePlan({ intensity:'high' })` → navega a `PlanningToday` |
+| Temas atascados en "Cargando" | `trainingApi.listTopics()` sin `oposicion` → 0 filas | `boeApi.listTopics('justicia-tramitacion')` |
+| Dashboard tarjeta Plan al 0% | No se llamaba `planningApi.getSummary()` | `DashboardScreen.loadData` carga ambos summaries |
+| "1 de 3" cuando el plan decía 2 tests | `PlanningToday` leía `getPlan().testsPerDay` (sin intensidad) | Ahora usa `getSummary().today.goalCount` (intensity-aware) |
+| Nombres de temas invisibles en modal | `topic.name` no existe en `TrainingTopic` | `topic.label` en todo `PlanningTodayScreen` |
+| Pop-up examen aparecía en cada visita al hub | `useRef(false)` se resetea al desmontar el componente | `let _alertsShownThisSession = false` a nivel de módulo |
+| Intensidad no se guardaba correctamente | Tap-to-cycle en tarjeta grande → doble-tap accidental cambiaba el valor | 3 botones explícitos (Baja / Media / Alta) en `PlanningEditScreen` |
+
+### Archivos modificados
+
+**Backend:**
+- `apps/backend/src/application/planning/dateUtils.ts` — `applyIntensity()`
+- `apps/backend/src/application/planning/GetPlanningSummaryUseCase.ts` — `localDate` + `applyIntensity`
+- `apps/backend/src/application/planning/TaskUseCases.ts` — `localDate` en `ListTasksUseCase` y `ToggleTaskUseCase`
+- `apps/backend/src/presentation/controllers/PlanningController.ts` — `enrichMacroWithTopics`, `listTopics`, `localDate`
+- `apps/backend/src/container.ts` — wiring de `listTopics` en `PlanningController`
+
+**Mobile:**
+- `apps/mobile/src/api/planning.js` — `localDate()` helper, todos los endpoints actualizados
+- `apps/mobile/src/screens/planning/PlanningHomeScreen.js` — `_alertsShownThisSession`, `useFocusEffect`, "Activar recta final" funcional
+- `apps/mobile/src/screens/planning/PlanningTodayScreen.js` — `useFocusEffect`, `boeApi`, modal rediseñado, `topic.label`, `getSummary().goalCount`
+- `apps/mobile/src/screens/planning/PlanningEditScreen.js` — 3 botones de intensidad, navega atrás tras guardar
+- `apps/mobile/src/screens/planning/PlanningMacroScreen.js` — `TopicLine`, CTA "Estudiar esta fase →"
+- `apps/mobile/src/screens/DashboardScreen.js` — `useFocusEffect`, carga `planningApi.getSummary()`
+
+---
+
 ## 2026-08-20 — Bloque 3 · Salud + GAP Notificaciones
 
 Rama: `feat/bloque-13-notificaciones`.

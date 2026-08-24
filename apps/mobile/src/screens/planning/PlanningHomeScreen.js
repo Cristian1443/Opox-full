@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import NudgeModal from '../../components/NudgeModal';
 import { planningApi } from '../../api';
 
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+// Variable de módulo: las alertas de planificación se muestran solo una vez
+// por sesión de app, sin importar cuántas veces el usuario entre/salga del hub.
+let _alertsShownThisSession = false;
 
 function IconGear() {
     return (
@@ -54,16 +59,21 @@ export default function PlanningHomeScreen({ navigation }) {
     const [summary, setSummary] = useState(null);
     const [alert, setAlert] = useState(null); // 'skipped' | 'examSoon' | null
 
-    useEffect(() => {
+    const load = useCallback(() => {
         let cancelled = false;
         planningApi.getSummary().then(({ data }) => {
             if (cancelled || !data) return;
             setSummary(data);
-            if (data.alerts.examSoonDays !== null) setAlert('examSoon');
-            else if (data.alerts.daysSinceLastActivity !== null && data.alerts.daysSinceLastActivity >= 3) setAlert('skipped');
+            if (!_alertsShownThisSession) {
+                _alertsShownThisSession = true;
+                if (data.alerts.examSoonDays !== null) setAlert('examSoon');
+                else if (data.alerts.daysSinceLastActivity !== null && data.alerts.daysSinceLastActivity >= 3) setAlert('skipped');
+            }
         });
         return () => { cancelled = true; };
     }, []);
+
+    useFocusEffect(load);
 
     const today = summary?.today ?? { completedCount: 0, goalCount: 3, percent: 0 };
     const days = summary?.week.days ?? [];
@@ -153,10 +163,14 @@ export default function PlanningHomeScreen({ navigation }) {
                     iconBg="#FDEBE9"
                     icon={<Svg width={24} height={24} viewBox="0 0 24 24" fill="none"><Path d="M3 5h18v16H3z" stroke="#E2483D" strokeWidth={1.6} /><Path d="M3 9h18M8 3v4M16 3v4" stroke="#E2483D" strokeWidth={1.6} /></Svg>}
                     title={`Tu examen es en ${summary.alerts.examSoonDays} días`}
-                    description="Entras en la recta final. La IA puede activar el modo simulacros intensivos."
+                    description="Entras en la recta final. Al activar, tu objetivo diario sube al 125% para simular el ritmo real del examen."
                     primaryLabel="Activar recta final"
                     secondaryLabel="Ahora no"
-                    onPrimaryPress={() => setAlert(null)}
+                    onPrimaryPress={async () => {
+                        await planningApi.updatePlan({ intensity: 'high' });
+                        setAlert(null);
+                        navigation.navigate('PlanningToday');
+                    }}
                     onSecondaryPress={() => setAlert(null)}
                 />
             )}

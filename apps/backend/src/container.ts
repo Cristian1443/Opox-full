@@ -478,6 +478,7 @@ export function buildContainer() {
         toggleTask: useCases.toggleTask,
         getWeek: useCases.getWeek,
         getMacro: useCases.getMacro,
+        listTopics: useCases.listTopics,
         listAgenda: useCases.listAgenda,
         createAgendaDate: useCases.createAgendaDate,
     });
