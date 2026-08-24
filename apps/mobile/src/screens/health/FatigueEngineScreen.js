@@ -19,18 +19,64 @@ const FIGMA = {
     separator: 'rgba(65,41,80,0.5)',
     featuredBgHigh: 'rgba(255,38,56,0.5)',
     featuredBgLow: 'rgba(36,189,144,0.5)',
+    unknownBadge: '#A7ADB8',
 };
 
-// Las 5 señales del motor de fatiga (mock — cuando entre la IA, esto viene
-// del backend). En Figma solo hay 2 estados de badge: activada (roja) o
-// resuelta (verde) — sin nivel intermedio de "warning".
-const SIGNALS = [
-    { id: 1, label: 'HRV por debajo de tu base', note: 'Señal principal', value: '42/50', status: 'alert' },
-    { id: 2, label: 'FC reposo elevada', note: 'Cuerpo no recuperado', value: '+6', status: 'alert' },
-    { id: 3, label: 'Estrés sostenido en la sesión', value: 'Alto', status: 'alert' },
-    { id: 4, label: 'Energía corporal', value: 'OK', status: 'ok' },
-    { id: 5, label: 'Sueño noche anterior', value: '7h', status: 'ok' },
-];
+// Construye las señales del motor con las métricas reales (HealthKit/Health
+// Connect) recibidas por params desde HomeHealthScreen. Sin dato disponible
+// se marca 'unknown' — un tercer estado real que Figma no contempla (solo
+// documenta activada/roja o resuelta/verde), así que se muestra en gris
+// neutro en vez de fingir que la señal está resuelta.
+function buildSignals(metrics) {
+    const hrv = metrics?.hrv;
+    const restHr = metrics?.restingHeartRate;
+    const spo2 = metrics?.spo2;
+    const sleep = metrics?.sleepHours;
+
+    const HRV_BASE = 50;
+    const HR_BASE = 61;
+
+    return [
+        {
+            id: 1,
+            label: 'HRV por debajo de tu base',
+            note: 'Señal principal',
+            value: hrv != null ? `${hrv}/${HRV_BASE}` : 'Sin datos',
+            status: hrv == null ? 'unknown' : hrv < HRV_BASE ? 'alert' : 'ok',
+            severity: hrv == null ? 'unknown' : hrv < HRV_BASE * 0.8 ? 'critical' : hrv < HRV_BASE ? 'warning' : 'ok',
+        },
+        {
+            id: 2,
+            label: 'FC reposo elevada',
+            note: 'Cuerpo no recuperado',
+            value: restHr != null ? `${restHr > HR_BASE ? '+' : ''}${restHr - HR_BASE}` : 'Sin datos',
+            status: restHr == null ? 'unknown' : restHr > HR_BASE ? 'alert' : 'ok',
+            severity: restHr == null ? 'unknown' : restHr > HR_BASE + 6 ? 'critical' : restHr > HR_BASE ? 'warning' : 'ok',
+        },
+        {
+            id: 3,
+            label: 'Estrés sostenido en la sesión',
+            value: hrv == null ? 'Sin datos' : hrv < 40 ? 'Alto' : hrv < 55 ? 'Medio' : 'Bajo',
+            status: hrv == null ? 'unknown' : hrv < 55 ? 'alert' : 'ok',
+            severity: hrv == null ? 'unknown' : hrv < 40 ? 'critical' : hrv < 55 ? 'warning' : 'ok',
+        },
+        {
+            id: 4,
+            label: 'Saturación de oxígeno',
+            note: 'Rendimiento aeróbico',
+            value: spo2 != null ? `${spo2}%` : 'Sin datos',
+            status: spo2 == null ? 'unknown' : spo2 >= 95 ? 'ok' : 'alert',
+            severity: spo2 == null ? 'unknown' : spo2 >= 95 ? 'ok' : 'warning',
+        },
+        {
+            id: 5,
+            label: 'Sueño noche anterior',
+            value: sleep != null ? `${sleep}h` : 'Sin datos',
+            status: sleep == null ? 'unknown' : sleep >= 7 ? 'ok' : 'alert',
+            severity: sleep == null ? 'unknown' : sleep >= 7 ? 'ok' : sleep >= 5.5 ? 'warning' : 'critical',
+        },
+    ];
+}
 
 function XMarkIcon({ size = 14, color = colors.white }) {
     return (
@@ -50,13 +96,12 @@ function CheckMarkIcon({ size = 14, color = colors.white }) {
 }
 
 function SignalRow({ signal, isFirst }) {
-    const isAlert = signal.status === 'alert';
-    const badgeColor = isAlert ? colors.statRed : colors.ctaGreen;
+    const badgeColor = signal.status === 'alert' ? colors.statRed : signal.status === 'unknown' ? FIGMA.unknownBadge : colors.ctaGreen;
 
     return (
         <View style={[styles.signalRow, !isFirst && styles.signalRowSeparator]}>
             <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-                {isAlert ? <XMarkIcon /> : <CheckMarkIcon />}
+                {signal.status === 'alert' ? <XMarkIcon /> : signal.status === 'ok' ? <CheckMarkIcon /> : null}
             </View>
             <View style={styles.signalTextWrap}>
                 <Text style={styles.signalLabel}>{signal.label}</Text>
@@ -67,10 +112,16 @@ function SignalRow({ signal, isFirst }) {
     );
 }
 
-export default function FatigueEngineScreen({ navigation }) {
-    const fatigueLevel = 'high'; // mock: 'low' | 'medium' | 'high'
+export default function FatigueEngineScreen({ navigation, route }) {
+    // HomeHealthScreen pasa las métricas reales como parámetro de navegación.
+    const metrics = route?.params?.metrics ?? null;
+    const SIGNALS = buildSignals(metrics);
+
+    const criticalCount = SIGNALS.filter((s) => s.severity === 'critical').length;
+    const warningCount = SIGNALS.filter((s) => s.severity === 'warning').length;
     const activeSignalsCount = SIGNALS.filter((s) => s.status === 'alert').length;
-    const isHigh = fatigueLevel === 'high';
+    const fatigueLevel = criticalCount >= 2 ? 'high' : criticalCount === 1 || warningCount >= 2 ? 'medium' : 'low';
+    const isHigh = fatigueLevel !== 'low';
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -83,7 +134,9 @@ export default function FatigueEngineScreen({ navigation }) {
                         {isHigh ? 'Fatiga alta detectada' : 'Fatiga baja'}
                     </Text>
                     <Text style={styles.featuredSubtitle}>
-                        {activeSignalsCount} de {SIGNALS.length} señales activadas
+                        {metrics
+                            ? `${activeSignalsCount} de ${SIGNALS.length} señales activadas`
+                            : 'Conecta un wearable para datos reales'}
                     </Text>
                 </View>
 

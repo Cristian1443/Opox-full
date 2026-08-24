@@ -1,4 +1,4 @@
-import type { ITrainingRepository, SaveAttemptInput } from '../../domain';
+import type { ITrainingRepository, IDashboardRepository, SaveAttemptInput } from '../../domain';
 import type { TrainingAttempt, TrainingSource, TrainingDifficulty } from '../../domain/entities/TrainingAttempt';
 import type { ErrorPattern } from '../../domain/entities/MockExam';
 
@@ -22,7 +22,10 @@ export interface SaveAttemptInput2 {
 }
 
 export class SaveAttemptUseCase {
-    constructor(private readonly trainingRepo: ITrainingRepository) { }
+    constructor(
+        private readonly trainingRepo: ITrainingRepository,
+        private readonly dashboardRepo: IDashboardRepository,
+    ) { }
 
     async execute(input: SaveAttemptInput2): Promise<TrainingAttempt> {
         const correctCount = input.responses.filter((r) => r.userAnswerIndex === r.correctIndex).length;
@@ -53,7 +56,18 @@ export class SaveAttemptUseCase {
             responses: input.responses,
         };
 
-        return this.trainingRepo.saveAttempt(repoInput);
+        const [attempt] = await Promise.all([
+            this.trainingRepo.saveAttempt(repoInput),
+            // Registrar actividad del día para mantener la racha — sin puntos
+            // extra porque el test no es una tarea ni un reto de clan.
+            this.dashboardRepo.registerActivity({
+                userId: input.userId,
+                reason: 'training_attempt',
+                points: 0,
+            }),
+        ]);
+
+        return attempt;
     }
 }
 

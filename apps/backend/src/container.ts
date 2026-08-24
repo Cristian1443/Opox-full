@@ -371,7 +371,7 @@ export function buildContainer() {
         generateQuestions: new GenerateQuestionsUseCase(aiApi),
         analyzePhoto: new AnalyzePhotoUseCase(aiApi),
         generateSurgicalTest: new GenerateSurgicalTestUseCase(aiApi, trainingRepo),
-        saveAttempt: new SaveAttemptUseCase(trainingRepo),
+        saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo),
         listErrorPatterns: new ListErrorPatternsUseCase(trainingRepo),
         listBookmarks: new ListBookmarksUseCase(trainingRepo),
         saveBookmark: new SaveBookmarkUseCase(trainingRepo),
@@ -478,6 +478,7 @@ export function buildContainer() {
         toggleTask: useCases.toggleTask,
         getWeek: useCases.getWeek,
         getMacro: useCases.getMacro,
+        listTopics: useCases.listTopics,
         listAgenda: useCases.listAgenda,
         createAgendaDate: useCases.createAgendaDate,
     });

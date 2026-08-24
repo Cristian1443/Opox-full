@@ -20,12 +20,11 @@ export class GetMotivationSummaryUseCase {
 
         let myClanSummary: MotivationSummary['myClan'] = null;
         if (myClan) {
-            const detail = await this.motivationRepo.getClanDetail({ userId, clanId: myClan.id });
             myClanSummary = {
-                id: myClan.id,
-                name: myClan.name,
-                initials: myClan.initials,
-                memberCount: detail.memberCount,
+                id: myClan.clan.id,
+                name: myClan.clan.name,
+                initials: myClan.clan.initials,
+                memberCount: myClan.memberCount,
             };
         }
 

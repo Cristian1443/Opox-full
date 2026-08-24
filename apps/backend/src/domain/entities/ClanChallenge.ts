@@ -10,6 +10,7 @@ export class ClanChallenge {
         public readonly rewardPoints: number,
         public readonly expiresAt: Date | null,
         public readonly createdAt: Date,
+        public readonly topicId: string | null,
     ) { }
 
     static create(props: {
@@ -22,6 +23,7 @@ export class ClanChallenge {
         rewardPoints?: number;
         expiresAt?: Date | null;
         createdAt?: Date;
+        topicId?: string | null;
     }): ClanChallenge {
         return new ClanChallenge(
             props.id,
@@ -33,6 +35,7 @@ export class ClanChallenge {
             props.rewardPoints ?? 0,
             props.expiresAt ?? null,
             props.createdAt ?? new Date(),
+            props.topicId ?? null,
         );
     }
 

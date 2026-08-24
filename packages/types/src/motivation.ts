@@ -2,7 +2,7 @@
  * Tipos compartidos del Bloque 5 · Motivación y Gamificación.
  */
 
-export type RankingScope = 'weekly' | 'global' | 'oposicion';
+export type RankingScope = 'weekly' | 'global' | 'oposicion' | 'topic';
 export type ClanRole = 'leader' | 'member';
 
 export interface ProfileDTO {
@@ -43,6 +43,7 @@ export interface ClanSummaryDTO {
     initials: string;
     description?: string;
     memberCount: number;
+    challengeCount: number;
 }
 
 export interface ClanMemberDTO {
@@ -58,6 +59,7 @@ export interface ClanDetailDTO {
     initials: string;
     description?: string;
     memberCount: number;
+    challengeCount: number;
     rankPosition: number | null;
     members: ClanMemberDTO[];
 }
@@ -79,6 +81,7 @@ export interface ClanChallengeDTO {
     completedCount: number;
     memberCount: number;
     completedByMe: boolean;
+    topicId?: string;
 }
 
 export interface CompleteChallengeResultDTO {
@@ -104,4 +107,5 @@ export interface CreateClanChallengeRequest {
     questionCount: number;
     rewardPoints: number;
     expiresAt?: string;
+    topicId?: string;
 }

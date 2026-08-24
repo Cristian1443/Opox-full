@@ -42,9 +42,9 @@ function IconChallenge({ size = 48 }) {
     );
 }
 
-function BaseModal({ visible, icon, title, description, primaryLabel, onPrimaryPress, secondaryLabel, onSecondaryPress }) {
+function BaseModal({ visible, icon, title, description, primaryLabel, onPrimaryPress, secondaryLabel, onSecondaryPress, tertiaryLabel, onTertiaryPress }) {
     return (
-        <Modal visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onSecondaryPress}>
+        <Modal visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onTertiaryPress ?? onSecondaryPress}>
             <View style={styles.backdrop}>
                 <View style={styles.card}>
                     <View style={styles.cardIcon}>{icon}</View>
@@ -56,6 +56,11 @@ function BaseModal({ visible, icon, title, description, primaryLabel, onPrimaryP
                     {secondaryLabel ? (
                         <TouchableOpacity style={styles.btnDeny} onPress={onSecondaryPress} activeOpacity={0.7}>
                             <Text style={styles.btnDenyText}>{secondaryLabel}</Text>
+                        </TouchableOpacity>
+                    ) : null}
+                    {tertiaryLabel ? (
+                        <TouchableOpacity style={styles.btnTertiary} onPress={onTertiaryPress} activeOpacity={0.7}>
+                            <Text style={styles.btnTertiaryText}>{tertiaryLabel}</Text>
                         </TouchableOpacity>
                     ) : null}
                 </View>
@@ -79,7 +84,7 @@ export function RachaRecordModal({ visible, days, points, onPress }) {
 }
 
 // Figma "POP-UP RACHA EN PELIGRO" (2337:1053)
-export function RachaPeligroModal({ visible, hours, days, onPrimaryPress, onSecondaryPress }) {
+export function RachaPeligroModal({ visible, hours, days, onPrimaryPress, onSecondaryPress, onDismissPress }) {
     return (
         <BaseModal
             visible={visible}
@@ -88,8 +93,10 @@ export function RachaPeligroModal({ visible, hours, days, onPrimaryPress, onSeco
             description={`Te quedan ${hours} horas para no perder tus ${days} días. Un test rápido la mantiene.`}
             primaryLabel="Hacer test rápido"
             onPrimaryPress={onPrimaryPress}
-            secondaryLabel="En otro momento"
+            secondaryLabel="Ver mis tareas"
             onSecondaryPress={onSecondaryPress}
+            tertiaryLabel="En otro momento"
+            onTertiaryPress={onDismissPress}
         />
     );
 }
@@ -168,5 +175,15 @@ const styles = StyleSheet.create({
         color: colors.textDark,
         fontSize: 14,
         fontWeight: '700',
+    },
+    btnTertiary: {
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+        alignSelf: 'stretch',
+    },
+    btnTertiaryText: {
+        color: colors.textMuted,
+        fontSize: 12,
+        fontWeight: '500',
     },
 });

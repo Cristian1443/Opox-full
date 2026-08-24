@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { RachaPeligroModal } from '../../components/MotivationModals';
 import DestacadoBanner from '../../components/DestacadoBanner';
@@ -147,7 +148,7 @@ export default function MotivationHomeScreen({ navigation }) {
     const [dangerVisible, setDangerVisible] = useState(false);
     const [dangerHours, setDangerHours] = useState(null);
 
-    useEffect(() => {
+    const loadData = useCallback(() => {
         let cancelled = false;
         Promise.all([motivationApi.getSummary(), planningApi.getSummary()]).then(([m, p]) => {
             if (cancelled) return;
@@ -162,13 +163,13 @@ export default function MotivationHomeScreen({ navigation }) {
         return () => { cancelled = true; };
     }, []);
 
+    useFocusEffect(loadData);
+
     const gamification = summary?.gamification ?? { currentStreak: 0, longestStreak: 0, opopointsBalance: 0 };
     const myClan = summary?.myClan ?? null;
     const nextMilestone = getNextMilestone(gamification.currentStreak);
 
-    // Ver tienda: todavía no existe una pantalla/ruta de tienda de Opopoints en OnboardingNavigator.
-    // Se deja como no-op hasta que exista esa pantalla (ver informe).
-    const handleShopPress = () => { };
+    const handleShopPress = () => navigation.navigate('StoreHome');
 
     return (
         <SafeAreaView style={styles.container}>
@@ -202,16 +203,22 @@ export default function MotivationHomeScreen({ navigation }) {
                 </TouchableOpacity>
 
                 <Text style={styles.groupTitle}>ÚLTIMOS 14 DÍAS</Text>
+                {/* Pips derivados del currentStreak: los últimos N (hasta 14) en verde, el resto en gris */}
                 <View style={styles.pipsRow}>
-                    {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                        <View key={i} style={[styles.pip, styles.pipDone]} />
-                    ))}
+                    {Array.from({ length: 7 }, (_, i) => {
+                        const dayFromEnd = 13 - i; // 13..7
+                        const done = gamification.currentStreak > dayFromEnd;
+                        return <View key={i} style={[styles.pip, done ? styles.pipDone : styles.pipEmpty]} />;
+                    })}
                 </View>
                 <View style={[styles.pipsRow, { marginBottom: 0 }]}>
-                    {[7, 8, 9, 10, 11, 12].map((i) => (
-                        <View key={i} style={[styles.pip, styles.pipDone]} />
-                    ))}
-                    <View style={[styles.pip, styles.pipToday]} />
+                    {Array.from({ length: 6 }, (_, i) => {
+                        const dayFromEnd = 6 - i; // 6..1
+                        const done = gamification.currentStreak > dayFromEnd;
+                        return <View key={i + 7} style={[styles.pip, done ? styles.pipDone : styles.pipEmpty]} />;
+                    })}
+                    {/* Pip de hoy: verde si racha >= 1, semitransparente si 0 */}
+                    <View style={[styles.pip, gamification.currentStreak >= 1 ? styles.pipDone : styles.pipToday]} />
                 </View>
 
                 {/* Figma: sin tarjeta/borde — solo icono + 2 líneas de texto sobre el fondo */}
@@ -233,6 +240,24 @@ export default function MotivationHomeScreen({ navigation }) {
                     )}
                 </View>
 
+                {/* CTA clan: visible solo cuando el usuario no pertenece a ningún clan */}
+                {!myClan && (
+                    <TouchableOpacity
+                        style={styles.clanCta}
+                        onPress={() => navigation.navigate('ClansList')}
+                        activeOpacity={0.85}
+                    >
+                        <View style={styles.clanCtaLeft}>
+                            <IconClan />
+                        </View>
+                        <View style={styles.clanCtaBody}>
+                            <Text style={styles.clanCtaTitle}>Únete a un clan</Text>
+                            <Text style={styles.clanCtaCaption}>Prepárate con otros opositores y completa retos juntos</Text>
+                        </View>
+                        <Text style={styles.clanCtaArrow}>›</Text>
+                    </TouchableOpacity>
+                )}
+
                 {/* Figma ("ATAJO TIENDA", 2334:311): tarjeta con borde fino, X-mark + valor/caption + link */}
                 <TouchableOpacity style={styles.shopCard} onPress={handleShopPress} activeOpacity={0.85}>
                     <IconOpoxMark size={48} />
@@ -252,7 +277,7 @@ export default function MotivationHomeScreen({ navigation }) {
                     <ExploreItem icon={<IconRankings />} label="Rankings" onPress={() => navigation.navigate('Rankings')} />
                     <ExploreItem
                         icon={<IconClan />}
-                        label={myClan ? myClan.name : 'Mis clanes'}
+                        label={myClan ? myClan.name : 'Ver clanes'}
                         onPress={() => navigation.navigate(myClan ? 'ClanDetail' : 'ClansList', myClan ? { clanId: myClan.id } : undefined)}
                     />
                     {myClan && (
@@ -265,8 +290,9 @@ export default function MotivationHomeScreen({ navigation }) {
                 visible={dangerVisible}
                 hours={dangerHours ?? 1}
                 days={gamification.currentStreak}
-                onPrimaryPress={() => { setDangerVisible(false); navigation.navigate('PlanningToday'); }}
-                onSecondaryPress={() => setDangerVisible(false)}
+                onPrimaryPress={() => { setDangerVisible(false); navigation.navigate('GeneratorConfig'); }}
+                onSecondaryPress={() => { setDangerVisible(false); navigation.navigate('PlanningToday'); }}
+                onDismissPress={() => setDangerVisible(false)}
             />
 
             {/* RachaRecordModal (MotivationModals.js) queda disponible para cuando el backend
@@ -323,6 +349,7 @@ const styles = StyleSheet.create({
     pip: { flex: 1, aspectRatio: 1, borderRadius: 8 },
     pipDone: { backgroundColor: colors.ctaGreen },
     pipToday: { backgroundColor: colors.ctaGreen, opacity: 0.5 },
+    pipEmpty: { backgroundColor: '#DDE1EA' },
     // Figma: sin tarjeta — icono + texto directamente sobre el fondo
     milestoneRow: {
         flexDirection: 'row',
@@ -334,6 +361,30 @@ const styles = StyleSheet.create({
     milestoneTitle: { fontSize: 16, fontWeight: '700', color: colors.textDark },
     // Figma (2334:339 "+ X Opopoints..."): fontSize 9dp exacto.
     milestoneCaption: { fontSize: 9, color: colors.textMuted, marginTop: 2 },
+    clanCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        backgroundColor: colors.white,
+        borderWidth: 1.5,
+        borderColor: `${colors.accentOrange}40`,
+        borderRadius: 16,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+    },
+    clanCtaLeft: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: `${colors.accentOrange}15`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    clanCtaBody: { flex: 1 },
+    clanCtaTitle: { fontSize: 14, fontWeight: '700', color: colors.textDark },
+    clanCtaCaption: { fontSize: 10, color: colors.textMuted, marginTop: 2, lineHeight: 14 },
+    clanCtaArrow: { fontSize: 20, color: colors.accentOrange, fontWeight: '300' },
+
     // Figma ("ATAJO TIENDA", 2334:311): tarjeta de 348x119dp, borde fino, fondo prácticamente transparente
     shopCard: {
         flexDirection: 'row',

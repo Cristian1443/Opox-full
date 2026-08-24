@@ -15,6 +15,11 @@ import { api, authApi } from '../../api';
 import { PENDING_OPOSICION_KEY } from './OppositionSelectorScreen';
 import { PENDING_LEVEL_TEST_KEY } from './LevelTestInProgressScreen';
 
+// Persiste entre instalaciones y sesiones. Si está presente, el usuario ya
+// completó el onboarding al menos una vez en este dispositivo → ir a login,
+// no al slider ni al selector de oposición.
+export const ONBOARDING_COMPLETED_KEY = 'opox.onboardingCompleted';
+
 // Restaura la sesión guardada en AsyncStorage (si existe) para no forzar
 // login + onboarding de nuevo cada vez que se cierra la app. `me()` valida
 // que el accessToken siga vivo; si expiró, se intenta un refresh antes de
@@ -35,10 +40,14 @@ async function resolveSession() {
     return false;
 }
 
-// Sin sesión todavía (usuario no ha creado cuenta), pero puede haber cerrado
-// la app a mitad del embudo de onboarding (Bloque 0). En vez de reiniciar
-// siempre en el slider, retoma el paso exacto donde se quedó.
+// Sin sesión activa. Tres casos posibles:
+// 1. El usuario ya hizo el onboarding alguna vez → ir directo a login (Entrada).
+// 2. Cerró la app a mitad del onboarding → retomar donde se quedó.
+// 3. Usuario completamente nuevo → empezar desde el slider.
 async function resolveOnboardingEntryRoute() {
+    const completed = await AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY);
+    if (completed) return 'Entrada';
+
     const pendingLevelTest = await AsyncStorage.getItem(PENDING_LEVEL_TEST_KEY);
     if (pendingLevelTest != null) return 'LevelTestInProgress';
 

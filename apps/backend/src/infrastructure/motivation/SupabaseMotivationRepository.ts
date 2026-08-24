@@ -57,6 +57,7 @@ type ChallengeRow = {
     reward_points: number;
     expires_at: string | null;
     created_at: string;
+    topic_id: string | null;
 };
 
 type RankingRow = {
@@ -110,6 +111,7 @@ function toDomainChallenge(row: ChallengeRow): ClanChallenge {
         rewardPoints: row.reward_points,
         expiresAt: row.expires_at ? new Date(row.expires_at) : null,
         createdAt: new Date(row.created_at),
+        topicId: row.topic_id,
     });
 }
 
@@ -169,7 +171,11 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
 
     // ─── Rankings ──────────────────────────────────
 
-    async listRanking(input: { userId: string; scope: RankingScope; limit: number }): Promise<RankingResult> {
+    async listRanking(input: { userId: string; scope: RankingScope; topicId?: string; limit: number }): Promise<RankingResult> {
+        if (input.scope === 'topic') {
+            return this.listRankingByTopic({ userId: input.userId, topicId: input.topicId ?? '', limit: input.limit });
+        }
+
         const view = input.scope === 'weekly' ? 'ranking_weekly' : 'ranking_global';
 
         let filterOposicion: string | null = null;
@@ -226,9 +232,78 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
         };
     }
 
+    /**
+     * Ranking por tema: usuarios ordenados por respuestas correctas acumuladas
+     * en `training_attempt_responses` para un `topicId` concreto.
+     * Usa supabaseAdmin para leer entre usuarios (bypasea RLS).
+     */
+    private async listRankingByTopic(input: { userId: string; topicId: string; limit: number }): Promise<RankingResult> {
+        if (!input.topicId) return { entries: [], me: null };
+
+        const { data: rows, error } = await this.supabaseAdmin
+            .from('training_attempt_responses')
+            .select('user_id, is_correct')
+            .eq('topic_id', input.topicId);
+        if (error) throw new Error(`listRankingByTopic: ${error.message}`);
+
+        const scoreByUser = new Map<string, number>();
+        for (const row of (rows ?? []) as Array<{ user_id: string; is_correct: boolean }>) {
+            if (row.is_correct) {
+                scoreByUser.set(row.user_id, (scoreByUser.get(row.user_id) ?? 0) + 1);
+            } else {
+                if (!scoreByUser.has(row.user_id)) scoreByUser.set(row.user_id, 0);
+            }
+        }
+        if (scoreByUser.size === 0) return { entries: [], me: null };
+
+        const sorted = [...scoreByUser.entries()].sort((a, b) => b[1] - a[1]);
+        const topN = sorted.slice(0, input.limit);
+        const userIds = topN.map(([uid]) => uid);
+
+        const { data: profileRows } = await this.supabaseAdmin
+            .from('profiles')
+            .select('id, display_name, avatar_url')
+            .in('id', userIds);
+
+        const nameById = new Map<string, string | null>();
+        const avatarById = new Map<string, string | null>();
+        for (const p of (profileRows ?? []) as Array<{ id: string; display_name: string | null; avatar_url: string | null }>) {
+            nameById.set(p.id, p.display_name);
+            avatarById.set(p.id, p.avatar_url);
+        }
+
+        const entries: RankingEntry[] = topN.map(([uid, pts], i) => ({
+            userId: uid,
+            displayName: nameById.get(uid) ?? null,
+            avatarUrl: avatarById.get(uid) ?? null,
+            points: pts,
+            position: i + 1,
+        }));
+
+        const inTop = entries.find((e) => e.userId === input.userId);
+        if (inTop) return { entries, me: inTop };
+
+        const myScore = scoreByUser.get(input.userId) ?? 0;
+        if (myScore === 0 && !scoreByUser.has(input.userId)) return { entries, me: null };
+        const myPosition = sorted.findIndex(([uid]) => uid === input.userId) + 1;
+        const { data: myProfile } = await this.supabaseAdmin
+            .from('profiles').select('display_name, avatar_url').eq('id', input.userId).maybeSingle();
+
+        return {
+            entries,
+            me: {
+                userId: input.userId,
+                displayName: (myProfile as { display_name: string | null } | null)?.display_name ?? null,
+                avatarUrl: (myProfile as { avatar_url: string | null } | null)?.avatar_url ?? null,
+                points: myScore,
+                position: myPosition,
+            },
+        };
+    }
+
     // ─── Clanes ────────────────────────────────────
 
-    async getMyClan(userId: string): Promise<Clan | null> {
+    async getMyClan(userId: string): Promise<ClanSummary | null> {
         const { data: membership, error: memErr } = await this.supabaseAdmin
             .from('clan_members')
             .select('clan_id')
@@ -237,42 +312,64 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
         if (memErr) throw new Error(`getMyClan: ${memErr.message}`);
         if (!membership) return null;
 
-        const { data, error } = await this.supabaseAdmin
-            .from('clans')
-            .select('*')
-            .eq('id', membership.clan_id as string)
-            .maybeSingle();
-        if (error) throw new Error(`getMyClan: ${error.message}`);
-        return data ? toDomainClan(data as ClanRow) : null;
+        const clanId = membership.clan_id as string;
+        const [
+            { data: clanRow, error: clanErr },
+            { count: memberCount },
+            { count: challengeCount },
+        ] = await Promise.all([
+            this.supabaseAdmin.from('clans').select('*').eq('id', clanId).maybeSingle(),
+            this.supabaseAdmin.from('clan_members').select('user_id', { count: 'exact', head: true }).eq('clan_id', clanId),
+            this.supabaseAdmin.from('clan_challenges').select('id', { count: 'exact', head: true })
+                .eq('clan_id', clanId)
+                .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString()),
+        ]);
+        if (clanErr) throw new Error(`getMyClan: ${clanErr.message}`);
+        if (!clanRow) return null;
+        return { clan: toDomainClan(clanRow as ClanRow), memberCount: memberCount ?? 0, challengeCount: challengeCount ?? 0 };
     }
 
     async listClans(input: { userId: string; limit: number }): Promise<ClanSummary[]> {
-        const myClan = await this.getMyClan(input.userId);
+        const mySummary = await this.getMyClan(input.userId);
 
         let query = this.supabaseAdmin
             .from('clans')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(input.limit);
-        if (myClan) query = query.neq('id', myClan.id);
+        if (mySummary) query = query.neq('id', mySummary.clan.id);
 
         const { data, error } = await query;
         if (error) throw new Error(`listClans: ${error.message}`);
         const clans = (data ?? []) as ClanRow[];
         if (clans.length === 0) return [];
 
-        const { data: memberRows, error: memErr } = await this.supabaseAdmin
-            .from('clan_members')
-            .select('clan_id')
-            .in('clan_id', clans.map((c) => c.id));
-        if (memErr) throw new Error(`listClans: ${memErr.message}`);
+        const clanIds = clans.map((c) => c.id);
+        const now = new Date().toISOString();
 
-        const counts = new Map<string, number>();
+        const [{ data: memberRows, error: memErr }, { data: challengeRows, error: chErr }] = await Promise.all([
+            this.supabaseAdmin.from('clan_members').select('clan_id').in('clan_id', clanIds),
+            this.supabaseAdmin.from('clan_challenges').select('clan_id, id')
+                .in('clan_id', clanIds)
+                .or(`expires_at.is.null,expires_at.gt.${now}`),
+        ]);
+        if (memErr) throw new Error(`listClans: ${memErr.message}`);
+        if (chErr) throw new Error(`listClans: ${chErr.message}`);
+
+        const memberCounts = new Map<string, number>();
         for (const row of (memberRows ?? []) as Array<{ clan_id: string }>) {
-            counts.set(row.clan_id, (counts.get(row.clan_id) ?? 0) + 1);
+            memberCounts.set(row.clan_id, (memberCounts.get(row.clan_id) ?? 0) + 1);
+        }
+        const challengeCounts = new Map<string, number>();
+        for (const row of (challengeRows ?? []) as Array<{ clan_id: string }>) {
+            challengeCounts.set(row.clan_id, (challengeCounts.get(row.clan_id) ?? 0) + 1);
         }
 
-        return clans.map((c) => ({ clan: toDomainClan(c), memberCount: counts.get(c.id) ?? 0 }));
+        return clans.map((c) => ({
+            clan: toDomainClan(c),
+            memberCount: memberCounts.get(c.id) ?? 0,
+            challengeCount: challengeCounts.get(c.id) ?? 0,
+        }));
     }
 
     async createClan(input: {
@@ -374,16 +471,17 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
         if (error) throw new Error(`getClanDetail: ${error.message}`);
         if (!clanRow) throw new ClanNotFoundError();
 
-        const members = await this.resolveMemberViews(input.clanId);
+        const now = new Date().toISOString();
+        const [members, { data: pointsRow }, { count: challengeCount }] = await Promise.all([
+            this.resolveMemberViews(input.clanId),
+            this.supabaseAdmin.from('clan_points').select('points').eq('clan_id', input.clanId).maybeSingle(),
+            this.supabaseAdmin.from('clan_challenges').select('id', { count: 'exact', head: true })
+                .eq('clan_id', input.clanId)
+                .or(`expires_at.is.null,expires_at.gt.${now}`),
+        ]);
 
-        const { data: pointsRow } = await this.supabaseAdmin
-            .from('clan_points')
-            .select('points')
-            .eq('clan_id', input.clanId)
-            .maybeSingle();
         const myPoints = pointsRow ? Number((pointsRow as { points: number }).points) : 0;
-
-        const { count } = await this.supabaseAdmin
+        const { count: aboveCount } = await this.supabaseAdmin
             .from('clan_points')
             .select('clan_id', { count: 'exact', head: true })
             .gt('points', myPoints);
@@ -391,7 +489,8 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
         return {
             clan: toDomainClan(clanRow as ClanRow),
             memberCount: members.length,
-            rankPosition: (count ?? 0) + 1,
+            challengeCount: challengeCount ?? 0,
+            rankPosition: (aboveCount ?? 0) + 1,
             members,
         };
     }
@@ -491,6 +590,7 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
         questionCount: number;
         rewardPoints: number;
         expiresAt?: string | null;
+        topicId?: string | null;
     }): Promise<ChallengeWithProgress> {
         await this.assertMember(input.clanId, input.userId);
 
@@ -504,6 +604,9 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
                 question_count: input.questionCount,
                 reward_points: input.rewardPoints,
                 expires_at: input.expiresAt ?? null,
+                // topic_id solo se incluye cuando tiene valor para no fallar si
+                // la migración ADD COLUMN aún no se ejecutó en Supabase.
+                ...(input.topicId != null && { topic_id: input.topicId }),
             })
             .select('*')
             .single();

@@ -6,6 +6,8 @@ import Svg, { Path } from 'react-native-svg';
 import { planningApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
+const DEFAULT_OPOSICION = 'justicia-tramitacion';
+
 // Colores confirmados contra Figma (frame OPOSICION, Bloque 4) sin
 // equivalente exacto en theme.js.
 const FIGMA = {
@@ -23,6 +25,14 @@ function CheckIcon() {
     );
 }
 
+function ArrowIcon() {
+    return (
+        <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+            <Path d="M5 12h14M13 6l6 6-6 6" stroke={colors.white} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
 // La API solo expone el status por fase (done/current/upcoming), no un
 // rango de meses por fase — Figma muestra rangos ilustrativos ("Oct-Dic",
 // "Ene-Mar"...) que no existen como dato real; se mantiene el subtítulo
@@ -33,7 +43,19 @@ function phaseSubtitle(status, index) {
     return `Fase ${index + 1}`;
 }
 
-function PhaseRow({ phase, index, isLast }) {
+function TopicLine({ topics }) {
+    if (!topics?.length) return null;
+    return (
+        <Text style={styles.topicLine} numberOfLines={2}>
+            {topics.map((t) => t.name).join(' · ')}
+        </Text>
+    );
+}
+
+function PhaseRow({ phase, index, isLast, navigation }) {
+    const hasTopics = phase.topics?.length > 0;
+    const topicIds = hasTopics ? phase.topics.map((t) => t.topicId).join(',') : null;
+
     return (
         <View style={[styles.phaseRow, index === 0 && styles.phaseRowTop, isLast && styles.phaseRowSeparator]}>
             {phase.status === 'done' ? (
@@ -46,23 +68,38 @@ function PhaseRow({ phase, index, isLast }) {
             <View style={styles.phaseTextWrap}>
                 <Text style={styles.phaseTitle}>{phase.title}</Text>
                 <Text style={styles.phaseSubtitle}>{phaseSubtitle(phase.status, index)}</Text>
+                <TopicLine topics={phase.topics} />
+                {phase.status === 'current' && hasTopics && (
+                    <TouchableOpacity
+                        style={styles.ctaBtn}
+                        onPress={() => navigation.navigate('GeneratorConfig', {
+                            topicId: topicIds,
+                            questionCount: 20,
+                        })}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.ctaBtnText}>Estudiar esta fase</Text>
+                        <ArrowIcon />
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
 }
 
-export default function PlanningMacroScreen({ navigation }) {
+export default function PlanningMacroScreen({ navigation, route }) {
+    const oposicion = route?.params?.oposicion ?? DEFAULT_OPOSICION;
     const [macro, setMacro] = useState(null);
     const [goalCount, setGoalCount] = useState(3);
     const [loaded, setLoaded] = useState(false);
 
     useEffect(() => {
-        Promise.all([planningApi.getMacro(), planningApi.getPlan()]).then(([m, p]) => {
+        Promise.all([planningApi.getMacro(oposicion), planningApi.getPlan()]).then(([m, p]) => {
             setMacro(m.data);
             if (p.data) setGoalCount(p.data.testsPerDay);
             setLoaded(true);
         });
-    }, []);
+    }, [oposicion]);
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -90,7 +127,7 @@ export default function PlanningMacroScreen({ navigation }) {
                         <Text style={styles.sectionLabel}>RUTAS POR FASES</Text>
                         <View style={styles.phasesList}>
                             {macro.phases.map((p, i) => (
-                                <PhaseRow key={p.key} phase={p} index={i} isLast={i === macro.phases.length - 1} />
+                                <PhaseRow key={p.key} phase={p} index={i} isLast={i === macro.phases.length - 1} navigation={navigation} />
                             ))}
                         </View>
                     </>
@@ -141,12 +178,12 @@ const styles = StyleSheet.create({
     phasesList: { marginBottom: 24 },
     phaseRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         paddingVertical: 16,
     },
     phaseRowTop: { borderTopWidth: 0.44, borderTopColor: FIGMA.separator },
     phaseRowSeparator: { borderBottomWidth: 0.44, borderBottomColor: FIGMA.separator },
-    phaseIcon: { width: 29, height: 29, borderRadius: 2.7, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+    phaseIcon: { width: 29, height: 29, borderRadius: 2.7, alignItems: 'center', justifyContent: 'center', marginRight: 14, marginTop: 2 },
     phaseIconCompleted: { backgroundColor: colors.ctaGreen },
     phaseIconInProgress: { backgroundColor: colors.accentOrange },
     phaseIconDot: { width: 13, height: 13, borderRadius: 6.5, backgroundColor: colors.white },
@@ -154,6 +191,19 @@ const styles = StyleSheet.create({
     phaseTextWrap: { flex: 1 },
     phaseTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
     phaseSubtitle: { marginTop: 2, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote },
+    topicLine: { marginTop: 3, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote, lineHeight: 13 },
+    ctaBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: colors.accentOrange,
+        borderRadius: 8,
+        paddingVertical: 7,
+        paddingHorizontal: 12,
+        marginTop: 8,
+        alignSelf: 'flex-start',
+    },
+    ctaBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 11.5, color: colors.white },
     emptyCard: { backgroundColor: colors.white, borderRadius: 14, padding: 20, alignItems: 'center', marginTop: 20 },
     emptyTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: colors.textDark, marginBottom: 6, textAlign: 'center' },
     emptyText: { fontFamily: 'Poppins-Regular', fontSize: 11.5, color: FIGMA.textNote, textAlign: 'center', marginBottom: 16, lineHeight: 17 },

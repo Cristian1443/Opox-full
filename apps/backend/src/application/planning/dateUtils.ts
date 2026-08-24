@@ -4,6 +4,15 @@ export function todayIso(): string {
     return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Aplica el multiplicador de intensidad al objetivo diario de tests.
+ * low → 75 %, high → 125 %, medium → sin cambio. Mínimo 1.
+ */
+export function applyIntensity(base: number, intensity: 'low' | 'medium' | 'high'): number {
+    const mult = intensity === 'low' ? 0.75 : intensity === 'high' ? 1.25 : 1;
+    return Math.max(1, Math.round(base * mult));
+}
+
 export function addDays(dateIso: string, days: number): string {
     const d = new Date(`${dateIso}T00:00:00.000Z`);
     d.setUTCDate(d.getUTCDate() + days);

@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { RetoRecibidoModal } from '../../components/MotivationModals';
-import { motivationApi } from '../../api';
+import { motivationApi, trainingApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
-// Icono de chevron para el botón de volver (mismo patrón que el resto de Bloque 5).
-// Figma (NAV 2336:964 "Vector"): ~5.6x11.1dp exacto dentro de un círculo de 24dp.
 function IconChevronLeft({ size = 11, color = colors.textDark }) {
     return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -23,17 +21,10 @@ function hoursLeft(expiresAt) {
     return Math.ceil(ms / 3600000);
 }
 
-// Figma ("RETOS - LISTADO Y CREACION", 2336:959): título y subtítulo CENTRADOS arriba,
-// luego la barra de progreso, y por último una fila inferior con la leyenda de progreso
-// a la izquierda y el badge de tiempo (o "Iniciar") a la derecha — no título+badge en la
-// misma fila de arriba, como tenía antes.
-function ChallengeCard({ item, onComplete }) {
+// Figma ("RETOS - LISTADO Y CREACION", 2336:959)
+function ChallengeCard({ item, onStart }) {
     const percent = item.memberCount > 0 ? Math.round((item.completedCount / item.memberCount) * 100) : 0;
     const left = hoursLeft(item.expiresAt);
-    // Dos variantes de tarjeta en Figma: "Reto diario del clan" (con cuenta atrás) y
-    // "Maratón semanal" (sin fecha límite, acción "Iniciar" + premio en Opopoints). El
-    // modelo de datos actual no expone un campo `type`, así que usamos la ausencia de
-    // `expiresAt` como mejor aproximación disponible.
     const isMarathon = !item.expiresAt;
     const subtitle = isMarathon
         ? [
@@ -43,11 +34,7 @@ function ChallengeCard({ item, onComplete }) {
         : item.subtitle;
 
     return (
-        <TouchableOpacity
-            style={styles.card}
-            onPress={() => !item.completedByMe && onComplete(item)}
-            activeOpacity={item.completedByMe ? 1 : 0.7}
-        >
+        <View style={styles.card}>
             <Text style={styles.cardTitle}>{item.title}</Text>
             {!!subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
 
@@ -57,31 +44,67 @@ function ChallengeCard({ item, onComplete }) {
 
             <View style={styles.cardFootRow}>
                 <Text style={styles.progressCaption}>
-                    {!isMarathon && (
-                        <>
-                            {item.completedByMe ? '✓ Ya lo completaste · ' : ''}
-                            {item.completedCount} de {item.memberCount} del clan ya lo hicieron
-                        </>
-                    )}
+                    {item.completedByMe ? '✓ Completado · ' : ''}
+                    {item.completedCount} de {item.memberCount} del clan
                 </Text>
                 {isMarathon ? (
-                    <Text style={styles.startLink}>Iniciar</Text>
+                    <TouchableOpacity
+                        onPress={() => !item.completedByMe && onStart(item)}
+                        activeOpacity={item.completedByMe ? 1 : 0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <Text style={[styles.startLink, item.completedByMe && styles.startLinkDone]}>
+                            {item.completedByMe ? '✓ Listo' : 'Iniciar →'}
+                        </Text>
+                    </TouchableOpacity>
                 ) : (
                     left !== null && (
                         <Text style={styles.timeBadge}>{left > 0 ? `${left}h restantes` : 'Caducado'}</Text>
                     )
                 )}
             </View>
-        </TouchableOpacity>
+        </View>
+    );
+}
+
+// ─── Stepper numérico ─────────────────────────────────────────────────────────
+function Stepper({ value, min, max, step, onChange, label }) {
+    return (
+        <View style={styles.stepperRow}>
+            <Text style={styles.stepperLabel}>{label}</Text>
+            <View style={styles.stepperControls}>
+                <TouchableOpacity
+                    style={styles.stepperBtn}
+                    onPress={() => onChange(Math.max(min, value - step))}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.stepperBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.stepperValue}>{value}</Text>
+                <TouchableOpacity
+                    style={styles.stepperBtn}
+                    onPress={() => onChange(Math.min(max, value + step))}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.stepperBtnText}>+</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 }
 
 export default function ChallengesScreen({ navigation, route }) {
     const { clanId } = route.params;
     const [challenges, setChallenges] = useState([]);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [previewVisible, setPreviewVisible] = useState(false);
-    const [form, setForm] = useState({ title: '', subtitle: '', questionCount: '20', rewardPoints: '50' });
+
+    // ─── Wizard de creación ────────────────────────────────────────────────────
+    const [wizardVisible, setWizardVisible] = useState(false);
+    const [wizardStep, setWizardStep] = useState(1); // 1: tema, 2: detalle
+    const [topics, setTopics] = useState([]);
+    const [topicsLoading, setTopicsLoading] = useState(false);
+    const [selectedTopic, setSelectedTopic] = useState(null); // { topicId, label }
+    const [form, setForm] = useState({ title: '', questionCount: 20, rewardPoints: 50 });
+    const [creating, setCreating] = useState(false);
 
     const load = useCallback(() => {
         motivationApi.listClanChallenges(clanId).then(({ data }) => { if (data) setChallenges(data); });
@@ -89,26 +112,47 @@ export default function ChallengesScreen({ navigation, route }) {
 
     useEffect(() => { load(); }, [load]);
 
-    const handleComplete = async (item) => {
-        const { data } = await motivationApi.completeChallenge(clanId, item.id);
-        if (data) load();
+    const openWizard = async () => {
+        setWizardStep(1);
+        setSelectedTopic(null);
+        setForm({ title: '', questionCount: 20, rewardPoints: 50 });
+        setWizardVisible(true);
+        setTopicsLoading(true);
+        const { data } = await trainingApi.listTopics();
+        setTopics(data ?? []);
+        setTopicsLoading(false);
+    };
+
+    const handleTopicSelect = (topic) => {
+        setSelectedTopic(topic);
+        if (topic) setForm((f) => ({ ...f, title: topic.label }));
+        setWizardStep(2);
     };
 
     const handleCreate = async () => {
-        const questionCount = parseInt(form.questionCount, 10);
-        const rewardPoints = parseInt(form.rewardPoints, 10);
-        if (!form.title.trim() || Number.isNaN(questionCount) || Number.isNaN(rewardPoints)) return;
+        if (!form.title.trim() || creating) return;
+        setCreating(true);
         const { data } = await motivationApi.createClanChallenge(clanId, {
             title: form.title.trim(),
-            subtitle: form.subtitle.trim() || undefined,
-            questionCount,
-            rewardPoints,
+            questionCount: form.questionCount,
+            rewardPoints: form.rewardPoints,
+            topicId: selectedTopic?.topicId,
         });
+        setCreating(false);
         if (data) {
-            setModalVisible(false);
-            setForm({ title: '', subtitle: '', questionCount: '20', rewardPoints: '50' });
+            setWizardVisible(false);
             load();
         }
+    };
+
+    // "Iniciar" un reto: navega al Generador con el contexto del reto pre-cargado
+    const handleStart = (item) => {
+        navigation.navigate('GeneratorConfig', {
+            challengeId: item.id,
+            clanId,
+            topicId: item.topicId ?? null,
+            questionCount: item.questionCount,
+        });
     };
 
     return (
@@ -128,73 +172,114 @@ export default function ChallengesScreen({ navigation, route }) {
                 {challenges.length === 0 ? (
                     <Text style={styles.empty}>Todavía no hay retos en tu clan.</Text>
                 ) : (
-                    challenges.map((c) => <ChallengeCard key={c.id} item={c} onComplete={handleComplete} />)
+                    challenges.map((c) => <ChallengeCard key={c.id} item={c} onStart={handleStart} />)
                 )}
 
-                <TouchableOpacity style={styles.createCard} onPress={() => setModalVisible(true)} activeOpacity={0.85}>
-                    <Text style={styles.createTitle}>+ Crear reto para tu clan</Text>
-                    <Text style={styles.createCaption}>Elige tema, nº de preguntas y duración</Text>
-                </TouchableOpacity>
-
-                {/* Vista previa temporal del popup "reto recibido" — no hay sistema de
-                    retos 1vs1 entre usuarios todavía, solo retos de clan. Afordancia
-                    solo de desarrollo, discreta a propósito (no forma parte del Figma). */}
-                <TouchableOpacity style={styles.previewBtn} onPress={() => setPreviewVisible(true)}>
-                    <Text style={styles.previewBtnText}>DEV · Vista previa: reto recibido</Text>
+                <TouchableOpacity style={styles.createCard} onPress={openWizard} activeOpacity={0.85}>
+                    <Text style={styles.createTitle}>+ Crear reto</Text>
+                    <Text style={styles.createCaption}>Elige tema, preguntas y puntos</Text>
                 </TouchableOpacity>
             </ScrollView>
 
-            <Modal transparent visible={modalVisible} animationType="fade" onRequestClose={() => setModalVisible(false)}>
+            {/* ─── Wizard modal ──────────────────────────────────────────────── */}
+            <Modal transparent visible={wizardVisible} animationType="fade" onRequestClose={() => setWizardVisible(false)}>
                 <View style={styles.overlay}>
                     <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>Nuevo reto</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Título (ej. Maratón semanal)"
-                            placeholderTextColor="#AEB5C2"
-                            value={form.title}
-                            onChangeText={(title) => setForm((f) => ({ ...f, title }))}
-                        />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Descripción (opcional)"
-                            placeholderTextColor="#AEB5C2"
-                            value={form.subtitle}
-                            onChangeText={(subtitle) => setForm((f) => ({ ...f, subtitle }))}
-                        />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Nº de preguntas"
-                            placeholderTextColor="#AEB5C2"
-                            keyboardType="number-pad"
-                            value={form.questionCount}
-                            onChangeText={(questionCount) => setForm((f) => ({ ...f, questionCount }))}
-                        />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Opopoints de premio"
-                            placeholderTextColor="#AEB5C2"
-                            keyboardType="number-pad"
-                            value={form.rewardPoints}
-                            onChangeText={(rewardPoints) => setForm((f) => ({ ...f, rewardPoints }))}
-                        />
-                        <TouchableOpacity style={styles.btn} onPress={handleCreate} activeOpacity={0.85}>
-                            <Text style={styles.btnText}>Crear reto</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setModalVisible(false)} style={{ marginTop: 8 }}>
+                        {/* Cabecera del wizard */}
+                        <View style={styles.wizardHeader}>
+                            {wizardStep === 2 && (
+                                <TouchableOpacity onPress={() => setWizardStep(1)} hitSlop={8}>
+                                    <Text style={styles.wizardBack}>‹ Volver</Text>
+                                </TouchableOpacity>
+                            )}
+                            <Text style={styles.modalTitle}>
+                                {wizardStep === 1 ? 'Elige el tema' : 'Configura el reto'}
+                            </Text>
+                            <Text style={styles.wizardStep}>{wizardStep}/2</Text>
+                        </View>
+
+                        {/* Paso 1: selector de tema */}
+                        {wizardStep === 1 && (
+                            topicsLoading ? (
+                                <ActivityIndicator size="small" color={colors.ctaGreen} style={{ marginVertical: 24 }} />
+                            ) : (
+                                <ScrollView style={styles.topicList} showsVerticalScrollIndicator={false}>
+                                    {topics.map((t) => (
+                                        <TouchableOpacity
+                                            key={t.id}
+                                            style={styles.topicItem}
+                                            onPress={() => handleTopicSelect(t)}
+                                            activeOpacity={0.75}
+                                        >
+                                            <Text style={styles.topicItemText}>{t.label}</Text>
+                                            <Text style={styles.topicItemArrow}>›</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                    {/* Sin tema específico */}
+                                    <TouchableOpacity
+                                        style={[styles.topicItem, { borderTopWidth: 1, borderTopColor: '#EEF1F7', marginTop: 4 }]}
+                                        onPress={() => handleTopicSelect(null)}
+                                        activeOpacity={0.75}
+                                    >
+                                        <Text style={[styles.topicItemText, { color: colors.textMuted }]}>Sin tema específico</Text>
+                                        <Text style={styles.topicItemArrow}>›</Text>
+                                    </TouchableOpacity>
+                                </ScrollView>
+                            )
+                        )}
+
+                        {/* Paso 2: configuración del reto */}
+                        {wizardStep === 2 && (
+                            <>
+                                {selectedTopic && (
+                                    <View style={styles.selectedTopicBadge}>
+                                        <Text style={styles.selectedTopicText}>{selectedTopic.label}</Text>
+                                    </View>
+                                )}
+                                <Text style={styles.fieldLabel}>Nombre del reto</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Ej. Maratón semanal"
+                                    placeholderTextColor="#AEB5C2"
+                                    value={form.title}
+                                    onChangeText={(title) => setForm((f) => ({ ...f, title }))}
+                                />
+                                <Stepper
+                                    label="Preguntas"
+                                    value={form.questionCount}
+                                    min={5}
+                                    max={100}
+                                    step={5}
+                                    onChange={(v) => setForm((f) => ({ ...f, questionCount: v }))}
+                                />
+                                <Stepper
+                                    label="Opopoints de premio"
+                                    value={form.rewardPoints}
+                                    min={10}
+                                    max={500}
+                                    step={10}
+                                    onChange={(v) => setForm((f) => ({ ...f, rewardPoints: v }))}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.btn, (!form.title.trim() || creating) && { opacity: 0.5 }]}
+                                    onPress={handleCreate}
+                                    activeOpacity={0.85}
+                                    disabled={!form.title.trim() || creating}
+                                >
+                                    {creating
+                                        ? <ActivityIndicator size="small" color="#fff" />
+                                        : <Text style={styles.btnText}>Crear reto</Text>
+                                    }
+                                </TouchableOpacity>
+                            </>
+                        )}
+
+                        <TouchableOpacity onPress={() => setWizardVisible(false)} style={{ marginTop: 8 }}>
                             <Text style={styles.cancel}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
-
-            <RetoRecibidoModal
-                visible={previewVisible}
-                challengerName="Ana_G"
-                description="Reto de 20 preguntas de Constitución. ¿Aceptas el desafío?"
-                onPrimaryPress={() => setPreviewVisible(false)}
-                onSecondaryPress={() => setPreviewVisible(false)}
-            />
         </SafeAreaView>
     );
 }
@@ -220,7 +305,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    // Figma (2336:965 "Retos"): fontSize 21dp exacto (1dp = 2.25px de Figma).
+    // Figma (2336:965 "Retos"): fontSize 21dp exacto.
     headerTitle: { fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3 },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: 24 },
@@ -228,9 +313,7 @@ const styles = StyleSheet.create({
     groupTitle: { fontSize: 16, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, marginBottom: 8, marginTop: 8, textTransform: 'uppercase' },
     empty: { textAlign: 'center', color: colors.textMuted, fontSize: 12.5, marginBottom: 10 },
     card: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 14, padding: spacing.md, marginBottom: 9 },
-    // Figma: título y subtítulo CENTRADOS, la barra de progreso debajo, y una fila
-    // inferior con la leyenda a la izquierda y el badge/"Iniciar" a la derecha.
-    // Figma (2337:1025/1003 "Maratón semanal"/"Reto diario del clan"): fontSize 16dp exacto.
+    // Figma (2337:1025/1003 "Maratón semanal"): fontSize 16dp exacto.
     cardTitle: { fontSize: 16, fontWeight: '700', color: colors.textDark, textAlign: 'center' },
     // Figma (2337:1024/1002 subtítulos): fontSize 7dp exacto.
     cardSubtitle: { fontSize: 7, fontWeight: '600', color: colors.accentOrange, textAlign: 'center', marginTop: 2 },
@@ -244,18 +327,33 @@ const styles = StyleSheet.create({
     timeBadge: { fontSize: 9, fontWeight: '700', color: colors.accentOrange },
     // Figma (2337:1022 "Iniciar"): fontSize 9dp exacto.
     startLink: { fontSize: 9, fontWeight: '700', color: colors.ctaGreen },
-    createCard: { backgroundColor: colors.ctaGreen, borderRadius: 14, paddingVertical: spacing.md, paddingHorizontal: spacing.md, alignItems: 'center' },
+    startLinkDone: { color: colors.textMuted },
+    createCard: { backgroundColor: colors.ctaGreen, borderRadius: 14, paddingVertical: spacing.md, paddingHorizontal: spacing.md, alignItems: 'center', marginTop: spacing.sm },
     // Figma (2337:1029 "+ Crear reto para tu clan"): fontSize 16dp exacto.
     createTitle: { fontSize: 16, fontWeight: '700', color: colors.white },
     // Figma (2337:1030 "Elige tema, nº de preguntas y duración"): fontSize 7dp exacto.
     createCaption: { fontSize: 7, fontWeight: '500', color: colors.white, marginTop: 2 },
-    previewBtn: { marginTop: spacing.lg, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, backgroundColor: colors.grayLight },
-    previewBtnText: { fontSize: 10, fontWeight: '600', color: colors.textMuted },
     overlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-    modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 18, width: '100%' },
-    modalTitle: { fontSize: 15, fontWeight: '800', color: '#0F1B33', marginBottom: 12 },
-    input: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: '#1B2A4A', marginBottom: 10 },
-    btn: { backgroundColor: '#FF6B4A', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+    modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 18, width: '100%', maxHeight: '80%' },
+    wizardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    wizardBack: { fontSize: 13, fontWeight: '600', color: colors.ctaGreen },
+    modalTitle: { fontSize: 15, fontWeight: '800', color: '#0F1B33', flex: 1, textAlign: 'center' },
+    wizardStep: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
+    topicList: { maxHeight: 320 },
+    topicItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#F0F2F6' },
+    topicItemText: { fontSize: 13, fontWeight: '500', color: '#0F1B33', flex: 1 },
+    topicItemArrow: { fontSize: 18, color: colors.ctaGreen, marginLeft: 8 },
+    selectedTopicBadge: { backgroundColor: `${colors.ctaGreen}22`, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, alignSelf: 'flex-start', marginBottom: 12 },
+    selectedTopicText: { fontSize: 11, fontWeight: '700', color: colors.ctaGreen },
+    fieldLabel: { fontSize: 11, fontWeight: '600', color: '#0F1B33', marginBottom: 4 },
+    input: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: '#1B2A4A', marginBottom: 14 },
+    stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    stepperLabel: { fontSize: 13, fontWeight: '500', color: '#0F1B33' },
+    stepperControls: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    stepperBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#F0F2F6', alignItems: 'center', justifyContent: 'center' },
+    stepperBtnText: { fontSize: 18, fontWeight: '700', color: '#0F1B33', lineHeight: 22 },
+    stepperValue: { fontSize: 16, fontWeight: '700', color: '#0F1B33', minWidth: 32, textAlign: 'center' },
+    btn: { backgroundColor: colors.ctaGreen, borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
     btnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
     cancel: { textAlign: 'center', color: '#8A92A0', fontSize: 12, fontWeight: '700' },
 });

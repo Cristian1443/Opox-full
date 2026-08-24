@@ -1,7 +1,7 @@
 import type { IPlanningRepository } from '../../domain';
 import { GetWeekUseCase, WeekDaySummary } from './WeekUseCase';
 import { GetMacroUseCase, MacroResult } from './MacroUseCase';
-import { todayIso, daysBetween } from './dateUtils';
+import { todayIso, daysBetween, applyIntensity } from './dateUtils';
 
 const EXAM_SOON_THRESHOLD_DAYS = 30;
 
@@ -28,18 +28,18 @@ export class GetPlanningSummaryUseCase {
         private readonly getMacro: GetMacroUseCase,
     ) { }
 
-    async execute(userId: string): Promise<PlanningSummary> {
-        const today = todayIso();
+    async execute(userId: string, opts?: { localDate?: string }): Promise<PlanningSummary> {
+        const today = opts?.localDate ?? todayIso();
         const [plan, todayTasks, week, macro, lastActivityDate] = await Promise.all([
             this.planningRepo.getPlan(userId),
             this.planningRepo.listTasks({ userId, date: today }),
-            this.getWeek.execute({ userId }),
+            this.getWeek.execute({ userId, localDate: today }),
             this.getMacro.execute(userId),
             this.planningRepo.getLastActivityDate(userId),
         ]);
 
         const completedCount = todayTasks.filter((t) => t.done).length;
-        const goalCount = plan.testsPerDay;
+        const goalCount = applyIntensity(plan.testsPerDay, plan.intensity);
 
         const daysSinceLastActivity = lastActivityDate
             ? daysBetween(lastActivityDate, today)

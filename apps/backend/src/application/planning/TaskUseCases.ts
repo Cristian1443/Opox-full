@@ -6,15 +6,15 @@ import type {
     TaskKind,
     TimeOfDay,
 } from '../../domain';
-import { todayIso } from './dateUtils';
+import { todayIso, applyIntensity } from './dateUtils';
 
 const DAILY_GOAL_POINTS = 40;
 
 export class ListTasksUseCase {
     constructor(private readonly planningRepo: IPlanningRepository) { }
 
-    execute(input: { userId: string; date?: string }): Promise<StudyTask[]> {
-        return this.planningRepo.listTasks({ userId: input.userId, date: input.date ?? todayIso() });
+    execute(input: { userId: string; date?: string; localDate?: string }): Promise<StudyTask[]> {
+        return this.planningRepo.listTasks({ userId: input.userId, date: input.date ?? input.localDate ?? todayIso() });
     }
 }
 
@@ -62,9 +62,10 @@ export class ToggleTaskUseCase {
         ]);
         const completedCount = todayTasks.filter((t) => t.done).length;
 
-        // Umbral exacto: dispara solo la vez que se cruza el objetivo, no en
-        // cada toggle posterior sobre el mismo día.
-        if (completedCount === plan.testsPerDay) {
+        // Umbral exacto: dispara solo la vez que se cruza el objetivo (ajustado
+        // por intensidad), no en cada toggle posterior sobre el mismo día.
+        const goalCount = applyIntensity(plan.testsPerDay, plan.intensity);
+        if (completedCount === goalCount) {
             const gamification = await this.dashboardRepo.registerActivity({
                 userId: input.userId,
                 reason: 'daily_goal_completed',

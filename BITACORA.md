@@ -5,6 +5,267 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-23 — Bloque 4 · Planificación — Revisión post-testing (10 fixes)
+
+Rama: `feat/revision-bloque-4-planificacion` (nacida de `feat/bloque-13-notificaciones` tras merge a `main`).
+
+Auditoría y corrección completa del Bloque 4. Se identificaron y cerraron 10 bugs/gaps
+detectados en pruebas reales en dispositivo, distribuidos entre backend y mobile.
+
+### Gap 1 · Bug de zona horaria (hub muestra día incorrecto)
+
+`todayIso()` usaba `new Date().toISOString().slice(0,10)` → devuelve fecha UTC.
+En Colombia (UTC-5) una sesión a las 20:00h mostraba el día siguiente.
+
+- **`dateUtils.ts`**: se mantiene `todayIso()` para uso interno del backend.
+- **`apps/mobile/src/api/planning.js`**: `localDate()` usa `new Date().toLocaleDateString('sv')` (locale sueco → `YYYY-MM-DD` en la zona horaria del dispositivo). Todos los endpoints planificación (`getSummary`, `listTasks`, `getWeek`) envían `?localDate=<hoy-local>`.
+- **Backend** (`GetPlanningSummaryUseCase`, `ListTasksUseCase`, `GetWeekUseCase`): aceptan `localDate?` opcional; si viene, lo usan en vez de `todayIso()`.
+
+### Gap 2 · Campo intensidad era código muerto
+
+`intensity` se guardaba en BD pero nunca afectaba el objetivo diario.
+
+- **`apps/backend/src/application/planning/dateUtils.ts`**: nuevo helper `applyIntensity(base, intensity)` — `low=0.75×`, `medium=1×`, `high=1.25×` con `Math.max(1, Math.round(...))`.
+- Aplicado en 3 lugares: `GetPlanningSummaryUseCase` (goalCount del hub), `ToggleTaskUseCase` (umbral de meta completada), `PlanningTodayScreen` (vista previa cliente).
+- **`PlanningEditScreen`**: muestra el "objetivo real" cuando `effectiveGoal ≠ testsPerDay` y navega atrás tras guardar.
+
+### Gap 3 · Modal de añadir tarea rediseñado con flujo a Generador
+
+El modal de crear tarea no tenía forma de crear tareas de tipo "Test de práctica" vinculadas al Generador.
+
+- **`PlanningTodayScreen.js`**: modal con dos tabs (Test de práctica / Tarea libre).
+  - Tab Test: selector de tema (cargado de `boeApi.listTopics('justicia-tramitacion')`), stepper de preguntas (5-50, step 5).
+  - Subtitle se guarda como `JSON.stringify({ topicId, count })` para que `TaskRow` pueda renderizar "N preguntas" y badge "Empezar".
+  - Al pulsar "Empezar": `navigation.navigate('GeneratorConfig', { topicId, questionCount })`.
+- `tryParseTestParams(subtitle)` helper que decodifica el JSON guardado.
+- `useFocusEffect` (no `useEffect`) para recargar tareas al volver del Generador.
+
+### Gap 4 · Pantalla Macro enriquecida con temas reales
+
+La vista Macro mostraba 4 fases vacías sin distribución de temario.
+
+- **`PlanningController.ts`** `getMacro`: llama `listTopics` en paralelo y enriquece fases con `enrichMacroWithTopics()`.
+  - `PHASE_WEIGHTS = [0.35, 0.30, 0.25, 0.10]`.
+  - Usa `t.label` (campo correcto de `TrainingTopic`, no `t.name`).
+  - `container.ts`: pasa `listTopics: useCases.listTopics` al constructor de `PlanningController`.
+- **`PlanningMacroScreen.js`**: `TopicLine` muestra temas de la fase; CTA "Estudiar esta fase →" navega a `GeneratorConfig` con los `topicId` de la fase.
+
+### Fixes post-testing
+
+| Bug | Causa | Fix |
+|---|---|---|
+| HOY MICRO no se actualizaba | `useEffect(fn,[])` no se dispara al volver | `useFocusEffect(load)` en `PlanningTodayScreen` |
+| "Activar recta final" no hacía nada | `onPrimaryPress` era `() => {}` | Llama `planningApi.updatePlan({ intensity:'high' })` → navega a `PlanningToday` |
+| Temas atascados en "Cargando" | `trainingApi.listTopics()` sin `oposicion` → 0 filas | `boeApi.listTopics('justicia-tramitacion')` |
+| Dashboard tarjeta Plan al 0% | No se llamaba `planningApi.getSummary()` | `DashboardScreen.loadData` carga ambos summaries |
+| "1 de 3" cuando el plan decía 2 tests | `PlanningToday` leía `getPlan().testsPerDay` (sin intensidad) | Ahora usa `getSummary().today.goalCount` (intensity-aware) |
+| Nombres de temas invisibles en modal | `topic.name` no existe en `TrainingTopic` | `topic.label` en todo `PlanningTodayScreen` |
+| Pop-up examen aparecía en cada visita al hub | `useRef(false)` se resetea al desmontar el componente | `let _alertsShownThisSession = false` a nivel de módulo |
+| Intensidad no se guardaba correctamente | Tap-to-cycle en tarjeta grande → doble-tap accidental cambiaba el valor | 3 botones explícitos (Baja / Media / Alta) en `PlanningEditScreen` |
+
+### Archivos modificados
+
+**Backend:**
+- `apps/backend/src/application/planning/dateUtils.ts` — `applyIntensity()`
+- `apps/backend/src/application/planning/GetPlanningSummaryUseCase.ts` — `localDate` + `applyIntensity`
+- `apps/backend/src/application/planning/TaskUseCases.ts` — `localDate` en `ListTasksUseCase` y `ToggleTaskUseCase`
+- `apps/backend/src/presentation/controllers/PlanningController.ts` — `enrichMacroWithTopics`, `listTopics`, `localDate`
+- `apps/backend/src/container.ts` — wiring de `listTopics` en `PlanningController`
+
+**Mobile:**
+- `apps/mobile/src/api/planning.js` — `localDate()` helper, todos los endpoints actualizados
+- `apps/mobile/src/screens/planning/PlanningHomeScreen.js` — `_alertsShownThisSession`, `useFocusEffect`, "Activar recta final" funcional
+- `apps/mobile/src/screens/planning/PlanningTodayScreen.js` — `useFocusEffect`, `boeApi`, modal rediseñado, `topic.label`, `getSummary().goalCount`
+- `apps/mobile/src/screens/planning/PlanningEditScreen.js` — 3 botones de intensidad, navega atrás tras guardar
+- `apps/mobile/src/screens/planning/PlanningMacroScreen.js` — `TopicLine`, CTA "Estudiar esta fase →"
+- `apps/mobile/src/screens/DashboardScreen.js` — `useFocusEffect`, carga `planningApi.getSummary()`
+
+---
+
+## 2026-08-23 — Bloque 0 · Onboarding — Revisión completa del flujo de entrada
+
+Rama: `feat/revision-bloque-0` (nacida de `main` tras merge de bloque 4).
+
+Auditoría y corrección del flujo de onboarding. Se identificaron 3 bugs críticos que
+hacían que el selector de oposición y el test de nivel aparecieran en **cada arranque**
+de la app, y que el test no tuviera ningún efecto sobre el plan de estudio.
+
+### Bug 1 · El onboarding se repetía en cada arranque o al cerrar sesión
+
+**Antes:** `SplashScreen.resolveOnboardingEntryRoute()` evaluaba `PENDING_OPOSICION_KEY`
+y `PENDING_LEVEL_TEST_KEY`, pero nunca existía un flag que marcara que el onboarding
+ya estaba completado. Resultado: cada arranque o logout volvía al slider de bienvenida
+y al selector de oposición.
+
+**Después:** Se añadió `ONBOARDING_COMPLETED_KEY = 'opox.onboardingCompleted'` (AsyncStorage).
+- `SplashScreen.resolveOnboardingEntryRoute()` lo comprueba primero. Si existe → `Entrada` (login directo).
+- `SesionIniciadaScreen` lo escribe (`'1'`) justo antes de navegar al Dashboard.
+- El selector de oposición y el test de nivel solo aparecen en instalación nueva o dispositivo sin sesión previa.
+
+### Bug 2 · El test de nivel no estaba conectado al plan de estudio
+
+**Antes:** `LevelTestInProgressScreen` era un flujo visual sin cálculo real. Navegaba a
+`LevelTestResult` sin parámetros reales. No persistía ningún resultado.
+
+**Después:**
+- 20 preguntas únicas (no cicladas) distribuidas en 4 temas: 8 Constitución, 8 Ley 39/2015, 2 Ley 40/2015, 2 Org. del Estado.
+- Cálculo real de puntuación y nivel: `≥75% → Avanzado/high`, `50-74% → Intermedio/medium`, `<50% → Básico/low`.
+- Análisis de fortalezas y debilidades por tema (hit rate ≥50% → fortaleza, <50% → a reforzar).
+- Cronómetro real con `useRef(Date.now())`.
+- Resultado guardado en `LEVEL_TEST_RESULT_KEY = 'opox.levelTestResult'` (AsyncStorage).
+- `LevelTestResultScreen` recibe y muestra los datos reales (porcentaje, aciertos, tiempo, chips de fortalezas/debilidades).
+
+### Bug 3 · El resultado del test no inicializaba la intensidad del plan
+
+**Antes:** El campo `intensity` del plan de estudio siempre arrancaba con el valor por defecto
+y ningún paso del onboarding lo modificaba.
+
+**Después:** `SesionIniciadaScreen` lee `LEVEL_TEST_RESULT_KEY`, extrae `intensity` (`low/medium/high`)
+y llama `planningApi.updatePlan({ intensity })` — reutilizando el endpoint existente `PATCH /planning/plan`.
+No se necesitó ningún endpoint ni tabla nueva en Supabase.
+
+### Flujo completo antes y después
+
+| Paso | Antes | Después |
+|---|---|---|
+| Arranque con sesión guardada | → Dashboard ✓ | → Dashboard ✓ (sin cambios) |
+| Arranque sin sesión, onboarding completado | → Slider → OppositionSelector cada vez | → Login directo (Entrada) |
+| Arranque sin sesión, usuario nuevo | → Slider → OppositionSelector | → Slider → OppositionSelector (igual) |
+| Test de nivel: preguntas | 3 preguntas cicladas (placeholder) | 20 preguntas únicas por tema |
+| Test de nivel: resultado | Pantalla de resultado vacía / valores hardcodeados | Resultado real con score, nivel, fortalezas y debilidades reales |
+| Test de nivel: efecto en el plan | Ninguno | Inicializa `intensity` del plan (`low/medium/high`) vía `PATCH /planning/plan` |
+| "Ahora no" en propuesta de test | `navigate('Permissions')` (puede volver atrás) | `replace('Permissions')` (sin vuelta atrás) |
+| CTA "Crear mi plan" en resultado | `navigate('Permissions')` (puede volver al test) | `replace('Permissions')` (sin vuelta al test) |
+
+### Archivos modificados
+
+- `apps/mobile/src/screens/onboarding/SplashScreen.js` — `ONBOARDING_COMPLETED_KEY`, lógica de `resolveOnboardingEntryRoute()`
+- `apps/mobile/src/screens/onboarding/LevelTestInProgressScreen.js` — reescritura completa: 20 preguntas, cálculo real, `LEVEL_TEST_RESULT_KEY`
+- `apps/mobile/src/screens/onboarding/LevelTestResultScreen.js` — `replace` en CTA
+- `apps/mobile/src/screens/onboarding/LevelTestProposalScreen.js` — `replace` en "Ahora no"
+- `apps/mobile/src/screens/access/SesionIniciadaScreen.js` — `applyLevelTestResult()`, `markOnboardingCompleted()`, `Promise.all` paralelo
+
+---
+
+## 2026-08-20 — Bloque 3 · Salud + GAP Notificaciones
+
+Rama: `feat/bloque-13-notificaciones`.
+
+### Bloque 3 · Salud — Integración real con HealthKit y Health Connect (Opción A)
+
+El bloque estaba 100% mock (datos hardcodeados, animaciones sin lógica real). Se implementó
+la capa de integración completa con las APIs de salud del SO sin necesidad de ejectar a bare workflow:
+
+- **`apps/mobile/src/services/HealthService.js`** (nuevo): abstracción multiplataforma.
+  - iOS: `@kingstinct/react-native-healthkit` con carga lazy (patrón Expo Go).
+  - Android: `react-native-health-connect`.
+  - Lee: HR, FC reposo, HRV, SpO₂, sueño y pasos de las últimas 24 h.
+  - `isHealthAvailable()` — false en Expo Go; require lazy para evitar crash.
+  - `requestHealthPermissions()` — solicita permisos al SO en la plataforma correcta.
+  - `getHealthMetrics()` — retorna las métricas o `null` sin permisos.
+
+- **`PairingScreen.js`**: reemplaza `setTimeout` por flujo real de permisos.
+  Fases: `loading → (SO pide permisos) → complete / denied / unavailable`.
+  Si deniegan: botón "Ir a Ajustes" + "Continuar igualmente".
+  Si Expo Go: pantalla informativa con instrucciones para EAS build.
+
+- **`ConnectDeviceScreen.js`**: eliminado el mock de error de Garmin (id '2').
+  Todos los dispositivos abren el flujo de permisos real.
+
+- **`HomeHealthScreen.js`**: carga métricas reales con `useFocusEffect`.
+  Heurística de energía: `HRV (50%) + sueño (30%) + FC reposo (20%)`.
+  Muestra `—` cuando no hay datos. CTA "Conectar wearable" cuando sin datos.
+  Chip de header muestra "Conectado" (verde) o "Conectar" (primario).
+
+- **`FatigueEngineScreen.js`**: señales dinámicas calculadas desde métricas reales.
+  `buildSignals(metrics)` calcula status (ok/warning/critical/unknown) para cada señal.
+  Nivel de fatiga derivado del conteo de señales activas.
+
+- **`app.json`**: plugins `@kingstinct/react-native-healthkit` y `react-native-health-connect`
+  con `NSHealthShareUsageDescription` (iOS) y permisos `android.permission.health.*`.
+
+- **`package.json`**: dependencias `@kingstinct/react-native-healthkit ^13.0.0` y
+  `react-native-health-connect ^3.1.0` instaladas. EAS build requerido para usar.
+
+### GAP Notificaciones — fix en dos frentes
+
+- **`PermissionsScreen.js`**: el botón "¡A por más!" ahora llama la API real
+  `Notifications.requestPermissionsAsync()` con el mismo patrón de carga lazy que App.js.
+  Si el usuario deniega → `DeniedState` con "Ir a Ajustes" (`Linking.openSettings()`).
+  Texto corregido: antes decía "Sin acceso a Salud", ahora habla de notificaciones.
+
+- **`App.js` `registerForPushNotifications()`**: si `existing === 'denied'`
+  (el usuario ya había denegado antes y el SO no muestra el diálogo),
+  se muestra `Alert.alert()` ofreciendo "Ir a Configuración" → `Linking.openSettings()`.
+
+---
+
+## 2026-08-21 — Bloque 5 · Motivación — Correcciones y mejoras post-testing en dispositivo
+
+Rama: `feat/bloque-13-notificaciones`. Sesión de corrección intensiva tras pruebas
+en dispositivo físico. Se resolvieron 9 bugs de UX/lógica, se cerraron 3 gaps de
+datos reales y se añadió la infraestructura para que los retos de clan sean jugables
+extremo a extremo.
+
+### Gaps de datos cerrados (sesión anterior completada)
+
+- **`challengeCount` real**: `ClanSummaryDTO` y `ClanDetailDTO` ahora incluyen el
+  conteo de retos activos (`expires_at IS NULL OR expires_at > NOW()`). Antes era
+  hardcodeado a 3 en el frontend.
+- **Ranking por tema**: nuevo scope `topic` en `GET /motivation/ranking`. Agrega
+  `training_attempt_responses` por `topic_id` vía `supabaseAdmin` (bypasa RLS).
+  Mobile muestra pills horizontales para seleccionar el tema.
+- **Presencia Supabase en chat**: `ClanChatScreen` muestra "X en línea" usando el
+  canal `clan-presence-{clanId}` con `supabase.channel().on('presence', ...)`.
+
+### Correcciones de bugs (dispositivo físico)
+
+**Bug 1+2 — Wizard de creación de retos**  
+Reemplazado el formulario libre por un wizard 2 pasos:
+- Paso 1: selector de temas cargado desde `trainingApi.listTopics()` (tapping a tema auto-rellena el nombre).
+- Paso 2: nombre editable + steppers para preguntas (5–100, step 5) y Opopoints (10–500, step 10).
+- Fix adicional: `handleTopicSelect(null)` ya no explota al tocar "Sin tema específico".
+
+**Bug 3+6 — "Iniciar" reto conectado al Generador**  
+El botón "Iniciar →" navega a `GeneratorConfigScreen` con `{ challengeId, clanId, topicId, questionCount }`. El generador pre-selecciona tema y cuenta. Al terminar el test, `TrainingResultScreen` llama `motivationApi.completeChallenge` si `percentage >= 60`. Antes, "Iniciar" marcaba el reto como completado sin preguntas y daba 510 puntos incorrectamente.
+
+**Bug 4 — Botón DEV eliminado** de `ChallengesScreen`.
+
+**Bug 5 — `RachaPeligroModal` con 3 acciones**  
+`BaseModal` extendido con `tertiaryLabel`/`onTertiaryPress`. El modal ahora ofrece:
+- "Hacer test rápido" → `GeneratorConfig`
+- "Ver mis tareas" → `PlanningToday`  
+- "En otro momento" → dismiss
+
+**Bug 7 — "Ver tienda"** navega a `StoreHome` (antes era no-op).
+
+**Bug 8 — Pips de racha** derivados de `currentStreak`: últimos N pips en verde desde la derecha, resto en gris (`#DDE1EA`). Sin llamada extra al backend.
+
+**Bug 9 — `useFocusEffect`** en `MotivationHomeScreen`: datos se recargan en cada foco de pantalla.
+
+### `topic_id` en retos de clan
+
+- SQL: `ALTER TABLE public.clan_challenges ADD COLUMN IF NOT EXISTS topic_id text` añadido a `bloque5_motivacion.sql`. Correr en Supabase SQL Editor si la BD es previa a hoy.
+- `ClanChallenge` (entidad), `IMotivationRepository`, `ChallengeUseCases`, `SupabaseMotivationRepository`, `motivationValidators`, `MotivationController` y `packages/types/src/motivation.ts` — todos actualizados.
+- Insert **condicional**: solo incluye `topic_id` si tiene valor para no fallar en BDs sin la migración.
+
+### Racha desde tests
+
+`SaveAttemptUseCase` inyecta `IDashboardRepository` y llama `registerActivity({ points: 0 })` en paralelo con `saveAttempt`. Cualquier test (generador, test rápido de racha, simulacro) ahora registra actividad del día y salva la racha. Antes solo la salvaban las tareas de planificación y los retos de clan.
+
+### Discoverabilidad de clanes
+
+- `MotivationHomeScreen`: tarjeta CTA "Únete a un clan" visible cuando `myClan === null`, con borde naranja y navegación a `ClansList`.
+- Label EXPLORAR: "Mis clanes" → "Ver clanes" cuando sin clan.
+- `ClansListScreen.handleJoin`: tras unirse, si `clan.challengeCount > 0`, navega directo a `Challenges`. Join abierto sin aprobación de líder (decisión deliberada, GAP-05-05 para Fase 2).
+
+### GAPS actualizados
+
+- `GAPS.md` creado con GAP-05-01 a 05-05, GAP-09-01, GAP-10-01, GAP-12-01, GAP-MOTOR-01/02.
+- GAP-05-05 nuevo: clanes privados con aprobación de líder (Fase 2).
+
+---
+
 ## 2026-08-18 — Motor de IA migrado a Render y validado extremo a extremo
 
 El equipo IA cambió el despliegue del Motor de GCP Cloud Run a Render, unificando

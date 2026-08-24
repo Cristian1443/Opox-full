@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Svg, { Path, Circle, G, Rect, Line, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import NudgeModal from '../components/NudgeModal';
 import BoeAlertBanner from '../components/BoeAlertBanner';
 import AlertCardModal from '../components/AlertCardModal';
@@ -470,19 +471,25 @@ export default function DashboardScreen({ navigation }) {
     const [summary, setSummary] = useState(null);
     const [planSummary, setPlanSummary] = useState(null);
     const [realNudgeVisible, setRealNudgeVisible] = useState(false);
+    const nudgeShownRef = useRef(false);
 
-    useEffect(() => {
+    const loadData = useCallback(() => {
         let cancelled = false;
         dashboardApi.getSummary().then(({ data }) => {
             if (cancelled || !data) return;
             setSummary(data);
-            if (data.nextNudge) setRealNudgeVisible(true);
+            if (data.nextNudge && !nudgeShownRef.current) {
+                nudgeShownRef.current = true;
+                setRealNudgeVisible(true);
+            }
         });
         planningApi.getSummary().then(({ data }) => {
             if (!cancelled && data) setPlanSummary(data);
         });
         return () => { cancelled = true; };
     }, []);
+
+    useFocusEffect(loadData);
 
     const displayName = summary?.profile.displayName || 'Opositor';
     const oposicionLine = summary?.profile.oposicion && summary?.profile.especialidad

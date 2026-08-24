@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -75,7 +75,22 @@ export async function registerForPushNotifications() {
       console.log('[push-reg] permission requested → status=', status);
       finalStatus = status;
     }
-    if (finalStatus !== 'granted') { console.warn('[push-reg] abort: permiso denegado por el usuario'); return; }
+    if (finalStatus !== 'granted') {
+      console.warn('[push-reg] abort: permiso denegado por el usuario');
+      // Ofrecer apertura de ajustes solo si el usuario ya denegó antes (no la primera vez,
+      // para no ser intrusivo). Si existing ya era denied, el sistema no mostró el diálogo.
+      if (existing === 'denied') {
+        Alert.alert(
+          'Notificaciones desactivadas',
+          'Para recibir alertas del BOE y recordatorios de racha, actívalas en Configuración del dispositivo.',
+          [
+            { text: 'Ahora no', style: 'cancel' },
+            { text: 'Ir a Configuración', onPress: () => Linking.openSettings() },
+          ],
+        );
+      }
+      return;
+    }
 
     // projectId es OBLIGATORIO en dev builds a partir de SDK 49+
     const projectId =
