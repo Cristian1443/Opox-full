@@ -9,4 +9,5 @@ export { notesApi } from './notes';
 export { boeApi } from './boe';
 export { storeApi } from './store';
 export { settingsApi } from './settings';
+export { pushApi } from './push';
 export { API_BASE_URL } from './config';

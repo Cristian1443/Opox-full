@@ -1,11 +1,11 @@
-import type { IMotivationRepository, Clan, ClanSummary, ClanDetail } from '../../domain';
+import type { IMotivationRepository, ClanSummary, ClanDetail } from '../../domain';
 
 const DEFAULT_LIST_LIMIT = 20;
 
 export class GetMyClanUseCase {
     constructor(private readonly motivationRepo: IMotivationRepository) { }
 
-    execute(userId: string): Promise<Clan | null> {
+    execute(userId: string): Promise<ClanSummary | null> {
         return this.motivationRepo.getMyClan(userId);
     }
 }
@@ -21,7 +21,7 @@ export class ListClansUseCase {
 export class CreateClanUseCase {
     constructor(private readonly motivationRepo: IMotivationRepository) { }
 
-    execute(input: { userId: string; name: string; initials: string; description?: string }): Promise<Clan> {
+    execute(input: { userId: string; name: string; initials: string; description?: string }): ReturnType<IMotivationRepository['createClan']> {
         return this.motivationRepo.createClan(input);
     }
 }

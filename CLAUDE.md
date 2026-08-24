@@ -88,6 +88,47 @@ Contratos en `packages/types/src/contracts/`:
 Flujo de integración: **mobile → nuestro backend → OpenAI**. La API key de IA
 nunca va al móvil; vive en `apps/backend/.env` (`AI_API_KEY`).
 
+### Motivación y Gamificación (Bloque 5) — endpoints propios
+
+Rutas bajo `/motivation/`. Cubre racha, rankings, clanes, retos de clan y Muro de la Gloria.
+
+**Racha y gamificación**:
+- `GET /motivation/summary` — devuelve `{ gamification, myClan }`. Es el endpoint de arranque de `MotivationHomeScreen`.
+- `GET /motivation/streak` — detalle de racha con `recentActivityDates`, `nextMilestone` y `longestStreak`.
+- La racha se actualiza con `registerActivity()` en tres eventos: completar tarea de planificación, completar reto de clan, **y guardar cualquier intento de test** (`SaveAttemptUseCase` llama `registerActivity({ points: 0 })`). Sin este último, "Hacer test rápido" no salvaba la racha.
+
+**Rankings**: `GET /motivation/ranking?scope=weekly|global|oposicion|topic&topicId=xxx`.
+- Scope `topic` agrega `training_attempt_responses.is_correct` por `topic_id` usando `supabaseAdmin` (bypasa RLS cross-user). Requiere `topicId`.
+
+**Clanes**:
+- `clan_challenges` tiene columna `topic_id TEXT` (nullable) añadida en `bloque5_motivacion.sql` (migration: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS topic_id text`). Correr en Supabase SQL Editor si la BD es anterior a 2026-08-21.
+- `ClanChallengeDTO` expone `topicId?: string`. `CreateClanChallengeRequest` acepta `topicId?: string`.
+- El insert de `createClanChallenge` en `SupabaseMotivationRepository` es **condicional**: solo incluye `topic_id` si `input.topicId != null` para no fallar en BDs que aún no corrieron la migración.
+- `ClanSummaryDTO` y `ClanDetailDTO` exponen `challengeCount: number` (retos activos con `expires_at IS NULL OR expires_at > NOW()`).
+- Join abierto (sin aprobación de líder) — decisión deliberada. GAP-05-05 documenta la ruta para clanes privados en Fase 2.
+
+**Flujo de retos de clan (mobile)**:
+1. `ChallengesScreen` wizard 2 pasos: Step 1 = selector de tema (`trainingApi.listTopics()`), Step 2 = nombre + steppers de preguntas (5–100 step 5) y Opopoints (10–500 step 10).
+2. "Iniciar →" navega a `GeneratorConfig` con `{ challengeId, clanId, topicId, questionCount }`.
+3. `GeneratorConfigScreen` acepta `route.params` del reto, pre-selecciona tema y cuenta, pasa `challengeId`/`clanId` a `TrainingSession`.
+4. `QuestionActiveScreen` propaga `challengeId`/`clanId` a `TrainingResult`.
+5. `TrainingResultScreen` llama `motivationApi.completeChallenge(clanId, challengeId)` si `percentage >= 60`.
+
+**Discoverabilidad de clanes (mobile)**:
+- `MotivationHomeScreen` muestra una tarjeta CTA "Únete a un clan" cuando `myClan === null`, navegando a `ClansList`.
+- Tras `joinClan` exitoso: si `clan.challengeCount > 0`, navega directo a `Challenges`.
+- Label EXPLORAR cambia de "Mis clanes" a "Ver clanes" cuando sin clan.
+
+**`RachaPeligroModal`** — 3 botones:
+- Primario: "Hacer test rápido" → `GeneratorConfig`.
+- Secundario: "Ver mis tareas" → `PlanningToday`.
+- Terciario: "En otro momento" → dismiss.
+`BaseModal` extendido con `tertiaryLabel`/`onTertiaryPress`.
+
+**Pips de racha** (`MotivationHomeScreen`): derivados de `currentStreak` sin llamada extra. Los últimos N pips (hasta 14) en verde desde la derecha; el resto en gris (`#DDE1EA`).
+
+**`useFocusEffect`** en `MotivationHomeScreen`: los datos se recargan cada vez que la pantalla recibe foco (volver de Challenges, Rankings, etc.).
+
 ### Tutor IA (Bloque 8) — endpoints propios
 
 El Aula Virtual tiene su propio conjunto de rutas bajo `/tutor/`. La entidad central
@@ -147,7 +188,7 @@ en `AiApiClientStub` hasta que el equipo IA entregue el prompt del
 etc.) distinto del `id` UUID. El mobile y el backend de generación de preguntas
 SIEMPRE usan `topicId`, nunca el UUID, para las llamadas a la IA.
 
-**Motor BOE externo** (`https://ingesta-demo-uadftnwmda-ue.a.run.app`): servicio
+**Motor BOE externo** (`https://ingesta-demo.onrender.com`): servicio
 desplegado para detectar cambios en el BOE oficial. Integrado en:
 - `infrastructure/boe/MotorBoeClient.ts` — cliente HTTP con auth `X-API-Key` +
   `X-OpenAI-Key`. Implementa `MotorBoeContract` (definido en `@opox/types`).
@@ -227,13 +268,89 @@ Mensaje: 1–500 caracteres (validado con Zod y con CHECK en BD).
 **Nota sobre naming**: el cliente mobile se llama `settingsApi` (en `settings.js`)
 porque `config.js` ya está tomado por la utilidad de URL base del cliente HTTP.
 
+### Salud (Bloque 3) — integración con plataformas de salud del SO
+
+Toda la UI del bloque está implementada (14 pantallas). Los datos reales vienen
+de HealthKit (iOS) y Health Connect (Android) a través de `HealthService.js`.
+
+**`apps/mobile/src/services/HealthService.js`** — abstracción multiplataforma:
+- `isHealthAvailable()` — false en Expo Go, false si módulos no cargados.
+- `requestHealthPermissions()` — llama `HealthKit.requestAuthorization` (iOS) o
+  `HealthConnect.requestPermission` (Android). Retorna boolean.
+- `getHealthMetrics()` — lee HR, FC reposo, HRV, SpO₂, sueño y pasos de las últimas 24 h.
+  Retorna `{ heartRate, restingHeartRate, hrv, spo2, sleepHours, steps }` o `null`.
+- Carga lazy (`require()` condicional, NO import) igual que expo-notifications en App.js.
+
+**Paquetes** (en `apps/mobile/package.json`):
+- `@kingstinct/react-native-healthkit ^13.0.0` — iOS HealthKit (Expo config plugin incluido).
+- `react-native-health-connect ^3.1.0` — Android Health Connect (Expo config plugin incluido).
+- Ambos requieren **EAS development build** (no funcionan en Expo Go).
+
+**`app.json` plugins**: `@kingstinct/react-native-healthkit` con `NSHealthShareUsageDescription`
+y `react-native-health-connect` con permisos `android.permission.health.*`.
+
+**Flujo pairing** (`PairingScreen.js`): monta pantalla → llama `requestHealthPermissions()`
+automáticamente. Estados: `loading → complete / denied / unavailable`.
+`denied`: "Ir a Ajustes" (`Linking.openSettings()`) + "Continuar igualmente".
+
+**Datos en HomeHealth** (`HomeHealthScreen.js`): `useFocusEffect` + `getHealthMetrics()`.
+Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.
+
+**Motor de fatiga** (`FatigueEngineScreen.js`): recibe `metrics` vía `route.params`.
+`buildSignals(metrics)` → status `ok/warning/critical/unknown` por señal.
+Nivel: `high` (≥2 críticas), `medium` (1 crítica o ≥2 warning), `low` (resto).
+
+**Permisos de notificaciones** (`PermissionsScreen.js`):
+- "¡A por más!" → `Notifications.requestPermissionsAsync()` real (lazy require).
+- Si denegado: `DeniedState` con texto correcto + "Ir a Ajustes" (`Linking.openSettings()`).
+- `App.js registerForPushNotifications()`: cuando `existing === 'denied'`, muestra
+  `Alert` con "Ir a Configuración" → `Linking.openSettings()` en vez de retornar silencio.
+
+### Notificaciones Push (Bloque 13) — endpoints propios
+
+Infraestructura completa de push notifications en 3 fases. Rutas bajo `/push/`.
+
+Tipos en `packages/types/src/notifications.ts` (`RegisterPushTokenInput`,
+`RegisterPushTokenResponse`, `PushNotificationData` con tipos `boe_alert`,
+`note_ready`, `streak_warning`, `daily_reminder`). SQL en
+`apps/backend/supabase/bloque13_notifications.sql` (tabla `user_push_tokens`
+con UNIQUE por `user_id+device_id`, RLS owner-all). Cliente mobile en
+`apps/mobile/src/api/push.js` exportado como `pushApi`.
+
+**`POST /push/token`**: registra o actualiza el token Expo del dispositivo.
+Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, device_id)`.
+
+**Triggers de notificación push** (backend):
+- `SendBoeAlertUseCase` — broadcast a todos los tokens cuando `SyncBoeChangesUseCase` detecta cambios (> 0 registros nuevos).
+- `SendNoteReadyUseCase` — push dirigido al owner del apunte cuando el pipeline OCR→tags→preguntas termina (`UploadNoteUseCase.onNoteReady`).
+- `SendStreakWarningUseCase` — broadcast diario a las 01:00 UTC (20:00h Colombia, sin DST), disparado por `NotificationScheduler` con cron `0 1 * * *`.
+- `SendDailyGoalCompletedUseCase` — push al usuario cuando `ToggleTaskUseCase` detecta que ha cruzado el umbral `plan.testsPerDay`.
+
+**Mobile — flujo de registro**:
+1. `App.js` — exporta `registerForPushNotifications()` que usa `require('expo-notifications')` lazy (no `import` top-level, para evitar crash en Expo Go SDK 53+). Guard `IS_EXPO_GO = Constants.appOwnership === 'expo'`.
+2. `SesionIniciadaScreen.js` — llama `registerForPushNotifications()` fire-and-forget tras login exitoso, antes de navegar al Dashboard.
+
+**Mobile — visualización**:
+- `InAppNotificationBanner.js` — banner animado, auto-dismiss 4 s, iconos por tipo.
+- Montado en `App.js` con `useState`. `PushNotificationHandler` escucha foreground + tap. En tap navega a `data.screen`.
+- `BoeRealtimeWatcher` en `App.js` — Supabase Realtime `postgres_changes` INSERT en `boe_changes`. Muestra el banner in-app sin latencia cuando el backend inserta un cambio BOE con la app abierta.
+
+**Mobile — Realtime chat de clanes**:
+- `ClanChatScreen.js` migrado de `setInterval(poll, 4000)` a canal Realtime `clan_messages` filtrado por `clan_id`.
+- Fallback automático a polling si `supabase === null` (vars EXPO_PUBLIC_SUPABASE_* no configuradas).
+- Cliente en `apps/mobile/src/lib/supabase.js` (requiere `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY` en `.env`).
+
+**Limitación Expo Go**: push remotos no funcionan en Expo Go SDK 53+. Requiere EAS development build (`eas build --profile development`) para prueba end-to-end de tokens reales.
+
 ### Motor de IA del cliente (DESPLEGADO y activo)
 
 Microservicio RAG del equipo IA, desplegado en producción:
-`https://ingesta-demo-1097036487734.us-east1.run.app`
+`https://ingesta-demo.onrender.com` (migrado desde GCP Cloud Run el 2026-08-18).
 
 Ingesta PDFs de temario y genera tests con evidencia verbatim + página exacta.
-Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b`.
+Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b` — es el
+id del Cloud Run viejo que sigue resolviendo en Render (datos migrados), pero
+está pendiente re-ingestar el temario oficial y actualizar `MOTOR_DEFAULT_CURSO_ID`.
 
 **Integración activa (`CompositeAiClient.ts`):**
 - `generateQuestions` y `generateSurgicalTest` → Motor RAG (async job, ~50-70 s).
@@ -279,5 +396,6 @@ pnpm lint                       # lint completo
 | 10 | Monitor BOE | Frontend + backend completo (feed, detalle, comparativa con diff word-by-word, mini-test con AiApiClientStub, 14 requests / 61 assertions verde). IA real (`generateBoeMiniTest`) esperando entrega del prompt del `BRIEF_IA_BLOQUE10.md` |
 | 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
 | 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
+| 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

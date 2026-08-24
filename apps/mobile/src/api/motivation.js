@@ -5,7 +5,10 @@ import { API_ROUTES } from '@opox/constants';
 export const motivationApi = {
     getSummary: () => api.get(API_ROUTES.MOTIVATION.SUMMARY, { auth: true }),
     getStreak: () => api.get(API_ROUTES.MOTIVATION.STREAK, { auth: true }),
-    getRanking: (scope) => api.get(`${API_ROUTES.MOTIVATION.RANKING}?scope=${scope}`, { auth: true }),
+    getRanking: (scope, topicId) => {
+        const qs = topicId ? `scope=${scope}&topicId=${encodeURIComponent(topicId)}` : `scope=${scope}`;
+        return api.get(`${API_ROUTES.MOTIVATION.RANKING}?${qs}`, { auth: true });
+    },
     markExamPassed: () => api.post(API_ROUTES.MOTIVATION.PROFILE_PASSED, {}, { auth: true }),
 
     getMyClan: () => api.get(API_ROUTES.MOTIVATION.CLAN_MINE, { auth: true }),

@@ -5,7 +5,9 @@ import Svg, { Path } from 'react-native-svg';
 import AvatarPlaceholder from '../../components/AvatarPlaceholder';
 import { motivationApi, api } from '../../api';
 import { colors, spacing } from '../../theme';
+import { supabase } from '../../lib/supabase';
 
+// Usado solo como fallback cuando supabase no está configurado
 const POLL_INTERVAL_MS = 4000;
 
 // Figma (ENVIAR 2336:955): ícono de envío suelto (trazo naranja), sin círculo de
@@ -34,6 +36,7 @@ export default function ClanChatScreen({ navigation, route }) {
     const [draft, setDraft] = useState('');
     const [myUserId, setMyUserId] = useState(null);
     const [clanInfo, setClanInfo] = useState(null);
+    const [onlineCount, setOnlineCount] = useState(null);
     const scrollRef = useRef(null);
     const lastCreatedAtRef = useRef(null);
 
@@ -63,10 +66,41 @@ export default function ClanChatScreen({ navigation, route }) {
     }, [clanId]);
 
     useEffect(() => {
-        poll();
+        poll(); // carga inicial en ambos casos
+
+        if (supabase) {
+            // Realtime: recibir mensajes nuevos en tiempo real sin polling
+            const channel = supabase
+                .channel(`clan-messages-${clanId}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'clan_messages',
+                    filter: `clan_id=eq.${clanId}`,
+                }, (payload) => {
+                    const row = payload.new;
+                    const msg = {
+                        id: row.id,
+                        clanId: row.clan_id,
+                        userId: row.user_id,
+                        body: row.body,
+                        createdAt: row.created_at,
+                    };
+                    setMessages((prev) => {
+                        // evitar duplicados si el propio sender ya añadió el msg
+                        if (prev.some((m) => m.id === msg.id)) return prev;
+                        return [...prev, msg];
+                    });
+                    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+                })
+                .subscribe();
+            return () => { supabase.removeChannel(channel); };
+        }
+
+        // Fallback: polling cada 4 s cuando no hay cliente Supabase
         const id = setInterval(poll, POLL_INTERVAL_MS);
         return () => clearInterval(id);
-    }, [poll]);
+    }, [clanId, poll]);
 
     const handleSend = async () => {
         const body = draft.trim();
@@ -80,13 +114,29 @@ export default function ClanChatScreen({ navigation, route }) {
         }
     };
 
-    // Nota: el diseño de Figma muestra "28 miembros · 3 en línea", pero la API
-    // (ClanDetailDTO) solo expone memberCount total; no hay conteo de miembros
-    // en línea en ningún endpoint de motivación. Se omite ese segmento en vez
-    // de inventar un dato.
-    const caption = clanInfo
+    // Presence: registrar al usuario en línea y escuchar cuántos hay activos.
+    // Solo cuando supabase está configurado y ya tenemos el userId de sesión.
+    useEffect(() => {
+        if (!supabase || !myUserId) return;
+        const presenceChannel = supabase
+            .channel(`clan-presence-${clanId}`, { config: { presence: { key: myUserId } } })
+            .on('presence', { event: 'sync' }, () => {
+                setOnlineCount(Object.keys(presenceChannel.presenceState()).length);
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await presenceChannel.track({ user_id: myUserId });
+                }
+            });
+        return () => { supabase.removeChannel(presenceChannel); };
+    }, [clanId, myUserId]);
+
+    const memberLabel = clanInfo
         ? `${clanInfo.memberCount} ${clanInfo.memberCount === 1 ? 'miembro' : 'miembros'}`
         : null;
+    const caption = onlineCount !== null && memberLabel
+        ? `${memberLabel} · ${onlineCount} en línea`
+        : memberLabel;
 
     return (
         <SafeAreaView style={styles.container}>

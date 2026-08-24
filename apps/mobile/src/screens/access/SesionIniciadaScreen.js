@@ -20,6 +20,7 @@ const FIGMA = {
     cardBorder: 'rgba(65, 41, 80, 0.3)',
     checkGreen: '#3AB375',
 };
+import { registerForPushNotifications } from '../../../App';
 
 export default function SesionIniciadaScreen({ navigation, route }) {
     const { email } = route.params || {};
@@ -38,6 +39,7 @@ export default function SesionIniciadaScreen({ navigation, route }) {
         // TODO: sustituir el timer por la carga real del perfil / token
         const timer = setTimeout(() => {
             applyPendingOposicion().finally(() => {
+                registerForPushNotifications().catch(() => {});
                 navigation.replace('Dashboard', { email });
             });
         }, 2000);

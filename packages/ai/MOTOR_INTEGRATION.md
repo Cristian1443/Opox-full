@@ -14,18 +14,23 @@ Cubre dos capacidades que van MÁS allá de nuestro `AiApiContract` original:
 
 ---
 
-## Estado actual (2026-08-15)
+## Estado actual (2026-08-18)
 
-**DESPLEGADO en producción.**
+**DESPLEGADO en producción — migrado a Render.**
 
-- URL: `https://ingesta-demo-1097036487734.us-east1.run.app`
+- URL: `https://ingesta-demo.onrender.com` (Motor RAG y Motor BOE unificados en el mismo host)
 - Clave de servicio (`X-API-Key`): en `MOTOR_API_KEY` de `.env`
-- Suite de pruebas: `scripts/test_motor_ia.py` — 65/66 PASS
+- Suites de pruebas verdes contra el nuevo host:
+  - `scripts/smoke_motor_directo.js` — 53/53 PASS (directo al Motor, PDF Ley 39/2015 real del BOE)
+  - `scripts/smoke_bloques_0_6_7.js` — 30/30 PASS (backend OPOX vía `CompositeAiClient`)
 
-**Integrado:** `CompositeAiClient` + `MotorAiClient` ya activos en `container.ts`.
-Para desactivar el Motor temporalmente, vaciar `MOTOR_API_BASE_URL` en `.env`.
+**Integrado:** `CompositeAiClient` + `MotorAiClient` activos en `container.ts`. Motor BOE
+en `MotorBoeClient.ts`. Para desactivar el Motor RAG temporalmente, vaciar `MOTOR_API_BASE_URL`
+en `.env`; para el BOE, vaciar `MOTOR_BOE_BASE_URL`.
 
-### Incidencias conocidas (reportadas al equipo IA 2026-08-15)
+### Incidencias conocidas
+
+**Persisten tras la migración a Render (reportadas 2026-08-15, reconfirmadas 2026-08-18):**
 
 - **[INC-01]** `GET /v1/health` devuelve `{"ok":true,"version":"1.0.0"}` en lugar de `{"status":"ok"}`.
   Internamente ya adaptado: comprobar `body.ok === true`, no `body.status`.
@@ -47,6 +52,19 @@ Para desactivar el Motor temporalmente, vaciar `MOTOR_API_BASE_URL` en `.env`.
   1. Devolver `sesionId` junto a las preguntas en `POST /training/generate`.
   2. Nuevo endpoint `POST /training/validate-answer` → reenvía al Motor y retorna `{correct, explanation}`.
   3. Actualizar mobile para no asumir `correctIndex` en el payload de preguntas.
+
+**Nuevas del deploy en Render (2026-08-18):**
+
+- **[INC-05]** `GET /v1/courses/{id}/questions?limit=1000` devuelve `422`. El máximo real
+  parece ser ≤200 pero no está documentado en la colección Postman. Clientes que iteren el
+  banco deben paginar con `limit=200` + `offset`.
+- **[INC-06]** Cold start en Render de ~30 s tras periodos de inactividad (plan free).
+  El `MotorAiClient` tiene timeout de 60 s: el margen es corto. Considerar plan de pago
+  con always-on, o cron-warmer, si Render es la infra definitiva.
+- **[INC-07]** El `curso_id = 1357e871b542425b` del Cloud Run viejo sigue resolviendo en
+  Render. Se confirmó con el equipo IA que **es un id migrado**. Aun así hay que re-ingestar
+  el temario oficial y actualizar `MOTOR_DEFAULT_CURSO_ID` porque el contenido migrado no
+  necesariamente coincide con el temario definitivo.
 
 ---
 
@@ -79,15 +97,20 @@ con pegar la key en `MOTOR_API_KEY` sea cual sea el modo.
 
 ---
 
-## Activación — COMPLETADA (2026-08-15)
+## Activación — MIGRADA A RENDER (2026-08-18)
 
 ### Env vars actuales en `.env`
 
 ```
-MOTOR_API_BASE_URL=https://ingesta-demo-1097036487734.us-east1.run.app
+MOTOR_API_BASE_URL=https://ingesta-demo.onrender.com
 MOTOR_API_KEY=opox-c1U6Ovj-drc-o6pFEWg62-PNpKN6CIEn
 MOTOR_API_TIMEOUT_MS=60000
-MOTOR_DEFAULT_CURSO_ID=1357e871b542425b   # Temario 1 · Bloque 1 (Temas 1-10)
+MOTOR_DEFAULT_CURSO_ID=1357e871b542425b   # id viejo del Cloud Run, migrado a Render (INC-07)
+
+# Motor BOE — mismo host tras consolidación
+MOTOR_BOE_BASE_URL=https://ingesta-demo.onrender.com
+MOTOR_BOE_API_KEY=
+MOTOR_BOE_OPENAI_KEY=sk-...
 ```
 
 ### Arquitectura activa

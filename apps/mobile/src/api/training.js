@@ -44,4 +44,6 @@ export const trainingApi = {
             { reason, details },
             { auth: true },
         ),
+
+    listTopics: () => api.get(API_ROUTES.TRAINING.TOPICS, { auth: true }),
 };

@@ -8,10 +8,19 @@ import {
     ScrollView,
     Modal,
     Linking,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
+import Constants from 'expo-constants';
 import { colors, spacing } from '../../theme';
+
+// Mismo patrón lazy que App.js — expo-notifications rompe en Expo Go SDK 53+
+const IS_EXPO_GO = Constants.appOwnership === 'expo';
+let Notifications = null;
+if (!IS_EXPO_GO) {
+    try { Notifications = require('expo-notifications'); } catch (_) {}
+}
 
 // ─── Iconos SVG exactos del wireframe (34×34, viewBox 0 0 24 24) ─────────────
 // Tamaño real proporcional al Figma: los grupos de ícono ocupan ~70-110px
@@ -294,7 +303,7 @@ function DeniedState({ onContinue }) {
                 <Text style={err.cardTitle}>Función limitada</Text>
 
                 <Text style={err.cardDesc}>
-                    Sin acceso a Salud no podremos avisarte de la fatiga. Actívalo cuando quieras en Ajustes.
+                    Sin notificaciones no podremos avisarte de cambios en el BOE ni de tu racha. Actívalas cuando quieras en Ajustes.
                 </Text>
 
                 <TouchableOpacity
@@ -388,13 +397,32 @@ export default function PermissionsScreen({ navigation }) {
     // Cuando el usuario pulsa "Activar permisos"
     const handleActivate = () => setModalVisible(true);
 
-    // Diálogo nativo: el usuario pulsa "Permitir"
-    const handleAllow = () => {
+    // Botón "¡A por más!" — solicita el permiso real al SO
+    const handleAllow = async () => {
         setModalVisible(false);
-        setStatus('granted');
+
+        if (!Notifications) {
+            // Expo Go o módulo no disponible — simular concedido para no bloquear el onboarding
+            setStatus('granted');
+            return;
+        }
+
+        try {
+            if (Platform.OS === 'android') {
+                await Notifications.setNotificationChannelAsync('default', {
+                    name: 'default',
+                    importance: Notifications.AndroidImportance.MAX,
+                });
+            }
+            const { status } = await Notifications.requestPermissionsAsync();
+            setStatus(status === 'granted' ? 'granted' : 'denied');
+        } catch (_) {
+            // Si falla, no bloquear al usuario
+            setStatus('granted');
+        }
     };
 
-    // Diálogo nativo: el usuario pulsa "No permitir"
+    // Botón "No permitir" — el usuario rechazó la solicitud sin pasar por el diálogo del SO
     const handleDeny = () => {
         setModalVisible(false);
         setStatus('denied');

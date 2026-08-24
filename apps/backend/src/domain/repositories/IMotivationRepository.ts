@@ -1,6 +1,6 @@
 import { Profile, Clan, ClanRole, ClanMessage, ClanChallenge } from '../entities';
 
-export type RankingScope = 'weekly' | 'global' | 'oposicion';
+export type RankingScope = 'weekly' | 'global' | 'oposicion' | 'topic';
 
 export interface RankingEntry {
     userId: string;
@@ -18,6 +18,7 @@ export interface RankingResult {
 export interface ClanSummary {
     clan: Clan;
     memberCount: number;
+    challengeCount: number;
 }
 
 export interface ClanMemberView {
@@ -30,6 +31,7 @@ export interface ClanMemberView {
 export interface ClanDetail {
     clan: Clan;
     memberCount: number;
+    challengeCount: number;
     rankPosition: number | null;
     members: ClanMemberView[];
 }
@@ -51,10 +53,10 @@ export interface IMotivationRepository {
     getRecentActivityDays(userId: string, days: number): Promise<string[]>;
 
     // ─── Rankings ──────────────────────────────────
-    listRanking(input: { userId: string; scope: RankingScope; limit: number }): Promise<RankingResult>;
+    listRanking(input: { userId: string; scope: RankingScope; topicId?: string; limit: number }): Promise<RankingResult>;
 
     // ─── Clanes ────────────────────────────────────
-    getMyClan(userId: string): Promise<Clan | null>;
+    getMyClan(userId: string): Promise<ClanSummary | null>;
     listClans(input: { userId: string; limit: number }): Promise<ClanSummary[]>;
     createClan(input: {
         userId: string;
@@ -84,6 +86,7 @@ export interface IMotivationRepository {
         questionCount: number;
         rewardPoints: number;
         expiresAt?: string | null;
+        topicId?: string | null;
     }): Promise<ChallengeWithProgress>;
     completeChallenge(input: { challengeId: string; userId: string }): Promise<void>;
 

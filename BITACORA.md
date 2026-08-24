@@ -5,6 +5,243 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-20 — Bloque 3 · Salud + GAP Notificaciones
+
+Rama: `feat/bloque-13-notificaciones`.
+
+### Bloque 3 · Salud — Integración real con HealthKit y Health Connect (Opción A)
+
+El bloque estaba 100% mock (datos hardcodeados, animaciones sin lógica real). Se implementó
+la capa de integración completa con las APIs de salud del SO sin necesidad de ejectar a bare workflow:
+
+- **`apps/mobile/src/services/HealthService.js`** (nuevo): abstracción multiplataforma.
+  - iOS: `@kingstinct/react-native-healthkit` con carga lazy (patrón Expo Go).
+  - Android: `react-native-health-connect`.
+  - Lee: HR, FC reposo, HRV, SpO₂, sueño y pasos de las últimas 24 h.
+  - `isHealthAvailable()` — false en Expo Go; require lazy para evitar crash.
+  - `requestHealthPermissions()` — solicita permisos al SO en la plataforma correcta.
+  - `getHealthMetrics()` — retorna las métricas o `null` sin permisos.
+
+- **`PairingScreen.js`**: reemplaza `setTimeout` por flujo real de permisos.
+  Fases: `loading → (SO pide permisos) → complete / denied / unavailable`.
+  Si deniegan: botón "Ir a Ajustes" + "Continuar igualmente".
+  Si Expo Go: pantalla informativa con instrucciones para EAS build.
+
+- **`ConnectDeviceScreen.js`**: eliminado el mock de error de Garmin (id '2').
+  Todos los dispositivos abren el flujo de permisos real.
+
+- **`HomeHealthScreen.js`**: carga métricas reales con `useFocusEffect`.
+  Heurística de energía: `HRV (50%) + sueño (30%) + FC reposo (20%)`.
+  Muestra `—` cuando no hay datos. CTA "Conectar wearable" cuando sin datos.
+  Chip de header muestra "Conectado" (verde) o "Conectar" (primario).
+
+- **`FatigueEngineScreen.js`**: señales dinámicas calculadas desde métricas reales.
+  `buildSignals(metrics)` calcula status (ok/warning/critical/unknown) para cada señal.
+  Nivel de fatiga derivado del conteo de señales activas.
+
+- **`app.json`**: plugins `@kingstinct/react-native-healthkit` y `react-native-health-connect`
+  con `NSHealthShareUsageDescription` (iOS) y permisos `android.permission.health.*`.
+
+- **`package.json`**: dependencias `@kingstinct/react-native-healthkit ^13.0.0` y
+  `react-native-health-connect ^3.1.0` instaladas. EAS build requerido para usar.
+
+### GAP Notificaciones — fix en dos frentes
+
+- **`PermissionsScreen.js`**: el botón "¡A por más!" ahora llama la API real
+  `Notifications.requestPermissionsAsync()` con el mismo patrón de carga lazy que App.js.
+  Si el usuario deniega → `DeniedState` con "Ir a Ajustes" (`Linking.openSettings()`).
+  Texto corregido: antes decía "Sin acceso a Salud", ahora habla de notificaciones.
+
+- **`App.js` `registerForPushNotifications()`**: si `existing === 'denied'`
+  (el usuario ya había denegado antes y el SO no muestra el diálogo),
+  se muestra `Alert.alert()` ofreciendo "Ir a Configuración" → `Linking.openSettings()`.
+
+---
+
+## 2026-08-21 — Bloque 5 · Motivación — Correcciones y mejoras post-testing en dispositivo
+
+Rama: `feat/bloque-13-notificaciones`. Sesión de corrección intensiva tras pruebas
+en dispositivo físico. Se resolvieron 9 bugs de UX/lógica, se cerraron 3 gaps de
+datos reales y se añadió la infraestructura para que los retos de clan sean jugables
+extremo a extremo.
+
+### Gaps de datos cerrados (sesión anterior completada)
+
+- **`challengeCount` real**: `ClanSummaryDTO` y `ClanDetailDTO` ahora incluyen el
+  conteo de retos activos (`expires_at IS NULL OR expires_at > NOW()`). Antes era
+  hardcodeado a 3 en el frontend.
+- **Ranking por tema**: nuevo scope `topic` en `GET /motivation/ranking`. Agrega
+  `training_attempt_responses` por `topic_id` vía `supabaseAdmin` (bypasa RLS).
+  Mobile muestra pills horizontales para seleccionar el tema.
+- **Presencia Supabase en chat**: `ClanChatScreen` muestra "X en línea" usando el
+  canal `clan-presence-{clanId}` con `supabase.channel().on('presence', ...)`.
+
+### Correcciones de bugs (dispositivo físico)
+
+**Bug 1+2 — Wizard de creación de retos**  
+Reemplazado el formulario libre por un wizard 2 pasos:
+- Paso 1: selector de temas cargado desde `trainingApi.listTopics()` (tapping a tema auto-rellena el nombre).
+- Paso 2: nombre editable + steppers para preguntas (5–100, step 5) y Opopoints (10–500, step 10).
+- Fix adicional: `handleTopicSelect(null)` ya no explota al tocar "Sin tema específico".
+
+**Bug 3+6 — "Iniciar" reto conectado al Generador**  
+El botón "Iniciar →" navega a `GeneratorConfigScreen` con `{ challengeId, clanId, topicId, questionCount }`. El generador pre-selecciona tema y cuenta. Al terminar el test, `TrainingResultScreen` llama `motivationApi.completeChallenge` si `percentage >= 60`. Antes, "Iniciar" marcaba el reto como completado sin preguntas y daba 510 puntos incorrectamente.
+
+**Bug 4 — Botón DEV eliminado** de `ChallengesScreen`.
+
+**Bug 5 — `RachaPeligroModal` con 3 acciones**  
+`BaseModal` extendido con `tertiaryLabel`/`onTertiaryPress`. El modal ahora ofrece:
+- "Hacer test rápido" → `GeneratorConfig`
+- "Ver mis tareas" → `PlanningToday`  
+- "En otro momento" → dismiss
+
+**Bug 7 — "Ver tienda"** navega a `StoreHome` (antes era no-op).
+
+**Bug 8 — Pips de racha** derivados de `currentStreak`: últimos N pips en verde desde la derecha, resto en gris (`#DDE1EA`). Sin llamada extra al backend.
+
+**Bug 9 — `useFocusEffect`** en `MotivationHomeScreen`: datos se recargan en cada foco de pantalla.
+
+### `topic_id` en retos de clan
+
+- SQL: `ALTER TABLE public.clan_challenges ADD COLUMN IF NOT EXISTS topic_id text` añadido a `bloque5_motivacion.sql`. Correr en Supabase SQL Editor si la BD es previa a hoy.
+- `ClanChallenge` (entidad), `IMotivationRepository`, `ChallengeUseCases`, `SupabaseMotivationRepository`, `motivationValidators`, `MotivationController` y `packages/types/src/motivation.ts` — todos actualizados.
+- Insert **condicional**: solo incluye `topic_id` si tiene valor para no fallar en BDs sin la migración.
+
+### Racha desde tests
+
+`SaveAttemptUseCase` inyecta `IDashboardRepository` y llama `registerActivity({ points: 0 })` en paralelo con `saveAttempt`. Cualquier test (generador, test rápido de racha, simulacro) ahora registra actividad del día y salva la racha. Antes solo la salvaban las tareas de planificación y los retos de clan.
+
+### Discoverabilidad de clanes
+
+- `MotivationHomeScreen`: tarjeta CTA "Únete a un clan" visible cuando `myClan === null`, con borde naranja y navegación a `ClansList`.
+- Label EXPLORAR: "Mis clanes" → "Ver clanes" cuando sin clan.
+- `ClansListScreen.handleJoin`: tras unirse, si `clan.challengeCount > 0`, navega directo a `Challenges`. Join abierto sin aprobación de líder (decisión deliberada, GAP-05-05 para Fase 2).
+
+### GAPS actualizados
+
+- `GAPS.md` creado con GAP-05-01 a 05-05, GAP-09-01, GAP-10-01, GAP-12-01, GAP-MOTOR-01/02.
+- GAP-05-05 nuevo: clanes privados con aprobación de líder (Fase 2).
+
+---
+
+## 2026-08-18 — Motor de IA migrado a Render y validado extremo a extremo
+
+El equipo IA cambió el despliegue del Motor de GCP Cloud Run a Render, unificando
+Motor RAG y Motor BOE bajo un único host: `https://ingesta-demo.onrender.com`.
+Esta sesión actualiza la configuración, ejecuta la batería completa de la
+`Guia_Pruebas_Bloques_0_6_7.pdf` contra el host nuevo y deja verde toda la
+integración.
+
+### Cambios de infra
+
+- `.env` — `MOTOR_API_BASE_URL` y `MOTOR_BOE_BASE_URL` apuntan al host nuevo.
+- `.env.example` — bloque `MOTOR_*` reescrito con la URL nueva y añadido bloque `MOTOR_BOE_*`.
+- Referencias en `CLAUDE.md`, `packages/ai/MOTOR_INTEGRATION.md`,
+  `packages/ai/BRIEF_IA_BLOQUE10.md`, `MotorAiClient.ts`, `MotorBoeClient.ts`
+  y `scripts/test_motor_ia.py` — todas actualizadas.
+- `MOTOR_DEFAULT_CURSO_ID = 1357e871b542425b` — mantenido; el equipo IA
+  confirmó que es un id migrado que sigue resolviendo. Marcado como TODO porque
+  el temario oficial hay que re-ingestarlo para producción.
+
+### Pruebas ejecutadas contra el Motor nuevo
+
+- `scripts/smoke_motor_directo.js` (nuevo) — sigue paso a paso el PDF de la guía:
+  salud, ingesta de PDF (BOE Ley 39/2015 descargado a `scripts/tmp/temario_real.pdf`),
+  árbol, RAG search, generate, respuesta y resultado (Bloque 6); placement-test,
+  responder todas, finish, idempotencia (Bloque 0); modes/surgical, 3 pistas útiles
+  con reglas (≤300 chars, no letra, no copia opción), 4ª pista → 429, reference (Bloque 7).
+  **Resultado: 53/53 PASS en 65.8 s.**
+- `scripts/smoke_bloques_0_6_7.js` — el smoke E2E del backend ya existente contra
+  el Motor nuevo tras reiniciar el backend para releer `.env`. **Resultado: 30/30 PASS.**
+
+### Incidencias con el Motor nuevo (documentadas en `MOTOR_INTEGRATION.md`)
+
+- **INC-01/02/03/04** — persisten desde el deploy anterior (esperado, no bloqueante).
+  El workaround INC-04 (enriquecer preguntas via `/v1/courses/{id}/questions`) sigue vivo
+  en `MotorAiClient.ts` y ha sido validado en las pruebas.
+- **INC-05** (nueva) — el banco rechaza `?limit=1000` con 422. Máximo ≤200.
+- **INC-06** (nueva) — cold start Render ~30 s tras inactividad; el timeout del cliente (60 s) queda con poco margen.
+- **INC-07** (nueva) — `curso_id` migrado del Cloud Run resuelve en Render (confirmado por el equipo IA).
+
+### Pendiente
+
+- Re-ingestar el temario oficial completo en el Motor nuevo y actualizar `MOTOR_DEFAULT_CURSO_ID`.
+- Evaluar si Render free-plan es viable para producción o si conviene upgrade (cold start).
+
+---
+
+## 2026-08-17 — Bloque 13 · Notificaciones Push completo (3 fases)
+
+Rama de trabajo: `feat/bloque-13-notificaciones` (creada desde `feat/bloque-12`).
+Se cierra el Bloque 13 íntegro: infraestructura push, 3 triggers de backend,
+banner in-app, Supabase Realtime para chat de clanes y alertas BOE en vivo.
+
+### Fase 1 — Infraestructura base
+
+**SQL**: `apps/backend/supabase/bloque13_notifications.sql`:
+- `user_push_tokens` — `(id, user_id FK→auth.users CASCADE, token text, platform CHECK('ios','android'), device_id, created_at, updated_at)`.
+  UNIQUE por `(user_id, device_id)`, RLS owner-all, índice en `user_id`.
+
+**Contratos y tipos** (`packages/`):
+- `packages/types/src/notifications.ts` — `RegisterPushTokenInput`, `RegisterPushTokenResponse`, `PushNotificationData` con tipos: `boe_alert`, `note_ready`, `streak_warning`, `daily_reminder`.
+- `packages/constants/src/routes.js` — ruta `PUSH.REGISTER_TOKEN = '/push/token'`.
+
+**Domain** (`apps/backend/src/domain/`):
+- Entidad: `PushToken` + `UpsertPushTokenInput`.
+- Interfaz: `IPushRepository` — `upsertToken`, `getTokensByUser`, `getAllTokens`, `deleteToken`.
+- Error: `PushTokenInvalidError` (code: `notifications/invalid-token`, 400).
+
+**Application** (`apps/backend/src/application/notifications/NotificationUseCases.ts`):
+- `RegisterPushTokenUseCase` — valida formato `ExponentPushToken[...]`, llama `repo.upsertToken`.
+- `SendBoeAlertUseCase` — broadcast a todos los tokens cuando BOE sincroniza cambios.
+- `SendNoteReadyUseCase` — push dirigido al usuario propietario del apunte analizado.
+- `SendStreakWarningUseCase` — broadcast a las 01:00 UTC (20:00 Colombia).
+
+**Infrastructure**:
+- `SupabasePushRepository.ts` — upsert con `onConflict: 'user_id,device_id'`.
+- `ExpoPushService.ts` — batch de 100 msg por POST a `https://exp.host/--/api/v2/push/send`.
+- `NotificationScheduler.ts` — cron `0 1 * * * UTC` (20:00h Colombia sin DST).
+
+**Presentation**:
+- `PushTokenController.ts` + `pushTokenRoutes.ts` — `POST /push/token` autenticado.
+- `pushTokenValidators.ts` — Zod valida token, platform, deviceId.
+
+**Wiring**:
+- `container.ts`: use cases de notificaciones construidos como consts separados (antes de `useCases`) para evitar referencias circulares. `SyncBoeChangesUseCase` y `UploadNoteUseCase` reciben callbacks `onChanges` / `onNoteReady` que lanzan las notificaciones.
+- `server.ts`: monta `/push/token` y arranca `NotificationScheduler`.
+
+**Mobile** (`apps/mobile/`):
+- `src/api/push.js` — `pushApi.registerToken(token, platform, deviceId)`.
+- `App.js` — `registerForPushNotifications()` exportada. Usa `require()` lazy condicional (no `import` top-level) para evitar crash en Expo Go SDK 53+ donde el módulo `expo-notifications` lanza error al inicializarse.
+- `SesionIniciadaScreen.js` — llama `registerForPushNotifications()` fire-and-forget tras login, antes de navegar al Dashboard.
+- `InAppNotificationBanner.js` — banner animado (spring enter + fade exit), auto-dismiss 4 s, iconos por tipo de notificación.
+
+**Limitación Expo Go**: `IS_EXPO_GO = Constants.appOwnership === 'expo'`. Cuando es `true`, `registerForPushNotifications()` retorna inmediatamente sin registrar ningún token. Requiere EAS development build para prueba end-to-end.
+
+### Fase 2 — Hábito y retención
+
+- `SendDailyGoalCompletedUseCase` — push dirigido al usuario cuando completa todas sus tareas del día. Trigger: `ToggleTaskUseCase` al cruzar el umbral `plan.testsPerDay`.
+- `ToggleTaskUseCase` acepta callback opcional `onGoalCompleted?: (userId) => Promise<void>`. Se pasa desde `container.ts` sin romper el contrato público del use case.
+- `InAppNotificationBanner` montado en `App.js` con `useState(null)`. `PushNotificationHandler` escucha `addNotificationReceivedListener` (foreground) y `addNotificationResponseReceivedListener` (tap). Al llegar una notificación con la app abierta: muestra el banner; al tocar: navega a `data.screen`.
+
+### Fase 3 — Supabase Realtime
+
+**Dependencia nueva**: `@supabase/supabase-js` instalada en `apps/mobile`.
+
+- `apps/mobile/src/lib/supabase.js` — crea cliente Supabase con `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Si las vars no están, `supabase = null` y los consumidores hacen fallback.
+- `apps/mobile/.env.example` — documenta las dos vars EXPO_PUBLIC_SUPABASE_*.
+- `ClanChatScreen.js` — migrado de `setInterval(poll, 4000)` a canal Realtime `postgres_changes` INSERT en `clan_messages` filtrado por `clan_id`. Fallback automático a polling cuando `supabase === null`.
+- `BoeRealtimeWatcher` en `App.js` — suscripción a `boe_changes` INSERT. Cuando el backend inserta un cambio BOE, muestra el banner in-app sin necesidad de push externo (la app está abierta).
+
+### Pendientes conocidos del Bloque 13
+
+- **EAS development build**: prueba end-to-end de token Expo + push real. Expo Go (SDK 53+) no soporta push remotos.
+- **`EXPO_PUBLIC_SUPABASE_*` en `.env`**: añadir las vars al `.env` del mobile para activar Realtime. Los valores son los mismos que `SUPABASE_URL` / `SUPABASE_ANON_KEY` del backend.
+- **Filtrado por usuario en `SendStreakWarningUseCase`**: actualmente broadcast a todos los tokens; en Fase 4 filtrar solo usuarios sin actividad ese día (consultar `user_gamification.last_activity_at`).
+- **`POST /config/pro-stats/export` PDF**: stub devuelve 202 + `downloadUrl: null`. Implementar con pdfkit/puppeteer (marcador `TODO(bloque-12)`).
+
+---
+
 ## 2026-08-17 — Bloque 12 · Configuración completo de punta a punta
 
 Rama de trabajo: `feat/bloque-11` (continuada). Se cierra el Bloque 12 íntegro:
@@ -280,7 +517,6 @@ Cubre: balance, listado + filtro de productos, detalle, canje (código generado,
 saldo actualizado), cartera (lista + detalle), descuentos, tests comunidad (listar,
 filtrar gratis, publicar, detalle, obtener), y 6 casos de error
 (401, 404×2, 409, 400 Zod, 422 saldo insuficiente).
-
 ---
 
 ## 2026-08-07 (cont.) — Motor BOE integrado + mejoras UX Generador Infinito

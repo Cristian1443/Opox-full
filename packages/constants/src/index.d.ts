@@ -92,6 +92,17 @@ declare const API_ROUTES: {
         readonly GENERATE_TEST: string;
     };
 
+    readonly CONFIG: {
+        readonly PREFERENCES: string;
+        readonly PRO_STATS: string;
+        readonly PRO_STATS_EXPORT: string;
+        readonly FEEDBACK: string;
+    };
+
+    readonly PUSH: {
+        readonly REGISTER_TOKEN: string;
+    };
+
     readonly STORE: {
         readonly BALANCE: string;
         readonly PRODUCTS: string;
@@ -103,13 +114,6 @@ declare const API_ROUTES: {
         readonly COMMUNITY_TESTS: string;
         readonly COMMUNITY_TEST: string;
         readonly COMMUNITY_TEST_PURCHASE: string;
-    };
-
-    readonly CONFIG: {
-        readonly PREFERENCES: string;
-        readonly PRO_STATS: string;
-        readonly PRO_STATS_EXPORT: string;
-        readonly FEEDBACK: string;
     };
 
     readonly MOTIVATION: {

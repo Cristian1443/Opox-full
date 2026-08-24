@@ -12,54 +12,64 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
-// Las 5 señales del motor de fatiga (mock — cuando entre la IA, esto viene del backend)
-const SIGNALS = [
-    {
-        id: 1,
-        title: 'HRV por debajo de tu base',
-        subtitle: 'Señal principal',
-        value: '42 / 50',
-        status: 'critical',
-        icon: 'pulse',
-        description: 'Tu variabilidad cardíaca está muy por debajo de tu media habitual.',
-    },
-    {
-        id: 2,
-        title: 'Frecuencia cardíaca en reposo elevada',
-        subtitle: 'Cuerpo no recuperado',
-        value: '+6 ppm',
-        status: 'warning',
-        icon: 'heart',
-        description: 'Tu corazón late más rápido de lo normal en reposo.',
-    },
-    {
-        id: 3,
-        title: 'Estrés sostenido en la sesión',
-        subtitle: 'Alto',
-        value: 'Nivel 4/5',
-        status: 'critical',
-        icon: 'flame',
-        description: 'Has mantenido un nivel de actividad mental alta por mucho tiempo.',
-    },
-    {
-        id: 4,
-        title: 'Energía corporal',
-        subtitle: 'Batería disponible',
-        value: 'OK',
-        status: 'ok',
-        icon: 'battery-full',
-        description: 'Tu nivel de energía física sigue siendo alto.',
-    },
-    {
-        id: 5,
-        title: 'Sueño la noche anterior',
-        subtitle: 'Recuperación',
-        value: '7h',
-        status: 'ok',
-        icon: 'moon',
-        description: 'Dormiste la cantidad recomendada.',
-    },
-];
+// Construye las señales del motor según las métricas reales recibidas por params.
+// Cuando no hay datos usa valores de referencia y marca status 'unknown'.
+function buildSignals(metrics) {
+    const hrv = metrics?.hrv;
+    const restHr = metrics?.restingHeartRate;
+    const sleep = metrics?.sleepHours;
+
+    const HRV_BASE = 50;
+    const HR_BASE = 61;
+
+    return [
+        {
+            id: 1,
+            title: 'HRV por debajo de tu base',
+            subtitle: 'Señal principal',
+            value: hrv != null ? `${hrv} / ${HRV_BASE} ms` : 'Sin datos',
+            status: hrv == null ? 'unknown' : hrv < HRV_BASE * 0.8 ? 'critical' : hrv < HRV_BASE ? 'warning' : 'ok',
+            icon: 'pulse',
+            description: 'Tu variabilidad cardíaca está muy por debajo de tu media habitual.',
+        },
+        {
+            id: 2,
+            title: 'Frecuencia cardíaca en reposo',
+            subtitle: 'Recuperación cardiovascular',
+            value: restHr != null ? `${restHr > HR_BASE ? '+' : ''}${restHr - HR_BASE} ppm` : 'Sin datos',
+            status: restHr == null ? 'unknown' : restHr > HR_BASE + 6 ? 'critical' : restHr > HR_BASE ? 'warning' : 'ok',
+            icon: 'heart',
+            description: 'Tu corazón late más rápido de lo normal en reposo. Señal de que el cuerpo aún no se recuperó.',
+        },
+        {
+            id: 3,
+            title: 'Nivel de estrés estimado',
+            subtitle: 'Basado en HRV',
+            value: hrv == null ? 'Sin datos' : hrv < 40 ? 'Alto' : hrv < 55 ? 'Medio' : 'Bajo',
+            status: hrv == null ? 'unknown' : hrv < 40 ? 'critical' : hrv < 55 ? 'warning' : 'ok',
+            icon: 'flame',
+            description: 'El estrés estimado se calcula a partir de la variabilidad cardíaca. HRV baja = estrés alto.',
+        },
+        {
+            id: 4,
+            title: 'Saturación de oxígeno',
+            subtitle: 'Rendimiento aeróbico',
+            value: metrics?.spo2 != null ? `${metrics.spo2}%` : 'Sin datos',
+            status: metrics?.spo2 == null ? 'unknown' : metrics.spo2 >= 95 ? 'ok' : 'warning',
+            icon: 'water',
+            description: 'Un SpO₂ ≥95% indica que tu sangre transporta suficiente oxígeno para el rendimiento cognitivo.',
+        },
+        {
+            id: 5,
+            title: 'Sueño la noche anterior',
+            subtitle: 'Recuperación',
+            value: sleep != null ? `${sleep}h` : 'Sin datos',
+            status: sleep == null ? 'unknown' : sleep >= 7 ? 'ok' : sleep >= 5.5 ? 'warning' : 'critical',
+            icon: 'moon',
+            description: 'Dormir menos de 7 h reduce la capacidad de recuperación y el rendimiento cognitivo del día siguiente.',
+        },
+    ];
+}
 
 const getStatusColor = (status) => {
     switch (status) {
@@ -75,13 +85,19 @@ const getStatusIcon = (status) => {
         case 'critical': return 'alert-circle';
         case 'warning': return 'alert';
         case 'ok': return 'checkmark-circle';
-        default: return 'help-circle';
+        default: return 'help-circle-outline';
     }
 };
 
-export default function FatigueEngineScreen({ navigation }) {
-    const fatigueLevel = 'high'; // mock: 'low' | 'medium' | 'high'
-    const activeSignalsCount = 3;
+export default function FatigueEngineScreen({ navigation, route }) {
+    // HomeHealthScreen pasa las métricas reales como parámetro de navegación
+    const metrics = route?.params?.metrics ?? null;
+    const SIGNALS = buildSignals(metrics);
+
+    const criticalCount = SIGNALS.filter((s) => s.status === 'critical').length;
+    const warningCount = SIGNALS.filter((s) => s.status === 'warning').length;
+    const activeSignalsCount = criticalCount + warningCount;
+    const fatigueLevel = criticalCount >= 2 ? 'high' : criticalCount === 1 || warningCount >= 2 ? 'medium' : 'low';
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -89,25 +105,32 @@ export default function FatigueEngineScreen({ navigation }) {
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 {/* Tarjeta principal: estado de fatiga */}
-                <View style={[styles.fatigueCard, fatigueLevel === 'high' && styles.fatigueCardHigh]}>
+                <View style={[
+                    styles.fatigueCard,
+                    fatigueLevel === 'high' && styles.fatigueCardHigh,
+                    fatigueLevel === 'medium' && styles.fatigueCardMedium,
+                ]}>
                     <View style={styles.fatigueHeader}>
                         <Ionicons
-                            name={fatigueLevel === 'high' ? 'alert-circle' : 'checkmark-circle'}
+                            name={fatigueLevel === 'high' ? 'alert-circle' : fatigueLevel === 'medium' ? 'alert' : 'checkmark-circle'}
                             size={40}
-                            color={fatigueLevel === 'high' ? colors.error : colors.success}
+                            color={fatigueLevel === 'high' ? colors.error : fatigueLevel === 'medium' ? colors.warning : colors.success}
                         />
                         <Text
                             style={[
                                 styles.fatigueTitle,
                                 fatigueLevel === 'high' && { color: colors.error },
+                                fatigueLevel === 'medium' && { color: colors.warning },
                             ]}
                         >
-                            {fatigueLevel === 'high' ? 'Fatiga alta detectada' : 'Fatiga baja'}
+                            {fatigueLevel === 'high' ? 'Fatiga alta detectada' : fatigueLevel === 'medium' ? 'Fatiga moderada' : 'Fatiga baja'}
                         </Text>
                     </View>
 
                     <Text style={styles.fatigueSubtitle}>
-                        {activeSignalsCount} de 5 señales activadas
+                        {metrics
+                            ? `${activeSignalsCount} de 5 señales activadas`
+                            : 'Conecta un wearable para datos reales'}
                     </Text>
 
                     <Text style={styles.explanation}>
@@ -185,6 +208,10 @@ const styles = StyleSheet.create({
     fatigueCardHigh: {
         borderColor: colors.error,
         backgroundColor: colors.errorBg,
+    },
+    fatigueCardMedium: {
+        borderColor: colors.warning,
+        backgroundColor: colors.warning + '12',
     },
     fatigueHeader: {
         flexDirection: 'row',

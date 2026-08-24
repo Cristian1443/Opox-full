@@ -68,6 +68,7 @@ export class UploadNoteUseCase {
     constructor(
         private readonly repo: INotesRepository,
         private readonly ai: AiApiContract,
+        private readonly onNoteReady?: (userId: string, noteId: string, questionsCount: number, title: string) => Promise<void>,
     ) {}
 
     async execute(params: {
@@ -98,11 +99,15 @@ export class UploadNoteUseCase {
 
         // Arrancamos el pipeline en background — no bloqueamos la respuesta.
         // En una versión con colas esto pasaría a un job worker (BullMQ, etc.).
-        void runAnalysisPipeline({ note, files: params.files, oposicion: params.oposicion }, this.repo, this.ai)
-            .catch(() => {
-                // El pipeline persiste sus propios errores en updateStatus,
-                // así que un throw aquí solo lo tragamos para no matar el proceso.
-            });
+        void runAnalysisPipeline(
+            { note, files: params.files, oposicion: params.oposicion },
+            this.repo,
+            this.ai,
+            this.onNoteReady,
+        ).catch(() => {
+            // El pipeline persiste sus propios errores en updateStatus,
+            // así que un throw aquí solo lo tragamos para no matar el proceso.
+        });
 
         return { noteId: note.id, status: 'processing_ocr' };
     }
@@ -218,6 +223,7 @@ async function runAnalysisPipeline(
     },
     repo: INotesRepository,
     ai: AiApiContract,
+    onReady?: (userId: string, noteId: string, questionsCount: number, title: string) => Promise<void>,
 ): Promise<void> {
     const { note, files, oposicion } = ctx;
     try {
@@ -276,6 +282,12 @@ async function runAnalysisPipeline(
             progress: 100,
             questionsCount: questionsRes.questions.length,
         });
+
+        // Notificación push al propietario del apunte
+        if (onReady) {
+            await onReady(note.userId, note.id, questionsRes.questions.length, note.title)
+                .catch(() => { /* no interrumpir el pipeline si falla el push */ });
+        }
     } catch (err) {
         const message = err instanceof Error ? err.message : 'error desconocido';
         await repo.updateStatus(note.id, note.userId, {

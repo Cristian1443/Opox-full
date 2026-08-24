@@ -109,6 +109,17 @@ export const API_ROUTES = {
         GENERATE_TEST:     '/notes/:id/generate-test',
     },
 
+    CONFIG: {
+        PREFERENCES:       '/config/preferences',
+        PRO_STATS:         '/config/pro-stats',
+        PRO_STATS_EXPORT:  '/config/pro-stats/export',
+        FEEDBACK:          '/config/feedback',
+    },
+
+    PUSH: {
+        REGISTER_TOKEN: '/push/token',
+    },
+
     STORE: {
         BALANCE:                '/store/balance',
         PRODUCTS:               '/store/products',
@@ -120,13 +131,6 @@ export const API_ROUTES = {
         COMMUNITY_TESTS:        '/store/community-tests',
         COMMUNITY_TEST:         '/store/community-tests/:id',
         COMMUNITY_TEST_PURCHASE:'/store/community-tests/:id/purchase',
-    },
-
-    CONFIG: {
-        PREFERENCES:       '/config/preferences',
-        PRO_STATS:         '/config/pro-stats',
-        PRO_STATS_EXPORT:  '/config/pro-stats/export',
-        FEEDBACK:          '/config/feedback',
     },
 
     MOTIVATION: {

@@ -25,6 +25,7 @@ export class CreateClanChallengeUseCase {
         questionCount: number;
         rewardPoints: number;
         expiresAt?: string;
+        topicId?: string;
     }): Promise<ChallengeWithProgress> {
         return this.motivationRepo.createClanChallenge(input);
     }
