@@ -289,7 +289,7 @@ export default function PlanningTodayScreen({ navigation }) {
                                         >
                                             <View style={[styles.topicRadio, selectedTopicId === topic.topicId && styles.topicRadioOn]} />
                                             <Text style={[styles.topicName, selectedTopicId === topic.topicId && styles.topicNameOn]}>
-                                                {topic.name}
+                                                {topic.label}
                                             </Text>
                                         </TouchableOpacity>
                                     ))}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,6 +8,10 @@ import NudgeModal from '../../components/NudgeModal';
 import { planningApi } from '../../api';
 
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+// Variable de módulo: las alertas de planificación se muestran solo una vez
+// por sesión de app, sin importar cuántas veces el usuario entre/salga del hub.
+let _alertsShownThisSession = false;
 
 function IconGear() {
     return (
@@ -54,15 +58,14 @@ function DayCircle({ weekday, status }) {
 export default function PlanningHomeScreen({ navigation }) {
     const [summary, setSummary] = useState(null);
     const [alert, setAlert] = useState(null); // 'skipped' | 'examSoon' | null
-    const alertShownRef = useRef(false);
 
     const load = useCallback(() => {
         let cancelled = false;
         planningApi.getSummary().then(({ data }) => {
             if (cancelled || !data) return;
             setSummary(data);
-            if (!alertShownRef.current) {
-                alertShownRef.current = true;
+            if (!_alertsShownThisSession) {
+                _alertsShownThisSession = true;
                 if (data.alerts.examSoonDays !== null) setAlert('examSoon');
                 else if (data.alerts.daysSinceLastActivity !== null && data.alerts.daysSinceLastActivity >= 3) setAlert('skipped');
             }
