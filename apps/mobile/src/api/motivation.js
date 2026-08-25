@@ -1,6 +1,8 @@
 import { api } from './client';
 import { API_ROUTES } from '@opox/constants';
 
+const localDate = () => new Date().toLocaleDateString('sv');
+
 /** Wrappers del bloque 5 · Motivación y Gamificación. */
 export const motivationApi = {
     getSummary: () => api.get(API_ROUTES.MOTIVATION.SUMMARY, { auth: true }),
@@ -31,7 +33,7 @@ export const motivationApi = {
     completeChallenge: (clanId, challengeId) =>
         api.post(
             API_ROUTES.MOTIVATION.CLAN_CHALLENGE_COMPLETE.replace(':id', clanId).replace(':challengeId', challengeId),
-            {},
+            { localDate: localDate() },
             { auth: true },
         ),
 

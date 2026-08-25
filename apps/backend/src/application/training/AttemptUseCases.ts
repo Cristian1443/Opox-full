@@ -9,6 +9,8 @@ export interface SaveAttemptInput2 {
     topicId?: string;
     difficulty?: TrainingDifficulty;
     durationSecs?: number;
+    /** Fecha local del dispositivo (YYYY-MM-DD) — evita desfase de racha en TZ no-UTC. */
+    localDate?: string;
     responses: Array<{
         questionId?: string;
         topicId: string;
@@ -64,6 +66,7 @@ export class SaveAttemptUseCase {
                 userId: input.userId,
                 reason: 'training_attempt',
                 points: 0,
+                localDate: input.localDate,
             }),
         ]);
 

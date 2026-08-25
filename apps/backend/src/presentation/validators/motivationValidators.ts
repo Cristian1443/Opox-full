@@ -29,3 +29,7 @@ export const createClanChallengeSchema = z.object({
     expiresAt: z.string().datetime().optional(),
     topicId: z.string().min(1).max(80).optional(),
 });
+
+export const completeChallengeSchema = z.object({
+    localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});

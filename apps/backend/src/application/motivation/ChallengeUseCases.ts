@@ -47,7 +47,7 @@ export class CompleteChallengeUseCase {
         private readonly dashboardRepo: IDashboardRepository,
     ) { }
 
-    async execute(input: { userId: string; clanId: string; challengeId: string }): Promise<CompleteChallengeResult> {
+    async execute(input: { userId: string; clanId: string; challengeId: string; localDate?: string }): Promise<CompleteChallengeResult> {
         const challenges = await this.motivationRepo.listClanChallenges({
             userId: input.userId,
             clanId: input.clanId,
@@ -69,6 +69,7 @@ export class CompleteChallengeUseCase {
             userId: input.userId,
             reason: 'clan_challenge_completed',
             points: target.challenge.rewardPoints,
+            localDate: input.localDate,
         });
 
         return { gamification, alreadyCompleted: false };
