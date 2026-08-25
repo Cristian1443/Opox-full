@@ -361,11 +361,6 @@ const generatedQuestionSchema = z.object({
     articleRef: z.string().optional(),
 });
 
-const questionsResponseSchema = z.union([
-    z.array(generatedQuestionSchema),
-    z.object({ questions: z.array(generatedQuestionSchema) }),
-]);
-
 const photoResponseSchema = z.object({
     concept: z.string().min(1).max(120),
     question: z.string().min(1),

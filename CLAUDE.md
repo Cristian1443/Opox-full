@@ -421,44 +421,45 @@ Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, devic
 
 **Limitación Expo Go**: push remotos no funcionan en Expo Go SDK 53+. Requiere EAS development build (`eas build --profile development`) para prueba end-to-end de tokens reales.
 
-### Motor de IA del cliente (DESACTIVADO temporalmente por INC-04)
+### Motor de IA del cliente (ACTIVO — INC-04 aún pendiente)
 
 Microservicio RAG del equipo IA en `https://ingesta-demo.onrender.com`.
-**Estado actual (2026-08-25): desactivado en `.env`** (`MOTOR_API_BASE_URL` vacío).
-El generador infinito y el test quirúrgico usan OpenAI directo hasta que el
-equipo IA arregle INC-04.
+**Estado actual (2026-08-25): activo en `.env`** (`MOTOR_API_BASE_URL` configurado).
+Con el Motor activo, `CompositeAiClient` lo intenta primero y cae a OpenAI directo
+cuando el Motor falla por INC-04. El usuario no ve error pero espera ~67s en lugar de ~10s.
 
-**Por qué está desactivado**: el workaround INC-04 (cargar el banco pre-ingestado
-para cruzar `correcta_idx` por id) NO funciona porque el Motor genera preguntas
-nuevas con LLM en cada request (`origen: "generada"`). Ninguno de los IDs del
-job result coincide con el banco → todas las preguntas caían con `correctIndex = 0`
-(primera opción marcada como correcta). Bug crítico de correctitud, invisible
-para el usuario.
+**INC-04 confirmado pendiente (2026-08-25)**: diagnóstico ejecutado contra el Motor real
+(`scripts/diagnostico_motor.js`). El job result sigue sin incluir `correcta_idx`:
+campos reales del job = `[id, enunciado, opciones, dificultad, tema_id, origen, ref_legislativa]`.
+El equipo de IA probó `/v1/courses/{id}/questions` (el banco), que SÍ tiene `correcta_idx`,
+pero los IDs del banco y del LLM son distintos → el workaround por id-cruce nunca funciona.
 
-**Fixes defensivos aplicados (siguen valiendo cuando se reactive)**:
-- `MotorAiClient.ensureQuestionBank` — paginado con `limit=200` (antes 1000 → 422).
-- `MotorAiClient.generateQuestions` — descarta preguntas sin `correcta_idx` conocido
-  en vez de mandarlas al mobile con respuesta falsa. Si quedan 0, lanza.
-- `CompositeAiClient.generateQuestions` / `generateSurgicalTest` — envueltos en
-  try/catch con fallback automático a OpenAI. Aunque el Motor vuelva a fallar,
-  el usuario no verá error.
-- Timeouts: `pollTimeoutMs` 120 → 240 s; mobile `TTL_KILL_MS` 60 → 240 s;
-  log `[motor-ai] job en progreso` cada 15 s con `elapsedMs`.
+**Comportamiento actual con Motor activo**:
+1. Motor lanza job → polling ~57s → fail-fast (todas `origen="generada"` sin correcta_idx)
+2. `CompositeAiClient` captura → OpenAI directo ~10s
+Total: ~67s vs ~10s sin Motor. Si la latencia es inaceptable, vaciar `MOTOR_API_BASE_URL`.
 
-**Para reactivar**: rellenar `MOTOR_API_BASE_URL` en `apps/backend/.env`.
-El código está listo — solo depende de que el equipo IA cierre INC-04.
+**Fixes defensivos activos**:
+- `MotorAiClient.generateQuestions` — fail-fast si todas las preguntas son `origen="generada"`
+  sin `correcta_idx` (no carga el banco en vano). Cuando alguna tenga `correcta_idx` en el
+  job, la usa directamente sin consultar el banco (preparado para Opción A de INC-04).
+- `MotorPreguntaJob` — tipado con `correcta_idx?` y `explicacion?` opcionales. Cuando el
+  equipo IA los añada al job result, el cliente los usará automáticamente.
+- `CompositeAiClient.generateQuestions` / `generateSurgicalTest` — try/catch con fallback
+  automático a OpenAI. El usuario nunca ve error.
+- `MotorAiClient.ensureQuestionBank` — paginado con `limit=200`.
+- Timeouts: `pollTimeoutMs` 240 s; mobile `TTL_KILL_MS` 240 s.
 
-**[INC-04] Bloqueante del Motor**: el job result no expone `correcta_idx`. Las
-preguntas se generan con LLM (no del banco), así que el workaround por id-cruce
-no aplica. Opciones para el equipo IA:
+**[INC-04] Bloqueante del Motor**: el job result no expone `correcta_idx`. Opciones para el equipo IA:
 - **A** (recomendada): incluir `correcta_idx` + `explicacion` en el payload de
-  cada pregunta del job result.
+  cada pregunta del job result. El cliente ya está listo para recibirlos.
 - **B**: implementar `POST /v1/tests/{sesion_id}/answer` que valida respuesta a
   respuesta (requiere refactor del flujo mobile).
 
 Ver `packages/ai/MOTOR_INTEGRATION.md` para el detalle histórico.
 
 **Smoke test E2E:** `scripts/smoke_bloques_0_6_7.js` — 30/30 PASS (bloques 0, 6 y 7).
+**Diagnóstico Motor:** `scripts/diagnostico_motor.js` — verifica correcta_idx en job result.
 
 ---
 

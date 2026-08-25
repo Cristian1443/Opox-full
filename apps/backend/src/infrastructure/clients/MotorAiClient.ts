@@ -40,7 +40,12 @@ export interface MotorAiConfig {
 
 // ─── Tipos internos del Motor ─────────────────────────────────────────────────
 
-/** Schema real del Motor en /v1/tests/generate (job resultado). Sin correcta_idx. */
+/**
+ * Schema del Motor en /v1/tests/generate (job resultado).
+ * correcta_idx y explicacion son opcionales — presentes cuando INC-04 esté resuelto.
+ * origen: "generada" indica que el Motor generó la pregunta con LLM (no del banco),
+ * lo que significa que el ID no existirá en /v1/courses/{id}/questions.
+ */
 interface MotorPreguntaJob {
     id: string;
     enunciado: string;
@@ -49,6 +54,10 @@ interface MotorPreguntaJob {
     tema_id: string;
     origen?: string;
     ref_legislativa?: string;
+    // INC-04: el equipo IA añadirá estos campos al job result.
+    // Ya tipados aquí para usarlos directamente cuando estén disponibles.
+    correcta_idx?: number;
+    explicacion?: string;
 }
 
 /**
@@ -181,9 +190,6 @@ export class MotorAiClient implements AiApiContract {
 
         const data = res.data as Record<string, unknown>;
 
-        // Pre-cargar el banco de preguntas para enriquecer con correcta_idx
-        await this.ensureQuestionBank();
-
         let preguntas: MotorPreguntaJob[];
         if (res.status === 200) {
             // Respuesta síncrona desde caché
@@ -194,13 +200,38 @@ export class MotorAiClient implements AiApiContract {
             preguntas = await this.pollJobForPreguntas(jobId);
         }
 
-        // INC-04: el job result no incluye correcta_idx. El único modo de conocerlo
-        // hoy es cruzar por id contra el banco pre-ingestado. Si una pregunta no está
-        // en el banco (p. ej. origen="generada"), NO podemos calificarla y hay que
-        // descartarla — mandarla al mobile con correctIndex=0 corrompería estadísticas.
+        // Caso A (INC-04 resuelto): el job ya incluye correcta_idx en todas las preguntas.
+        // Caso B (INC-04 pendiente): las preguntas son origen="generada" sin correcta_idx.
+        //   → Fail-fast si NINGUNA tiene correcta_idx (evita cargar el banco en vano).
+        const todasGeneradasSinIdx = preguntas.every(
+            (p) => p.origen === 'generada' && typeof p.correcta_idx !== 'number',
+        );
+        if (todasGeneradasSinIdx && preguntas.length > 0) {
+            throw new Error(
+                '[MotorAiClient] todas las preguntas son origen="generada" sin correcta_idx (INC-04). ' +
+                'CompositeAiClient debe hacer fallback a OpenAI.',
+            );
+        }
+
+        // Separar las que ya traen correcta_idx en el job de las que necesitan el banco.
+        const conIdx = preguntas.filter((p) => typeof p.correcta_idx === 'number');
+        const sinIdx = preguntas.filter((p) => typeof p.correcta_idx !== 'number');
+
+        // Cargar el banco solo si hay preguntas sin correcta_idx que puedan estar en él.
+        if (sinIdx.length > 0) {
+            await this.ensureQuestionBank();
+        }
+
         const mapped: GeneratedQuestion[] = [];
         let droppedNoAnswer = 0;
-        for (const p of preguntas) {
+
+        // Preguntas que ya traen correcta_idx: mapear directamente.
+        for (const p of conIdx) {
+            mapped.push(this.mapPregunta(p, p as unknown as MotorPreguntaFull));
+        }
+
+        // Preguntas sin correcta_idx: buscar en banco por id (workaround INC-04).
+        for (const p of sinIdx) {
             const full = this.questionBankCache.get(p.id);
             if (!full || typeof full.correcta_idx !== 'number') {
                 droppedNoAnswer++;
@@ -219,8 +250,7 @@ export class MotorAiClient implements AiApiContract {
 
         if (mapped.length === 0) {
             throw new Error(
-                '[MotorAiClient] el Motor devolvió 0 preguntas con correcta_idx conocido. ' +
-                'Probablemente todas fueron generadas por LLM (INC-04). ' +
+                '[MotorAiClient] el Motor devolvió 0 preguntas con correcta_idx conocido (INC-04). ' +
                 'CompositeAiClient debe hacer fallback a OpenAI.',
             );
         }
@@ -371,14 +401,15 @@ export class MotorAiClient implements AiApiContract {
     }
 
     private mapPregunta(p: MotorPreguntaJob, full: MotorPreguntaFull): GeneratedQuestion {
-        // full.correcta_idx viene garantizado del banco — el filtro de generateQuestions
-        // ya descartó cualquier pregunta sin correcta_idx conocido (INC-04).
+        // p.correcta_idx toma precedencia cuando el job ya lo incluye (INC-04 resuelto).
+        // En caso contrario se usa full.correcta_idx del banco (workaround INC-04).
+        const correcta_idx = typeof p.correcta_idx === 'number' ? p.correcta_idx : full.correcta_idx;
         return {
             id: p.id,
             text: p.enunciado,
             options: p.opciones as [string, string, string, string],
-            correctIndex: full.correcta_idx as 0 | 1 | 2 | 3,
-            explanation: full.explicacion ?? '',
+            correctIndex: correcta_idx as 0 | 1 | 2 | 3,
+            explanation: p.explicacion ?? full.explicacion ?? '',
             topicId: p.tema_id,
             topic: p.tema_id,
             difficulty: DIFF_FROM_MOTOR[p.dificultad] ?? 'medium',

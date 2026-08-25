@@ -5,6 +5,59 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-25 — Diagnóstico Motor de IA + mejoras MotorAiClient
+
+Rama: `feat/revision-bloque-0`. El equipo de IA reportó que el endpoint de generación
+ya devuelve `correcta_idx`. Se activó `MOTOR_API_BASE_URL` en `.env` y se ejecutó un
+diagnóstico exhaustivo contra el Motor real.
+
+### Resultado del diagnóstico (`scripts/diagnostico_motor.js`)
+
+- Motor activo en `https://ingesta-demo.onrender.com` (cold start ~31s, Render free tier).
+- **INC-04 sigue sin resolver**: las preguntas del job result (`/v1/tests/generate` →
+  `/v1/jobs/{id}`) tienen `origen: "generada"` y NO incluyen `correcta_idx`.
+  Los campos del job son: `[id, enunciado, opciones, dificultad, tema_id, origen, ref_legislativa]`.
+- El equipo de IA probablemente testeó `/v1/courses/{id}/questions` (el banco), que SÍ
+  tiene `correcta_idx`. Pero esos IDs son del banco pre-ingestado, distintos a los
+  generados por LLM en el job.
+- El banco de preguntas sigue accesible y funciona correctamente.
+
+### Mejoras en `MotorAiClient.ts`
+
+**Fail-fast para INC-04**: cuando todas las preguntas del job son `origen="generada"`
+sin `correcta_idx`, el cliente lanza error inmediatamente sin intentar cargar el banco
+(que nunca tendrá esos IDs de LLM). Ahorra los ~164ms de carga del banco inútil.
+
+**Compatibilidad anticipada INC-04**: `MotorPreguntaJob` ahora incluye `correcta_idx?`
+y `explicacion?` opcionales. `mapPregunta()` usa `p.correcta_idx` del job result con
+prioridad sobre `full.correcta_idx` del banco. Cuando el equipo IA añada el campo al
+job, el cliente lo usará automáticamente sin más cambios.
+
+**Fix TS pre-existente**: `questionsResponseSchema` en `AiApiClient.ts` estaba
+declarada pero nunca usada (artefacto del Fix 4 de ayer). Eliminada.
+
+### Impacto en UX actual (Motor activo + INC-04 pendiente)
+
+Con el Motor activo, el flujo del Generador Infinito es:
+1. Motor lanza job (~387ms para 202)
+2. Polling hasta done (~57s para 3 preguntas)
+3. Fail-fast: todas "generada" sin correcta_idx → error inmediato
+4. `CompositeAiClient` captura → fallback a OpenAI (~10s)
+Total: ~67s por solicitud
+
+Sin el Motor (`MOTOR_API_BASE_URL` vacío): OpenAI directo ~10s.
+
+El blindaje `CompositeAiClient` garantiza que el usuario no ve error, pero sí espera
+más tiempo mientras el Motor esté activo con INC-04 pendiente.
+
+### Estado Motor
+
+Motor **activo** en `.env`. Si INC-04 tarda, considerar desactivar temporalmente para
+recuperar los ~57s de latencia. Para reactivar: ya solo hace falta que el equipo IA
+añada `correcta_idx` + `explicacion` al payload del job result — el cliente está listo.
+
+---
+
 ## 2026-08-25 — Sesión de fixes · Generador, racha y zona horaria
 
 Rama: `feat/revision-bloque-0` (extendida más allá del alcance original de Bloque 0).
