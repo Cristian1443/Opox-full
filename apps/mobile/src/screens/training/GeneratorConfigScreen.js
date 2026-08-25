@@ -163,8 +163,8 @@ function FatigueToggle({ value, onValueChange }) {
     );
 }
 
-const TTL_WARN_MS  = 15_000;
-const TTL_KILL_MS  = 60_000;
+const TTL_WARN_MS  = 30_000;
+const TTL_KILL_MS  = 240_000;
 
 // ─── Pantalla 6.2 · Generador infinito ───────────────────────────────────────
 export default function GeneratorConfigScreen({ navigation, route }) {
@@ -174,6 +174,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
         clanId: challengeClanId = null,
         topicId: challengeTopicId = null,
         questionCount: challengeQuestionCount = null,
+        taskId = null,
     } = route?.params ?? {};
 
     const isChallengeMode = !!challengeId;
@@ -324,6 +325,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                 oposicion,
                 ...(challengeId && { challengeId }),
                 ...(challengeClanId && { clanId: challengeClanId }),
+                ...(taskId && { taskId }),
             });
         } catch {
             clearTimeout(warnTimerRef.current);
