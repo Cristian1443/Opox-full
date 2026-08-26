@@ -1,19 +1,25 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
     Animated,
-    Dimensions,
-    StatusBar,
-    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { tutorApi } from '../../api';
+
+// Colores confirmados contra Figma (pop-up MAZO COMPLETADO, Bloque 8) sin
+// equivalente exacto en theme.js. Mismo patrón de overlay + tarjeta que el
+// resto de pop-ups de la app.
+const FIGMA = {
+    overlay: '#000000',
+    cardBorder: 'rgba(65,41,80,0.3)',
+};
 
 // ─── Mock — se sustituirá por las tarjetas del backend ───────────────────────
 const MOCK_CARDS = [
@@ -35,97 +41,71 @@ const MOCK_CARDS = [
     },
 ];
 
-const { width, height } = Dimensions.get('window');
-const CARD_HEIGHT = height * 0.48;
-const PURPLE = colors.purple;
+const CARD_WIDTH = 342.7;
+const CARD_HEIGHT = 493.8;
 
-// ─── 8.5 · ok — Pantalla de resultado del mazo ───────────────────────────────
-function DeckCompleted({ knownCount, failedCards, total, onReviewFailed, onClose }) {
-    const scaleAnim = useRef(new Animated.Value(0.5)).current;
-    const opacityAnim = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        Animated.parallel([
-            Animated.spring(scaleAnim, {
-                toValue: 1,
-                tension: 50,
-                friction: 7,
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacityAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-        ]).start();
-    }, []);
-
-    const unknownCount = failedCards.length;
-    const hasFailed = unknownCount > 0;
-
+function CheckBadgeIcon({ width = 107, height = 70, color = colors.ctaGreen }) {
     return (
-        <View style={styles.doneOuter}>
-            <Animated.View
-                style={[
-                    styles.doneContent,
-                    { opacity: opacityAnim, transform: [{ scale: scaleAnim }] },
-                ]}
-            >
-                {/* Trofeo */}
-                <View style={styles.trophyWrap}>
-                    <Ionicons name="trophy" size={64} color={colors.warning} />
-                    <View style={styles.trophyRing} />
+        <Svg width={width} height={height} viewBox="0 0 107 70">
+            <Path d="M4 36L38 66L103 4" stroke={color} strokeWidth={16} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function FlipIcon({ size = 18, color = colors.textDark }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path
+                d="M4 12C4 7.58 7.58 4 12 4C15 4 17.6 5.7 19 8.2M20 12C20 16.42 16.42 20 12 20C9 20 6.4 18.3 5 15.8"
+                stroke={color}
+                strokeWidth={2}
+                fill="none"
+                strokeLinecap="round"
+            />
+            <Path d="M19 4V8.2H14.8" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M5 20V15.8H9.2" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+// ─── Pop-up · Mazo completado (mismo patrón overlay + tarjeta que el resto
+// de pop-ups de la app). El backend ya reprioriza las tarjetas falladas
+// para el próximo repaso vía tutorApi.submitReview — por eso Figma no
+// pide un botón de "repasar falladas ahora": el mensaje ya lo comunica.
+function DeckCompleted({ knownCount, failedCount, onEmpezarTest, onVolverAlAula }) {
+    const totalCount = knownCount + failedCount;
+    return (
+        <View style={styles.doneOverlay}>
+            <View style={styles.doneCard}>
+                <View style={styles.doneIconWrap}>
+                    <CheckBadgeIcon />
                 </View>
 
                 <Text style={styles.doneTitle}>¡Mazo repasado!</Text>
 
-                {/* Stats */}
-                <View style={styles.statsBox}>
-                    <View style={styles.statCell}>
-                        <Text style={[styles.statNum, { color: colors.success }]}>{knownCount}</Text>
-                        <Text style={styles.statLabel}>SABÍAS</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statCell}>
-                        <Text style={[styles.statNum, { color: colors.error }]}>{unknownCount}</Text>
-                        <Text style={[styles.statLabel, { color: colors.error }]}>FALLASTE</Text>
-                    </View>
-                </View>
+                <Text style={styles.doneSubtitle}>
+                    Sabías {knownCount} de {totalCount}.
+                    {failedCount > 0 ? ` Las ${failedCount} que fallaste volverán antes en el próximo repaso.` : ''}
+                </Text>
 
-                {hasFailed && (
-                    <Text style={styles.doneMsg}>
-                        Las{' '}
-                        <Text style={{ fontWeight: '800', color: colors.error }}>
-                            {unknownCount}
-                        </Text>{' '}
-                        que fallaste volverán antes en el próximo repaso.
-                    </Text>
-                )}
+                <TouchableOpacity
+                    style={styles.primaryButton}
+                    onPress={onEmpezarTest}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Empezar test"
+                >
+                    <Text style={styles.primaryButtonText}>Empezar test</Text>
+                </TouchableOpacity>
 
-                {/* Botones */}
-                <View style={styles.doneBtns}>
-                    {hasFailed && (
-                        <TouchableOpacity
-                            style={styles.primaryDoneBtn}
-                            onPress={onReviewFailed}
-                            activeOpacity={0.85}
-                            accessibilityLabel="Repasar las tarjetas falladas"
-                        >
-                            <Ionicons name="refresh-circle" size={22} color="#fff" />
-                            <Text style={styles.primaryDoneBtnText}>Repasar las falladas</Text>
-                        </TouchableOpacity>
-                    )}
-
-                    <TouchableOpacity
-                        style={styles.secondaryDoneBtn}
-                        onPress={onClose}
-                        activeOpacity={0.7}
-                        accessibilityLabel="Volver al aula"
-                    >
-                        <Text style={styles.secondaryDoneBtnText}>Volver al aula</Text>
-                    </TouchableOpacity>
-                </View>
-            </Animated.View>
+                <TouchableOpacity
+                    style={styles.doneSecondaryButton}
+                    onPress={onVolverAlAula}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Volver al aula"
+                >
+                    <Text style={styles.doneSecondaryButtonText}>Volver al aula</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }
@@ -134,9 +114,10 @@ function DeckCompleted({ knownCount, failedCards, total, onReviewFailed, onClose
 export default function TutorFlashcardsScreen({ navigation, route }) {
     const initialCards = route?.params?.cards ?? MOCK_CARDS;
     const deckId       = route?.params?.deckId ?? null;
+    const topicId      = route?.params?.topicId ?? null;
     const insets = useSafeAreaInsets();
 
-    const [cards, setCards] = useState(initialCards);
+    const [cards] = useState(initialCards);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [knownCount, setKnownCount] = useState(0);
@@ -188,7 +169,6 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
                 setIsFlipped(false);
                 spinAnim.setValue(0);
             } else {
-                // Calcula totales finales con el estado actual + esta tarjeta
                 const finalKnown     = knownCount + (knew ? 1 : 0);
                 const finalFailed    = failedCards.length + (knew ? 0 : 1);
                 const finalFailedIds = (knew ? failedCards : [...failedCards, currentCard])
@@ -206,72 +186,38 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
         [currentIndex, cards, spinAnim, knownCount, failedCards, deckId]
     );
 
-    const handleReviewFailed = useCallback(() => {
-        setCards(failedCards);
-        setCurrentIndex(0);
-        setIsFlipped(false);
-        setKnownCount(0);
-        setFailedCards([]);
-        setIsDone(false);
-        spinAnim.setValue(0);
-    }, [failedCards, spinAnim]);
-
     if (isDone) {
         return (
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-                <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
                 <DeckCompleted
                     knownCount={knownCount}
-                    failedCards={failedCards}
-                    total={cards.length}
-                    onReviewFailed={handleReviewFailed}
-                    onClose={() => navigation.navigate('AITutor')}
+                    failedCount={failedCards.length}
+                    onEmpezarTest={() => (
+                        topicId
+                            ? navigation.navigate('GeneratorConfig', { topicId, questionCount: 20 })
+                            : navigation.navigate('AITutor')
+                    )}
+                    onVolverAlAula={() => navigation.navigate('AITutor')}
                 />
             </SafeAreaView>
         );
     }
 
     const card = cards[currentIndex];
-    const progressPct = ((currentIndex + 1) / cards.length) * 100;
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={styles.iconBtn}
-                    accessibilityLabel="Cerrar"
+                    accessibilityLabel="Volver"
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    <Ionicons name="close" size={22} color={colors.dark} />
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
-
-                <View style={styles.progressBlock}>
-                    <Text style={styles.progressLabel}>
-                        {currentIndex + 1} / {cards.length}
-                    </Text>
-                    <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
-                    </View>
-                </View>
-
-                <TouchableOpacity
-                    style={styles.iconBtn}
-                    accessibilityLabel="Ayuda"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={() =>
-                        Alert.alert(
-                            '¿Cómo funciona el repaso?',
-                            '• "La sabía" → la tarjeta aparecerá menos veces en el próximo repaso.\n\n• "No la sabía" → la tarjeta vuelve antes para reforzar el aprendizaje.\n\nEl sistema ajusta automáticamente la frecuencia según tu rendimiento.',
-                            [{ text: 'Entendido' }]
-                        )
-                    }
-                >
-                    <Ionicons name="help-circle-outline" size={22} color={colors.dark} />
-                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Flashcards</Text>
+                <View style={styles.iconBtn} />
             </View>
 
             {/* Área de tarjeta — toca en cualquier punto para girar */}
@@ -281,7 +227,6 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
                 activeOpacity={1}
                 accessibilityLabel={isFlipped ? 'Girar al frente' : 'Ver respuesta'}
             >
-                {/* Cara frontal */}
                 <Animated.View
                     pointerEvents="none"
                     style={[
@@ -295,61 +240,58 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
                     <Text style={styles.cardLabel}>PREGUNTA</Text>
                     <Text style={styles.cardText}>{card.question}</Text>
                     <View style={styles.flipHint}>
+                        <FlipIcon />
                         <Text style={styles.flipHintText}>Toca para girar</Text>
-                        <Ionicons name="swap-horizontal" size={18} color={colors.textSecondary} />
                     </View>
                 </Animated.View>
 
-                {/* Cara trasera */}
                 <Animated.View
                     pointerEvents="none"
                     style={[
                         styles.card,
-                        styles.cardBack,
                         {
                             opacity: backOpacity,
                             transform: [{ perspective: 1000 }, { rotateY: backRotateY }],
                         },
                     ]}
                 >
-                    <Text style={[styles.cardLabel, { color: PURPLE }]}>RESPUESTA</Text>
+                    <Text style={styles.cardLabel}>RESPUESTA</Text>
                     <Text style={styles.cardText}>{card.answer}</Text>
                 </Animated.View>
             </TouchableOpacity>
 
-            {/* Zona inferior */}
-            <View style={[styles.bottomZone, { paddingBottom: spacing.lg + insets.bottom }]}>
+            {/* Zona inferior — Figma solo confirma los 2 botones de autoevaluación;
+                el CTA "Ver respuesta" previo al flip no está en el frame pero es
+                necesario (no se puede autoevaluar sin ver antes la respuesta). */}
+            <View style={[styles.bottomZone, { paddingBottom: spacing.md + insets.bottom }]}>
                 {isFlipped ? (
                     <View style={styles.actionRow}>
                         <TouchableOpacity
-                            style={[styles.actionBtn, styles.actionWrong]}
+                            style={styles.secondaryButton}
                             onPress={() => handleAnswer(false)}
-                            activeOpacity={0.82}
+                            activeOpacity={0.7}
                             accessibilityLabel="No la sabía"
                         >
-                            <Ionicons name="close-circle" size={22} color="#fff" />
-                            <Text style={styles.actionBtnText}>No la sabía</Text>
+                            <Text style={styles.secondaryButtonText}>No la sabía</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.actionBtn, styles.actionCorrect]}
+                            style={styles.primaryButton}
                             onPress={() => handleAnswer(true)}
-                            activeOpacity={0.82}
+                            activeOpacity={0.85}
                             accessibilityLabel="La sabía"
                         >
-                            <Ionicons name="checkmark-circle" size={22} color="#fff" />
-                            <Text style={styles.actionBtnText}>La sabía</Text>
+                            <Text style={styles.primaryButtonText}>La sabía</Text>
                         </TouchableOpacity>
                     </View>
                 ) : (
                     <TouchableOpacity
-                        style={styles.flipBtn}
+                        style={styles.revealButton}
                         onPress={handleFlip}
                         activeOpacity={0.85}
                         accessibilityLabel="Ver respuesta"
                     >
-                        <Text style={styles.flipBtnText}>Ver respuesta</Text>
-                        <Ionicons name="chevron-down" size={22} color="#fff" />
+                        <Text style={styles.revealButtonText}>Ver respuesta</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -361,10 +303,9 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
 
-    // ── Header ────────────────────────────────────────────────────────────────
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -372,88 +313,60 @@ const styles = StyleSheet.create({
         paddingTop: spacing.sm,
         paddingBottom: spacing.md,
     },
-    iconBtn: {
-        width: 36,
-        height: 36,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    progressBlock: {
+    iconBtn: { width: 32, padding: 4 },
+    headerTitle: {
         flex: 1,
-        marginHorizontal: spacing.md,
-        alignItems: 'center',
-    },
-    progressLabel: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: colors.textSecondary,
-        marginBottom: 5,
-    },
-    progressTrack: {
-        height: 5,
-        backgroundColor: colors.separator,
-        borderRadius: 3,
-        overflow: 'hidden',
-        alignSelf: 'stretch',
-    },
-    progressFill: {
-        height: '100%',
-        backgroundColor: PURPLE,
-        borderRadius: 3,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
     },
 
     // ── Tarjeta ───────────────────────────────────────────────────────────────
     cardArea: {
         flex: 1,
-        marginHorizontal: spacing.md,
         alignItems: 'center',
         justifyContent: 'center',
     },
     card: {
         position: 'absolute',
-        width: width - spacing.md * 2,
+        width: CARD_WIDTH,
         height: CARD_HEIGHT,
-        backgroundColor: colors.card,
-        borderRadius: 22,
+        backgroundColor: colors.white,
+        borderRadius: 15.1,
         paddingHorizontal: spacing.xl,
         paddingVertical: spacing.xl,
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 18,
-        elevation: 8,
-    },
-    cardBack: {
-        backgroundColor: colors.purpleBg,
-        borderWidth: 2,
-        borderColor: PURPLE + '40',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 4,
     },
     cardLabel: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: colors.textSecondary,
-        letterSpacing: 1.2,
-        marginBottom: spacing.lg,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 16,
+        color: colors.purple,
+        marginBottom: spacing.md,
     },
     cardText: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 23.1,
+        color: colors.textDark,
         textAlign: 'center',
         lineHeight: 29,
     },
     flipHint: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
         marginTop: spacing.xl,
     },
     flipHintText: {
-        color: colors.textSecondary,
-        fontSize: 13,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Light',
+        fontSize: 16,
+        color: colors.textDark,
     },
 
     // ── Zona inferior ─────────────────────────────────────────────────────────
@@ -463,150 +376,100 @@ const styles = StyleSheet.create({
     },
     actionRow: {
         flexDirection: 'row',
-        gap: spacing.sm,
+        justifyContent: 'space-between',
     },
-    actionBtn: {
-        flex: 1,
-        flexDirection: 'row',
+    secondaryButton: {
+        width: 167,
+        height: 61,
+        borderRadius: 14.2,
+        borderWidth: 0.44,
+        borderColor: colors.textDark,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 15,
-        borderRadius: 16,
     },
-    actionWrong: { backgroundColor: colors.error },
-    actionCorrect: { backgroundColor: colors.success },
-    actionBtnText: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '700',
-    },
-    flipBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        backgroundColor: PURPLE,
-        paddingVertical: 16,
-        borderRadius: 16,
-        shadowColor: PURPLE,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    flipBtnText: {
-        color: '#fff',
+    secondaryButtonText: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
-        fontWeight: '700',
+        color: colors.textDark,
+    },
+    primaryButton: {
+        width: 167,
+        height: 61,
+        borderRadius: 14.2,
+        backgroundColor: colors.ctaGreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    primaryButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.white,
+    },
+    revealButton: {
+        height: 61,
+        borderRadius: 14.2,
+        backgroundColor: colors.accentOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    revealButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.white,
     },
 
-    // ── Mazo completado (8.5 · ok) ────────────────────────────────────────────
-    doneOuter: {
+    // ── Pop-up · Mazo completado (mismo patrón overlay + tarjeta que el
+    // resto de la app) ─────────────────────────────────────────────────────
+    doneOverlay: {
         flex: 1,
+        backgroundColor: FIGMA.overlay,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: spacing.xl,
+        paddingHorizontal: 27,
     },
-    doneContent: {
+    doneCard: {
+        width: 348,
+        backgroundColor: colors.white,
+        borderRadius: 24,
+        borderWidth: 0.32,
+        borderColor: FIGMA.cardBorder,
         alignItems: 'center',
-        width: '100%',
-        maxWidth: 360,
+        paddingVertical: 32,
+        paddingHorizontal: 28,
     },
-    trophyWrap: {
+    doneIconWrap: {
+        marginBottom: spacing.md,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.lg + 4,
-    },
-    trophyRing: {
-        position: 'absolute',
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        borderWidth: 2,
-        borderColor: colors.warning,
-        opacity: 0.3,
     },
     doneTitle: {
-        fontSize: 26,
-        fontWeight: '800',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
+        marginBottom: 12,
+    },
+    doneSubtitle: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 13.8,
+        color: colors.textDark,
+        textAlign: 'center',
+        lineHeight: 16.6,
         marginBottom: spacing.lg,
-        textAlign: 'center',
     },
-    statsBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.background,
-        borderRadius: 18,
-        padding: spacing.md,
-        marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.separator,
-        width: '100%',
-    },
-    statCell: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    statNum: {
-        fontSize: 34,
-        fontWeight: '800',
-        marginBottom: 3,
-    },
-    statLabel: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: colors.textSecondary,
-        letterSpacing: 0.6,
-    },
-    statDivider: {
-        width: 1,
-        height: 40,
-        backgroundColor: colors.separator,
-        marginHorizontal: spacing.md,
-    },
-    doneMsg: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        lineHeight: 21,
-        marginBottom: spacing.xl + spacing.sm,
-    },
-    doneBtns: {
-        width: '100%',
-        gap: spacing.sm,
-    },
-    primaryDoneBtn: {
-        flexDirection: 'row',
+    doneSecondaryButton: {
+        width: 322,
+        height: 61,
+        borderRadius: 14.2,
+        borderWidth: 0.44,
+        borderColor: colors.textDark,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        backgroundColor: PURPLE,
-        paddingVertical: 15,
-        borderRadius: 16,
-        shadowColor: PURPLE,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        marginTop: 16,
     },
-    primaryDoneBtnText: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '700',
-    },
-    secondaryDoneBtn: {
-        paddingVertical: 14,
-        borderRadius: 16,
-        alignItems: 'center',
-        backgroundColor: colors.background,
-        borderWidth: 1,
-        borderColor: colors.separator,
-    },
-    secondaryDoneBtnText: {
-        color: colors.textSecondary,
-        fontSize: 15,
-        fontWeight: '600',
+    doneSecondaryButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
     },
 });

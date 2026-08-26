@@ -8,7 +8,6 @@ import {
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
-    StatusBar,
     Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,10 +15,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import { tutorApi } from '../../api';
 
-// ─── Constantes de color del bloque 8 ────────────────────────────────────────
-const PURPLE = colors.purple;         // #7B4BC4
-const PURPLE_BG = colors.purpleBg;    // #F1ECFA
-const PURPLE_BUBBLE = '#6D3DB8';      // ligeramente más oscuro para contraste en burbuja
+// Colores confirmados contra Figma (frame CHAT TUTOR IA, Bloque 8) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    // Verde de sistema iOS "Accents/Green" — distinto de colors.ctaGreen,
+    // documentado tal cual está en Figma.
+    onlineGreen: '#34C759',
+    aiBubbleBg: 'rgba(159,110,228,0.1)',
+    // Verde ligeramente distinto de colors.ctaGreen (#24bd90 vs #24BD86) —
+    // segundo caso de "verde casi igual pero no idéntico" detectado en el
+    // archivo. Documentado tal cual, no se unifica.
+    userBubbleBg: 'rgba(36,189,134,0.32)',
+    inputBorder: 'rgba(65,41,80,0.5)',
+    timestampMuted: 'rgba(65,41,80,0.4)',
+};
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 const nowTime = () =>
@@ -39,6 +48,12 @@ const buildInitialMessages = (technique) => [
 ];
 
 // ─── Chip de acción rápida ────────────────────────────────────────────────────
+// Nota: Figma muestra 3 chips fijos y siempre visibles ("crear flashcards",
+// "poner un ejemplo", "hacer un test") como capas sueltas del bloque, no del
+// frame del chat. El código real es más rico: cada mensaje de la IA trae sus
+// propias acciones sugeridas desde el backend — se conserva ese
+// comportamiento real y solo se restylea el chip al lenguaje visual
+// confirmado (outline, sin relleno).
 function ActionChip({ icon, label, onPress }) {
     return (
         <TouchableOpacity
@@ -48,9 +63,17 @@ function ActionChip({ icon, label, onPress }) {
             accessibilityLabel={label}
             accessibilityRole="button"
         >
-            <Ionicons name={icon} size={13} color={PURPLE} />
+            {icon ? <Ionicons name={icon} size={13} color={colors.textDark} /> : null}
             <Text style={styles.actionText}>{label}</Text>
         </TouchableOpacity>
+    );
+}
+
+function Avatar({ size = 39 }) {
+    return (
+        <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
+            <Text style={[styles.avatarText, { fontSize: size * 0.36 }]}>IA</Text>
+        </View>
     );
 }
 
@@ -58,19 +81,11 @@ function ActionChip({ icon, label, onPress }) {
 function MessageBubble({ msg, onAction }) {
     return (
         <View style={[styles.messageRow, msg.isAI ? styles.rowLeft : styles.rowRight]}>
-            {msg.isAI && (
-                <View style={styles.avatarSmall}>
-                    <Ionicons name="sparkles-outline" size={14} color="#fff" />
-                </View>
-            )}
+            {msg.isAI && <Avatar size={26} />}
 
             <View style={[styles.bubble, msg.isAI ? styles.bubbleLeft : styles.bubbleRight]}>
-                <Text style={[styles.msgText, msg.isAI ? styles.msgTextLeft : styles.msgTextRight]}>
-                    {msg.text}
-                </Text>
-                <Text style={[styles.timestamp, msg.isAI ? styles.tsLeft : styles.tsRight]}>
-                    {msg.timestamp}
-                </Text>
+                <Text style={styles.msgText}>{msg.text}</Text>
+                <Text style={styles.timestamp}>{msg.timestamp}</Text>
 
                 {msg.isAI && msg.actions?.length > 0 && (
                     <View style={styles.actionsRow}>
@@ -93,9 +108,7 @@ function MessageBubble({ msg, onAction }) {
 function TypingIndicator() {
     return (
         <View style={[styles.messageRow, styles.rowLeft]}>
-            <View style={styles.avatarSmall}>
-                <Ionicons name="sparkles-outline" size={14} color="#fff" />
-            </View>
+            <Avatar size={26} />
             <View style={[styles.bubble, styles.bubbleLeft, styles.typingBubble]}>
                 <Text style={styles.typingText}>Tutor escribiendo…</Text>
             </View>
@@ -202,13 +215,8 @@ export default function TutorChatScreen({ navigation, route }) {
         sendToApi(label);
     }, [navigation, addMessage, sendToApi]);
 
-    const canSend = inputText.trim().length > 0;
-
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
-
-            {/* Header estilo chat — diferente del ScreenHeader estándar */}
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
@@ -216,19 +224,14 @@ export default function TutorChatScreen({ navigation, route }) {
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Volver"
                 >
-                    <Ionicons name="arrow-back" size={22} color={colors.dark} />
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
 
                 <View style={styles.headerInfo}>
-                    <View style={styles.aiAvatar}>
-                        <Ionicons name="sparkles-outline" size={20} color="#fff" />
-                    </View>
+                    <Avatar />
                     <View style={styles.headerText}>
                         <Text style={styles.headerTitle}>Tutor IA</Text>
-                        <View style={styles.onlineRow}>
-                            <View style={styles.onlineDot} />
-                            <Text style={styles.onlineText}>En línea</Text>
-                        </View>
+                        <Text style={styles.onlineText}>Siempre en línea</Text>
                     </View>
                 </View>
 
@@ -254,7 +257,7 @@ export default function TutorChatScreen({ navigation, route }) {
                         ])
                     }
                 >
-                    <Ionicons name="ellipsis-vertical" size={22} color={colors.dark} />
+                    <Ionicons name="ellipsis-vertical" size={22} color={colors.textDark} />
                 </TouchableOpacity>
             </View>
 
@@ -262,7 +265,6 @@ export default function TutorChatScreen({ navigation, route }) {
                 style={styles.flex}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                {/* Área de mensajes */}
                 <View style={styles.flex}>
                     <ScrollView
                         ref={scrollRef}
@@ -285,27 +287,16 @@ export default function TutorChatScreen({ navigation, route }) {
                             onPress={scrollToBottom}
                             accessibilityLabel="Ir al final"
                         >
-                            <Ionicons name="chevron-down-circle" size={32} color={PURPLE} />
+                            <Ionicons name="chevron-down-circle" size={32} color={colors.accentOrange} />
                         </TouchableOpacity>
                     )}
                 </View>
 
-                {/* Barra de entrada */}
                 <View style={styles.inputBar}>
-                    <TouchableOpacity
-                        style={styles.voiceBtn}
-                        accessibilityLabel="Entrada de voz"
-                        onPress={() =>
-                            Alert.alert('Próximamente', 'La entrada de voz no está disponible todavía.')
-                        }
-                    >
-                        <Ionicons name="mic-outline" size={22} color={PURPLE} />
-                    </TouchableOpacity>
-
                     <TextInput
                         style={styles.input}
                         placeholder="Escribe tu duda…"
-                        placeholderTextColor={colors.textSecondary}
+                        placeholderTextColor={colors.textDark}
                         value={inputText}
                         onChangeText={setInputText}
                         multiline
@@ -316,16 +307,13 @@ export default function TutorChatScreen({ navigation, route }) {
                     />
 
                     <TouchableOpacity
-                        style={[styles.sendBtn, !canSend && styles.sendBtnOff]}
-                        onPress={handleSend}
-                        disabled={!canSend}
-                        accessibilityLabel="Enviar mensaje"
+                        style={styles.voiceBtn}
+                        accessibilityLabel="Entrada de voz"
+                        onPress={() =>
+                            Alert.alert('Próximamente', 'La entrada de voz no está disponible todavía.')
+                        }
                     >
-                        <Ionicons
-                            name={canSend ? 'send' : 'send-outline'}
-                            size={18}
-                            color={canSend ? '#fff' : colors.textSecondary}
-                        />
+                        <Ionicons name="mic-outline" size={22} color={colors.accentOrange} />
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -338,58 +326,48 @@ const styles = StyleSheet.create({
     flex: { flex: 1 },
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
 
-    // Header chat
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: spacing.md,
-        paddingVertical: 10,
-        backgroundColor: colors.card,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.separator,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.md,
+        gap: 12,
     },
-    backBtn: { paddingRight: spacing.sm },
+    backBtn: { width: 32 },
     headerInfo: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-    },
-    aiAvatar: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: PURPLE,
-        justifyContent: 'center',
-        alignItems: 'center',
+        gap: 12,
     },
     headerText: { flex: 1 },
     headerTitle: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: colors.dark,
-    },
-    onlineRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        marginTop: 2,
-    },
-    onlineDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
-        backgroundColor: colors.success,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
     },
     onlineText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: colors.success,
+        marginTop: 2,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 8.9,
+        color: FIGMA.onlineGreen,
     },
-    moreBtn: { paddingLeft: spacing.sm },
+    moreBtn: { width: 32, alignItems: 'flex-end' },
+
+    avatar: {
+        backgroundColor: colors.selectionBorder,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    avatarText: {
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.white,
+    },
 
     // Lista de mensajes
     msgList: {
@@ -401,74 +379,55 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         marginBottom: spacing.md,
         alignItems: 'flex-end',
+        gap: 10,
     },
     rowLeft: { justifyContent: 'flex-start' },
     rowRight: { justifyContent: 'flex-end' },
 
-    avatarSmall: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: PURPLE,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: spacing.sm,
-        flexShrink: 0,
-    },
-
     bubble: {
         maxWidth: '80%',
-        paddingHorizontal: 13,
-        paddingVertical: 10,
-        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 13.3,
     },
     bubbleLeft: {
-        backgroundColor: colors.card,
-        borderBottomLeftRadius: 4,
-        borderWidth: 1,
-        borderColor: colors.separator,
+        backgroundColor: FIGMA.aiBubbleBg,
     },
     bubbleRight: {
-        backgroundColor: PURPLE_BUBBLE,
-        borderBottomRightRadius: 4,
+        backgroundColor: FIGMA.userBubbleBg,
     },
 
-    msgText: { fontSize: 14.5, lineHeight: 21 },
-    msgTextLeft: { color: colors.text },
-    msgTextRight: { color: '#fff' },
+    msgText: { fontFamily: 'Poppins-Regular', fontSize: 16, lineHeight: 20, color: colors.textDark },
+    timestamp: { fontFamily: 'Poppins-Regular', fontSize: 9, marginTop: 4, alignSelf: 'flex-end', color: FIGMA.timestampMuted },
 
-    timestamp: { fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
-    tsLeft: { color: colors.textSecondary },
-    tsRight: { color: 'rgba(255,255,255,0.7)' },
-
-    // Chips de acción
+    // Chips de acción — outline, sin relleno (ver nota junto a ActionChip)
     actionsRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 6,
+        gap: 8,
         marginTop: spacing.sm,
     },
     actionChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        backgroundColor: PURPLE_BG,
-        paddingHorizontal: 9,
-        paddingVertical: 5,
-        borderRadius: 10,
+        gap: 6,
+        borderWidth: 0.44,
+        borderColor: colors.textDark,
+        borderRadius: 9.8,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
     },
     actionText: {
-        fontSize: 11.5,
-        fontWeight: '700',
-        color: PURPLE,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 12.5,
+        color: colors.textDark,
     },
 
-    // Botón de ir al final
     scrollDownBtn: {
         position: 'absolute',
         bottom: spacing.md,
         right: spacing.md,
-        backgroundColor: colors.card,
+        backgroundColor: colors.white,
         borderRadius: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -477,54 +436,39 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
 
-    // Typing indicator
-    typingBubble: { paddingVertical: 9 },
+    typingBubble: { paddingVertical: 10 },
     typingText: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 12,
-        color: colors.textSecondary,
+        color: FIGMA.timestampMuted,
         fontStyle: 'italic',
     },
 
-    // Input bar
+    // Barra de entrada
     inputBar: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.sm,
         paddingHorizontal: spacing.md,
-        paddingVertical: 10,
-        backgroundColor: colors.card,
-        borderTopWidth: 1,
-        borderTopColor: colors.separator,
-    },
-    voiceBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: PURPLE_BG,
-        justifyContent: 'center',
-        alignItems: 'center',
-        flexShrink: 0,
+        paddingVertical: spacing.sm,
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.md,
+        minHeight: 66,
+        borderRadius: 13.3,
+        borderWidth: 1.3,
+        borderColor: FIGMA.inputBorder,
     },
     input: {
         flex: 1,
-        backgroundColor: colors.background,
-        borderRadius: 18,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 8,
-        fontSize: 14.5,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 16,
         maxHeight: 100,
-        color: colors.text,
+        color: colors.textDark,
     },
-    sendBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: PURPLE,
-        justifyContent: 'center',
+    voiceBtn: {
+        width: 32,
         alignItems: 'center',
+        justifyContent: 'center',
         flexShrink: 0,
-    },
-    sendBtnOff: {
-        backgroundColor: colors.separator,
     },
 });
