@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -6,6 +6,8 @@ import {
     ScrollView,
     TouchableOpacity,
     StatusBar,
+    Image,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +15,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing } from '../../theme';
 import NotesFormatErrorModal from '../../components/NotesFormatErrorModal';
-import { notesApi } from '../../api';
+import { notesApi, authApi } from '../../api';
 import * as FileSystem from 'expo-file-system';
 
 // Formatos aceptados por la Factoría de Apuntes — el backend valida lo mismo.
@@ -38,13 +40,11 @@ function extOf(name = '') {
 function isAcceptedAsset(asset) {
     if (!asset) return false;
     if (asset.mimeType && ACCEPTED_MIME.includes(asset.mimeType.toLowerCase())) return true;
-    // Fallback: aceptar por extensión.
     return ACCEPTED_EXT.includes(extOf(asset.name ?? asset.uri ?? ''));
 }
 
 const NOTES_ACCENT = '#2563EB';
 
-// Cada opción tiene su color propio — mismo criterio del selector del Bloque 6 (Foto-Test hub).
 const SOURCES = [
     {
         id: 'camera',
@@ -94,18 +94,26 @@ function SourceCard({ source, onPress }) {
 }
 
 export default function NotesUploadScreen({ navigation }) {
-    // Estado del modal de error de formato. Se dispara cuando el fichero elegido no cumple ACCEPTED_MIME.
     const [formatErrorVisible, setFormatErrorVisible] = useState(false);
     const [lastAttemptedSource, setLastAttemptedSource] = useState(null);
+    const [oposicion, setOposicion] = useState('justicia-tramitacion');
 
-    // Sube los assets al backend y arranca el análisis IA (9.3). Si el backend
-    // aún no está disponible (sin Supabase configurado), navegamos igualmente al
-    // análisis con noteId=null para que la pantalla siga siendo demostrable.
+    // Estado de la sesión de captura multipágina con cámara.
+    const [captureMode, setCaptureMode] = useState(false);
+    const [capturedPhotos, setCapturedPhotos] = useState([]);
+    const [uploading, setUploading] = useState(false);
+
+    // Carga la oposición del perfil del usuario para enviársela al backend.
+    useEffect(() => {
+        authApi.me()
+            .then(({ data }) => { if (data?.oposicion) setOposicion(data.oposicion); })
+            .catch(() => {});
+    }, []);
+
     const startAnalysis = async (assets, kind) => {
+        setUploading(true);
         try {
             const files = await Promise.all(assets.map(async (a) => {
-                // Reutilizamos el base64 si expo-image-picker ya lo devolvió; si no,
-                // lo leemos del URI con expo-file-system.
                 const base64 = a.base64 ?? await FileSystem.readAsStringAsync(a.uri, {
                     encoding: FileSystem.EncodingType.Base64,
                 });
@@ -115,47 +123,49 @@ export default function NotesUploadScreen({ navigation }) {
                     sizeBytes: a.size ?? a.fileSize ?? Math.floor(base64.length * 0.75),
                 };
             }));
-            const fileName = assets[0]?.name ?? assets[0]?.fileName ?? `Apunte ${new Date().toISOString().slice(0, 10)}`;
+            const fileName = assets[0]?.name ?? assets[0]?.fileName
+                ?? `Apunte ${new Date().toISOString().slice(0, 10)}`;
 
-            const res = await notesApi.upload({
-                oposicion: 'justicia-tramitacion', // TODO: leer de la sesión del usuario
-                kind,
-                fileName,
-                files,
-            });
+            const res = await notesApi.upload({ oposicion, kind, fileName, files });
             const noteId = res?.data?.noteId ?? null;
-            navigation.navigate('NotesAnalysis', {
-                noteId,
-                pageCount: assets.length,
-            });
+            setCaptureMode(false);
+            setCapturedPhotos([]);
+            navigation.navigate('NotesAnalysis', { noteId, pageCount: assets.length });
         } catch {
-            // Fallback: seguimos al análisis con simulación local si upload falla.
-            navigation.navigate('NotesAnalysis', {
-                noteId: null,
-                pageCount: assets.length,
-            });
+            setCaptureMode(false);
+            setCapturedPhotos([]);
+            navigation.navigate('NotesAnalysis', { noteId: null, pageCount: assets.length });
+        } finally {
+            setUploading(false);
         }
+    };
+
+    // Abre la cámara una sola vez y devuelve el asset, o null si se canceló/falló.
+    const takeCameraPhoto = async () => {
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.85,
+        });
+        if (result.canceled) return null;
+        const asset = result.assets?.[0];
+        if (!isAcceptedAsset(asset)) {
+            setFormatErrorVisible(true);
+            return null;
+        }
+        return asset;
     };
 
     const handleSource = async (id) => {
         setLastAttemptedSource(id);
         switch (id) {
             case 'camera': {
-                // Captura simple con la cámara nativa. Multipágina real vendrá con
-                // NotesCameraCaptureScreen (pantalla dedicada) cuando la diseñemos.
                 const perm = await ImagePicker.requestCameraPermissionsAsync();
                 if (!perm.granted) return;
-                const result = await ImagePicker.launchCameraAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    quality: 0.85,
-                });
-                if (result.canceled) return;
-                const asset = result.assets?.[0];
-                if (!isAcceptedAsset(asset)) {
-                    setFormatErrorVisible(true);
-                    return;
-                }
-                startAnalysis([asset], 'photo');
+                const asset = await takeCameraPhoto();
+                if (!asset) return;
+                // Entrar en sesión de captura multipágina con la primera foto.
+                setCapturedPhotos([asset]);
+                setCaptureMode(true);
                 break;
             }
 
@@ -176,8 +186,6 @@ export default function NotesUploadScreen({ navigation }) {
             }
 
             case 'gallery': {
-                // ImagePicker no devuelve mimeType siempre — validamos por extensión
-                // del uri cuando falte.
                 const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
                 if (!perm.granted) return;
                 const result = await ImagePicker.launchImageLibraryAsync({
@@ -199,17 +207,120 @@ export default function NotesUploadScreen({ navigation }) {
         }
     };
 
-    // Al reintentar desde el modal, reabrimos el selector de la misma fuente que falló.
+    const addCameraPage = async () => {
+        const asset = await takeCameraPhoto();
+        if (!asset) return;
+        setCapturedPhotos((prev) => [...prev, asset]);
+    };
+
+    const cancelCapture = () => {
+        const count = capturedPhotos.length;
+        Alert.alert(
+            'Descartar fotos',
+            `Se perderán ${count} ${count === 1 ? 'foto capturada' : 'fotos capturadas'}. ¿Continuar?`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Descartar',
+                    style: 'destructive',
+                    onPress: () => {
+                        setCaptureMode(false);
+                        setCapturedPhotos([]);
+                    },
+                },
+            ],
+        );
+    };
+
     const retryFromError = () => {
         setFormatErrorVisible(false);
         if (lastAttemptedSource) handleSource(lastAttemptedSource);
     };
 
+    // ─── Sesión de captura multipágina ───────────────────────────────────────────
+    if (captureMode) {
+        const count = capturedPhotos.length;
+        return (
+            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+                <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
+
+                <View style={styles.header}>
+                    <View style={styles.headerTop}>
+                        <TouchableOpacity
+                            onPress={cancelCapture}
+                            style={styles.backBtn}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="Descartar"
+                        >
+                            <Text style={styles.backChevron}>‹</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.title}>
+                            {count} {count === 1 ? 'foto capturada' : 'fotos capturadas'}
+                        </Text>
+                    </View>
+                    <Text style={styles.subtitle}>
+                        Revisa las páginas y añade más si necesitas.
+                    </Text>
+                </View>
+
+                <ScrollView
+                    style={styles.scroll}
+                    contentContainerStyle={styles.captureBody}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.captureGrid}>
+                        {capturedPhotos.map((photo, idx) => (
+                            <View key={idx} style={styles.captureThumbWrap}>
+                                <Image source={{ uri: photo.uri }} style={styles.captureThumb} />
+                                <View style={styles.capturePageBadge}>
+                                    <Text style={styles.capturePageBadgeText}>{idx + 1}</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                </ScrollView>
+
+                <View style={styles.captureActions}>
+                    {count < 20 ? (
+                        <TouchableOpacity
+                            style={styles.addPageBtn}
+                            onPress={addCameraPage}
+                            activeOpacity={0.8}
+                            accessibilityLabel="Añadir otra página"
+                        >
+                            <Ionicons name="camera-outline" size={20} color={NOTES_ACCENT} />
+                            <Text style={styles.addPageText}>Añadir página</Text>
+                        </TouchableOpacity>
+                    ) : null}
+
+                    <TouchableOpacity
+                        style={[styles.doneBtn, uploading && styles.doneBtnDisabled]}
+                        onPress={() => startAnalysis(capturedPhotos, 'photo')}
+                        disabled={uploading}
+                        activeOpacity={0.85}
+                        accessibilityLabel={`Subir ${count} páginas`}
+                    >
+                        <Ionicons name="cloud-upload-outline" size={20} color={colors.white} />
+                        <Text style={styles.doneBtnText}>
+                            {uploading ? 'Subiendo…' : `Listo · ${count} ${count === 1 ? 'página' : 'páginas'}`}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <NotesFormatErrorModal
+                    visible={formatErrorVisible}
+                    onRetry={() => { setFormatErrorVisible(false); addCameraPage(); }}
+                    onCancel={() => setFormatErrorVisible(false)}
+                />
+            </SafeAreaView>
+        );
+    }
+
+    // ─── Selector de fuente (vista principal) ────────────────────────────────────
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
 
-            {/* Header con chevron + título alineado a la izquierda + subtítulo debajo */}
             <View style={styles.header}>
                 <View style={styles.headerTop}>
                     <TouchableOpacity
@@ -313,7 +424,7 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
 
-    // Card
+    // Card de fuente
     card: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -365,5 +476,90 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: 18,
+    },
+
+    // ─── Sesión de captura multipágina ───────────────────────────────────────
+    captureBody: {
+        padding: spacing.md,
+        paddingTop: spacing.lg,
+    },
+    captureGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm + 2,
+    },
+    captureThumbWrap: {
+        width: '31%',
+        aspectRatio: 3 / 4,
+        borderRadius: 10,
+        overflow: 'hidden',
+        backgroundColor: colors.separator,
+    },
+    captureThumb: {
+        width: '100%',
+        height: '100%',
+    },
+    capturePageBadge: {
+        position: 'absolute',
+        top: 5,
+        left: 5,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        borderRadius: 9,
+        minWidth: 20,
+        height: 20,
+        paddingHorizontal: 5,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    capturePageBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+
+    captureActions: {
+        gap: spacing.sm,
+        padding: spacing.md,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: colors.separator,
+        backgroundColor: colors.card,
+    },
+    addPageBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        borderWidth: 1.5,
+        borderColor: NOTES_ACCENT,
+        borderRadius: 12,
+        paddingVertical: 13,
+    },
+    addPageText: {
+        color: NOTES_ACCENT,
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    doneBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        backgroundColor: NOTES_ACCENT,
+        borderRadius: 12,
+        paddingVertical: 16,
+        shadowColor: NOTES_ACCENT,
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+    },
+    doneBtnDisabled: {
+        backgroundColor: colors.grayMid,
+        shadowOpacity: 0,
+    },
+    doneBtnText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '800',
     },
 });

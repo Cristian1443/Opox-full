@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     StatusBar,
     Switch,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,6 +74,7 @@ export default function NotesTestConfigScreen({ navigation, route }) {
     const [selectedTopics, setSelectedTopics] = useState(new Set(note.tags));
     // Consistente con el Generador Infinito del Bloque 6 (aunque no está en el mockup).
     const [timed, setTimed] = useState(false);
+    const [starting, setStarting] = useState(false);
 
     // Cap del número de preguntas al techo real del documento.
     const questionCount = useMemo(() => {
@@ -104,24 +106,40 @@ export default function NotesTestConfigScreen({ navigation, route }) {
 
     const canStart = selectedTopics.size > 0 && questionCount > 0;
 
-    const startTest = () => {
-        // Reutiliza el runner del Bloque 7 con source 'notes'.
-        // El backend tendrá que aceptar { noteId, questionCount, topics[] } en /training/generate
-        // o en un endpoint nuevo /notes/:id/generate-test.
-        // Params que el runner (QuestionActiveScreen) ya entiende:
-        //   examTitle → cabecera "Zona de entrenamiento / <título>"
-        //   timedMode + secondsPerQuestion → contrarreloj
-        // Cuando exista backend, primero cargar las preguntas via
-        // notesApi.generateTest({ noteId, questionCount, topics }) y pasarlas por `questions`.
-        navigation.replace('TrainingSession', {
-            source: 'notes',
-            noteId: note.id,
-            questionCount,
-            topics: Array.from(selectedTopics),
-            examTitle: `Apuntes: ${note.title}`,
-            timedMode: timed,
-            secondsPerQuestion: 30,
-        });
+    const startTest = async () => {
+        if (!canStart || starting) return;
+        setStarting(true);
+        try {
+            const res = await notesApi.generateTest(note.id, {
+                questionCount,
+                topics: Array.from(selectedTopics),
+                timed,
+            });
+            const questions = res?.data?.questions ?? [];
+            navigation.replace('TrainingSession', {
+                source: 'notes',
+                noteId: note.id,
+                questions,
+                questionCount,
+                topics: Array.from(selectedTopics),
+                examTitle: `Apuntes: ${note.title}`,
+                timedMode: timed,
+                secondsPerQuestion: 30,
+            });
+        } catch {
+            navigation.replace('TrainingSession', {
+                source: 'notes',
+                noteId: note.id,
+                questions: [],
+                questionCount,
+                topics: Array.from(selectedTopics),
+                examTitle: `Apuntes: ${note.title}`,
+                timedMode: timed,
+                secondsPerQuestion: 30,
+            });
+        } finally {
+            setStarting(false);
+        }
     };
 
     return (
@@ -221,7 +239,9 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                     accessibilityLabel="Generar y empezar"
                     accessibilityRole="button"
                 >
-                    <Ionicons name="sparkles" size={20} color={colors.white} />
+                    {starting
+                        ? <ActivityIndicator size="small" color={colors.white} />
+                        : <Ionicons name="sparkles" size={20} color={colors.white} />}
                     <Text style={styles.btnPrimaryText}>
                         {starting ? 'Generando…' : 'Generar y empezar'}
                     </Text>

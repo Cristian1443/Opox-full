@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
     Text,
@@ -172,7 +173,7 @@ export default function NotesHomeScreen({ navigation, route }) {
         }
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useFocusEffect(load);
 
     useEffect(() => {
         if (!toastMessage) return;

@@ -55,7 +55,7 @@ function MetaCard({ note }) {
             <View style={styles.metaTexts}>
                 <Text style={styles.metaTitle} numberOfLines={1}>{note.fileName}</Text>
                 <Text style={styles.metaSubtitle}>
-                    {note.pages} {note.pages === 1 ? 'página' : 'páginas'} · subido el {formatDate(note.uploadedAt)}
+                    {note.pages} {note.pages === 1 ? 'página' : 'páginas'} · subido el {formatDate(note.createdAt ?? note.uploadedAt)}
                 </Text>
             </View>
         </View>
