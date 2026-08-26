@@ -173,7 +173,7 @@ export default function NotesHomeScreen({ navigation, route }) {
         }
     }, []);
 
-    useFocusEffect(load);
+    useFocusEffect(useCallback(() => { load(); }, [load]));
 
     useEffect(() => {
         if (!toastMessage) return;
