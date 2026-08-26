@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import { MENUS_DATA } from '../../data/healthContent';
 
 // Colores confirmados contra Figma (frame MENUS EQUILIBRADOS, Bloque 3)
 // sin equivalente exacto en theme.js. El gris del tab inactivo es el mismo
@@ -25,47 +26,23 @@ const FIGMA = {
 // el mismo lenguaje visual del resto de tabs.
 const FILTERS = ['Todos', 'Concentración', 'Energía', 'Día de examen'];
 
-// bodyLines: mismo bloque de texto que en Figma (comidas o info del
-// dietista, una línea por elemento, unidas con salto de línea al pintar).
-const MENUS_DATA = [
-    {
-        id: 'm1',
-        title: 'Día de concentración máxima',
-        badgeLabel: 'IA',
-        highlighted: true,
-        bodyLines: [
-            'Desayuno · Avena con arándanos y nueces',
-            'Comida · Salmón, quinoa y verduras',
-            'Cena · Tortilla y aguacate',
-        ],
-        filterKey: 'Concentración',
-    },
-    {
-        id: 'm2',
-        title: 'Energía sostenida',
-        badgeLabel: 'Dietista',
-        highlighted: false,
-        bodyLines: ['Por Laura M., dietista col. nº 1234'],
-        filterKey: 'Energía',
-    },
-    {
-        id: 'm3',
-        title: 'Recuperación post-examen',
-        badgeLabel: 'Dietista',
-        highlighted: false,
-        bodyLines: ['Por Carlos R., dietista col. nº 5678'],
-        filterKey: 'Día de examen',
-    },
-];
+function menuBodyLines(menu) {
+    if (menu.type === 'AI') {
+        return menu.meals.map(
+            (m) => `${m.label.charAt(0) + m.label.slice(1).toLowerCase()} · ${m.name}`,
+        );
+    }
+    return [menu.subtitle];
+}
 
 function MenuCardItem({ menu, onViewRecipe }) {
     return (
         <View style={[styles.card, menu.highlighted ? styles.cardHighlighted : styles.cardNormal]}>
             <View style={styles.cardHeaderRow}>
                 <Text style={styles.cardTitle}>{menu.title}</Text>
-                <Text style={styles.cardBadge}>{menu.badgeLabel}</Text>
+                <Text style={styles.cardBadge}>{menu.type}</Text>
             </View>
-            <Text style={styles.cardBody}>{menu.bodyLines.join('\n')}</Text>
+            <Text style={styles.cardBody}>{menuBodyLines(menu).join('\n')}</Text>
             <TouchableOpacity activeOpacity={0.7} onPress={() => onViewRecipe?.(menu)}>
                 <Text style={styles.cardLink}>Ver receta y lista de la compra ›</Text>
             </TouchableOpacity>
