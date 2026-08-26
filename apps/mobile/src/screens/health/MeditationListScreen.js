@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import { MEDITATIONS } from '../../data/healthContent';
 
 // Colores confirmados contra Figma (frame "DETALLE MENÚ/RECETA" #1, cuyo
 // contenido real es la pantalla de Meditación, Bloque 3) sin equivalente
@@ -30,17 +31,11 @@ function CheckMarkIcon({ size = 16, color = colors.white }) {
     );
 }
 
-const RECOMMENDED = { id: '1', title: 'Calma antes del examen', note: 'gestión de la ansiedad', duration: '8 min' };
-
-const EXERCISES = [
-    { id: '2', title: 'Respiración 4-7-8', note: 'relajación rápida', duration: '5 min' },
-    { id: '3', title: 'Bajar la activación', note: 'tras una sesión intensa', duration: '7 min' },
-    { id: '4', title: 'Foco en 3 minutos', note: 'antes de empezar a estudiar', duration: '3 min' },
-];
-
 export default function MeditationListScreen({ navigation }) {
     const handlePlay = (session) => {
-        navigation.navigate('MeditationPlayer', { session: { title: session.title, subtitle: session.note, duration: session.duration } });
+        navigation.navigate('MeditationPlayer', {
+            session: { title: session.title, audioKey: session.audioKey, subtitle: session.note, duration: session.duration },
+        });
     };
 
     return (
@@ -48,14 +43,14 @@ export default function MeditationListScreen({ navigation }) {
             <HealthScreenHeader title="Meditación" onBack={() => navigation.goBack()} />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9} onPress={() => handlePlay(RECOMMENDED)}>
+                <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9} onPress={() => handlePlay(MEDITATIONS.recommended)}>
                     <Text style={styles.featuredEyebrow}>RECOMENDADA HOY</Text>
-                    <Text style={styles.featuredTitle}>{RECOMMENDED.title}</Text>
-                    <Text style={styles.featuredSubtitle}>{RECOMMENDED.duration} · {RECOMMENDED.note}</Text>
+                    <Text style={styles.featuredTitle}>{MEDITATIONS.recommended.title}</Text>
+                    <Text style={styles.featuredSubtitle}>{MEDITATIONS.recommended.duration} · {MEDITATIONS.recommended.note}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.exercisesList}>
-                    {EXERCISES.map((exercise, index) => (
+                    {MEDITATIONS.exercises.map((exercise, index) => (
                         <TouchableOpacity
                             key={exercise.id}
                             style={[styles.exerciseRow, index > 0 && styles.exerciseRowSeparator]}

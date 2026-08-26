@@ -234,3 +234,35 @@ async function _readAndroidMetrics(startTime, endTime) {
 
     return { heartRate, restingHeartRate, hrv: null, spo2, sleepHours, steps };
 }
+
+// ─── Historial de métricas ────────────────────────────────────────────────────
+
+/**
+ * Devuelve puntos de historial para una métrica y rango temporal dados.
+ * Más reciente al final. En Expo Go o sin módulos nativos devuelve datos mock.
+ *
+ * @param {'hrv'|'heartRate'|'restingHeartRate'|'spo2'|'sleep'|'steps'} metricType
+ * @param {'Día'|'Semana'|'Mes'} range
+ * @returns {Promise<number[]>}
+ */
+export async function getMetricHistory(metricType, range) {
+    if (!isHealthAvailable()) return _mockHistoryPoints(range);
+
+    // TODO(bloque3-history): implementar con HealthKit queryStatisticsCollectionQuery (iOS)
+    // o getAggregateRecord (Android Health Connect) para datos reales por intervalo.
+    return _mockHistoryPoints(range);
+}
+
+// Formas mock con tendencia realista — la pantalla normaliza contra chartMax,
+// así que la escala absoluta no importa; solo importa la forma de la curva.
+function _mockHistoryPoints(range) {
+    if (range === 'Día') {
+        return [38, 42, 40, 37, 45, 43, 41, 44, 46, 43, 42, 45];
+    }
+    if (range === 'Mes') {
+        return [35, 38, 40, 36, 42, 39, 44, 41, 46, 43, 48, 45, 50, 47,
+                49, 48, 53, 50, 55, 52, 54, 56, 53, 58, 55, 57, 59, 56, 60, 62];
+    }
+    // 'Semana' (default)
+    return [40, 45, 38, 50, 42, 48, 43];
+}

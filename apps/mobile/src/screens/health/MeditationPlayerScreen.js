@@ -1,5 +1,5 @@
 // Bloque 3 · Salud — Pantalla 3.9a · Reproductor de sesión de meditación
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -14,13 +14,24 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Polygon } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 
+// Lazy require para evitar crash en Expo Go (mismo patrón que expo-notifications en App.js).
+let ExpoAudio = null;
+try { ExpoAudio = require('expo-av').Audio; } catch { /* Expo Go o módulo no disponible */ }
+
+// Mapa de sesiones → archivo de audio local.
+// Para activar audio en una sesión: añadir el .mp3 en apps/mobile/assets/audio/
+// y descomentar la línea correspondiente.
+const AUDIO_FILES = {
+    'Calma antes del examen': null, // require('../../assets/audio/calma_examen.mp3')
+    'Respiración 4-7-8':      null, // require('../../assets/audio/respiracion_478.mp3')
+    'Bajar la activación':    null, // require('../../assets/audio/bajar_activacion.mp3')
+    'Foco en 3 minutos':      null, // require('../../assets/audio/foco_3min.mp3')
+};
+
 const { width } = Dimensions.get('window');
 
-// Colores confirmados contra Figma (segundo frame "RESPIRACION", cuyo
-// contenido real es este reproductor, Bloque 3) sin equivalente exacto en
-// theme.js.
 const FIGMA = {
-    moonCircleBg: 'rgba(36,189,144,0.25)', // colors.ctaGreen @ 25%
+    moonCircleBg: 'rgba(36,189,144,0.25)',
     subtitleGray: '#C4C4C4',
     progressTrack: '#F1F1F1',
     timeLabel: '#919097',
@@ -87,32 +98,79 @@ const parseDurationSeconds = (str) => {
 
 export default function MeditationPlayerScreen({ navigation, route }) {
     const session = route?.params?.session ?? DEFAULT_SESSION;
-
     const totalSeconds = parseDurationSeconds(session.duration);
+
     const [isPlaying, setIsPlaying] = useState(false);
     const [timeLeft, setTimeLeft] = useState(totalSeconds);
     const [showExitModal, setShowExitModal] = useState(false);
+    const [audioReady, setAudioReady] = useState(false);
 
+    const soundRef = useRef(null);
     const timerRef = useRef(null);
 
+    // ── Carga de audio ────────────────────────────────────────────────────────
     useEffect(() => {
-        setTimeLeft(parseDurationSeconds(session.duration));
-    }, [session.duration]);
+        const audioSource = AUDIO_FILES[session.audioKey ?? session.title];
+        if (!ExpoAudio || !audioSource) return; // sin audio → timer puro
 
+        let mounted = true;
+
+        (async () => {
+            try {
+                await ExpoAudio.setAudioModeAsync({
+                    allowsRecordingIOS: false,
+                    staysActiveInBackground: true,
+                    playsInSilentModeIOS: true,    // reproduce con el switch silencio en iOS
+                    shouldDuckAndroid: true,
+                });
+
+                const { sound } = await ExpoAudio.Sound.createAsync(
+                    audioSource,
+                    { shouldPlay: false, isLooping: false },
+                    (status) => {
+                        if (!mounted || !status.isLoaded) return;
+                        if (status.didJustFinish) {
+                            setIsPlaying(false);
+                            setTimeLeft(0);
+                            return;
+                        }
+                        // Sincronizar el timer con la posición real del audio.
+                        if (status.isPlaying && status.durationMillis) {
+                            const remaining = status.durationMillis - status.positionMillis;
+                            setTimeLeft(Math.max(0, Math.ceil(remaining / 1000)));
+                        }
+                    },
+                );
+
+                soundRef.current = sound;
+                if (mounted) setAudioReady(true);
+            } catch {
+                // Fallo al cargar → fallback silencioso a timer puro
+            }
+        })();
+
+        return () => {
+            mounted = false;
+            if (soundRef.current) {
+                soundRef.current.unloadAsync();
+                soundRef.current = null;
+            }
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Timer de fallback (solo cuando no hay audio cargado) ──────────────────
     useEffect(() => {
+        if (audioReady) return; // el callback de audio maneja el tiempo
         if (isPlaying && timeLeft > 0) {
             timerRef.current = setInterval(() => {
                 setTimeLeft((prev) => {
-                    if (prev <= 1) {
-                        setIsPlaying(false);
-                        return 0;
-                    }
+                    if (prev <= 1) { setIsPlaying(false); return 0; }
                     return prev - 1;
                 });
             }, 1000);
         }
         return () => clearInterval(timerRef.current);
-    }, [isPlaying, timeLeft]);
+    }, [isPlaying, timeLeft, audioReady]);
 
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -123,17 +181,52 @@ export default function MeditationPlayerScreen({ navigation, route }) {
     const progressed = totalSeconds - timeLeft;
     const progressPct = totalSeconds > 0 ? (progressed / totalSeconds) * 100 : 0;
 
-    const confirmExit = () => {
+    // ── Handlers ──────────────────────────────────────────────────────────────
+
+    const handlePlayPause = useCallback(async () => {
+        const sound = soundRef.current;
+        if (audioReady && sound) {
+            try {
+                if (isPlaying) {
+                    await sound.pauseAsync();
+                } else {
+                    if (timeLeft === 0) await sound.setPositionAsync(0);
+                    await sound.playAsync();
+                }
+            } catch { /* fallback: el setIsPlaying de abajo maneja la UI */ }
+        }
+        setIsPlaying((v) => !v);
+    }, [audioReady, isPlaying, timeLeft]);
+
+    const skipBy = useCallback(async (deltaSec) => {
+        const sound = soundRef.current;
+        if (audioReady && sound) {
+            try {
+                const status = await sound.getStatusAsync();
+                if (status.isLoaded) {
+                    const newPos = Math.max(
+                        0,
+                        Math.min(status.durationMillis ?? 0, status.positionMillis + deltaSec * 1000),
+                    );
+                    await sound.setPositionAsync(newPos);
+                }
+            } catch { /* ignorar */ }
+        }
+        // Actualizar timer local también (por si no hay audio o el seek falla)
+        setTimeLeft((prev) => Math.max(0, Math.min(totalSeconds, prev - deltaSec)));
+    }, [audioReady, totalSeconds]);
+
+    const confirmExit = useCallback(async () => {
         setShowExitModal(false);
         setIsPlaying(false);
+        const sound = soundRef.current;
+        if (sound) {
+            try { await sound.stopAsync(); } catch { /* ok */ }
+        }
         navigation.goBack();
-    };
+    }, [navigation]);
 
-    // Skips ±15s.
-    const skipBy = (deltaSec) => {
-        setTimeLeft((prev) => Math.max(0, Math.min(totalSeconds, prev - deltaSec)));
-    };
-
+    // ── UI ────────────────────────────────────────────────────────────────────
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="light-content" backgroundColor={colors.textDark} />
@@ -148,7 +241,6 @@ export default function MeditationPlayerScreen({ navigation, route }) {
             </View>
 
             <View style={styles.content}>
-                {/* Ícono grande dentro del círculo semitransparente */}
                 <View style={styles.moonCircle}>
                     <Ionicons name="moon-outline" size={56} color="#FFFFFF" />
                 </View>
@@ -156,7 +248,6 @@ export default function MeditationPlayerScreen({ navigation, route }) {
                 <Text style={styles.title}>{session.title}</Text>
                 <Text style={styles.subtitle}>{session.subtitle}</Text>
 
-                {/* Barra de progreso lineal + manija + tiempos */}
                 <View style={styles.progressWrap}>
                     <View style={styles.progressBg}>
                         <View style={[styles.progressFg, { width: `${progressPct}%` }]} />
@@ -168,20 +259,23 @@ export default function MeditationPlayerScreen({ navigation, route }) {
                     </View>
                 </View>
 
-                {/* Controles: aleatorio / anterior (-15s) / play·pause / siguiente (+15s) / repetir */}
                 <View style={styles.controls}>
                     <TouchableOpacity activeOpacity={0.7}>
                         <ShuffleIcon />
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.75} onPress={() => skipBy(15)}>
+                    <TouchableOpacity
+                        style={styles.secondaryButton}
+                        activeOpacity={0.75}
+                        onPress={() => skipBy(15)}
+                    >
                         <SkipIcon direction="previous" />
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.playBtn}
                         activeOpacity={0.85}
-                        onPress={() => setIsPlaying((v) => !v)}
+                        onPress={handlePlayPause}
                     >
                         {isPlaying ? (
                             <View style={styles.pauseIconWrap}>
@@ -193,7 +287,11 @@ export default function MeditationPlayerScreen({ navigation, route }) {
                         )}
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.75} onPress={() => skipBy(-15)}>
+                    <TouchableOpacity
+                        style={styles.secondaryButton}
+                        activeOpacity={0.75}
+                        onPress={() => skipBy(-15)}
+                    >
                         <SkipIcon direction="next" />
                     </TouchableOpacity>
 
@@ -203,7 +301,12 @@ export default function MeditationPlayerScreen({ navigation, route }) {
                 </View>
             </View>
 
-            <Modal transparent visible={showExitModal} onRequestClose={() => setShowExitModal(false)} animationType="fade">
+            <Modal
+                transparent
+                visible={showExitModal}
+                onRequestClose={() => setShowExitModal(false)}
+                animationType="fade"
+            >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>¿Terminar la sesión?</Text>
@@ -211,7 +314,10 @@ export default function MeditationPlayerScreen({ navigation, route }) {
                             Si sales ahora, no se completará el tiempo de meditación.
                         </Text>
                         <View style={styles.modalButtons}>
-                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowExitModal(false)}>
+                            <TouchableOpacity
+                                style={styles.modalCancelBtn}
+                                onPress={() => setShowExitModal(false)}
+                            >
                                 <Text style={styles.modalCancelText}>Cancelar</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.modalConfirmBtn} onPress={confirmExit}>
