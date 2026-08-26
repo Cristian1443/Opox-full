@@ -132,7 +132,10 @@ function DeckCompleted({ knownCount, failedCards, total, onReviewFailed, onClose
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 export default function TutorFlashcardsScreen({ navigation, route }) {
-    const initialCards = route?.params?.cards ?? MOCK_CARDS;
+    const paramCards   = route?.params?.cards;
+    // Si llega [] explícito (la IA no generó tarjetas), no caer en el mock
+    const isEmpty      = Array.isArray(paramCards) && paramCards.length === 0;
+    const initialCards = isEmpty ? [] : (paramCards?.length > 0 ? paramCards : MOCK_CARDS);
     const deckId       = route?.params?.deckId ?? null;
     const insets = useSafeAreaInsets();
 
@@ -215,6 +218,36 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
         setIsDone(false);
         spinAnim.setValue(0);
     }, [failedCards, spinAnim]);
+
+    if (isEmpty) {
+        return (
+            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+                <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+                <TouchableOpacity
+                    style={styles.emptyClose}
+                    onPress={() => navigation.goBack()}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Cerrar"
+                >
+                    <Ionicons name="close" size={22} color={colors.dark} />
+                </TouchableOpacity>
+                <View style={styles.emptyState}>
+                    <Ionicons name="layers-outline" size={56} color={colors.textSecondary} />
+                    <Text style={styles.emptyTitle}>No se generaron tarjetas</Text>
+                    <Text style={styles.emptyMsg}>
+                        La IA no pudo crear flashcards para este tema. Inténtalo de nuevo o elige otro tema.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.emptyBtn}
+                        onPress={() => navigation.goBack()}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.emptyBtnText}>Volver</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     if (isDone) {
         return (
@@ -362,6 +395,49 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
+    },
+
+    // ── Estado vacío ─────────────────────────────────────────────────────────
+    emptyClose: {
+        position: 'absolute',
+        top: 16,
+        left: 16,
+        zIndex: 1,
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xl,
+        gap: spacing.md,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: colors.dark,
+        textAlign: 'center',
+    },
+    emptyMsg: {
+        fontSize: 14,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 21,
+    },
+    emptyBtn: {
+        marginTop: spacing.sm,
+        backgroundColor: PURPLE,
+        paddingHorizontal: spacing.xl,
+        paddingVertical: 13,
+        borderRadius: 14,
+    },
+    emptyBtnText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '700',
     },
 
     // ── Header ────────────────────────────────────────────────────────────────

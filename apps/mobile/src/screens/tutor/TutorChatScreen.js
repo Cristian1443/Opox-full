@@ -191,6 +191,10 @@ export default function TutorChatScreen({ navigation, route }) {
             navigation.navigate('TutorFlashcardsLoading');
             return;
         }
+        if (label === 'Lanzar test') {
+            navigation.navigate('GeneratorConfig');
+            return;
+        }
 
         addMessage({
             id: Date.now().toString(),
@@ -245,7 +249,7 @@ export default function TutorChatScreen({ navigation, route }) {
                                     setInputText('');
                                     try {
                                         const res = await tutorApi.createConversation('Nueva conversación', technique);
-                                        if (res?.success) conversationIdRef.current = res.data.id;
+                                        if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
                                     } catch {}
                                 },
                             },
