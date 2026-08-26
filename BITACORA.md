@@ -5,6 +5,81 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-25 — Bloque 9 · Factoría de Apuntes — Fixes de upload en dispositivo Android
+
+Rama: `feat/revision-bloque-9-notas`. Sesión de depuración en dispositivo real
+(Android / Expo Go SDK 57). Se identificaron y cerraron 6 bugs que impedían el
+flujo completo upload → análisis → test desde apuntes.
+
+### Fix 1 · Supabase Storage no recibía los archivos subidos
+
+El repositorio pasaba un `Buffer` nativo de Node a la API de Supabase Storage.
+Supabase JS v2 requiere `Uint8Array` para uploads binarios.
+
+- **`SupabaseNotesRepository.uploadFile`**: `Buffer.from(base64, 'base64')` →
+  `new Uint8Array(Buffer.from(base64, 'base64'))`.
+
+### Fix 2 · `expo-file-system` deprecada en SDK 57
+
+`import * as FileSystem from 'expo-file-system'` está deprecated en SDK 57 y
+genera warning de consola. Todo el código de lectura de archivos migrado.
+
+### Fix 3 · `readAsStringAsync` no puede leer URIs `content://` de Android
+
+En SDK 57 la API legada de expo-file-system no soporta el esquema `content://`
+que Android usa para las URIs del Storage Access Framework (SAF). Crash silencioso
+→ el upload no llegaba al backend.
+
+- **`NotesUploadScreen.js`**: eliminado `readAsStringAsync`. Para PDFs se usa
+  `new FSFile(asset.uri).arrayBuffer()` (nueva API de `expo-file-system`) que
+  delega en el ContentResolver nativo y funciona con cualquier URI de Android.
+- Helper `bufferToBase64(buffer)`: convierte `ArrayBuffer` a base64 en chunks de
+  8 192 bytes para no reventar el call stack con documentos grandes.
+- Para fotos de cámara y galería: `ImagePicker.launchCameraAsync` /
+  `launchImageLibraryAsync` con `base64: true` — el picker hace la conversión
+  internamente, evitando FileSystem por completo.
+
+### Fix 4 · Nombre de archivo con ID numérico o UUID en Android
+
+`ImagePicker` en Android devuelve IDs de media store (`1000052094`) como nombre de
+archivo para fotos de galería, y UUIDs para fotos de cámara. Estos aparecían como
+título del apunte en la pantalla de detalle.
+
+- **`NotesUploadScreen.startAnalysis`**: detecta si el nombre base es un número
+  puro o un UUID (regex). Si es así, genera `Apunte DD mon AAAA.ext` con la fecha
+  local del dispositivo. PDFs y fotos con nombre real se dejan intactos.
+
+### Fix 5 · `key` prop warning y test de apuntes no arrancaba
+
+`NotesTestConfigScreen` navegaba al runner con preguntas en formato backend
+(`options: string[], correctIndex: number`), pero `QuestionActiveScreen` espera
+formato runner (`options: [{id, text, correct}]`). Primer síntoma: warning de `key`
+prop undefined; segundo: el test no podía calificar respuestas.
+
+- **`NotesTestConfigScreen.js`**: aplica `adaptGeneratedQuestions(res.data.questions)`
+  antes de navegar (mismo adapter que usa `GeneratorConfigScreen`).
+
+### Fix 6 · Número de páginas siempre "1" para PDFs multipágina
+
+El backend creaba el apunte con `pages = files.length` (1 para un PDF,
+sin importar sus páginas internas). El conteo real se conoce tras el OCR.
+
+- **`INotesRepository.updateStatus` patch**: nuevo campo opcional `pages?: number`.
+- **`SupabaseNotesRepository.updateStatus`**: escribe `pages` en BD si viene en el patch.
+- **`runAnalysisPipeline` (NotesUseCases.ts)**: tras OCR llama
+  `updateStatus({ progress: 33, pages: ocr.pages.length })` — el detalle mostrará
+  el número real en cuanto la IA real esté conectada.
+
+### Estado tras la sesión
+
+- Upload end-to-end funcional en Android (PDF + galería + cámara).
+- Archivos visibles en Supabase Storage con rutas correctas.
+- Test desde apunte arrancan sin errores de key/formato.
+- Etiquetas y conteo de páginas siguen dependiendo de la IA real
+  (`BRIEF_IA_BLOQUE9.md` pendiente de entrega por el equipo IA).
+
+---
+
 ## 2026-08-25 — Diagnóstico Motor de IA + mejoras MotorAiClient
 
 Rama: `feat/revision-bloque-0`. El equipo de IA reportó que el endpoint de generación

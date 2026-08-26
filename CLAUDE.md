@@ -241,6 +241,25 @@ métodos en `AiApiClientStub` — el pipeline es ejecutable de punta a punta con
 mock realistas. El día que llegue la implementación real basta con reemplazar los
 tres métodos delegados por llamadas a OpenAI/Motor.
 
+**Lectura de archivos en Android (SDK 57)**: `readAsStringAsync` de expo-file-system
+**no** puede leer URIs `content://` del SAF de Android. Usar siempre
+`new FSFile(uri).arrayBuffer()` (import `{ File as FSFile } from 'expo-file-system'`),
+que delega en ContentResolver nativo. Para fotos de cámara/galería, usar
+`base64: true` en `ImagePicker` — evita pasar por FileSystem por completo.
+
+**Nombres de archivo Android**: `ImagePicker` devuelve IDs numéricos para galería
+y UUIDs para cámara. `NotesUploadScreen.startAnalysis` detecta ambos patrones y
+genera `Apunte DD mon AAAA.ext` cuando el nombre no tiene extensión real.
+
+**Formato de preguntas**: el backend devuelve `{options: string[], correctIndex}`.
+El runner espera `{options: [{id,text,correct}]}`. Aplicar siempre
+`adaptGeneratedQuestions` (de `utils/questionAdapter.js`) antes de navegar a
+`TrainingSession` desde `NotesTestConfigScreen`.
+
+**Conteo de páginas real**: el backend crea el apunte con `pages = files.length`
+(1 para un PDF). `runAnalysisPipeline` actualiza `notes.pages` a `ocr.pages.length`
+tras el OCR. Con la IA real, el detalle mostrará las páginas reales del documento.
+
 ### Monitor BOE (Bloque 10) — endpoints propios
 
 Detecta y notifica cambios legislativos en el BOE que afectan al temario del
@@ -487,7 +506,7 @@ pnpm lint                       # lint completo
 | 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **desactivado por INC-04** (generaba con LLM y no exponía `correcta_idx` → primera opción siempre "correcta"). Fallback a OpenAI directo activo. Blindaje `CompositeAiClient` para reactivar sin riesgo cuando el equipo IA cierre INC-04 |
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
-| 9 | Factoría de Apuntes | Frontend + backend completo (upload, pipeline OCR→tags→preguntas con AiApiClientStub, generación de tests, 10/10 smoke test verde). IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
+| 9 | Factoría de Apuntes | Frontend + backend completo. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. Test desde apuntes arranca con formato correcto. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo (feed, detalle, comparativa con diff word-by-word, mini-test con AiApiClientStub, 14 requests / 61 assertions verde). IA real (`generateBoeMiniTest`) esperando entrega del prompt del `BRIEF_IA_BLOQUE10.md` |
 | 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
 | 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |

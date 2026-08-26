@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import AccentSlider from '../../components/AccentSlider';
 import { notesApi } from '../../api';
+import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 const NOTES_ACCENT = '#2563EB';
 const NOTES_ACCENT_BG = '#EFF6FF';
@@ -115,7 +116,7 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                 topics: Array.from(selectedTopics),
                 timed,
             });
-            const questions = res?.data?.questions ?? [];
+            const questions = adaptGeneratedQuestions(res?.data?.questions ?? []);
             navigation.replace('TrainingSession', {
                 source: 'notes',
                 noteId: note.id,

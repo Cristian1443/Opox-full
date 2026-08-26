@@ -58,6 +58,32 @@ export class SupabaseNotesRepository implements INotesRepository {
         return (data ?? []).map(mapTag);
     }
 
+    // ── Subida a Storage ─────────────────────────────────────────────────────
+
+    async uploadFile(params: {
+        userId: string;
+        noteId: string;
+        fileName: string;
+        base64: string;
+        mimeType: string;
+    }): Promise<string> {
+        const storagePath = `${params.userId}/${params.noteId}/${params.fileName}`;
+        const fileBuffer  = new Uint8Array(Buffer.from(params.base64, 'base64'));
+
+        const { error } = await this.db.storage
+            .from('notes')
+            .upload(storagePath, fileBuffer, {
+                contentType: params.mimeType,
+                upsert: true,
+            });
+
+        if (error) {
+            logger.error('[notes-repo] uploadFile', { error, storagePath });
+            throw error;
+        }
+        return storagePath;
+    }
+
     // ── Creación ─────────────────────────────────────────────────────────────
 
     async createNote(input: {
@@ -98,6 +124,7 @@ export class SupabaseNotesRepository implements INotesRepository {
             errorCode?: NoteAnalysisErrorCode | null;
             errorMessage?: string | null;
             questionsCount?: number;
+            storagePath?: string | null;
         },
     ): Promise<void> {
         const dbPatch: Record<string, unknown> = {};
@@ -106,6 +133,8 @@ export class SupabaseNotesRepository implements INotesRepository {
         if (patch.errorCode !== undefined) dbPatch.error_code = patch.errorCode;
         if (patch.errorMessage !== undefined) dbPatch.error_message = patch.errorMessage;
         if (patch.questionsCount !== undefined) dbPatch.questions_count = patch.questionsCount;
+        if (patch.storagePath !== undefined) dbPatch.storage_path = patch.storagePath;
+        if (patch.pages !== undefined) dbPatch.pages = patch.pages;
 
         const { error } = await this.db
             .from('notes')

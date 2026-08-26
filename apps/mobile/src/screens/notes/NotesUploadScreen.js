@@ -13,10 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { File as FSFile } from 'expo-file-system';
 import { colors, spacing } from '../../theme';
 import NotesFormatErrorModal from '../../components/NotesFormatErrorModal';
 import { notesApi, authApi } from '../../api';
-import * as FileSystem from 'expo-file-system';
 
 // Formatos aceptados por la Factoría de Apuntes — el backend valida lo mismo.
 // Incluimos HEIC/HEIF por defecto de iPhone y WEBP por Android moderno.
@@ -31,6 +31,18 @@ const ACCEPTED_MIME = [
 
 // Fallback por extensión cuando el sistema no devuelve mimeType.
 const ACCEPTED_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.pdf'];
+
+// Convierte ArrayBuffer a base64 en chunks para no reventar el stack con archivos grandes.
+function bufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const CHUNK = 8192;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+}
+
 
 function extOf(name = '') {
     const idx = name.lastIndexOf('.');
@@ -113,28 +125,41 @@ export default function NotesUploadScreen({ navigation }) {
     const startAnalysis = async (assets, kind) => {
         setUploading(true);
         try {
-            const files = await Promise.all(assets.map(async (a) => {
-                const base64 = a.base64 ?? await FileSystem.readAsStringAsync(a.uri, {
-                    encoding: FileSystem.EncodingType.Base64,
-                });
-                return {
-                    base64,
-                    mimeType: a.mimeType ?? (kind === 'pdf' ? 'application/pdf' : 'image/jpeg'),
-                    sizeBytes: a.size ?? a.fileSize ?? Math.floor(base64.length * 0.75),
-                };
+            // Los assets ya vienen con base64 (ImagePicker base64:true para fotos,
+            // o campo base64 inyectado por el caso PDF vía DocumentPicker + FileSystem).
+            const files = assets.map((a) => ({
+                base64: a.base64,
+                mimeType: a.mimeType ?? (kind === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+                sizeBytes: a.size ?? a.fileSize ?? Math.floor((a.base64?.length ?? 0) * 0.75),
             }));
-            const fileName = assets[0]?.name ?? assets[0]?.fileName
-                ?? `Apunte ${new Date().toISOString().slice(0, 10)}`;
+            const rawName = assets[0]?.name ?? assets[0]?.fileName ?? '';
+            const nameBase = rawName.replace(/\.[^.]+$/, '');
+            // Android devuelve IDs numéricos (galería) o UUIDs (cámara) como nombre.
+            const looksGenerated = !nameBase
+                || /^\d+$/.test(nameBase)
+                || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nameBase);
+            const ext = kind === 'pdf' ? '.pdf' : '.jpg';
+            const dateStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+            const fileName = looksGenerated ? `Apunte ${dateStr}${ext}` : rawName;
 
             const res = await notesApi.upload({ oposicion, kind, fileName, files });
-            const noteId = res?.data?.noteId ?? null;
+            if (res?.error || !res?.data?.noteId) {
+                Alert.alert(
+                    'Error al subir',
+                    res?.error?.message ?? 'No se pudo conectar con el servidor. Revisa tu red.',
+                );
+                return;
+            }
             setCaptureMode(false);
             setCapturedPhotos([]);
-            navigation.navigate('NotesAnalysis', { noteId, pageCount: assets.length });
-        } catch {
+            navigation.navigate('NotesAnalysis', { noteId: res.data.noteId, pageCount: assets.length });
+        } catch (err) {
             setCaptureMode(false);
             setCapturedPhotos([]);
-            navigation.navigate('NotesAnalysis', { noteId: null, pageCount: assets.length });
+            Alert.alert(
+                'Error inesperado',
+                err?.message ?? 'Ocurrió un error al preparar el archivo.',
+            );
         } finally {
             setUploading(false);
         }
@@ -145,6 +170,7 @@ export default function NotesUploadScreen({ navigation }) {
         const result = await ImagePicker.launchCameraAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             quality: 0.85,
+            base64: true,
         });
         if (result.canceled) return null;
         const asset = result.assets?.[0];
@@ -172,7 +198,7 @@ export default function NotesUploadScreen({ navigation }) {
             case 'pdf': {
                 const result = await DocumentPicker.getDocumentAsync({
                     type: '*/*',
-                    copyToCacheDirectory: true,
+                    copyToCacheDirectory: false,
                     multiple: false,
                 });
                 if (result.canceled) return;
@@ -181,7 +207,11 @@ export default function NotesUploadScreen({ navigation }) {
                     setFormatErrorVisible(true);
                     return;
                 }
-                startAnalysis([asset], 'pdf');
+                // readAsStringAsync no soporta las URIs content:// de Android en SDK 57.
+                // FSFile.arrayBuffer() usa ContentResolver nativamente y sí funciona.
+                const arrayBuf = await new FSFile(asset.uri).arrayBuffer();
+                const base64 = bufferToBase64(arrayBuf);
+                startAnalysis([{ ...asset, base64 }], 'pdf');
                 break;
             }
 
@@ -193,6 +223,7 @@ export default function NotesUploadScreen({ navigation }) {
                     allowsMultipleSelection: true,
                     selectionLimit: 20,
                     quality: 0.85,
+                    base64: true,
                 });
                 if (result.canceled) return;
                 const assets = result.assets ?? [];

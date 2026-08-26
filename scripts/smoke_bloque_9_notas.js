@@ -143,6 +143,17 @@ async function getDetail(noteId) {
     ok('GET /notes/:id', `title="${note.title}" pages=${note.pages} questions=${note.questionsCount}`);
     ok('etiquetas', (note.tags ?? []).join(', ') || '(ninguna)');
     ok('páginas OCR', `${(note.pageThumbnails ?? []).length} páginas procesadas`);
+
+    // Verificar que storage_path fue persistido (la subida corre en background —
+    // damos 3s extra para que termine antes de leer el campo).
+    await new Promise(r => setTimeout(r, 3000));
+    const r2 = await req('GET', `/notes/${noteId}`, null, 'storagePath check');
+    const storagePath = r2?.json?.data?.storagePath ?? null;
+    if (storagePath) {
+        ok('storage_path guardado', storagePath);
+    } else {
+        ko('storage_path null', 'el archivo no se subió a Supabase Storage');
+    }
 }
 
 async function generateTest(noteId) {
