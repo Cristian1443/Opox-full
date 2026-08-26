@@ -46,6 +46,10 @@ export interface IDashboardRepository {
     // ─── Gamificación (racha + Opopoints) ─────────
     getGamification(userId: string): Promise<UserGamification>;
 
-    /** Registra actividad de hoy: actualiza racha y suma Opopoints. */
-    registerActivity(input: { userId: string; reason: string; points: number }): Promise<UserGamification>;
+    /**
+     * Registra actividad de hoy: actualiza racha y suma Opopoints.
+     * `localDate` (YYYY-MM-DD): fecha local del dispositivo. Sin ella se cae
+     * a UTC, lo que puede desfasar la racha en zonas horarias no-UTC.
+     */
+    registerActivity(input: { userId: string; reason: string; points: number; localDate?: string }): Promise<UserGamification>;
 }

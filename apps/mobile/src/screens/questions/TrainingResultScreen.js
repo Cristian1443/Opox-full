@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
-import { trainingApi, motivationApi } from '../../api';
+import { trainingApi, motivationApi, planningApi } from '../../api';
 
 const OPTION_ID_TO_INDEX = { A: 0, B: 1, C: 2, D: 3 };
 
@@ -171,6 +171,7 @@ export default function TrainingResultScreen({ navigation, route }) {
     elapsedSeconds = MOCK_DATA.elapsedSeconds,
     challengeId = null,
     clanId = null,
+    taskId = null,
   } = route?.params ?? {};
 
   const total = questions.length;
@@ -201,6 +202,12 @@ export default function TrainingResultScreen({ navigation, route }) {
     // Si venimos de un reto de clan y superamos el umbral del 60%, completamos el reto.
     if (challengeId && clanId && percentage >= 60) {
       motivationApi.completeChallenge(clanId, challengeId).catch(() => { });
+    }
+
+    // Si el test se lanzó desde una tarea de planificación, la marcamos como
+    // completada para que suba el % del día y dispare la racha del bloque 4.
+    if (taskId) {
+      planningApi.toggleTask(taskId, true).catch(() => { });
     }
   }, []);
 

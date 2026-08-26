@@ -5,6 +5,178 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-25 — Diagnóstico Motor de IA + mejoras MotorAiClient
+
+Rama: `feat/revision-bloque-0`. El equipo de IA reportó que el endpoint de generación
+ya devuelve `correcta_idx`. Se activó `MOTOR_API_BASE_URL` en `.env` y se ejecutó un
+diagnóstico exhaustivo contra el Motor real.
+
+### Resultado del diagnóstico (`scripts/diagnostico_motor.js`)
+
+- Motor activo en `https://ingesta-demo.onrender.com` (cold start ~31s, Render free tier).
+- **INC-04 sigue sin resolver**: las preguntas del job result (`/v1/tests/generate` →
+  `/v1/jobs/{id}`) tienen `origen: "generada"` y NO incluyen `correcta_idx`.
+  Los campos del job son: `[id, enunciado, opciones, dificultad, tema_id, origen, ref_legislativa]`.
+- El equipo de IA probablemente testeó `/v1/courses/{id}/questions` (el banco), que SÍ
+  tiene `correcta_idx`. Pero esos IDs son del banco pre-ingestado, distintos a los
+  generados por LLM en el job.
+- El banco de preguntas sigue accesible y funciona correctamente.
+
+### Mejoras en `MotorAiClient.ts`
+
+**Fail-fast para INC-04**: cuando todas las preguntas del job son `origen="generada"`
+sin `correcta_idx`, el cliente lanza error inmediatamente sin intentar cargar el banco
+(que nunca tendrá esos IDs de LLM). Ahorra los ~164ms de carga del banco inútil.
+
+**Compatibilidad anticipada INC-04**: `MotorPreguntaJob` ahora incluye `correcta_idx?`
+y `explicacion?` opcionales. `mapPregunta()` usa `p.correcta_idx` del job result con
+prioridad sobre `full.correcta_idx` del banco. Cuando el equipo IA añada el campo al
+job, el cliente lo usará automáticamente sin más cambios.
+
+**Fix TS pre-existente**: `questionsResponseSchema` en `AiApiClient.ts` estaba
+declarada pero nunca usada (artefacto del Fix 4 de ayer). Eliminada.
+
+### Impacto en UX actual (Motor activo + INC-04 pendiente)
+
+Con el Motor activo, el flujo del Generador Infinito es:
+1. Motor lanza job (~387ms para 202)
+2. Polling hasta done (~57s para 3 preguntas)
+3. Fail-fast: todas "generada" sin correcta_idx → error inmediato
+4. `CompositeAiClient` captura → fallback a OpenAI (~10s)
+Total: ~67s por solicitud
+
+Sin el Motor (`MOTOR_API_BASE_URL` vacío): OpenAI directo ~10s.
+
+El blindaje `CompositeAiClient` garantiza que el usuario no ve error, pero sí espera
+más tiempo mientras el Motor esté activo con INC-04 pendiente.
+
+### Estado Motor
+
+Motor **activo** en `.env`. Si INC-04 tarda, considerar desactivar temporalmente para
+recuperar los ~57s de latencia. Para reactivar: ya solo hace falta que el equipo IA
+añada `correcta_idx` + `explicacion` al payload del job result — el cliente está listo.
+
+---
+
+## 2026-08-25 — Sesión de fixes · Generador, racha y zona horaria
+
+Rama: `feat/revision-bloque-0` (extendida más allá del alcance original de Bloque 0).
+Sesión de depuración en dispositivo. Se cerraron 5 bugs encadenados que impedían
+el flujo Generador infinito → guardar intento → completar tarea → subir racha.
+
+### Fix 1 · Generador infinito devolvía siempre la primera opción como correcta
+
+El Motor de IA generaba preguntas nuevas con LLM en cada request (no las servía
+del banco pre-ingestado). Como el workaround INC-04 depende de cruzar por ID
+contra el banco para conocer `correcta_idx`, y ninguno de los IDs generados
+existía en el banco, el mapeo caía al fallback `correctIndex = 0` en silencio.
+**Efecto real**: cada test corregía la primera opción como acertada, ensuciando
+estadísticas del usuario sin que este lo notara.
+
+Cambios:
+- **`MotorAiClient.ensureQuestionBank`**: paginar `/v1/courses/{id}/questions`
+  con `limit=200` (el Motor rechazaba `limit=1000` con 422). Aunque esto no
+  arregla el bug de fondo, evita el error de arranque.
+- **`MotorAiClient.generateQuestions`**: filtra preguntas cuyo id no existe
+  en el banco (no podemos calificarlas). Si quedan 0 útiles, lanza error.
+  `mapPregunta` recibe `full: MotorPreguntaFull` como parámetro requerido —
+  imposible ya devolver `correctIndex: 0` en silencio.
+- **`CompositeAiClient.generateQuestions` / `generateSurgicalTest`**: envuelto
+  en `try/catch` con fallback automático a OpenAI directo. Cualquier fallo del
+  Motor cae al cliente OpenAI sin romper la experiencia del usuario.
+- **`.env`**: `MOTOR_API_BASE_URL` desactivado temporalmente. Hasta que el
+  equipo IA arregle INC-04, el generador usa OpenAI directo (rápido y correcto).
+
+### Fix 2 · Timeouts del Generador infinito
+
+El Motor tarda ~10 s por pregunta generada (LLM en tiempo real). El TTL del
+mobile era 60 s y el timeout del backend 120 s → tests de 10+ preguntas
+cancelaban antes de terminar.
+
+- **`GeneratorConfigScreen`**: TTL aviso 15 s → 30 s, TTL kill 60 s → 240 s.
+- **`MotorAiClient.pollJobForPreguntas`**: `pollTimeoutMs` 120 s → 240 s.
+  Log de progreso `[motor-ai] job en progreso` cada 15 s con `elapsedMs`.
+
+### Fix 3 · Guardar intento fallaba con FK violation
+
+`training_attempt_responses.question_id` es FK a `training_questions.id`.
+Las preguntas generadas por IA nunca se insertan en `training_questions`, así
+que el UUID del mobile no existía en la tabla → violación de FK, el intento
+no se guardaba y el usuario veía "no responde".
+
+- **`SupabaseTrainingRepository.saveAttempt`**: antes de insertar, consulta
+  `SELECT id FROM training_questions WHERE id IN (...)` para saber qué IDs
+  existen realmente. Las preguntas ausentes se guardan con `question_id = null`
+  (permitido por el schema y comentado como tal).
+
+### Fix 4 · Parseo estricto tumbaba tests completos
+
+`AiApiClient.generateQuestions` validaba la respuesta OpenAI con un schema Zod
+monolítico. Si el modelo alucinaba 90 items malos y 10 buenos (patrón real:
+aplanar las opciones al mismo nivel que la pregunta), se descartaba todo el
+batch y el usuario veía "malformada".
+
+- **`AiApiClient.generateQuestions` / `generateSurgicalTest`**: parseo laxo del
+  array + validación por elemento con `generatedQuestionSchema.safeParse`. Los
+  buenos se conservan, los malos se descartan y se cuentan en log
+  `[ai-openai] preguntas descartadas por schema inválido`. El loop de 3 rondas
+  ya existente rellena las que faltan.
+
+### Fix 5 · Tarea de test no se marcaba como completada
+
+Al lanzar un test desde una tarea de planificación, el `taskId` no viajaba por
+la cadena de navegación. Al terminar el test, la tarea seguía sin marcar y no
+disparaba la racha del bloque 4.
+
+- **`PlanningTodayScreen.handleStartTask`**: propaga `taskId` al navegar.
+- **`GeneratorConfigScreen`** → **`QuestionActiveScreen`** → **`TrainingResultScreen`**:
+  cadena de propagación del `taskId` completa.
+- **`TrainingResultScreen`**: al montar, si hay `taskId`, llama
+  `planningApi.toggleTask(taskId, true)`.
+
+### Fix 6 · Racha solo subía al cruzar el objetivo diario
+
+`ToggleTaskUseCase` solo llamaba `registerActivity` cuando `completedCount === goalCount`.
+Un usuario que completaba una tarea sin llegar a la meta no veía racha ni ledger.
+
+- **`ToggleTaskUseCase`**: cada tarea completada llama `registerActivity` con
+  `points: 0`. Solo cuando se cruza el objetivo se dan los `DAILY_GOAL_POINTS`
+  y `goalCompleted: true` (para disparar el pop-up).
+
+### Fix 7 · Racha usaba UTC → desfase en zonas horarias
+
+`registerActivity` calculaba "hoy" con `new Date().toISOString().slice(0,10)` —
+en Colombia (UTC−5) una sesión a las 20:00h se registraba con la fecha UTC
+del día siguiente. Efecto: dos actividades del mismo día local podían quedar
+en dos días UTC distintos (racha sube de más), o al revés (racha no sube).
+
+- **`IDashboardRepository.registerActivity`**: nuevo parámetro `localDate?: string`.
+- **`SupabaseDashboardRepository.registerActivity`**: si viene `localDate`, lo
+  usa; si no, cae a UTC (retrocompatible).
+- **Use cases propagados**: `SaveAttemptUseCase`, `ToggleTaskUseCase`,
+  `CompleteChallengeUseCase`, `RegisterActivityUseCase` reciben y pasan `localDate`.
+- **Validators Zod**: `registerActivitySchema`, `saveAttemptSchema`,
+  `toggleTaskSchema`, nuevo `completeChallengeSchema` — regex `YYYY-MM-DD`.
+- **Ruta `POST /motivation/clans/:id/challenges/:challengeId/complete`**: ahora
+  con `validateBody(completeChallengeSchema)`.
+- **Types compartidos**: `SaveAttemptRequest.localDate?: string`.
+- **Mobile — inyección automática** en cada wrapper que dispara actividad:
+  `trainingApi.saveAttempt`, `planningApi.toggleTask`, `motivationApi.completeChallenge`,
+  `dashboardApi.registerActivity`. Cada uno añade `localDate: new Date().toLocaleDateString('sv')`
+  (locale sueco → `YYYY-MM-DD` en TZ del dispositivo).
+
+### Estado actual
+
+- Motor de IA del cliente **desactivado** (`MOTOR_API_BASE_URL` vacío en `.env`).
+  El generador infinito y el test quirúrgico usan OpenAI directo. Reactivar
+  requiere que el equipo IA arregle INC-04 (job result no expone `correcta_idx`).
+- Fallback en `CompositeAiClient` blindado: aunque se reactive el Motor, si
+  vuelve a fallar por INC-04 u otra causa, cae automáticamente a OpenAI.
+- Racha, ledger de Opopoints y tarea completada ya funcionan end-to-end desde
+  el flujo test + planificación.
+
+---
+
 ## 2026-08-23 — Bloque 4 · Planificación — Revisión post-testing (10 fixes)
 
 Rama: `feat/revision-bloque-4-planificacion` (nacida de `feat/bloque-13-notificaciones` tras merge a `main`).

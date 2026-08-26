@@ -8,6 +8,7 @@ import {
     sendClanMessageSchema,
     listClanMessagesQuerySchema,
     createClanChallengeSchema,
+    completeChallengeSchema,
 } from '../validators';
 
 /** Todas las rutas del Bloque 5 requieren sesión. */
@@ -61,6 +62,7 @@ export function createMotivationRouter(
     r.post(
         API_ROUTES.MOTIVATION.CLAN_CHALLENGE_COMPLETE,
         authMiddleware,
+        validateBody(completeChallengeSchema),
         controller.completeChallenge,
     );
 

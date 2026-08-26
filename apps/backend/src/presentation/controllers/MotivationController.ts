@@ -272,6 +272,7 @@ export class MotivationController {
                 userId: req.authUser!.id,
                 clanId: req.params['id'] as string,
                 challengeId: req.params['challengeId'] as string,
+                localDate: req.body?.localDate,
             });
             this.ok(res, 200, this.serializeCompleteResult(result));
         } catch (err) { next(err); }

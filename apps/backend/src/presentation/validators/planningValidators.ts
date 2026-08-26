@@ -26,6 +26,7 @@ export const createTaskSchema = z.object({
 
 export const toggleTaskSchema = z.object({
     done: z.boolean(),
+    localDate: dateSchema.optional(),
 });
 
 export const weekQuerySchema = z.object({

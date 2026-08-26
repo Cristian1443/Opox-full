@@ -17,6 +17,7 @@ import type {
     GenerateBoeMiniTestParams,
     BoeMiniTestAiResult,
 } from '@opox/types';
+import { logger } from '@opox/utils';
 
 export interface CompositeAiConfig {
     /** Motor de IA del cliente — cubre generateQuestions y generateSurgicalTest (RAG). */
@@ -36,12 +37,26 @@ export interface CompositeAiConfig {
 export class CompositeAiClient implements AiApiContract {
     constructor(private readonly cfg: CompositeAiConfig) {}
 
-    generateQuestions(params: GenerateQuestionsParams): Promise<GeneratedQuestion[]> {
-        return this.cfg.questions.generateQuestions(params);
+    async generateQuestions(params: GenerateQuestionsParams): Promise<GeneratedQuestion[]> {
+        try {
+            return await this.cfg.questions.generateQuestions(params);
+        } catch (err) {
+            logger.warn('[composite-ai] Motor falló en generateQuestions — usando OpenAI', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return this.cfg.fallback.generateQuestions(params);
+        }
     }
 
-    generateSurgicalTest(params: GenerateSurgicalTestParams): Promise<SurgicalTestResult> {
-        return this.cfg.questions.generateSurgicalTest(params);
+    async generateSurgicalTest(params: GenerateSurgicalTestParams): Promise<SurgicalTestResult> {
+        try {
+            return await this.cfg.questions.generateSurgicalTest(params);
+        } catch (err) {
+            logger.warn('[composite-ai] Motor falló en generateSurgicalTest — usando OpenAI', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return this.cfg.fallback.generateSurgicalTest(params);
+        }
     }
 
     analyzePhoto(params: AnalyzePhotoParams): Promise<PhotoTestResult> {

@@ -207,9 +207,13 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
         userId: string;
         reason: string;
         points: number;
+        localDate?: string;
     }): Promise<UserGamification> {
         const current = await this.getGamification(input.userId);
-        const today = new Date().toISOString().slice(0, 10);
+        // `localDate` viene del dispositivo — evita el desfase de racha en
+        // usuarios de UTC−N (una actividad a las 21:00 hora Colombia se
+        // registraba en UTC del día siguiente y "quemaba" la racha).
+        const today = input.localDate ?? new Date().toISOString().slice(0, 10);
         const next = current.withActivity(today, input.points);
 
         const { data, error } = await this.supabaseAdmin

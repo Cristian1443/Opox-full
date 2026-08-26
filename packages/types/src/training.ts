@@ -100,6 +100,8 @@ export interface SaveAttemptRequest {
     topicId?: string;
     difficulty?: TrainingDifficulty;
     durationSecs?: number;
+    /** Fecha local del dispositivo (YYYY-MM-DD) para calcular la racha correctamente en TZ no-UTC. */
+    localDate?: string;
     responses: SaveAttemptResponseInput[];
 }
 

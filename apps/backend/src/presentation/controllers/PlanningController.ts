@@ -189,6 +189,7 @@ export class PlanningController {
                 userId: req.authUser!.id,
                 taskId: req.params['id'] as string,
                 done: req.body.done,
+                localDate: req.body.localDate,
             });
             this.ok(res, 200, this.serializeToggleResult(result));
         } catch (err) { next(err); }

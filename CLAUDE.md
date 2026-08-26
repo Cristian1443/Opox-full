@@ -173,7 +173,8 @@ Rutas bajo `/motivation/`. Cubre racha, rankings, clanes, retos de clan y Muro d
 **Racha y gamificación**:
 - `GET /motivation/summary` — devuelve `{ gamification, myClan }`. Es el endpoint de arranque de `MotivationHomeScreen`.
 - `GET /motivation/streak` — detalle de racha con `recentActivityDates`, `nextMilestone` y `longestStreak`.
-- La racha se actualiza con `registerActivity()` en tres eventos: completar tarea de planificación, completar reto de clan, **y guardar cualquier intento de test** (`SaveAttemptUseCase` llama `registerActivity({ points: 0 })`). Sin este último, "Hacer test rápido" no salvaba la racha.
+- La racha se actualiza con `registerActivity()` en cuatro eventos: **cada tarea de planificación completada** (`points: 0`, y `DAILY_GOAL_POINTS` solo la vez que se cruza el objetivo diario), completar reto de clan, guardar cualquier intento de test (`SaveAttemptUseCase` llama `registerActivity({ points: 0 })`) y el endpoint público `POST /dashboard/register-activity`.
+- **Fecha de la actividad** — `registerActivity` acepta `localDate?: string` (YYYY-MM-DD). Si viene, se usa; si no, cae a UTC. El mobile lo inyecta automáticamente en `trainingApi.saveAttempt`, `planningApi.toggleTask`, `motivationApi.completeChallenge` y `dashboardApi.registerActivity` con `new Date().toLocaleDateString('sv')` — evita que una actividad de las 20:00h Colombia se registre con la fecha UTC del día siguiente y desfase la racha.
 
 **Rankings**: `GET /motivation/ranking?scope=weekly|global|oposicion|topic&topicId=xxx`.
 - Scope `topic` agrega `training_attempt_responses.is_correct` por `topic_id` usando `supabaseAdmin` (bypasa RLS cross-user). Requiere `topicId`.
@@ -420,29 +421,45 @@ Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, devic
 
 **Limitación Expo Go**: push remotos no funcionan en Expo Go SDK 53+. Requiere EAS development build (`eas build --profile development`) para prueba end-to-end de tokens reales.
 
-### Motor de IA del cliente (DESPLEGADO y activo)
+### Motor de IA del cliente (ACTIVO — INC-04 aún pendiente)
 
-Microservicio RAG del equipo IA, desplegado en producción:
-`https://ingesta-demo.onrender.com` (migrado desde GCP Cloud Run el 2026-08-18).
+Microservicio RAG del equipo IA en `https://ingesta-demo.onrender.com`.
+**Estado actual (2026-08-25): activo en `.env`** (`MOTOR_API_BASE_URL` configurado).
+Con el Motor activo, `CompositeAiClient` lo intenta primero y cae a OpenAI directo
+cuando el Motor falla por INC-04. El usuario no ve error pero espera ~67s en lugar de ~10s.
 
-Ingesta PDFs de temario y genera tests con evidencia verbatim + página exacta.
-Autentica con `X-API-Key` (no Bearer). Curso activo: `1357e871b542425b` — es el
-id del Cloud Run viejo que sigue resolviendo en Render (datos migrados), pero
-está pendiente re-ingestar el temario oficial y actualizar `MOTOR_DEFAULT_CURSO_ID`.
+**INC-04 confirmado pendiente (2026-08-25)**: diagnóstico ejecutado contra el Motor real
+(`scripts/diagnostico_motor.js`). El job result sigue sin incluir `correcta_idx`:
+campos reales del job = `[id, enunciado, opciones, dificultad, tema_id, origen, ref_legislativa]`.
+El equipo de IA probó `/v1/courses/{id}/questions` (el banco), que SÍ tiene `correcta_idx`,
+pero los IDs del banco y del LLM son distintos → el workaround por id-cruce nunca funciona.
 
-**Integración activa (`CompositeAiClient.ts`):**
-- `generateQuestions` y `generateSurgicalTest` → Motor RAG (async job, ~50-70 s).
-- `analyzePhoto`, `generateHint`, Bloques 9/10 → OpenAI directo (sin cambios).
-- Para desactivar: vaciar `MOTOR_API_BASE_URL` en `.env`.
+**Comportamiento actual con Motor activo**:
+1. Motor lanza job → polling ~57s → fail-fast (todas `origen="generada"` sin correcta_idx)
+2. `CompositeAiClient` captura → OpenAI directo ~10s
+Total: ~67s vs ~10s sin Motor. Si la latencia es inaceptable, vaciar `MOTOR_API_BASE_URL`.
 
-**[INC-04] `correcta_idx` ausente en job result** — el Motor no expone el índice
-correcto en el job result. Workaround activo: `MotorAiClient` carga el banco de
-preguntas del curso (`GET /v1/courses/{id}/questions`) y cachea `correcta_idx` 30 min.
-Solución definitiva (Opción A del equipo IA): validar respuesta a respuesta vía
-`POST /v1/tests/{sesion_id}/answer` — pendiente de confirmación del equipo IA.
-Ver `packages/ai/MOTOR_INTEGRATION.md` para el detalle completo.
+**Fixes defensivos activos**:
+- `MotorAiClient.generateQuestions` — fail-fast si todas las preguntas son `origen="generada"`
+  sin `correcta_idx` (no carga el banco en vano). Cuando alguna tenga `correcta_idx` en el
+  job, la usa directamente sin consultar el banco (preparado para Opción A de INC-04).
+- `MotorPreguntaJob` — tipado con `correcta_idx?` y `explicacion?` opcionales. Cuando el
+  equipo IA los añada al job result, el cliente los usará automáticamente.
+- `CompositeAiClient.generateQuestions` / `generateSurgicalTest` — try/catch con fallback
+  automático a OpenAI. El usuario nunca ve error.
+- `MotorAiClient.ensureQuestionBank` — paginado con `limit=200`.
+- Timeouts: `pollTimeoutMs` 240 s; mobile `TTL_KILL_MS` 240 s.
+
+**[INC-04] Bloqueante del Motor**: el job result no expone `correcta_idx`. Opciones para el equipo IA:
+- **A** (recomendada): incluir `correcta_idx` + `explicacion` en el payload de
+  cada pregunta del job result. El cliente ya está listo para recibirlos.
+- **B**: implementar `POST /v1/tests/{sesion_id}/answer` que valida respuesta a
+  respuesta (requiere refactor del flujo mobile).
+
+Ver `packages/ai/MOTOR_INTEGRATION.md` para el detalle histórico.
 
 **Smoke test E2E:** `scripts/smoke_bloques_0_6_7.js` — 30/30 PASS (bloques 0, 6 y 7).
+**Diagnóstico Motor:** `scripts/diagnostico_motor.js` — verifica correcta_idx en job result.
 
 ---
 
@@ -467,7 +484,7 @@ pnpm lint                       # lint completo
 | 3 | Salud | Frontend cerrado |
 | 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |
 | 5 | Motivación | Frontend + backend completo |
-| 6 | Entrenamiento | Frontend + backend + IA completo (los 4 flujos cableados a OpenAI real) |
+| 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **desactivado por INC-04** (generaba con LLM y no exponía `correcta_idx` → primera opción siempre "correcta"). Fallback a OpenAI directo activo. Blindaje `CompositeAiClient` para reactivar sin riesgo cuando el equipo IA cierre INC-04 |
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
 | 9 | Factoría de Apuntes | Frontend + backend completo (upload, pipeline OCR→tags→preguntas con AiApiClientStub, generación de tests, 10/10 smoke test verde). IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
