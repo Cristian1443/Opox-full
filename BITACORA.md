@@ -5,6 +5,60 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-26 — Merge rediseño Figma Bloques 8 y 9 en rama BOE
+
+Rama: `feat/revision-bloque-10-boe`. Integración de `feat/bloque-8-9-rediseno-figma`
+mediante merge con resolución manual de 8 conflictos. Estrategia global: **Figma gana
+en layout y estilos, HEAD gana en lógica de negocio y llamadas API**.
+
+### Lo que trajo el rediseño Figma
+
+**Build fix crítico**: `expo-build-properties` añadido al `package.json` y a los
+plugins de `app.json` con `android.minSdkVersion: 26`. Sin esto `react-native-health-connect`
+no compilaba el APK en EAS (la librería exige API 26+).
+
+**Assets nuevos** (usados en pantallas de Salud): `cel.png`, `celu.png`,
+`celular.png`, `reloj.png`, `watch.png` en `apps/mobile/assets/`.
+
+**`AccentSlider.js`**: thumb rediseñado — antes blanco con borde de color, ahora
+fondo `colors.textDark` con punto interior más pequeño. Afecta a todos los sliders
+de configuración de test (Bloque 6, 9, etc.).
+
+**Aula Virtual — Bloque 8** (6 pantallas + 1 modal reestilizados fiel a Figma):
+- `TutorHomeScreen`, `TutorChatScreen`, `TutorPodcastScreen`, `TutorSummariesScreen`,
+  `TutorFlashcardsScreen`, `TutorFlashcardsLoadingScreen`, `FlashcardsSuccessModal`.
+- Tokens Figma exactos (`Poppins-*`, sizes en puntos, border-radius, paleta morada/verde).
+- `TutorPodcastScreen`: añadido `EpisodePicker` funcional — carga `tutorApi.listEpisodes(oposicion)`
+  y muestra lista antes de entrar al player.
+- `TutorSummariesScreen`: añadido `TopicPicker` funcional — carga `tutorApi.listSummaries(oposicion)`.
+- `TutorFlashcardsScreen`: empty state cuando la IA no genera tarjetas (`paramCards.length === 0`).
+
+**Factoría de Apuntes — Bloque 9** (4 pantallas + 4 modales reestilizados):
+- `NotesHomeScreen`, `NotesUploadScreen`, `NoteDetailScreen`, `NotesTestConfigScreen`.
+- Modales: `NotesDeleteConfirmModal`, `NotesDigitizedModal`, `NotesFormatErrorModal`,
+  `NotesOcrErrorModal`. También `AlertCardModal` (modal genérico compartido).
+- `NotesTestConfigScreen`: nuevo toggle "Solo temas etiquetados" + selector de
+  dificultad (Fácil/Medio/Difícil) integrados; ambos se pasan al API en `startTest`.
+
+**Salud — Bloque 3**:
+- `ConnectDeviceScreen`: iconos SVG inline eliminados, reemplazados por `Ionicons`
+  (más compacto, consistente con el resto de la app).
+
+### Resolución de los 8 conflictos
+
+| Archivo | Decisión |
+|---|---|
+| `package.json` | expo-av (podcast) + expo-build-properties (health connect) |
+| `NoteDetailScreen.js` | DocumentIcon de Figma + fix `createdAt ?? uploadedAt` |
+| `NotesTestConfigScreen.js` | UI Figma + `notesApi.generateTest` async + `adaptGeneratedQuestions`; estados `starting` + `onlyTaggedTopics` combinados; `difficulty` pasado al API |
+| `NotesUploadScreen.js` | Layout Figma + `StatusBar`/`Image`/`Alert` del captureMode; `NOTES_ACCENT = colors.accentOrange` añadido; dead styles `body`/`list` eliminados |
+| `TutorFlashcardsScreen.js` | Figma + empty state re-incorporado; `PURPLE` → `colors.purple`; `handleReviewFailed` eliminado (bug: no tenía setter `setCards`) |
+| `TutorPodcastScreen.js` | `EpisodePicker` conservado (necesario para el flujo); `StatusBar` eliminado; `BLUE_ACCENT` → `colors.accentOrange`; estilos Figma |
+| `TutorSummariesScreen.js` | `TopicPicker` conservado con header inline (fix `ScreenHeader` no importado); `MoreButton` eliminado (no referenciado); `isLoading` inicializado con `topicId` |
+| `pnpm-lock.yaml` | Regenerado con `pnpm install` — conflicto resuelto automáticamente |
+
+---
+
 ## 2026-08-27 — Bloque 10 · Monitor BOE — Revisión completa + fixes en dispositivo
 
 Rama: `feat/revision-bloque-10-boe`. Revisión integral del Monitor BOE: gaps de

@@ -221,6 +221,24 @@ Colección de tests completa en `Bloque8_Tutor_Tests.postman_collection.json`.
 Patrón de respuesta del API client mobile: devuelve `{ data, error }` — **nunca**
 `{ success, data }`. Usar `!res?.error && res?.data` para comprobar éxito.
 
+**Rediseño Figma (2026-08-26)**: 6 pantallas + 1 modal completamente reestilizados
+con tokens exactos de Figma (`Poppins-*`, border-radius, paleta morada/verde):
+`TutorHomeScreen`, `TutorChatScreen`, `TutorPodcastScreen`, `TutorSummariesScreen`,
+`TutorFlashcardsScreen`, `TutorFlashcardsLoadingScreen`, `FlashcardsSuccessModal`.
+
+**`TutorPodcastScreen` — `EpisodePicker`**: cuando no hay `episodeId` en los params,
+muestra un selector que carga `tutorApi.listEpisodes(oposicion)`. Al seleccionar un
+episodio navega al player. El timer simulado avanza con la velocidad elegida
+(`0.5x / 1x / 1.5x / 2x`) y guarda progreso via `tutorApi.saveProgress` cada 10 s.
+
+**`TutorSummariesScreen` — `TopicPicker`**: cuando no hay `topicId` en los params,
+muestra un selector que carga `tutorApi.listSummaries(oposicion)`.
+
+**`TutorFlashcardsScreen` — empty state**: si `paramCards` llega como array vacío
+(`paramCards.length === 0`), muestra pantalla de error en lugar de intentar renderizar
+una tarjeta undefined. La función `handleReviewFailed` fue eliminada (bug: `cards`
+no tiene setter).
+
 ### Factoría de Apuntes (Bloque 9) — endpoints propios
 
 Sube fotos/PDFs del temario del usuario, corre un pipeline de IA en background
@@ -259,6 +277,21 @@ El runner espera `{options: [{id,text,correct}]}`. Aplicar siempre
 **Conteo de páginas real**: el backend crea el apunte con `pages = files.length`
 (1 para un PDF). `runAnalysisPipeline` actualiza `notes.pages` a `ocr.pages.length`
 tras el OCR. Con la IA real, el detalle mostrará las páginas reales del documento.
+
+**Rediseño Figma (2026-08-26)**: 4 pantallas + 4 modales + 1 modal genérico reestilizados:
+`NotesHomeScreen`, `NotesUploadScreen`, `NoteDetailScreen`, `NotesTestConfigScreen`.
+Modales: `NotesDeleteConfirmModal`, `NotesDigitizedModal`, `NotesFormatErrorModal`,
+`NotesOcrErrorModal`, `AlertCardModal`. Tokens Figma exactos (fondos outline con
+`rgba(65,41,80,0.3)`, tipografía Poppins, border-radius 10.7/14.2).
+
+**`NotesTestConfigScreen` — controles adicionales de Figma**: slider de dificultad
+(Fácil/Medio/Difícil, índice 0/1/2) → pasa `difficulty: ['low','medium','high'][dificultadIdx]`
+al API. Toggle "Solo temas etiquetados" → pasa `topics: onlyTaggedTopics ? note.tags : []`.
+Spinner en el botón mientras `starting === true` (`ActivityIndicator` reemplaza el texto).
+
+**`AccentSlider.js`** (componente compartido): thumb rediseñado — fondo `colors.textDark`
+con punto interior más pequeño, antes era blanco con borde de color del acento.
+Afecta a todos los sliders de la app (Bloque 6 Generador, Bloque 9 test config).
 
 ### Monitor BOE (Bloque 10) — endpoints propios
 
@@ -415,6 +448,11 @@ de HealthKit (iOS) y Health Connect (Android) a través de `HealthService.js`.
 
 **`app.json` plugins**: `@kingstinct/react-native-healthkit` con `NSHealthShareUsageDescription`
 y `react-native-health-connect` con permisos `android.permission.health.*`.
+Plugin `expo-build-properties` con `android.minSdkVersion: 26` — obligatorio para que
+`react-native-health-connect` compile en EAS (la librería exige API 26+).
+
+**`ConnectDeviceScreen.js`**: iconos SVG inline de reloj/smartwatch eliminados,
+reemplazados por `Ionicons` para mayor consistencia visual con el resto de la app.
 
 **Flujo pairing** (`PairingScreen.js`): monta pantalla → llama `requestHealthPermissions()`
 automáticamente. Estados: `loading → complete / denied / unavailable`.
@@ -534,8 +572,8 @@ pnpm lint                       # lint completo
 | 5 | Motivación | Frontend + backend completo |
 | 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **desactivado por INC-04** (generaba con LLM y no exponía `correcta_idx` → primera opción siempre "correcta"). Fallback a OpenAI directo activo. Blindaje `CompositeAiClient` para reactivar sin riesgo cuando el equipo IA cierre INC-04 |
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
-| 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
-| 9 | Factoría de Apuntes | Frontend + backend completo. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. Test desde apuntes arranca con formato correcto. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
+| 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 6 pantallas + modal reestilizados. EpisodePicker y TopicPicker funcionales. Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes |
+| 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
 | 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
 | 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
