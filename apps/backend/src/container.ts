@@ -100,6 +100,11 @@ import {
     CompleteBoeMiniTestUseCase,
     ListTopicsUseCase,
     SyncBoeChangesUseCase,
+    ListFollowedRegulationsUseCase,
+    FollowRegulationUseCase,
+    UnfollowRegulationUseCase,
+    SearchBoeRegulationsUseCase,
+    SyncBoeCatalogUseCase,
     // Bloque 11 · Tienda
     GetStoreBalanceUseCase,
     ListStoreProductsUseCase,
@@ -427,6 +432,11 @@ export function buildContainer() {
                 (synced) => sendBoeAlert.execute(synced),
               )
             : undefined,
+        listBoeRegulations: new ListFollowedRegulationsUseCase(boeRepo),
+        followBoeRegulation: new FollowRegulationUseCase(boeRepo, motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        unfollowBoeRegulation: new UnfollowRegulationUseCase(boeRepo, motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        searchBoeCatalog: new SearchBoeRegulationsUseCase(motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        syncBoeCatalog: motorBoe ? new SyncBoeCatalogUseCase(motorBoe) : undefined,
 
         // Bloque 11 · Tienda
         getStoreBalance: new GetStoreBalanceUseCase(storeRepo),
@@ -517,6 +527,11 @@ export function buildContainer() {
         toggleBookmark: useCases.toggleBoeBookmark,
         completeMiniTest: useCases.completeBoeMiniTest,
         syncChanges: useCases.syncBoeChanges,
+        listRegulations: useCases.listBoeRegulations,
+        followRegulation: useCases.followBoeRegulation,
+        unfollowRegulation: useCases.unfollowBoeRegulation,
+        searchCatalog: useCases.searchBoeCatalog,
+        syncCatalog: useCases.syncBoeCatalog,
     });
 
     const storeController = new StoreController({

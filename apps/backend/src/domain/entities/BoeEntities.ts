@@ -12,6 +12,7 @@ export interface BoeChangeInput {
     affectedQuestions: number;
     detectedAt: Date;
     fragmentos: Array<{ fragType: 'antes' | 'despues'; text: string }>;
+    resumen?: string;
 }
 
 export interface BoeWatchedRegulation {
@@ -21,6 +22,8 @@ export interface BoeWatchedRegulation {
     title: string;
     followedAt: Date;
     lastCheckedAt: Date | null;
+    /** ID de la norma en el Motor BOE (NormaOut.id). Guardado para poder hacer unfollow en el Motor. */
+    motorNormaId: string | null;
 }
 
 export interface BoeChange {
@@ -33,6 +36,8 @@ export interface BoeChange {
     affectedQuestions: number;
     detectedAt: Date;
     createdAt: Date;
+    /** Resumen generado por el Motor BOE. Null en cambios anteriores al patch2. */
+    resumen: string | null;
 }
 
 export interface BoeChangeFragment {
