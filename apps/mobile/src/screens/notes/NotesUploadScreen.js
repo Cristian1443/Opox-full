@@ -3,7 +3,6 @@ import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
     TouchableOpacity,
     StatusBar,
     Image,
@@ -11,12 +10,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { File as FSFile } from 'expo-file-system';
 import { colors, spacing } from '../../theme';
 import NotesFormatErrorModal from '../../components/NotesFormatErrorModal';
 import { notesApi, authApi } from '../../api';
+
+// Colores confirmados contra Figma (frame SUBIR APUNTES · selector, Bloque
+// 9) sin equivalente exacto en theme.js.
+const FIGMA = {
+    cardBorder: 'rgba(65,41,80,0.3)',
+};
+const NOTES_ACCENT = colors.accentOrange;
 
 // Formatos aceptados por la Factoría de Apuntes — el backend valida lo mismo.
 // Incluimos HEIC/HEIF por defecto de iPhone y WEBP por Android moderno.
@@ -55,36 +62,58 @@ function isAcceptedAsset(asset) {
     return ACCEPTED_EXT.includes(extOf(asset.name ?? asset.uri ?? ''));
 }
 
-const NOTES_ACCENT = '#2563EB';
+// ─── Iconos (ver nota: en Figma los 3 están nombrados genéricamente "Capa_1") ──
+function CameraIcon({ size = 38, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 38 34">
+            <Path
+                d="M13 4L11 8H5C3.3 8 2 9.3 2 11V27C2 28.7 3.3 30 5 30H33C34.7 30 36 28.7 36 27V11C36 9.3 34.7 8 33 8H27L25 4H13Z"
+                fill="none"
+                stroke={color}
+                strokeWidth={2.2}
+                strokeLinejoin="round"
+            />
+            <Circle cx={19} cy={19} r={7} fill="none" stroke={color} strokeWidth={2.2} />
+        </Svg>
+    );
+}
+
+function PdfIcon({ size = 38, color = colors.accentOrange }) {
+    return (
+        <Svg width={size * 0.75} height={size} viewBox="0 0 30 40">
+            <Path
+                d="M4 2H18L26 10V36C26 37.1 25.1 38 24 38H4C2.9 38 2 37.1 2 36V4C2 2.9 2.9 2 4 2Z"
+                fill="none"
+                stroke={color}
+                strokeWidth={2.2}
+                strokeLinejoin="round"
+            />
+            <Path d="M18 2V10H26" fill="none" stroke={color} strokeWidth={2.2} strokeLinejoin="round" />
+            <Rect x={7} y={19} width={16} height={2.2} rx={1.1} fill={color} />
+            <Rect x={7} y={25} width={16} height={2.2} rx={1.1} fill={color} />
+            <Rect x={7} y={31} width={10} height={2.2} rx={1.1} fill={color} />
+        </Svg>
+    );
+}
+
+function GalleryIcon({ size = 38, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 38 34">
+            <Rect x={2} y={2} width={34} height={30} rx={4} fill="none" stroke={color} strokeWidth={2.2} />
+            <Circle cx={12} cy={12} r={3.2} fill="none" stroke={color} strokeWidth={2.2} />
+            <Path d="M2 25L12 16L20 22L27 15L36 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
 
 const SOURCES = [
-    {
-        id: 'camera',
-        icon: 'camera-outline',
-        title: 'Hacer fotos',
-        desc: 'Fotografía tus apuntes en papel. Soporta multipágina.',
-        color: '#10B981',
-        bg: '#D1FAE5',
-    },
-    {
-        id: 'pdf',
-        icon: 'document-text-outline',
-        title: 'Subir PDF',
-        desc: 'Desde tus archivos locales o servicios en la nube.',
-        color: '#EF4444',
-        bg: '#FEE2E2',
-    },
-    {
-        id: 'gallery',
-        icon: 'images-outline',
-        title: 'Desde galería',
-        desc: 'Selecciona imágenes que ya tienes guardadas.',
-        color: '#8B5CF6',
-        bg: '#EDE9FE',
-    },
+    { id: 'camera', title: 'Hacer fotos', desc: 'Fotografía tus apuntes en papel', Icon: CameraIcon },
+    { id: 'pdf', title: 'Subir PDF', desc: 'Desde tus archivos o la nube', Icon: PdfIcon },
+    { id: 'gallery', title: 'Desde galería', desc: 'Imágenes ya guardadas', Icon: GalleryIcon },
 ];
 
 function SourceCard({ source, onPress }) {
+    const { Icon } = source;
     return (
         <TouchableOpacity
             style={styles.card}
@@ -93,14 +122,9 @@ function SourceCard({ source, onPress }) {
             accessibilityLabel={source.title}
             accessibilityRole="button"
         >
-            <View style={[styles.iconBox, { backgroundColor: source.bg }]}>
-                <Ionicons name={source.icon} size={28} color={source.color} />
-            </View>
-            <View style={styles.cardTexts}>
-                <Text style={styles.cardTitle}>{source.title}</Text>
-                <Text style={styles.cardDesc}>{source.desc}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            <Icon />
+            <Text style={styles.cardTitle}>{source.title}</Text>
+            <Text style={styles.cardDesc}>{source.desc}</Text>
         </TouchableOpacity>
     );
 }
@@ -351,44 +375,23 @@ export default function NotesUploadScreen({ navigation }) {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
-
             <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={styles.backBtn}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityLabel="Volver"
-                    >
-                        <Text style={styles.backChevron}>‹</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.title}>Subir apuntes</Text>
-                </View>
-                <Text style={styles.subtitle}>
-                    Elige cómo quieres añadir tus apuntes al repositorio.
-                </Text>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.iconBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Volver"
+                >
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Subir apuntes</Text>
+                <View style={styles.iconBtn} />
             </View>
 
-            <ScrollView
-                style={styles.scroll}
-                contentContainerStyle={styles.body}
-                showsVerticalScrollIndicator={false}
-            >
-                <View style={styles.list}>
-                    {SOURCES.map((s) => (
-                        <SourceCard
-                            key={s.id}
-                            source={s}
-                            onPress={() => handleSource(s.id)}
-                        />
-                    ))}
-                </View>
-            </ScrollView>
-
-            <View style={styles.infoFooter}>
-                <Text style={styles.infoFooterText}>
-                    A diferencia del Foto-Test, aquí puedes subir varios documentos para crear tu banco personal.
-                </Text>
+            <View style={styles.cardsWrap}>
+                {SOURCES.map((s) => (
+                    <SourceCard key={s.id} source={s} onPress={() => handleSource(s.id)} />
+                ))}
             </View>
 
             <NotesFormatErrorModal
@@ -403,110 +406,49 @@ export default function NotesUploadScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.card,
+        backgroundColor: colors.white,
     },
-
-    // Header
     header: {
-        paddingHorizontal: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 27.1,
         paddingTop: spacing.sm,
-        paddingBottom: spacing.md,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: colors.separator,
+        paddingBottom: spacing.xl + spacing.md,
     },
-    headerTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    backBtn: {
-        paddingRight: spacing.xs,
-    },
-    backChevron: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: colors.primary,
-        lineHeight: 32,
-        marginRight: spacing.sm,
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: colors.dark,
+    iconBtn: { width: 32, alignItems: 'center' },
+    headerTitle: {
         flex: 1,
-    },
-    subtitle: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        lineHeight: 20,
-        marginLeft: 34,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
     },
 
-    // Cuerpo
-    scroll: {
-        flex: 1,
-        backgroundColor: colors.background,
+    cardsWrap: {
+        paddingHorizontal: 27.1,
+        gap: 15,
     },
-    body: {
-        padding: spacing.md,
-        paddingTop: spacing.lg,
-    },
-    list: {
-        gap: spacing.md,
-    },
-
-    // Card de fuente
     card: {
-        flexDirection: 'row',
+        borderWidth: 0.32,
+        borderColor: FIGMA.cardBorder,
+        borderRadius: 10.7,
         alignItems: 'center',
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.separator,
-        borderRadius: 16,
-        padding: spacing.md + 4,
-        shadowColor: '#000',
-        shadowOpacity: 0.02,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 1,
-    },
-    iconBox: {
-        width: 56,
-        height: 56,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: spacing.md,
-    },
-    cardTexts: {
-        flex: 1,
-        marginRight: spacing.xs,
+        paddingVertical: spacing.lg,
+        paddingHorizontal: spacing.lg,
     },
     cardTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: colors.dark,
-        marginBottom: 3,
+        marginTop: 12,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
     },
     cardDesc: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        lineHeight: 18,
-    },
-
-    // Footer informativo
-    infoFooter: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
-        backgroundColor: '#F9FAFB',
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: colors.separator,
-    },
-    infoFooterText: {
-        fontSize: 12,
-        color: colors.textSecondary,
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 8.9,
+        color: colors.textDark,
         textAlign: 'center',
-        lineHeight: 18,
     },
 
     // ─── Sesión de captura multipágina ───────────────────────────────────────

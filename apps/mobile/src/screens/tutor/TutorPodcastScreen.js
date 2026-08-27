@@ -5,7 +5,6 @@ import {
     StyleSheet,
     TouchableOpacity,
     Dimensions,
-    StatusBar,
     Modal,
     Animated,
     Easing,
@@ -15,31 +14,73 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Rect, Polygon } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { tutorApi } from '../../api';
 
-// ─── Constantes de color del bloque 8 · Podcast ──────────────────────────────
-// Fondo oscuro análogo al de MeditationPlayerScreen pero en azul
-const BG_DARK = '#0D2440';
-const BLUE_ACCENT = '#4A8FC4';
-const WHITE_DIM = 'rgba(255,255,255,0.65)';
-const WHITE_FAINT = 'rgba(255,255,255,0.15)';
+// Colores confirmados contra Figma (frame PODCAST, Bloque 8) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    progressTrack: '#F1F1F1',
+    timeLabel: '#919097',
+    controlBg: '#EDEDED',
+    playBg: 'rgba(36,189,144,0.15)',
+    // Verde más claro que colors.ctaGreen, documentado tal cual está en
+    // Figma (a confirmar con diseño si debería unificarse).
+    playIcon: '#65C681',
+    subtitleMuted: 'rgba(65,41,80,0.5)',
+};
 
-// Alturas máximas (px) de cada barra del waveform — distribución asimétrica para
-// que parezca una onda de audio real y no un bloque uniforme
-const WAVE_HEIGHTS = [6, 14, 22, 18, 28, 10, 24, 20, 30, 16, 12, 8];
+// Alturas máximas (px) de cada barra del waveform — distribución asimétrica
+// para que parezca una onda de audio real y no un bloque uniforme.
+const WAVE_HEIGHTS = [10, 18, 26, 16, 22, 12, 20];
 
 const SPEEDS = [0.5, 1.0, 1.5, 2.0];
 const TOTAL_SECONDS = 600; // 10:00
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
 };
 
-// ─── Componente waveform ──────────────────────────────────────────────────────
+// ─── Íconos ───────────────────────────────────────────────────────────────────
+function ShuffleIcon({ size = 16, color = colors.textDark }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M16 3H21V8M21 3L14 10M8 6H3M3 6L8 11M3 18H8L14 12M16 21H21V16M21 21L14 14" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function SkipIcon({ size = 16, color = colors.textDark, direction = 'next' }) {
+    const isNext = direction === 'next';
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Polygon points={isNext ? '6,5 15,12 6,19' : '18,5 9,12 18,19'} fill={color} />
+            <Rect x={isNext ? 16.6 : 5} y={5} width={2.4} height={14} fill={color} />
+        </Svg>
+    );
+}
+
+function PlayTriangleIcon({ size = 24, color = FIGMA.playIcon }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M7 4L20 12L7 20V4Z" fill={color} />
+        </Svg>
+    );
+}
+
+function RepeatIcon({ size = 16, color = colors.textDark }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M4 7H17L14 4M20 17H7L10 20" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+// Waveform animado (mejora funcional, no viene del diseño estático) dentro
+// de la carátula circular, con las barras naranjas confirmadas en Figma.
 function Waveform({ waveAnim, isPlaying }) {
     return (
         <View style={styles.waveRow}>
@@ -53,7 +94,7 @@ function Waveform({ waveAnim, isPlaying }) {
                                 inputRange: [0, 1],
                                 outputRange: [4, maxH],
                             }),
-                            opacity: isPlaying ? 0.55 + i * 0.04 : 0.25,
+                            opacity: isPlaying ? 0.7 + i * 0.03 : 0.4,
                         },
                     ]}
                 />
@@ -77,21 +118,20 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
     }, [oposicion]);
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <View style={styles.pickerHeader}>
                 <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="arrow-back" size={22} color={colors.dark} />
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.pickerTitle}>Episodios</Text>
-                <View style={{ width: 22 }} />
+                <View style={{ width: 24 }} />
             </View>
 
             {loading ? (
-                <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+                <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} />
             ) : episodes.length === 0 ? (
                 <View style={styles.pickerEmpty}>
-                    <Ionicons name="headset-outline" size={44} color={colors.textSecondary} />
+                    <Ionicons name="headset-outline" size={44} color={colors.textDark} />
                     <Text style={styles.pickerEmptyText}>No hay episodios disponibles</Text>
                 </View>
             ) : (
@@ -106,7 +146,7 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
                             activeOpacity={0.75}
                         >
                             <View style={styles.episodeIcon}>
-                                <Ionicons name="headset-outline" size={22} color={BLUE_ACCENT} />
+                                <Ionicons name="headset-outline" size={22} color={colors.accentOrange} />
                             </View>
                             <View style={styles.episodeInfo}>
                                 <Text style={styles.episodeName} numberOfLines={2}>{item.title}</Text>
@@ -114,7 +154,7 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
                                     {Math.floor((item.totalSeconds ?? TOTAL_SECONDS) / 60)} min
                                 </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                            <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
                         </TouchableOpacity>
                     )}
                 />
@@ -122,8 +162,6 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
         </SafeAreaView>
     );
 }
-
-// ─── Pantalla ─────────────────────────────────────────────────────────────────
 export default function TutorPodcastScreen({ navigation, route }) {
     const oposicion        = route?.params?.oposicion ?? 'aux-adm-estado';
     const initialEpisodeId = route?.params?.episodeId ?? null;
@@ -286,52 +324,38 @@ export default function TutorPodcastScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="light-content" backgroundColor={BG_DARK} />
-
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => setShowExitModal(true)}
+                    style={styles.iconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Minimizar reproductor"
+                    accessibilityLabel="Volver"
                 >
-                    <Ionicons name="chevron-down" size={26} color="#fff" />
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
-
-                <Text style={styles.headerTitle}>Modo Podcast</Text>
-
+                <Text style={styles.headerTitle}>Podcasts</Text>
                 <TouchableOpacity
+                    style={styles.iconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Más opciones"
                     onPress={handleMoreOptions}
                 >
-                    <Ionicons name="ellipsis-horizontal" size={22} color="#fff" />
+                    <Ionicons name="ellipsis-horizontal" size={22} color={colors.textDark} />
                 </TouchableOpacity>
             </View>
 
             <View style={styles.content}>
-                {/* Portada */}
-                <View style={styles.coverWrap}>
-                    <Ionicons name="headset-outline" size={68} color="#fff" />
+                <View style={styles.artwork}>
+                    <Waveform waveAnim={waveAnim} isPlaying={isPlaying} />
                 </View>
 
-                {/* Waveform */}
-                <Waveform waveAnim={waveAnim} isPlaying={isPlaying} />
+                <Text style={styles.title} numberOfLines={2}>{title}</Text>
+                <Text style={styles.subtitle}>{subtitle} · narrado por la IA</Text>
 
-                {/* Info */}
-                <View style={styles.infoBlock}>
-                    <Text style={styles.title} numberOfLines={2}>{title}</Text>
-                    <Text style={styles.subtitle}>{subtitle}</Text>
-                    <View style={styles.narratorBadge}>
-                        <Ionicons name="sparkles-outline" size={12} color={BLUE_ACCENT} />
-                        <Text style={styles.narratorText}>Narrado por la IA</Text>
-                    </View>
-                </View>
-
-                {/* Barra de progreso */}
                 <View style={styles.progressWrap}>
-                    <View style={styles.progressBg}>
-                        <View style={[styles.progressFg, { width: `${progressPct}%` }]} />
+                    <View style={styles.progressTrack}>
+                        <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+                        <View style={[styles.progressThumb, { left: `${progressPct}%` }]} />
                     </View>
                     <View style={styles.timesRow}>
                         <Text style={styles.timeText}>{formatTime(elapsed)}</Text>
@@ -339,48 +363,52 @@ export default function TutorPodcastScreen({ navigation, route }) {
                     </View>
                 </View>
 
-                {/* Controles principales */}
-                <View style={styles.controls}>
-                    <TouchableOpacity
-                        onPress={() => skipBy(-15)}
-                        style={styles.skipBtn}
-                        accessibilityLabel="Retroceder 15 segundos"
-                    >
-                        <Ionicons name="play-back" size={26} color="#fff" />
-                        <Text style={styles.skipLabel}>15</Text>
+                {/* Controles: aleatorio y repetir son decorativos (no hay cola de
+                    reproducción real); anterior/siguiente hacen skip ±15s real —
+                    mismo patrón usado en MeditationPlayerScreen. */}
+                <View style={styles.controlsRow}>
+                    <TouchableOpacity activeOpacity={0.7}>
+                        <ShuffleIcon />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.controlButton} activeOpacity={0.7} onPress={() => skipBy(-15)}>
+                        <SkipIcon direction="prev" />
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={styles.playBtn}
+                        style={styles.playButton}
+                        activeOpacity={0.85}
                         onPress={() => setIsPlaying((v) => !v)}
                         accessibilityLabel={isPlaying ? 'Pausar' : 'Reproducir'}
                     >
-                        <Ionicons
-                            name={isPlaying ? 'pause' : 'play'}
-                            size={34}
-                            color="#fff"
-                            style={isPlaying ? null : { marginLeft: 4 }}
-                        />
+                        {isPlaying ? (
+                            <View style={styles.pauseIconWrap}>
+                                <View style={styles.pauseBar} />
+                                <View style={styles.pauseBar} />
+                            </View>
+                        ) : (
+                            <PlayTriangleIcon />
+                        )}
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={() => skipBy(15)}
-                        style={styles.skipBtn}
-                        accessibilityLabel="Avanzar 15 segundos"
-                    >
-                        <Ionicons name="play-forward" size={26} color="#fff" />
-                        <Text style={styles.skipLabel}>15</Text>
+                    <TouchableOpacity style={styles.controlButton} activeOpacity={0.7} onPress={() => skipBy(15)}>
+                        <SkipIcon direction="next" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity activeOpacity={0.7}>
+                        <RepeatIcon />
                     </TouchableOpacity>
                 </View>
 
-                {/* Controles secundarios: velocidad y temporizador */}
+                {/* Controles secundarios (velocidad, temporizador de sueño) — sin
+                    datos de Figma, restyleados al lenguaje visual claro del bloque. */}
                 <View style={styles.secondaryControls}>
                     <TouchableOpacity
                         style={styles.secondaryBtn}
                         onPress={cycleSpeed}
                         accessibilityLabel={`Velocidad: ${speed}x`}
                     >
-                        <Ionicons name="speedometer-outline" size={16} color={WHITE_DIM} />
+                        <Ionicons name="speedometer-outline" size={16} color={colors.textDark} />
                         <Text style={styles.secondaryBtnText}>{speed}x</Text>
                     </TouchableOpacity>
 
@@ -392,16 +420,15 @@ export default function TutorPodcastScreen({ navigation, route }) {
                         <Ionicons
                             name="timer-outline"
                             size={16}
-                            color={sleepMinutes ? BLUE_ACCENT : WHITE_DIM}
+                            color={sleepMinutes ? colors.accentOrange : colors.textDark}
                         />
-                        <Text style={[styles.secondaryBtnText, sleepMinutes && { color: BLUE_ACCENT }]}>
+                        <Text style={[styles.secondaryBtnText, sleepMinutes && { color: colors.accentOrange }]}>
                             {sleepMinutes ? `${sleepMinutes} min` : 'Dormir'}
                         </Text>
                     </TouchableOpacity>
                 </View>
             </View>
 
-            {/* Modal de confirmación de salida */}
             <Modal
                 transparent
                 visible={showExitModal}
@@ -435,162 +462,145 @@ export default function TutorPodcastScreen({ navigation, route }) {
     );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
 const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: BG_DARK,
+        backgroundColor: colors.white,
     },
-
-    // Header
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         paddingHorizontal: spacing.md,
         paddingTop: spacing.sm,
-        paddingBottom: spacing.md,
+        paddingBottom: 4,
     },
+    iconBtn: { width: 32, alignItems: 'center' },
     headerTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: WHITE_DIM,
-        letterSpacing: 0.4,
-        textTransform: 'uppercase',
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
     },
-
-    // Contenido central
     content: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: spacing.xl,
     },
-
-    // Portada
-    coverWrap: {
-        width: 140,
-        height: 140,
-        borderRadius: 28,
-        backgroundColor: WHITE_FAINT,
+    artwork: {
+        width: 199,
+        height: 199,
+        borderRadius: 99.5,
+        backgroundColor: colors.textDark,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: spacing.lg,
     },
-
-    // Waveform
     waveRow: {
         flexDirection: 'row',
-        alignItems: 'flex-end',
-        height: 34,
-        gap: 4,
-        marginBottom: spacing.lg,
+        alignItems: 'center',
+        height: 30,
+        gap: 6,
     },
     waveBar: {
-        width: 4,
-        borderRadius: 2,
-        backgroundColor: BLUE_ACCENT,
-    },
-
-    // Info
-    infoBlock: {
-        alignItems: 'center',
-        marginBottom: spacing.xl,
+        width: 5,
+        borderRadius: 2.5,
+        backgroundColor: colors.accentOrange,
     },
     title: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#fff',
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
         textAlign: 'center',
-        marginBottom: 4,
     },
     subtitle: {
-        fontSize: 14,
-        color: WHITE_DIM,
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 10.7,
+        color: FIGMA.subtitleMuted,
         textAlign: 'center',
-        marginBottom: spacing.sm,
+        marginBottom: spacing.xl,
     },
-    narratorBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: WHITE_FAINT,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 10,
-    },
-    narratorText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: BLUE_ACCENT,
-    },
-
-    // Progreso
     progressWrap: {
         alignSelf: 'stretch',
         marginBottom: spacing.xl,
     },
-    progressBg: {
-        height: 4,
-        backgroundColor: WHITE_FAINT,
-        borderRadius: 2,
-        overflow: 'hidden',
-        marginBottom: spacing.xs,
+    progressTrack: {
+        height: 7.3,
+        borderRadius: 1.78,
+        backgroundColor: FIGMA.progressTrack,
     },
-    progressFg: {
-        height: '100%',
-        backgroundColor: BLUE_ACCENT,
-        borderRadius: 2,
+    progressFill: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        height: 7.3,
+        borderRadius: 1.78,
+        backgroundColor: colors.accentOrange,
+    },
+    progressThumb: {
+        position: 'absolute',
+        width: 20.1,
+        height: 20.1,
+        borderRadius: 10.05,
+        backgroundColor: colors.accentOrange,
+        top: -6.4,
+        marginLeft: -10.05,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 3,
     },
     timesRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        marginTop: 8,
     },
     timeText: {
-        color: WHITE_DIM,
-        fontSize: 12,
-        fontWeight: '600',
+        fontFamily: 'Poppins-Regular',
+        fontSize: 5.3,
+        letterSpacing: 0.44,
+        color: FIGMA.timeLabel,
     },
-
-    // Controles principales
-    controls: {
+    controlsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.xl,
-        marginBottom: spacing.xl,
+        gap: 20,
+        marginBottom: spacing.lg,
     },
-    skipBtn: {
+    controlButton: {
+        width: 33,
+        height: 33,
+        borderRadius: 16.5,
+        backgroundColor: FIGMA.controlBg,
         alignItems: 'center',
         justifyContent: 'center',
-        width: 48,
-        height: 48,
     },
-    skipLabel: {
-        color: WHITE_DIM,
-        fontSize: 10,
-        fontWeight: '700',
-        marginTop: 2,
-    },
-    playBtn: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: colors.primary,
+    playButton: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: FIGMA.playBg,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.45,
-        shadowRadius: 14,
-        elevation: 10,
     },
-
-    // Controles secundarios
+    pauseIconWrap: {
+        flexDirection: 'row',
+        gap: 4,
+    },
+    pauseBar: {
+        width: 3.5,
+        height: 16,
+        borderRadius: 1.5,
+        backgroundColor: FIGMA.playIcon,
+    },
     secondaryControls: {
         flexDirection: 'row',
-        gap: spacing.lg,
+        gap: spacing.md,
     },
     secondaryBtn: {
         flexDirection: 'row',
@@ -599,28 +609,27 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 12,
-        backgroundColor: WHITE_FAINT,
+        backgroundColor: FIGMA.controlBg,
     },
     secondaryBtnText: {
-        color: WHITE_DIM,
-        fontSize: 13,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 12,
+        color: colors.textDark,
     },
 
-    // Selector de episodios
     pickerHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.md,
         paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.separator,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FIGMA.progressTrack,
     },
     pickerTitle: {
-        fontSize: 17,
-        fontWeight: '800',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
     },
     pickerList: {
         padding: spacing.md,
@@ -633,13 +642,14 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
     pickerEmptyText: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 15,
-        color: colors.textSecondary,
+        color: FIGMA.subtitleMuted,
     },
     episodeRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.card,
+        backgroundColor: FIGMA.controlBg,
         borderRadius: 14,
         padding: spacing.md,
         gap: spacing.md,
@@ -648,45 +658,46 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 12,
-        backgroundColor: `${BLUE_ACCENT}20`,
+        backgroundColor: `${colors.accentOrange}20`,
         alignItems: 'center',
         justifyContent: 'center',
     },
     episodeInfo: { flex: 1 },
     episodeName: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 14,
-        fontWeight: '700',
-        color: colors.dark,
+        color: colors.textDark,
         marginBottom: 3,
     },
     episodeDuration: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 12,
-        color: colors.textSecondary,
+        color: FIGMA.subtitleMuted,
     },
 
-    // Modal de salida
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0,0,0,0.45)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     modalCard: {
         width: width * 0.8,
-        backgroundColor: colors.card,
+        backgroundColor: colors.white,
         borderRadius: 20,
         padding: spacing.xl,
         alignItems: 'center',
     },
     modalTitle: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 18,
-        fontWeight: '800',
-        color: colors.dark,
+        color: colors.textDark,
         marginBottom: spacing.sm,
     },
     modalText: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 14,
-        color: colors.textSecondary,
+        color: FIGMA.subtitleMuted,
         textAlign: 'center',
         lineHeight: 20,
         marginBottom: spacing.lg,
@@ -698,24 +709,24 @@ const styles = StyleSheet.create({
     },
     modalCancelBtn: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: FIGMA.controlBg,
         paddingVertical: 12,
         borderRadius: 12,
         alignItems: 'center',
     },
     modalCancelText: {
-        color: colors.textSecondary,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
     },
     modalConfirmBtn: {
         flex: 1,
-        backgroundColor: colors.primary,
+        backgroundColor: colors.accentOrange,
         paddingVertical: 12,
         borderRadius: 12,
         alignItems: 'center',
     },
     modalConfirmText: {
-        color: '#fff',
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.white,
     },
 });

@@ -18,6 +18,10 @@ export default function AlertCardModal({
     primaryColor,
     secondaryLabel,
     onSecondaryPress,
+    // 'link' (por defecto, estilo existente) o 'button' (bordeado, usado por
+    // NotesDeleteConfirmModal — Figma confirma un botón con trazo para
+    // "Cancelar" en vez de un enlace de texto en esa alerta destructiva).
+    secondaryVariant = 'link',
 }) {
     const fade = useRef(new Animated.Value(0)).current;
     const scale = useRef(new Animated.Value(0.88)).current;
@@ -91,13 +95,23 @@ export default function AlertCardModal({
                     </TouchableOpacity>
 
                     {secondaryLabel ? (
-                        <TouchableOpacity
-                            style={styles.btnLink}
-                            onPress={onSecondaryPress}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.btnLinkText}>{secondaryLabel}</Text>
-                        </TouchableOpacity>
+                        secondaryVariant === 'button' ? (
+                            <TouchableOpacity
+                                style={styles.btnSecondary}
+                                onPress={onSecondaryPress}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={styles.btnSecondaryText}>{secondaryLabel}</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.btnLink}
+                                onPress={onSecondaryPress}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.btnLinkText}>{secondaryLabel}</Text>
+                            </TouchableOpacity>
+                        )
                     ) : null}
                 </Animated.View>
             </Animated.View>
@@ -173,5 +187,21 @@ const styles = StyleSheet.create({
         color: colors.textDark,
         fontSize: 14,
         fontFamily: 'Poppins-Light',
+    },
+    btnSecondary: {
+        borderWidth: 1,
+        borderColor: 'rgba(65, 41, 80, 0.3)',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        height: 57,
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        marginTop: 10,
+    },
+    btnSecondaryText: {
+        color: colors.textDark,
+        fontSize: 16,
+        fontFamily: 'Poppins-SemiBold',
     },
 });

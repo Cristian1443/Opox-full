@@ -6,24 +6,18 @@ import {
     ScrollView,
     FlatList,
     TouchableOpacity,
-    StatusBar,
-    Alert,
     ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
 import { tutorApi } from '../../api';
 
-// ─── Colores semánticos por sección ──────────────────────────────────────────
-// Se mantienen 3 tonos distintos para diferenciar tipos de contenido.
-// Mapeados a tokens del proyecto siempre que aplica.
-const SECTION_COLORS = {
-    principles: colors.purple,          // #7B4BC4 — identidad IA/tutor
-    structure:  '#1f9d6b',              // verde — estructura/planificación
-    reminder:   colors.warning,         // #FF9F0A — ámbar de atención
+// Colores confirmados contra Figma (frame RESUMEN INTELIGENTE, Bloque 8)
+// sin equivalente exacto en theme.js.
+const FIGMA = {
+    subtitleMuted: 'rgba(65,41,80,0.5)',
+    bulletStroke: '#D9D9D9',
 };
 
 // ─── Mock data — se sustituirá por tutorApi.getSummary(topicId) ──────────────
@@ -32,9 +26,7 @@ const MOCK_SUMMARY = {
     sections: [
         {
             id: 'principles',
-            type: 'principles',
             title: 'PRINCIPIOS CLAVE',
-            icon: 'star-outline',
             content: [
                 'Igualdad ante la ley',
                 'Dignidad de la persona',
@@ -43,9 +35,7 @@ const MOCK_SUMMARY = {
         },
         {
             id: 'structure',
-            type: 'structure',
             title: 'ESTRUCTURA',
-            icon: 'layers-outline',
             content: [
                 'Derechos y deberes (cap. I–II)',
                 'Garantías (cap. IV)',
@@ -54,9 +44,7 @@ const MOCK_SUMMARY = {
         },
         {
             id: 'reminder',
-            type: 'reminder',
             title: 'A RECORDAR',
-            icon: 'alert-circle-outline',
             content: [
                 'El art. 14 abre la sección: igualdad sin discriminación.',
                 'Suele caer en examen.',
@@ -66,52 +54,17 @@ const MOCK_SUMMARY = {
 };
 
 // ─── Subcomponentes ───────────────────────────────────────────────────────────
-function SectionCard({ section }) {
-    const color = SECTION_COLORS[section.type] ?? colors.purple;
+function SectionBlock({ section }) {
     return (
-        <View style={styles.card}>
-            <View style={[styles.cardHeader, { borderBottomColor: color + '33' }]}>
-                <Ionicons name={section.icon} size={18} color={color} />
-                <Text style={[styles.cardTitle, { color }]}>{section.title}</Text>
-            </View>
-            <View style={styles.cardBody}>
-                {section.content.map((item, idx) => (
-                    <View key={idx} style={styles.bulletRow}>
-                        <View style={[styles.bullet, { backgroundColor: color }]} />
-                        <Text style={styles.bulletText}>{item}</Text>
-                    </View>
-                ))}
-            </View>
+        <View style={styles.section}>
+            <Text style={styles.sectionHeading}>{section.title}</Text>
+            {section.content.map((item, idx) => (
+                <View key={idx} style={styles.bulletRow}>
+                    <View style={styles.bullet} />
+                    <Text style={styles.bulletText}>{item}</Text>
+                </View>
+            ))}
         </View>
-    );
-}
-
-function MoreButton({ navigation, topicTitle, topicId, oposicion }) {
-    return (
-        <TouchableOpacity
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Más opciones"
-            onPress={() =>
-                Alert.alert('Opciones', null, [
-                    { text: 'Compartir resumen', onPress: () => {} },
-                    {
-                        text: 'Generar flashcards',
-                        onPress: () => navigation.navigate('TutorFlashcardsLoading', {
-                            topicId,
-                            topicTitle,
-                            oposicion,
-                        }),
-                    },
-                    {
-                        text: 'Escuchar en podcast',
-                        onPress: () => navigation.navigate('TutorPodcast', { title: topicTitle }),
-                    },
-                    { text: 'Cancelar', style: 'cancel' },
-                ])
-            }
-        >
-            <Ionicons name="ellipsis-vertical" size={20} color={colors.dark} />
-        </TouchableOpacity>
     );
 }
 
@@ -131,16 +84,21 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
-            <ScreenHeader title="Resúmenes" onBack={onBack} />
+            <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Resúmenes</Text>
+                <View style={{ width: 24 }} />
+            </View>
 
             {loading ? (
                 <View style={styles.loadingCenter}>
-                    <ActivityIndicator color={colors.purple} size="large" />
+                    <ActivityIndicator color={colors.accentOrange} size="large" />
                 </View>
             ) : summaries.length === 0 ? (
                 <View style={styles.loadingCenter}>
-                    <Ionicons name="document-text-outline" size={44} color={colors.textSecondary} />
+                    <Ionicons name="document-text-outline" size={44} color={colors.textDark} />
                     <Text style={styles.emptyText}>No hay resúmenes disponibles</Text>
                 </View>
             ) : (
@@ -158,7 +116,7 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
                                 <Ionicons name="document-text-outline" size={20} color={colors.purple} />
                             </View>
                             <Text style={styles.topicName} numberOfLines={2}>{item.topicTitle}</Text>
-                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                            <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
                         </TouchableOpacity>
                     )}
                 />
@@ -166,6 +124,7 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
         </SafeAreaView>
     );
 }
+
 
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 export default function TutorSummariesScreen({ navigation, route }) {
@@ -182,8 +141,7 @@ export default function TutorSummariesScreen({ navigation, route }) {
     const topicId = selectedTopic?.topicId ?? null;
 
     const [summary, setSummary]     = useState(null);
-    const [isLoading, setIsLoading] = useState(!!initialTopicId && !paramSections);
-    const insets = useSafeAreaInsets();
+    const [isLoading, setIsLoading] = useState(!!topicId && !paramSections);
 
     // Hooks siempre antes de cualquier return condicional
     useEffect(() => {
@@ -211,13 +169,29 @@ export default function TutorSummariesScreen({ navigation, route }) {
     const displayTitle    = summary?.topicTitle ?? selectedTopic?.topicTitle ?? paramTitle ?? MOCK_SUMMARY.title;
     const displaySections = summary?.sections   ?? paramSections ?? MOCK_SUMMARY.sections;
 
+    const Header = () => (
+        <View style={styles.header}>
+            <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.iconBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+                <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+            </TouchableOpacity>
+            <View style={styles.headerTextWrap}>
+                <Text style={styles.headerTitle}>Resumen</Text>
+                {!isLoading && <Text style={styles.headerSubtitle}>{displayTitle}</Text>}
+            </View>
+            <View style={styles.iconBtn} />
+        </View>
+    );
+
     if (isLoading) {
         return (
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-                <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
-                <ScreenHeader title="Resumen" onBack={() => navigation.goBack()} />
+                <Header />
                 <View style={styles.loadingCenter}>
-                    <ActivityIndicator color={colors.purple} size="large" />
+                    <ActivityIndicator color={colors.accentOrange} size="large" />
                 </View>
             </SafeAreaView>
         );
@@ -225,51 +199,32 @@ export default function TutorSummariesScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
+            <Header />
 
-            <ScreenHeader
-                title="Resumen"
-                subtitle={displayTitle}
-                onBack={() => navigation.goBack()}
-                right={<MoreButton navigation={navigation} topicTitle={displayTitle} topicId={topicId} oposicion={oposicion} />}
-            />
-
-            <ScrollView
-                contentContainerStyle={[
-                    styles.scrollBody,
-                    { paddingBottom: 96 + insets.bottom },
-                ]}
-                showsVerticalScrollIndicator={false}
-            >
+            <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
                 {displaySections.map((section) => (
-                    <SectionCard key={section.id} section={section} />
+                    <SectionBlock key={section.id} section={section} />
                 ))}
             </ScrollView>
 
-            {/* FABs flotantes — parte inferior derecha */}
-            <View style={[styles.fabRow, { bottom: 24 + insets.bottom }]}>
+            <View style={styles.buttonsRow}>
                 <TouchableOpacity
-                    style={[styles.fab, { backgroundColor: '#2D6FB0' }]}
-                    onPress={() => navigation.navigate('TutorPodcast', { title: displayTitle })}
+                    style={styles.primaryButton}
                     activeOpacity={0.85}
-                    accessibilityLabel="Escuchar en modo podcast"
-                >
-                    <Ionicons name="headset" size={20} color="#fff" />
-                    <Text style={styles.fabText}>Escuchar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.fab, { backgroundColor: colors.purple }]}
                     onPress={() => navigation.navigate('TutorFlashcardsLoading', {
                         topicId,
                         topicTitle: displayTitle,
                         oposicion,
                     })}
-                    activeOpacity={0.85}
-                    accessibilityLabel="Generar flashcards"
                 >
-                    <Ionicons name="layers-outline" size={20} color="#fff" />
-                    <Text style={styles.fabText}>Flashcards</Text>
+                    <Text style={styles.primaryButtonText}>Flashcards</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.secondaryButton}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('TutorPodcast', { title: displayTitle })}
+                >
+                    <Text style={styles.secondaryButtonText}>Escuchar</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -280,7 +235,29 @@ export default function TutorSummariesScreen({ navigation, route }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.md,
+    },
+    iconBtn: { width: 32, padding: 4 },
+    headerTextWrap: { flex: 1, alignItems: 'center' },
+    headerTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
+    },
+    headerSubtitle: {
+        marginTop: 2,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 10.7,
+        color: FIGMA.subtitleMuted,
+        textAlign: 'center',
     },
     loadingCenter: {
         flex: 1,
@@ -291,6 +268,20 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 15,
         color: colors.textSecondary,
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FIGMA.bulletStroke,
+    },
+    pickerTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
     },
     pickerList: {
         padding: spacing.md,
@@ -320,83 +311,72 @@ const styles = StyleSheet.create({
     },
     scrollBody: {
         paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
+        paddingTop: spacing.xs,
+        paddingBottom: spacing.lg,
     },
-
-    // Tarjeta de sección
-    card: {
-        backgroundColor: colors.card,
-        borderRadius: 14,
-        marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.separator,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 2,
+    section: {
+        marginBottom: 24,
     },
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 11,
-        borderBottomWidth: 1,
-        backgroundColor: colors.background,
-    },
-    cardTitle: {
-        fontSize: 12,
-        fontWeight: '800',
-        letterSpacing: 0.6,
-    },
-    cardBody: {
-        padding: spacing.md,
+    sectionHeading: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
+        marginBottom: 8,
     },
     bulletRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: spacing.sm,
+        marginBottom: 8,
     },
     bullet: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 6.2,
+        height: 6.2,
+        borderRadius: 3.1,
+        backgroundColor: colors.accentOrange,
+        borderWidth: 0.44,
+        borderColor: FIGMA.bulletStroke,
         marginTop: 6,
         marginRight: 10,
         flexShrink: 0,
     },
     bulletText: {
-        fontSize: 14,
-        color: colors.text,
-        lineHeight: 21,
         flex: 1,
+        fontFamily: 'Poppins-Light',
+        fontSize: 16,
+        lineHeight: 22.4,
+        color: colors.textDark,
     },
-
-    // FABs
-    fabRow: {
-        position: 'absolute',
-        right: spacing.md,
+    buttonsRow: {
         flexDirection: 'row',
-        gap: spacing.sm,
-    },
-    fab: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: spacing.md,
-        paddingVertical: 11,
-        borderRadius: 22,
-        gap: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        elevation: 6,
+        paddingBottom: spacing.md,
     },
-    fabText: {
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: '700',
+    primaryButton: {
+        width: 167,
+        height: 61,
+        borderRadius: 14.2,
+        backgroundColor: colors.ctaGreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    primaryButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.white,
+    },
+    secondaryButton: {
+        width: 167,
+        height: 61,
+        borderRadius: 14.2,
+        borderWidth: 0.44,
+        borderColor: colors.textDark,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    secondaryButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
     },
 });
