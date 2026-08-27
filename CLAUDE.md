@@ -293,11 +293,40 @@ desplegado para detectar cambios en el BOE oficial. Integrado en:
 - `application/boe/BoeUseCases.ts` → `SyncBoeChangesUseCase` — orquesta el flujo:
   `checkForChanges → pollJob → getChanges → repo.upsertChange()`.
 - `POST /boe/sync` (ruta `BOE.SYNC`) — endpoint autenticado que dispara la sync.
-  Cuerpo: `{ curso_id: string }` (ID del curso en el Motor).
+  Cuerpo: `{ curso_id: string }` (ID del curso en el Motor). Validado con Zod.
 - `SupabaseBoeRepository.upsertChange()` — idempotente, deduplica por
-  `boe_identifier + día de detected_at`.
-- Vars de entorno opcionales: `MOTOR_BOE_BASE_URL`, `MOTOR_BOE_API_KEY`,
-  `MOTOR_BOE_OPENAI_KEY`. Sin `MOTOR_BOE_BASE_URL`, el cliente no se instancia.
+  `boe_identifier + día de detected_at`. Persiste campo `resumen` del Motor.
+- `SupabaseBoeRepository.addRegulation()` — **UPSERT** por `(user_id, boe_identifier)`;
+  idempotente si el usuario ya sigue la norma.
+- `SyncBoeChangesUseCase` — tras upsert, si `preguntas_afectadas.length > 0`,
+  llama `motor.regenerateQuestions(changeId, cursoId)` fire-and-forget.
+- Vars de entorno: `MOTOR_BOE_BASE_URL`, `MOTOR_BOE_API_KEY`, `MOTOR_BOE_OPENAI_KEY`
+  (opcional, cae a `AI_API_KEY`), **`MOTOR_BOE_CURSO_ID`** (obligatorio cuando el
+  Motor está activo — ID del curso en el Motor para la oposición activa).
+  Sin `MOTOR_BOE_BASE_URL`, el cliente no se instancia.
+
+**`SearchBoeRegulationsUseCase` — búsqueda con fallback**:
+- Llama `motor.searchCatalog(q)` con timeout de 5 s (configurado por request).
+- Si supera el timeout o devuelve vacío/no-sincronizado, hace fallback automático
+  a `motor.listRegulations(MOTOR_BOE_CURSO_ID)` y filtra localmente por el query.
+- Así el modal "Añadir norma" muestra siempre las normas monitorizadas del curso
+  sin requerir `POST /boe/catalog/sync` previo.
+
+**Modal "Añadir norma" (mobile `BoeHomeScreen`)**:
+- Al abrir: carga en paralelo `listRegulations()` (normas ya seguidas) y
+  `searchCatalog('')` (sugerencias). Sin escribir nada el usuario ve las 8 normas.
+- Normas ya seguidas → badge gris "Siguiendo" (no botón). Guard en `handleFollow`.
+- Tras seguir: actualiza `followedIds` y `watchedCount` localmente sin cerrar el modal.
+
+**Cross-bloque BOE**:
+- `BoeDetailScreen`: carga `affectedQuestionsCount` desde API; si > 0 muestra CTA
+  "Practicar" → `GeneratorConfig`. Migrado de `useEffect` a `useFocusEffect`.
+- `DashboardScreen`: alerta de leyes obsoletas usa `boeApi.getFeed().totalUnread`
+  real (era mock = 3). Flag de módulo `_boeAlertShownThisSession` para no repetir.
+- `TrainingResultScreen`: tras guardar intento, consulta feed BOE; si hay no leídos
+  muestra tarjeta hint "Revisar →" hacia `BoeHome`.
+- `App.js BoeRealtimeWatcher`: banner Realtime navega a `BoeDetail` con `itemId`
+  específico cuando el payload incluye `id`; si no, cae a `BoeHome`.
 
 **Generador Infinito (pantalla 6.2) — `GeneratorConfigScreen.js`**:
 - TTL de 15 s (aviso) / 60 s (cancelación con tarjeta de error + Reintentar).
@@ -507,7 +536,7 @@ pnpm lint                       # lint completo
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo (Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes) |
 | 9 | Factoría de Apuntes | Frontend + backend completo. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. Test desde apuntes arranca con formato correcto. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
-| 10 | Monitor BOE | Frontend + backend completo (feed, detalle, comparativa con diff word-by-word, mini-test con AiApiClientStub, 14 requests / 61 assertions verde). IA real (`generateBoeMiniTest`) esperando entrega del prompt del `BRIEF_IA_BLOQUE10.md` |
+| 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
 | 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
 | 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
 | 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |

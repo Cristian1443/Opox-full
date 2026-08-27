@@ -5,6 +5,98 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-27 — Bloque 10 · Monitor BOE — Revisión completa + fixes en dispositivo
+
+Rama: `feat/revision-bloque-10-boe`. Revisión integral del Monitor BOE: gaps de
+backend, integración real con el Motor BOE, corrección de bugs encontrados en
+dispositivo Android y limpieza del `.env`.
+
+### Backend — nuevas capacidades
+
+**Campo `resumen` en `boe_changes`**: el Motor BOE devuelve un resumen textual del
+cambio en `MotorCambio.resumen`. Ahora se persiste en BD y se usa en `buildHint()`
+como primera opción antes de truncar el texto del fragmento. Requiere correr
+`bloque10_boe_patch2.sql` en Supabase.
+
+**`regenerateQuestions` fire-and-forget**: tras sincronizar un cambio con
+`SyncBoeChangesUseCase`, si `mc.preguntas_afectadas.length > 0` se llama
+`motor.regenerateQuestions(mc.id, cursoId)` de forma asíncrona. Los errores
+son no-fatales (solo warn en log).
+
+**`addRegulation` UPSERT idempotente**: cambiado de `INSERT` a `UPSERT` por
+`(user_id, boe_identifier)`. Si el usuario ya sigue la norma el endpoint devuelve
+el registro existente en vez de explotar con constraint violation (500).
+
+**`SearchBoeRegulationsUseCase` con fallback**: el catálogo del Motor
+(`/v1/boe/catalog`) tiene timeout de 5 s (timeout corto configurado por request).
+Si supera ese límite o devuelve vacío, hace fallback automático a
+`motor.listRegulations(MOTOR_BOE_CURSO_ID)` → las normas ya monitorizadas para
+el curso. Filtra localmente por el query del usuario. Así el modal "Añadir norma"
+funciona sin necesidad de ejecutar `POST /boe/catalog/sync` primero.
+
+**Validación del body en `POST /boe/sync`**: añadido `validateBody(syncChangesBody)`
+con Zod → `{ curso_id: string }` requerido.
+
+**`MOTOR_BOE_CURSO_ID` en `.env`**: nueva variable de entorno requerida cuando
+`MOTOR_BOE_BASE_URL` está configurado. Identifica el curso activo en el Motor para
+la oposición (justicia-tramitación: `1357e871b542425b`). Es un ID estable que
+actualiza el equipo IA cuando re-ingesta el temario oficial.
+
+### Mobile — nuevas pantallas y flujos
+
+**`BoeHomeScreen` — modal "Añadir norma"**:
+- Al abrir el modal, carga en paralelo las normas ya seguidas (`listRegulations`)
+  y el catálogo/sugerencias (`searchCatalog('')`).
+- Normas ya seguidas muestran badge gris "Siguiendo" en vez del botón "Seguir".
+- Guard en `handleFollow`: si `followedIds` ya contiene el `boe_identifier`, no
+  relanza la llamada a la API.
+- Al seguir con éxito: actualiza `followedIds` localmente y el contador
+  `watchedCount` sin cerrar el modal.
+
+**`BoeDetailScreen` — botón "Practicar" cross-bloque**:
+- Carga `affectedQuestionsCount` desde el detalle real de la API.
+- Si > 0, muestra un tercer CTA `tertiaryBtn` que navega a `GeneratorConfig`
+  con `{ questionCount: 10 }`.
+- Migrado de `useEffect` a `useFocusEffect` para recargar al volver.
+
+**`BoeUpdateSuccessScreen`**: nuevo CTA secundario "Practicar con preguntas
+actualizadas" → navega a `GeneratorConfig`.
+
+**`DashboardScreen` — alerta de leyes obsoletas con datos reales**:
+- `staleLawsCount` ya no es un mock (era `3`). Carga `boeApi.getFeed()` en
+  paralelo al resto del dashboard y usa `totalUnread` real.
+- Flag de módulo `_boeAlertShownThisSession` (no `useRef`): el pop-up de alerta
+  solo se muestra una vez por sesión de app aunque el componente se remonte.
+
+**`TrainingResultScreen` — hint card BOE**:
+- Tras guardar el intento, consulta `boeApi.getFeed()` fire-and-forget.
+- Si `totalUnread > 0` muestra una tarjeta de aviso antes del bloque "¿Qué
+  quieres hacer ahora?" con CTA "Revisar →" que navega a `BoeHome`.
+
+**`App.js` — Realtime BOE navega a detalle específico**:
+- `BoeRealtimeWatcher` extrae `payload.new?.id` del evento Supabase.
+- Si existe: banner navega a `BoeDetail` con `{ itemId: changeId }`.
+- Si no: navega a `BoeHome` (fallback anterior).
+
+### Limpieza `.env`
+
+- Eliminada indentación de 4 espacios en todas las líneas.
+- `MOTOR_BOE_OPENAI_KEY` vaciado (era copia exacta de `AI_API_KEY`; el código
+  ya tiene fallback automático `MOTOR_BOE_OPENAI_KEY ?? AI_API_KEY`).
+- `PASSWORD_RESET_REDIRECT_URL=opox://reset-password` añadido explícitamente.
+- `MOTOR_BOE_CURSO_ID=1357e871b542425b` añadido (faltaba).
+- `.env.example` actualizado con `MOTOR_BOE_CURSO_ID`.
+
+### Estado tras la sesión
+
+- Monitor BOE completamente funcional en dispositivo Android.
+- Modal "Añadir norma" muestra las 8 normas del Motor sin requerir sync del catálogo.
+- Flujo seguir → ver cambios → revisar detalle → mini-test → practicar: end-to-end.
+- Pendiente de terceros: `generateBoeMiniTest` con prompts reales (equipo IA,
+  `BRIEF_IA_BLOQUE10.md`) y ejecutar los dos patches SQL en Supabase.
+
+---
+
 ## 2026-08-25 — Bloque 9 · Factoría de Apuntes — Fixes de upload en dispositivo Android
 
 Rama: `feat/revision-bloque-9-notas`. Sesión de depuración en dispositivo real
