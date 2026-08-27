@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     StyleSheet,
     View,
@@ -79,22 +80,27 @@ export default function BoeDetailScreen({ route, navigation }) {
     const [apiDetail, setApiDetail] = useState(null);
     const [bookmarked, setBookmarked] = useState(mockDetail.type === 'critical' ? false : false);
 
-    useEffect(() => {
-        boeApi.getDetail(itemId).then(res => {
-            if (res?.data) {
-                const d = res.data;
-                setApiDetail({
-                    title: `${d.articulo} · ${d.shortTitle}`,
-                    subtitle: d.regulationTitle,
-                    type: changeTypeToDetailType(d.changeType),
-                    summary: d.hint,
-                    source: d.sourceDescription,
-                    date: new Date(d.detectedAt).toLocaleDateString('es-ES'),
-                });
-                setBookmarked(d.isBookmarked);
-            }
-        }).catch(() => {});
-    }, [itemId]);
+    const [affectedCount, setAffectedCount] = useState(0);
+
+    useFocusEffect(
+        useCallback(() => {
+            boeApi.getDetail(itemId).then(res => {
+                if (res?.data) {
+                    const d = res.data;
+                    setApiDetail({
+                        title: `${d.articulo} · ${d.shortTitle}`,
+                        subtitle: d.regulationTitle,
+                        type: changeTypeToDetailType(d.changeType),
+                        summary: d.hint,
+                        source: d.sourceDescription,
+                        date: new Date(d.detectedAt).toLocaleDateString('es-ES'),
+                    });
+                    setBookmarked(d.isBookmarked);
+                    setAffectedCount(d.affectedQuestionsCount ?? 0);
+                }
+            }).catch(() => {});
+        }, [itemId]),
+    );
 
     const detail = apiDetail ?? mockDetail;
     const type = routeType ?? detail.type;
@@ -196,6 +202,22 @@ export default function BoeDetailScreen({ route, navigation }) {
                         >
                             <Text style={styles.secondaryBtnText}>Mini-test</Text>
                         </TouchableOpacity>
+
+                        {affectedCount > 0 && (
+                            <TouchableOpacity
+                                style={styles.tertiaryBtn}
+                                activeOpacity={0.78}
+                                onPress={() =>
+                                    navigation.navigate('GeneratorConfig', { questionCount: 10 })
+                                }
+                                accessibilityLabel={`Practicar las ${affectedCount} preguntas afectadas`}
+                            >
+                                <Ionicons name="barbell-outline" size={18} color={BOE_ACCENT} />
+                                <Text style={styles.tertiaryBtnText}>
+                                    Practicar · {affectedCount} pregunta{affectedCount > 1 ? 's' : ''} afectada{affectedCount > 1 ? 's' : ''}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
 
@@ -328,6 +350,22 @@ const styles = StyleSheet.create({
     secondaryBtnText: {
         color: colors.text,
         fontSize: 17,
+        fontWeight: '700',
+    },
+    tertiaryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: BOE_ACCENT,
+        backgroundColor: '#FDEBE9',
+    },
+    tertiaryBtnText: {
+        color: BOE_ACCENT,
+        fontSize: 15,
         fontWeight: '700',
     },
 });

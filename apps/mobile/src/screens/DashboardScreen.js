@@ -15,7 +15,10 @@ import NudgeModal from '../components/NudgeModal';
 import BoeAlertBanner from '../components/BoeAlertBanner';
 import AlertCardModal from '../components/AlertCardModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { dashboardApi, planningApi } from '../api';
+import { dashboardApi, planningApi, boeApi } from '../api';
+
+// Evita mostrar la alerta BOE más de una vez por sesión de app
+let _boeAlertShownThisSession = false;
 import { colors } from '../theme';
 
 // ─── Colores reales de Figma sin token exacto en theme.js ───────────────────
@@ -464,9 +467,8 @@ export default function DashboardScreen({ navigation }) {
     const [activeNudge, setActiveNudge] = useState(null); // null | 'fatigue' | 'academic' | 'boe'
     const nudge = activeNudge ? NUDGES[activeNudge] : null;
     const [boeBannerVisible, setBoeBannerVisible] = useState(false);
-    // staleLawsCount: en Paso 2 lo devuelve dashboardApi.getSummary() → data.staleLawsCount
     const [staleAlertVisible, setStaleAlertVisible] = useState(false);
-    const [staleLawsCount, setStaleLawsCount] = useState(3); // mock; Paso 2: setStaleLawsCount(data.staleLawsCount)
+    const [staleLawsCount, setStaleLawsCount] = useState(0);
 
     const [summary, setSummary] = useState(null);
     const [planSummary, setPlanSummary] = useState(null);
@@ -486,6 +488,17 @@ export default function DashboardScreen({ navigation }) {
         planningApi.getSummary().then(({ data }) => {
             if (!cancelled && data) setPlanSummary(data);
         });
+        boeApi.getFeed().then(res => {
+            if (cancelled || res?.error || !res?.data) return;
+            const unread = res.data.totalUnread ?? 0;
+            if (unread > 0) {
+                setStaleLawsCount(unread);
+                if (!_boeAlertShownThisSession) {
+                    _boeAlertShownThisSession = true;
+                    setStaleAlertVisible(true);
+                }
+            }
+        }).catch(() => {});
         return () => { cancelled = true; };
     }, []);
 

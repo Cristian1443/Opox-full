@@ -72,6 +72,8 @@ export const API_ROUTES = {
         FEED:                     '/boe/feed',
         REGULATIONS:              '/boe/regulations',
         REGULATION:               '/boe/regulations/:id',
+        CATALOG_SEARCH:           '/boe/catalog/search',
+        CATALOG_SYNC:             '/boe/catalog/sync',
         CHANGE_DETAIL:            '/boe/changes/:id',
         CHANGE_COMPARISON:        '/boe/changes/:id/comparison',
         CHANGE_MINI_TEST:         '/boe/changes/:id/mini-test',

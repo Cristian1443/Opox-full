@@ -11,6 +11,23 @@ export const boeApi = {
     // ── Feed de cambios (10.1) ────────────────────────────────────────────────
     getFeed: () => api.get(B.FEED, { auth: true }),
 
+    // ── Gestión de normas seguidas ────────────────────────────────────────────
+    listRegulations: () =>
+        api.get(B.REGULATIONS, { auth: true }),
+
+    followRegulation: (boeIdentifier, titulo) =>
+        api.post(B.REGULATIONS, { boeIdentifier, titulo }, { auth: true }),
+
+    unfollowRegulation: (regulationId) =>
+        api.delete(B.REGULATION.replace(':id', regulationId), { auth: true }),
+
+    // ── Catálogo BOE — buscar normas para seguir ──────────────────────────────
+    searchCatalog: (q = '', limit = 20) =>
+        api.get(`${B.CATALOG_SEARCH}?q=${encodeURIComponent(q)}&limit=${limit}`, { auth: true }),
+
+    syncCatalog: (desde) =>
+        api.post(B.CATALOG_SYNC, desde ? { desde } : {}, { auth: true }),
+
     // ── Detalle del cambio (10.2) ─────────────────────────────────────────────
     getDetail: (changeId) =>
         api.get(B.CHANGE_DETAIL.replace(':id', changeId), { auth: true }),

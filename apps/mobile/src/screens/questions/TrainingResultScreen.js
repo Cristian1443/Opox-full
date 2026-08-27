@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
-import { trainingApi, motivationApi, planningApi } from '../../api';
+import { trainingApi, motivationApi, planningApi, boeApi } from '../../api';
 
 const OPTION_ID_TO_INDEX = { A: 0, B: 1, C: 2, D: 3 };
 
@@ -183,10 +183,18 @@ export default function TrainingResultScreen({ navigation, route }) {
 
   // Persiste el intento en el backend UNA SOLA VEZ al montar. Sin esto el
   // Laboratorio de Errores no tiene con qué calcular los patrones de fallo.
+  const [boeUnread, setBoeUnread] = React.useState(0);
+
   const savedRef = useRef(false);
   useEffect(() => {
     if (savedRef.current) return;
     savedRef.current = true;
+    // Comprobar si hay cambios BOE pendientes para mostrar el hint
+    boeApi.getFeed().then(res => {
+        if (!res?.error && (res?.data?.totalUnread ?? 0) > 0) {
+            setBoeUnread(res.data.totalUnread);
+        }
+    }).catch(() => {});
     const responses = buildResponses(questions, answers);
     if (responses.length === 0) return; // MOCK data, no persistimos
     // 'photo' no es un enum válido del backend — se guarda como 'generator'.
@@ -289,6 +297,23 @@ export default function TrainingResultScreen({ navigation, route }) {
             <Text style={styles.chipTitle}>{incorrect} fallos detectados</Text>
             <Text style={styles.chipSub}>¡Refuérzalos con un test quirúrgico!</Text>
           </View>
+        )}
+
+        {boeUnread > 0 && (
+          <TouchableOpacity
+            style={styles.boeHintCard}
+            onPress={() => navigation.navigate('BoeHome')}
+            activeOpacity={0.8}
+            accessibilityLabel="Ver cambios BOE pendientes"
+          >
+            <View style={styles.boeHintDot} />
+            <Text style={styles.boeHintText} numberOfLines={2}>
+              {boeUnread === 1
+                ? '1 cambio legislativo sin revisar en tu temario'
+                : `${boeUnread} cambios legislativos sin revisar en tu temario`}
+            </Text>
+            <Text style={styles.boeHintCta}>Revisar →</Text>
+          </TouchableOpacity>
         )}
 
         <Text style={styles.whatNow}>¿Qué quieres hacer ahora?</Text>
@@ -421,6 +446,37 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
+  },
+
+  boeHintCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDEBE9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: spacing.md,
+    gap: 8,
+  },
+  boeHintDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E2483D',
+    flexShrink: 0,
+  },
+  boeHintText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: '#C0392B',
+    lineHeight: 17,
+  },
+  boeHintCta: {
+    fontSize: 12,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#E2483D',
+    flexShrink: 0,
   },
 
   whatNow: {

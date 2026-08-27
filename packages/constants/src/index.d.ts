@@ -60,6 +60,8 @@ declare const API_ROUTES: {
         readonly FEED: string;
         readonly REGULATIONS: string;
         readonly REGULATION: string;
+        readonly CATALOG_SEARCH: string;
+        readonly CATALOG_SYNC: string;
         readonly CHANGE_DETAIL: string;
         readonly CHANGE_COMPARISON: string;
         readonly CHANGE_MINI_TEST: string;

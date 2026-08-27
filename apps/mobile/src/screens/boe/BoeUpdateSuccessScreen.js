@@ -76,7 +76,18 @@ export default function BoeUpdateSuccessScreen({ route, navigation }) {
                     <Ionicons name="arrow-forward" size={20} color={colors.white} />
                 </TouchableOpacity>
 
-                {/* ── Hint secundario ───────────────────────────────────────── */}
+                {/* ── CTA secundario: practicar con preguntas actualizadas ──── */}
+                <TouchableOpacity
+                    style={styles.secondaryBtn}
+                    activeOpacity={0.78}
+                    onPress={() => navigation.navigate('GeneratorConfig', { questionCount: 10 })}
+                    accessibilityLabel="Practicar con preguntas actualizadas"
+                >
+                    <Ionicons name="barbell-outline" size={18} color={colors.success} />
+                    <Text style={styles.secondaryBtnText}>Practicar con preguntas actualizadas</Text>
+                </TouchableOpacity>
+
+                {/* ── Hint ──────────────────────────────────────────────────── */}
                 <Text style={styles.hint}>
                     Puedes seguir estudiando o revisar otros cambios.
                 </Text>
@@ -171,6 +182,23 @@ const styles = StyleSheet.create({
     primaryBtnText: {
         color: colors.white,
         fontSize: 17,
+        fontWeight: '700',
+    },
+    secondaryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        paddingHorizontal: spacing.lg,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: colors.success,
+        backgroundColor: '#F0FFF4',
+        marginBottom: spacing.sm,
+    },
+    secondaryBtnText: {
+        color: colors.success,
+        fontSize: 15,
         fontWeight: '700',
     },
 
