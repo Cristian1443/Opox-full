@@ -28,6 +28,20 @@ export class SupabaseStoreRepository implements IStoreRepository {
         }, 0);
     }
 
+    async getTodayTestEarnings(userId: string): Promise<number> {
+        const todayStart = new Date();
+        todayStart.setUTCHours(0, 0, 0, 0);
+        const { data, error } = await this.db
+            .from('user_opopoints_ledger')
+            .select('amount')
+            .eq('user_id', userId)
+            .eq('type', 'earn')
+            .like('reason', 'test_%')
+            .gte('created_at', todayStart.toISOString());
+        if (error) { logger.error('[store-repo] getTodayTestEarnings', { error }); return 0; }
+        return (data ?? []).reduce((sum: number, row: { amount: number }) => sum + row.amount, 0);
+    }
+
     async addLedgerEntry(entry: Omit<OpoLedgerEntry, 'id' | 'createdAt'>): Promise<OpoLedgerEntry> {
         const { data, error } = await this.db
             .from('user_opopoints_ledger')

@@ -1,4 +1,4 @@
-import type { IBoeRepository, BoeChange, BoeChangeFragment, BoeChangeType, BoeWatchedRegulation } from '../../domain';
+import type { IBoeRepository, IDashboardRepository, BoeChange, BoeChangeFragment, BoeChangeType, BoeWatchedRegulation } from '../../domain';
 import { computeBoeDiff } from './boeDiff';
 import {
     BoeChangeNotFoundError,
@@ -232,12 +232,25 @@ export class ToggleBoeBookmarkUseCase {
 // ─── Guardar resultado del mini-test ─────────────────────────────────────────
 
 export class CompleteBoeMiniTestUseCase {
-    constructor(private readonly repo: IBoeRepository) {}
+    constructor(
+        private readonly repo: IBoeRepository,
+        private readonly dashboardRepo: IDashboardRepository,
+    ) {}
 
     async execute(changeId: string, userId: string, score: number, total: number): Promise<void> {
         const change = await this.repo.getChange(changeId);
         if (!change) throw new BoeChangeNotFoundError();
         await this.repo.saveMiniTestResult({ userId, changeId, score, total });
+
+        // Opopoints: máx 5 por mini-test BOE (3 preguntas), proporcional a aciertos
+        const miniTestPoints = total > 0 ? Math.round((score / total) * 5) : 0;
+        if (miniTestPoints > 0) {
+            await this.dashboardRepo.registerActivity({
+                userId,
+                reason: 'test_boe_minitest',
+                points: miniTestPoints,
+            });
+        }
     }
 }
 

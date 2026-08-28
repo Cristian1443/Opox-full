@@ -14,6 +14,8 @@ export interface IStoreRepository {
     // ── Saldo de Opopoints ──────────────────────────────────────────────────
     getBalance(userId: string): Promise<number>;
     addLedgerEntry(entry: Omit<OpoLedgerEntry, 'id' | 'createdAt'>): Promise<OpoLedgerEntry>;
+    /** Suma de puntos ganados por tests hoy (reason LIKE 'test_%'). Usado para el cap diario. */
+    getTodayTestEarnings(userId: string): Promise<number>;
 
     // ── Catálogo de recompensas reales ──────────────────────────────────────
     listProducts(category?: string): Promise<StoreProduct[]>;

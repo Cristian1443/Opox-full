@@ -213,7 +213,71 @@ muestra `RedeemSuccessModal` con `newBalance` real y navega a `StoreWallet`.
 - Tienda completamente conectada al backend: cero mocks en producción.
 - Bug de saldo 0 corregido: al completar el plan diario (40 O) el balance refleja los puntos.
 - Flujo canje end-to-end: descuento → confirmar → código real → cartera.
-- Pendiente: ejecutar el ALTER TABLE de `store_discounts` en Supabase.
+- SQL `ADD COLUMN cost/code` ejecutado en Supabase.
+
+---
+
+## 2026-08-28 — Bloque 11 · Opopoints automáticos por tests + fixes UI tienda
+
+Rama: `feat/revision-bloque-11-tienda`. Motor de earn de Opopoints por rendimiento
+en tests y corrección de dos bugs de UI en la pantalla home de la tienda.
+
+### Motor de earn por tests (sin datos manuales en Supabase)
+
+Los Opopoints ahora se acumulan automáticamente al completar cualquier test, sin
+necesidad de insertar filas manualmente en la base de datos.
+
+**Fórmula de puntos en `SaveAttemptUseCase`**:
+- 1 O por cada respuesta correcta
+- × multiplicador de nota: ≥80% → ×1.5, ≥60% → ×1.2, resto → ×1.0
+- Cap diario de 100 O procedentes de tests (evita farming de tests cortos)
+
+**Cap diario — `getTodayTestEarnings(userId)`** añadido a `IStoreRepository` /
+`SupabaseStoreRepository`: suma filas `type='earn'` con `reason LIKE 'test_%'`
+creadas hoy (UTC). Consultado antes de cada insert para calcular el remanente.
+
+**`CompleteBoeMiniTestUseCase`**: al completar un mini-test BOE (3 preguntas)
+gana hasta 5 O proporcionales a los aciertos (`Math.round(score/total × 5)`).
+Usa `dashboardRepo.registerActivity` → el puente del Bloque 11 escribe en el ledger.
+
+**Flujo completo** (sin nuevas tablas ni rutas):
+```
+Test terminado
+  → SaveAttemptUseCase (Bloques 6/7/9)
+  → dashboardRepo.registerActivity({ reason: 'test_completed', points: N })
+  → insert earn en user_opopoints_ledger  ← puente del Bloque 11
+  → getBalance() devuelve saldo actualizado
+```
+
+Mini-test BOE:
+```
+CompleteBoeMiniTestUseCase (Bloque 10)
+  → dashboardRepo.registerActivity({ reason: 'test_boe_minitest', points: 0-5 })
+  → insert earn en user_opopoints_ledger
+```
+
+### Fixes UI StoreHomeScreen
+
+**Bug escalera en tabs**: `tabIndicator` con `position: 'absolute', bottom: 0` dentro
+de un `ScrollView` horizontal no anclaba correctamente en Android — cada tab calculaba
+su alto de forma diferente. Reemplazado por `borderBottomWidth: 2` directamente en
+el `TouchableOpacity`, con `borderBottomColor: 'transparent'` en inactivo y el color
+de acento en activo.
+
+**Suscripción desaparecía**: el `ScrollView` de planes no tenía espacio asignado
+porque la estructura padre no tenía `flex: 1`. Añadido `<View style={contentArea}>`
+con `flex: 1` envolviendo el área de contenido condicional (FlatList / ScrollView).
+
+**Tab Virtual eliminado**: el tab por defecto era `'virtual'` (sin contenido en BD).
+Eliminado de `TABS`; arranca en `'discounts'` (primer tab con datos reales).
+
+### Estado tras la sesión
+
+- Completar un test de 20 preguntas con 80% acierto → +24 O automáticos.
+- Mini-test BOE 3/3 → +5 O automáticos.
+- Plan diario completado → +40 O (canal previo, sin cambios).
+- Tienda muestra el saldo real al volver a la pantalla (useFocusEffect).
+- Tabs sin escalera, Suscripción visible, default en Descuentos.
 
 ---
 

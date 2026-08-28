@@ -377,7 +377,7 @@ export function buildContainer() {
         generateQuestions: new GenerateQuestionsUseCase(aiApi),
         analyzePhoto: new AnalyzePhotoUseCase(aiApi),
         generateSurgicalTest: new GenerateSurgicalTestUseCase(aiApi, trainingRepo),
-        saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo),
+        saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo, storeRepo),
         listErrorPatterns: new ListErrorPatternsUseCase(trainingRepo),
         listBookmarks: new ListBookmarksUseCase(trainingRepo),
         saveBookmark: new SaveBookmarkUseCase(trainingRepo),
@@ -424,7 +424,7 @@ export function buildContainer() {
         getBoeMiniTest: new GetBoeMiniTestUseCase(boeRepo, aiApi),
         markBoeRead: new MarkBoeReadUseCase(boeRepo),
         toggleBoeBookmark: new ToggleBoeBookmarkUseCase(boeRepo),
-        completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo),
+        completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo, dashboardRepo),
         listTopics: new ListTopicsUseCase(boeRepo),
         syncBoeChanges: motorBoe
             ? new SyncBoeChangesUseCase(

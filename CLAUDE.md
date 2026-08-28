@@ -416,6 +416,14 @@ Recibe `productId` + `redeemType: 'product' | 'discount' | 'community_test'` des
 `newBalance` real del response y navega a `StoreWallet` (o `StoreMarketplace` si es
 `community_test`).
 
+**Motor earn por tests** (revisión 2026-08-28): `SaveAttemptUseCase` calcula Opopoints
+automáticamente al guardar cualquier intento (Bloques 6, 7, 9). Fórmula:
+`correctas × multiplicador(≥80%→1.5, ≥60%→1.2, resto→1.0)`, cap diario 100 O/día
+(filtrado por `reason LIKE 'test_%'` en `getTodayTestEarnings`). `CompleteBoeMiniTestUseCase`
+(Bloque 10) gana hasta 5 O por mini-test BOE proporcional a aciertos.
+Ambos pasan por `dashboardRepo.registerActivity` → puente earn → ledger tienda.
+Sin nuevas tablas ni rutas. `getTodayTestEarnings(userId)` añadido a `IStoreRepository`.
+
 **Pantallas conectadas al backend** (revisión 2026-08-27 — todas eliminan mocks):
 - `StoreHomeScreen`: `useFocusEffect` carga balance + discounts + products en paralelo.
 - `StoreProductDetailScreen`: enriquece el producto con `storeApi.getProduct(id)`.
@@ -609,7 +617,7 @@ pnpm lint                       # lint completo
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 6 pantallas + modal reestilizados. EpisodePicker y TopicPicker funcionales. Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes |
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
-| 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-27: puente earn→store ledger (balance ya no es 0), endpoint `POST /store/discounts/:id/redeem`, 8 pantallas mobile conectadas al backend (eliminación de todos los mocks), canje real por `redeemType`. Pendiente SQL `ADD COLUMN cost/code` en `store_discounts` si la tabla es anterior a la revisión. |
+| 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-28: motor earn automático por tests (1 O/acierto × multiplicador, cap 100 O/día), mini-test BOE hasta 5 O, `getTodayTestEarnings` en repo. Revisión 2026-08-27: puente earn→ledger, `POST /store/discounts/:id/redeem`, 8 pantallas sin mocks, canje por `redeemType`, fixes tabs UI. |
 | 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
 | 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |
 
