@@ -237,7 +237,10 @@ export default function StoreHomeScreen({ navigation }) {
           return (
             <TouchableOpacity
               key={tab.key}
-              style={styles.tab}
+              style={[
+                styles.tab,
+                isActive && (tab.isPhase2 ? styles.tabActivePhase2 : styles.tabActive),
+              ]}
               onPress={() => {
                 if (tab.navigateTo) {
                   navigation.navigate(tab.navigateTo);
@@ -255,39 +258,38 @@ export default function StoreHomeScreen({ navigation }) {
               ]}>
                 {tab.label}
               </Text>
-              {isActive && (
-                <View style={[styles.tabIndicator, tab.isPhase2 && styles.phase2Indicator]} />
-              )}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
-      {/* Contenido: se evita anidar FlatList dentro de ScrollView */}
-      {activeTab === 'subscription' ? (
-        <ScrollView contentContainerStyle={styles.subScrollContent}>
-          <Text style={styles.sectionTitle}>Elige tu plan</Text>
-          {SUBSCRIPTION_PLANS.map((plan) => (
-            <SubscriptionCard
-              key={plan.key}
-              plan={plan}
-              onPress={() => navigation.navigate('StoreSubscription', { planKey: plan.key })}
-            />
-          ))}
-        </ScrollView>
-      ) : (
-        <FlatList
-          data={getCurrentItems()}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          contentContainerStyle={styles.gridContent}
-          columnWrapperStyle={styles.gridRow}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No hay productos en esta categoría.</Text>
-          }
-        />
-      )}
+      {/* Contenido: flex:1 garantiza que ScrollView de Suscripción no colapse */}
+      <View style={styles.contentArea}>
+        {activeTab === 'subscription' ? (
+          <ScrollView contentContainerStyle={styles.subScrollContent}>
+            <Text style={styles.sectionTitle}>Elige tu plan</Text>
+            {SUBSCRIPTION_PLANS.map((plan) => (
+              <SubscriptionCard
+                key={plan.key}
+                plan={plan}
+                onPress={() => navigation.navigate('StoreSubscription', { planKey: plan.key })}
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <FlatList
+            data={getCurrentItems()}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            contentContainerStyle={styles.gridContent}
+            columnWrapperStyle={styles.gridRow}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>No hay productos en esta categoría.</Text>
+            }
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -387,7 +389,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     paddingVertical: 12,
-    position: 'relative',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: ACCENT,
+  },
+  tabActivePhase2: {
+    borderBottomColor: PHASE2_COLOR,
   },
   tabText: {
     fontSize: 13,
@@ -400,17 +409,8 @@ const styles = StyleSheet.create({
   phase2TabText: {
     color: PHASE2_COLOR,
   },
-  tabIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    left: 4,
-    right: 4,
-    height: 2,
-    backgroundColor: ACCENT,
-    borderRadius: 2,
-  },
-  phase2Indicator: {
-    backgroundColor: PHASE2_COLOR,
+  contentArea: {
+    flex: 1,
   },
   // Grid de productos
   gridContent: {
