@@ -151,6 +151,72 @@ actualizadas" → navega a `GeneratorConfig`.
 
 ---
 
+## 2026-08-27 — Bloque 11 · Tienda OPOX — Conexión al backend y canje real
+
+Rama: `feat/revision-bloque-11-tienda`. MVP completo: eliminación de todos los mocks
+del mobile, corrección del bug de balance=0 y nuevo endpoint de canje de descuentos.
+
+### Bug crítico resuelto: saldo siempre 0
+
+Existían dos sistemas de Opopoints desconectados:
+- `registerActivity()` en `SupabaseDashboardRepository` escribía en `opopoints_ledger`
+  (tabla de auditoría de gamificación) pero **no** en `user_opopoints_ledger`.
+- `getBalance()` en la tienda lee únicamente `user_opopoints_ledger` → siempre devolvía 0.
+
+**Fix**: en `SupabaseDashboardRepository.registerActivity()`, cuando `input.points > 0`,
+insertar fila `type='earn'` en `user_opopoints_ledger` justo después del upsert de
+gamificación. El error es no-fatal (solo log). Sin cambio de interfaz ni de use cases.
+
+### Nuevo endpoint: canje de descuentos
+
+`POST /store/discounts/:id/redeem` — `RedeemDiscountUseCase`:
+- Verifica que el descuento existe y que el saldo es suficiente.
+- Inserta fila `spend` en el ledger.
+- Devuelve `{ walletItemId: '', code: discount.code, newBalance }` (no crea `user_wallet`
+  porque los descuentos son códigos precargados en BD, no artículos de cartera).
+
+Nuevos campos `cost: number; code: string;` en `StoreDiscount` (domain), `StoreDiscountDTO`
+(types) y mapping de `ListStoreDiscountsUseCase`. Ruta registrada en constants,
+handler en controller, inyección en container, método `redeemDiscount` en `store.js`.
+
+**Pendiente SQL** (ejecutar en Supabase SQL Editor):
+```sql
+ALTER TABLE store_discounts
+  ADD COLUMN IF NOT EXISTS cost integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS code  text    NOT NULL DEFAULT '';
+```
+
+### Pantallas mobile conectadas (eliminación de mocks)
+
+Todas las pantallas de la tienda siguen el patrón `useFocusEffect` + `cancelled` guard:
+
+| Pantalla | Antes | Después |
+|---|---|---|
+| `StoreHomeScreen` | `MOCK_PRODUCTS / DISCOUNTS / REAL_REWARDS` | `getBalance + listDiscounts + listProducts` en paralelo |
+| `StoreProductDetailScreen` | `setTimeout` fake + balance hardcoded | `getBalance + getProduct(id)` real |
+| `StoreDiscountsScreen` | `DISCOUNTS_DATA` hardcoded | `listDiscounts()` real |
+| `StoreConfirmRedeemScreen` | `setTimeout` sin API | `redeemDiscount / redeemProduct / obtainCommunityTest` según `redeemType` |
+| `StoreWalletScreen` | `WALLET_DATA` hardcoded | `getWallet()` real |
+| `StoreRealRewardsScreen` | `REWARDS_DATA` hardcoded | `getBalance + listProducts()` real |
+| `StoreRealRedeemConfirmScreen` | `setTimeout` fake | `redeemProduct(reward.id)` real |
+| `StoreMarketplaceScreen` | `MOCK_COMMUNITY_TESTS` | `listCommunityTests()` real; gratis → `obtainCommunityTest` directo |
+
+`StoreConfirmRedeemScreen` centraliza todos los tipos de canje con `redeemType:
+'product' | 'discount' | 'community_test'` recibido desde `route.params`. En éxito
+muestra `RedeemSuccessModal` con `newBalance` real y navega a `StoreWallet`.
+
+`StoreHowToEarnScreen`: textos actualizados para coincidir con `DAILY_GOAL_POINTS = 40`
+(antes mostraba `+15 O` por plan).
+
+### Estado tras la sesión
+
+- Tienda completamente conectada al backend: cero mocks en producción.
+- Bug de saldo 0 corregido: al completar el plan diario (40 O) el balance refleja los puntos.
+- Flujo canje end-to-end: descuento → confirmar → código real → cartera.
+- Pendiente: ejecutar el ALTER TABLE de `store_discounts` en Supabase.
+
+---
+
 ## 2026-08-25 — Bloque 9 · Factoría de Apuntes — Fixes de upload en dispositivo Android
 
 Rama: `feat/revision-bloque-9-notas`. Sesión de depuración en dispositivo real

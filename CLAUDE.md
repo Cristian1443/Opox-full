@@ -384,6 +384,12 @@ Colección de tests en `Bloque11_Tienda_Tests.postman_collection.json`
 (filas `type='earn'` suman, `type='spend'` restan). No hay columna de saldo
 precalculada — siempre se recalcula en `getBalance()`.
 
+**Puente earn → store ledger** (revisión 2026-08-27): `registerActivity()` en
+`SupabaseDashboardRepository` inserta fila `type='earn'` en `user_opopoints_ledger`
+cuando `input.points > 0`. Sin este puente el balance siempre era 0 porque los
+eventos `daily_goal` solo escribían en `opopoints_ledger` (tabla de auditoría
+separada). El error es no-fatal (solo log); no afecta la racha ni la gamificación.
+
 **Canje de producto real** (`POST /store/products/:id/redeem`):
 1. Verifica stock > 0 e `isAvailable`.
 2. Verifica saldo >= coste (422 si no alcanza).
@@ -391,6 +397,34 @@ precalculada — siempre se recalcula en `getBalance()`.
 4. Decrementa stock.
 5. Genera código con `generateCode(partner)` (prefijo 3 letras + 6 chars random).
 6. Crea item en `user_wallet` con `status='active'` y fecha de caducidad.
+
+**Canje de descuento** (`POST /store/discounts/:id/redeem`): flujo sin stock ni wallet.
+`RedeemDiscountUseCase` verifica balance, inserta `spend` en ledger y devuelve el
+`code` precargado en la fila `store_discounts`. No crea fila en `user_wallet`.
+`StoreDiscount` y `StoreDiscountDTO` tienen campos `cost: number; code: string;`.
+**Pendiente SQL** (correr en Supabase si la tabla fue creada antes de la revisión):
+```sql
+ALTER TABLE store_discounts
+  ADD COLUMN IF NOT EXISTS cost integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS code  text    NOT NULL DEFAULT '';
+```
+
+**`StoreConfirmRedeemScreen`** — canje real por tipo:
+Recibe `productId` + `redeemType: 'product' | 'discount' | 'community_test'` desde
+`route.params`. `handleConfirm` llama `redeemDiscount`, `obtainCommunityTest` o
+`redeemProduct` según el tipo. En éxito muestra `RedeemSuccessModal` con el
+`newBalance` real del response y navega a `StoreWallet` (o `StoreMarketplace` si es
+`community_test`).
+
+**Pantallas conectadas al backend** (revisión 2026-08-27 — todas eliminan mocks):
+- `StoreHomeScreen`: `useFocusEffect` carga balance + discounts + products en paralelo.
+- `StoreProductDetailScreen`: enriquece el producto con `storeApi.getProduct(id)`.
+- `StoreDiscountsScreen`: carga `storeApi.listDiscounts()`, pasa `redeemType:'discount'`.
+- `StoreWalletScreen`: carga `storeApi.getWallet()` (elimina `WALLET_DATA`).
+- `StoreRealRewardsScreen`: carga balance + `storeApi.listProducts()`.
+- `StoreRealRedeemConfirmScreen`: canje real con `storeApi.redeemProduct(reward.id)`.
+- `StoreMarketplaceScreen`: carga `storeApi.listCommunityTests()`, free → `obtainCommunityTest` directo.
+- `StoreHowToEarnScreen`: textos alineados con `DAILY_GOAL_POINTS = 40`.
 
 **Marketplace**: `community_tests` con campo `is_free` generado (`price = 0`).
 Compra idempotente por unique constraint `(user_id, test_id)` en `community_test_purchases`.
@@ -575,7 +609,7 @@ pnpm lint                       # lint completo
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 6 pantallas + modal reestilizados. EpisodePicker y TopicPicker funcionales. Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes |
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
-| 11 | Tienda OPOX | Frontend + backend completo (recompensas reales, descuentos virtuales, cartera de códigos, marketplace comunidad, 20 requests / 65 assertions verde). Saldo Opopoints gestionado por ledger earn/spend en Supabase. |
+| 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-27: puente earn→store ledger (balance ya no es 0), endpoint `POST /store/discounts/:id/redeem`, 8 pantallas mobile conectadas al backend (eliminación de todos los mocks), canje real por `redeemType`. Pendiente SQL `ADD COLUMN cost/code` en `store_discounts` si la tabla es anterior a la revisión. |
 | 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
 | 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |
 
