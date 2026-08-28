@@ -20,7 +20,6 @@ const ACCENT_LIGHT = '#A29BFE';
 const PHASE2_COLOR = '#7B1FA2';
 
 const TABS = [
-  { key: 'virtual', label: 'Virtual' },
   { key: 'discounts', label: 'Descuentos' },
   { key: 'real', label: 'Reales', isPhase2: true },
   { key: 'subscription', label: 'Suscripción' },
@@ -158,7 +157,7 @@ const SubscriptionCard = ({ plan, onPress }) => (
 // --- Pantalla principal ---
 
 export default function StoreHomeScreen({ navigation }) {
-  const [activeTab, setActiveTab] = useState('virtual');
+  const [activeTab, setActiveTab] = useState('discounts');
   const [balance, setBalance] = useState(null);
   const [discounts, setDiscounts] = useState([]);
   const [realProducts, setRealProducts] = useState([]);
@@ -196,9 +195,8 @@ export default function StoreHomeScreen({ navigation }) {
   }, []));
 
   const getCurrentItems = () => {
-    if (activeTab === 'discounts') return discounts;
     if (activeTab === 'real') return realProducts;
-    return [];
+    return discounts;
   };
 
   const renderItem = ({ item }) => (

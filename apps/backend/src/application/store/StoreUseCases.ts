@@ -182,13 +182,16 @@ export class RedeemDiscountUseCase {
         const balance = await this.repo.getBalance(userId);
         if (balance < discount.cost) throw new StoreInsufficientBalanceError();
 
-        await this.repo.addLedgerEntry({
-            userId,
-            type: 'spend',
-            amount: discount.cost,
-            reason: `Descuento: ${discount.partner} · ${discount.title}`,
-            refId: discountId,
-        });
+        // Solo debitar si el descuento tiene coste; evita violar CHECK (amount > 0)
+        if (discount.cost > 0) {
+            await this.repo.addLedgerEntry({
+                userId,
+                type: 'spend',
+                amount: discount.cost,
+                reason: `Descuento: ${discount.partner} · ${discount.title}`,
+                refId: discountId,
+            });
+        }
 
         const newBalance = balance - discount.cost;
         return { walletItemId: '', code: discount.code, newBalance };
