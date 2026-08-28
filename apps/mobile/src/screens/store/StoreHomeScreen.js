@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
+import { storeApi } from '../../api/store';
 
 // Acento propio del Bloque 11 · Tienda (violeta)
 const ACCENT = '#6C5CE7';
@@ -25,23 +27,6 @@ const TABS = [
   { key: 'comunidad', label: 'Comunidad', isPhase2: true, navigateTo: 'StoreMarketplace' },
 ];
 
-const MOCK_PRODUCTS = [
-  { id: '1', name: 'Avatar Pro', price: 300, icon: 'cube-outline', type: 'virtual' },
-  { id: '2', name: 'Insignia Élite', price: 150, icon: 'trophy-outline', type: 'virtual' },
-  { id: '3', name: 'Pack Tests Premium', price: 500, icon: 'document-text-outline', type: 'virtual' },
-  { id: '4', name: 'Tema Desbloqueado', price: 400, icon: 'color-palette-outline', type: 'virtual' },
-];
-
-const MOCK_DISCOUNTS = [
-  { id: '1', name: 'FNAC -15%', price: 250, desc: 'Libros y material', icon: 'book-outline', type: 'discounts' },
-  { id: '2', name: '5€ en cafetería', price: 180, desc: 'Para jornadas de estudio', icon: 'cafe-outline', type: 'discounts' },
-  { id: '3', name: '-10% Papelería', price: 120, desc: 'Subrayadores, agendas', icon: 'pricetags-outline', type: 'discounts' },
-];
-
-const MOCK_REAL_REWARDS = [
-  { id: '1', name: 'Uber Eats (1 mes)', price: 1500, desc: 'Suscripción Uber One', icon: 'restaurant-outline', type: 'real', isPhase2: true },
-  { id: '2', name: 'Decathlon -20%', price: 1200, desc: 'Prueba física', icon: 'fitness-outline', type: 'real', isPhase2: true },
-];
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -75,7 +60,9 @@ const OpopointsHeader = ({ balance, onEarnClick, onWalletClick, onAffiliateClick
         <Ionicons name="gift-outline" size={24} color={ACCENT} />
         <Text style={styles.opopointsLabel}>Opopoints disponibles</Text>
       </View>
-      <Text style={styles.opopointsBalance}>{balance.toLocaleString()}</Text>
+      <Text style={styles.opopointsBalance}>
+        {balance !== null && balance !== undefined ? balance.toLocaleString() : '—'}
+      </Text>
       <TouchableOpacity
         style={styles.earnButton}
         onPress={onEarnClick}
@@ -172,12 +159,45 @@ const SubscriptionCard = ({ plan, onPress }) => (
 
 export default function StoreHomeScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('virtual');
-  const [opopointsBalance] = useState(1840);
+  const [balance, setBalance] = useState(null);
+  const [discounts, setDiscounts] = useState([]);
+  const [realProducts, setRealProducts] = useState([]);
+
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    storeApi.getBalance().then(res => {
+      if (cancelled || !res?.data) return;
+      setBalance(res.data.balance);
+    });
+    storeApi.listDiscounts().then(res => {
+      if (cancelled || !res?.data) return;
+      setDiscounts(res.data.map(d => ({
+        id: d.id,
+        name: d.title,
+        price: d.cost,
+        icon: d.icon,
+        desc: d.subtitle,
+        type: 'discounts',
+      })));
+    });
+    storeApi.listProducts().then(res => {
+      if (cancelled || !res?.data) return;
+      setRealProducts(res.data.map(p => ({
+        id: p.id,
+        name: p.title,
+        price: p.cost,
+        icon: p.icon,
+        desc: p.subtitle,
+        type: 'real',
+        isPhase2: true,
+      })));
+    });
+    return () => { cancelled = true; };
+  }, []));
 
   const getCurrentItems = () => {
-    if (activeTab === 'virtual') return MOCK_PRODUCTS;
-    if (activeTab === 'discounts') return MOCK_DISCOUNTS;
-    if (activeTab === 'real') return MOCK_REAL_REWARDS;
+    if (activeTab === 'discounts') return discounts;
+    if (activeTab === 'real') return realProducts;
     return [];
   };
 
@@ -201,7 +221,7 @@ export default function StoreHomeScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
       <OpopointsHeader
-        balance={opopointsBalance}
+        balance={balance}
         onEarnClick={() => navigation.navigate('StoreHowToEarn')}
         onWalletClick={() => navigation.navigate('StoreWallet')}
         onAffiliateClick={() => navigation.navigate('StoreAffiliate')}

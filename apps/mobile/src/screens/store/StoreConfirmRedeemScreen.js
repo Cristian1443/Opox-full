@@ -7,11 +7,13 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import RedeemSuccessModal from '../../components/RedeemSuccessModal';
+import { storeApi } from '../../api/store';
 
 const ACCENT = '#6C5CE7';
 
@@ -24,16 +26,24 @@ const MOCK_FALLBACK = {
 export default function StoreConfirmRedeemScreen({ navigation, route }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [redeemResult, setRedeemResult] = useState(null);
 
-  const { product, currentBalance, newBalance } = route?.params ?? MOCK_FALLBACK;
+  const { product, currentBalance, newBalance, productId, redeemType } = route?.params ?? MOCK_FALLBACK;
   const productCost = product?.price ?? (currentBalance - newBalance);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setShowSuccess(true);
-    }, 1500);
+    let res;
+    if (redeemType === 'discount') res = await storeApi.redeemDiscount(productId);
+    else if (redeemType === 'community_test') res = await storeApi.obtainCommunityTest(productId);
+    else res = await storeApi.redeemProduct(productId);
+    setIsLoading(false);
+    if (res?.error) {
+      Alert.alert('Error al canjear', res.error.message ?? 'Inténtalo de nuevo');
+      return;
+    }
+    setRedeemResult(res?.data ?? null);
+    setShowSuccess(true);
   };
 
   const handleCancel = () => {
@@ -42,13 +52,16 @@ export default function StoreConfirmRedeemScreen({ navigation, route }) {
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
-    navigation.navigate('StoreHome');
+    navigation.navigate('StoreWallet');
   };
 
   const handleSuccessContinue = () => {
     setShowSuccess(false);
-    // TODO: navegar al destino del producto según su tipo (TrainingHome, etc.)
-    navigation.navigate('StoreHome');
+    if (redeemType === 'community_test') {
+      navigation.navigate('StoreMarketplace');
+    } else {
+      navigation.navigate('StoreWallet');
+    }
   };
 
   const insets = useSafeAreaInsets();
@@ -145,7 +158,7 @@ export default function StoreConfirmRedeemScreen({ navigation, route }) {
       <RedeemSuccessModal
         visible={showSuccess}
         productName={product?.name}
-        newBalance={newBalance}
+        newBalance={redeemResult?.newBalance ?? newBalance}
         onContinue={handleSuccessContinue}
         onClose={handleSuccessClose}
       />

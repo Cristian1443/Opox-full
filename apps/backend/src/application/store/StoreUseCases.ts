@@ -166,7 +166,32 @@ export class ListStoreDiscountsUseCase {
             expiryDate: d.expiryDate,
             conditions: d.conditions,
             deepLink: d.deepLink,
+            cost: d.cost,
+            code: d.code,
         }));
+    }
+}
+
+export class RedeemDiscountUseCase {
+    constructor(private readonly repo: IStoreRepository) {}
+
+    async execute(userId: string, discountId: string): Promise<PurchaseResultDTO> {
+        const discount = await this.repo.getDiscount(discountId);
+        if (!discount) throw new StoreProductNotFoundError();
+
+        const balance = await this.repo.getBalance(userId);
+        if (balance < discount.cost) throw new StoreInsufficientBalanceError();
+
+        await this.repo.addLedgerEntry({
+            userId,
+            type: 'spend',
+            amount: discount.cost,
+            reason: `Descuento: ${discount.partner} · ${discount.title}`,
+            refId: discountId,
+        });
+
+        const newBalance = balance - discount.cost;
+        return { walletItemId: '', code: discount.code, newBalance };
     }
 }
 

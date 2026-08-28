@@ -117,6 +117,7 @@ export const API_ROUTES = {
         PRODUCT:                '/store/products/:id',
         REDEEM:                 '/store/products/:id/redeem',
         DISCOUNTS:              '/store/discounts',
+        DISCOUNT_REDEEM:        '/store/discounts/:id/redeem',
         WALLET:                 '/store/wallet',
         WALLET_ITEM:            '/store/wallet/:id',
         COMMUNITY_TESTS:        '/store/community-tests',

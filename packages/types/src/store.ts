@@ -39,6 +39,8 @@ export interface StoreDiscountDTO {
     expiryDate: string;
     conditions: string[];
     deepLink: string | null;
+    cost: number;
+    code: string;
 }
 
 /** A single item in the user's wallet (a redeemed code). */

@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
+import { storeApi } from '../../api/store';
 
 const ACCENT = '#6C5CE7';
 const PHASE2_COLOR = '#7B1FA2';
@@ -37,17 +39,19 @@ export default function StoreRealRedeemConfirmScreen({ navigation, route }) {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setIsLoading(true);
-    // TODO(store-backend): llamar al endpoint de canje real, recibir el código generado
-    setTimeout(() => {
-      setIsLoading(false);
-      navigation.navigate('StoreRealRewardSuccess', {
-        reward,
-        newBalance,
-        code: 'OPOX-UE-30',
-      });
-    }, 1500);
+    const res = await storeApi.redeemProduct(reward.id);
+    setIsLoading(false);
+    if (res?.error) {
+      Alert.alert('Error al canjear', res.error.message ?? 'Inténtalo de nuevo');
+      return;
+    }
+    navigation.navigate('StoreRealRewardSuccess', {
+      reward,
+      newBalance: res.data?.newBalance ?? newBalance,
+      code: res.data?.code ?? '',
+    });
   };
 
   return (

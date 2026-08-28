@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,73 +9,17 @@ import {
   FlatList,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import InsufficientPointsModal from '../../components/InsufficientPointsModal';
+import { storeApi } from '../../api/store';
 
 const ACCENT = '#6C5CE7';
 const ACCENT_LIGHT = '#A29BFE';
 const PHASE2_COLOR = '#7B1FA2';
 
-const REWARDS_DATA = [
-  {
-    id: '1',
-    partner: 'Uber Eats',
-    title: '1 mes gratis',
-    subtitle: 'Suscripción Uber One durante 30 días',
-    cost: 1500,
-    stock: 12,
-    maxStock: 20,
-    icon: 'restaurant-outline',
-    color: '#000000',
-    tag: 'Comida equilibrada',
-    isAvailable: true,
-    category: 'Food',
-  },
-  {
-    id: '2',
-    partner: 'Decathlon',
-    title: '-20% en tienda',
-    subtitle: 'Ideal para tu prueba física',
-    cost: 1200,
-    stock: 8,
-    maxStock: 10,
-    icon: 'fitness-outline',
-    color: '#0082C3',
-    tag: 'Prueba física',
-    isAvailable: true,
-    category: 'Sport',
-  },
-  {
-    id: '3',
-    partner: 'Spotify',
-    title: '3 meses Premium',
-    subtitle: 'Música sin anuncios para estudiar',
-    cost: 2000,
-    stock: 0,
-    maxStock: 0,
-    icon: 'musical-notes-outline',
-    color: '#1DB954',
-    tag: 'Podcasts',
-    isAvailable: false,
-    category: 'Music',
-  },
-  {
-    id: '4',
-    partner: 'Amazon',
-    title: '15€ en libros',
-    subtitle: 'Material de estudio',
-    cost: 1800,
-    stock: 5,
-    maxStock: 10,
-    icon: 'book-outline',
-    color: '#FF9900',
-    tag: 'Libros',
-    isAvailable: true,
-    category: 'Books',
-  },
-];
 
 const partnerAbbr = (name) => {
   const w = name.trim().split(/\s+/);
@@ -161,17 +105,32 @@ const RewardCard = ({ item, onPress }) => (
 
 export default function StoreRealRewardsScreen({ navigation }) {
   const { top: topInset } = useSafeAreaInsets();
-  const [userBalance] = useState(1840);
+  const [userBalance, setUserBalance] = useState(null);
+  const [rewardsData, setRewardsData] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all');
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
   const [selectedReward, setSelectedReward] = useState(null);
 
-  const filteredRewards = REWARDS_DATA.filter(
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    storeApi.getBalance().then(res => {
+      if (cancelled || !res?.data) return;
+      setUserBalance(res.data.balance);
+    });
+    storeApi.listProducts().then(res => {
+      if (cancelled || !res?.data) return;
+      setRewardsData(res.data);
+    });
+    return () => { cancelled = true; };
+  }, []));
+
+  const filteredRewards = rewardsData.filter(
     (r) => activeCategory === 'all' || r.category === activeCategory,
   );
 
   const handleRedeem = (reward) => {
-    if (userBalance < reward.cost) {
+    const bal = userBalance ?? 0;
+    if (userBalance === null || bal < reward.cost) {
       setSelectedReward(reward);
       setShowInsufficientModal(true);
       return;
@@ -211,7 +170,9 @@ export default function StoreRealRewardsScreen({ navigation }) {
       {/* Saldo flotante sobre el gradiente */}
       <View style={styles.balanceBanner}>
         <Text style={styles.balanceLabel}>Tus Opopoints:</Text>
-        <Text style={styles.balanceAmount}>{userBalance.toLocaleString()} O</Text>
+        <Text style={styles.balanceAmount}>
+          {userBalance !== null ? userBalance.toLocaleString() : '—'} O
+        </Text>
       </View>
 
       {/* Filtros */}
@@ -254,7 +215,7 @@ export default function StoreRealRewardsScreen({ navigation }) {
         visible={showInsufficientModal}
         onClose={() => setShowInsufficientModal(false)}
         cost={selectedReward?.cost ?? 0}
-        currentBalance={userBalance}
+        currentBalance={userBalance ?? 0}
         navigation={navigation}
       />
     </SafeAreaView>

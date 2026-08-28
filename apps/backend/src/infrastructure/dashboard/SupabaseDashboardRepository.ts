@@ -240,6 +240,18 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
             console.error('[dashboard registerActivity] ledger insert failed:', ledgerError.message);
         }
 
+        // Puente earn → store ledger: getBalance() de la tienda lee user_opopoints_ledger
+        // (solo recibe filas spend). Sin esta fila earn el saldo siempre sería 0.
+        if (input.points > 0) {
+            const { error: earnError } = await this.supabaseAdmin
+                .from('user_opopoints_ledger')
+                .insert({ user_id: input.userId, type: 'earn', amount: input.points, reason: input.reason, ref_id: null });
+            if (earnError) {
+                // eslint-disable-next-line no-console
+                console.error('[dashboard registerActivity] earn ledger insert failed:', earnError.message);
+            }
+        }
+
         return toDomainGamification(data as GamificationRow);
     }
 }

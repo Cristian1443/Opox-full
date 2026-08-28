@@ -260,6 +260,8 @@ function mapDiscount(row: any): StoreDiscount {
         conditions: row.conditions ?? [],
         deepLink: row.deep_link ?? null,
         isActive: row.is_active,
+        cost: row.cost ?? 0,
+        code: row.code ?? '',
         createdAt: new Date(row.created_at),
     };
 }

@@ -30,6 +30,8 @@ export const storeApi = {
         return api.get(url, { auth: true });
     },
 
+    redeemDiscount: (id) => api.post(S.DISCOUNT_REDEEM.replace(':id', id), {}, { auth: true }),
+
     // ── Cartera del usuario ───────────────────────────────────────────────────
     getWallet: () => api.get(S.WALLET, { auth: true }),
 

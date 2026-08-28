@@ -100,6 +100,7 @@ declare const API_ROUTES: {
         readonly PRODUCT: string;
         readonly REDEEM: string;
         readonly DISCOUNTS: string;
+        readonly DISCOUNT_REDEEM: string;
         readonly WALLET: string;
         readonly WALLET_ITEM: string;
         readonly COMMUNITY_TESTS: string;
