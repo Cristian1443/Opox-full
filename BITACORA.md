@@ -5,6 +5,529 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-26 — Merge rediseño Figma Bloques 8 y 9 en rama BOE
+
+Rama: `feat/revision-bloque-10-boe`. Integración de `feat/bloque-8-9-rediseno-figma`
+mediante merge con resolución manual de 8 conflictos. Estrategia global: **Figma gana
+en layout y estilos, HEAD gana en lógica de negocio y llamadas API**.
+
+### Lo que trajo el rediseño Figma
+
+**Build fix crítico**: `expo-build-properties` añadido al `package.json` y a los
+plugins de `app.json` con `android.minSdkVersion: 26`. Sin esto `react-native-health-connect`
+no compilaba el APK en EAS (la librería exige API 26+).
+
+**Assets nuevos** (usados en pantallas de Salud): `cel.png`, `celu.png`,
+`celular.png`, `reloj.png`, `watch.png` en `apps/mobile/assets/`.
+
+**`AccentSlider.js`**: thumb rediseñado — antes blanco con borde de color, ahora
+fondo `colors.textDark` con punto interior más pequeño. Afecta a todos los sliders
+de configuración de test (Bloque 6, 9, etc.).
+
+**Aula Virtual — Bloque 8** (6 pantallas + 1 modal reestilizados fiel a Figma):
+- `TutorHomeScreen`, `TutorChatScreen`, `TutorPodcastScreen`, `TutorSummariesScreen`,
+  `TutorFlashcardsScreen`, `TutorFlashcardsLoadingScreen`, `FlashcardsSuccessModal`.
+- Tokens Figma exactos (`Poppins-*`, sizes en puntos, border-radius, paleta morada/verde).
+- `TutorPodcastScreen`: añadido `EpisodePicker` funcional — carga `tutorApi.listEpisodes(oposicion)`
+  y muestra lista antes de entrar al player.
+- `TutorSummariesScreen`: añadido `TopicPicker` funcional — carga `tutorApi.listSummaries(oposicion)`.
+- `TutorFlashcardsScreen`: empty state cuando la IA no genera tarjetas (`paramCards.length === 0`).
+
+**Factoría de Apuntes — Bloque 9** (4 pantallas + 4 modales reestilizados):
+- `NotesHomeScreen`, `NotesUploadScreen`, `NoteDetailScreen`, `NotesTestConfigScreen`.
+- Modales: `NotesDeleteConfirmModal`, `NotesDigitizedModal`, `NotesFormatErrorModal`,
+  `NotesOcrErrorModal`. También `AlertCardModal` (modal genérico compartido).
+- `NotesTestConfigScreen`: nuevo toggle "Solo temas etiquetados" + selector de
+  dificultad (Fácil/Medio/Difícil) integrados; ambos se pasan al API en `startTest`.
+
+**Salud — Bloque 3**:
+- `ConnectDeviceScreen`: iconos SVG inline eliminados, reemplazados por `Ionicons`
+  (más compacto, consistente con el resto de la app).
+
+### Resolución de los 8 conflictos
+
+| Archivo | Decisión |
+|---|---|
+| `package.json` | expo-av (podcast) + expo-build-properties (health connect) |
+| `NoteDetailScreen.js` | DocumentIcon de Figma + fix `createdAt ?? uploadedAt` |
+| `NotesTestConfigScreen.js` | UI Figma + `notesApi.generateTest` async + `adaptGeneratedQuestions`; estados `starting` + `onlyTaggedTopics` combinados; `difficulty` pasado al API |
+| `NotesUploadScreen.js` | Layout Figma + `StatusBar`/`Image`/`Alert` del captureMode; `NOTES_ACCENT = colors.accentOrange` añadido; dead styles `body`/`list` eliminados |
+| `TutorFlashcardsScreen.js` | Figma + empty state re-incorporado; `PURPLE` → `colors.purple`; `handleReviewFailed` eliminado (bug: no tenía setter `setCards`) |
+| `TutorPodcastScreen.js` | `EpisodePicker` conservado (necesario para el flujo); `StatusBar` eliminado; `BLUE_ACCENT` → `colors.accentOrange`; estilos Figma |
+| `TutorSummariesScreen.js` | `TopicPicker` conservado con header inline (fix `ScreenHeader` no importado); `MoreButton` eliminado (no referenciado); `isLoading` inicializado con `topicId` |
+| `pnpm-lock.yaml` | Regenerado con `pnpm install` — conflicto resuelto automáticamente |
+
+---
+
+## 2026-08-27 — Bloque 10 · Monitor BOE — Revisión completa + fixes en dispositivo
+
+Rama: `feat/revision-bloque-10-boe`. Revisión integral del Monitor BOE: gaps de
+backend, integración real con el Motor BOE, corrección de bugs encontrados en
+dispositivo Android y limpieza del `.env`.
+
+### Backend — nuevas capacidades
+
+**Campo `resumen` en `boe_changes`**: el Motor BOE devuelve un resumen textual del
+cambio en `MotorCambio.resumen`. Ahora se persiste en BD y se usa en `buildHint()`
+como primera opción antes de truncar el texto del fragmento. Requiere correr
+`bloque10_boe_patch2.sql` en Supabase.
+
+**`regenerateQuestions` fire-and-forget**: tras sincronizar un cambio con
+`SyncBoeChangesUseCase`, si `mc.preguntas_afectadas.length > 0` se llama
+`motor.regenerateQuestions(mc.id, cursoId)` de forma asíncrona. Los errores
+son no-fatales (solo warn en log).
+
+**`addRegulation` UPSERT idempotente**: cambiado de `INSERT` a `UPSERT` por
+`(user_id, boe_identifier)`. Si el usuario ya sigue la norma el endpoint devuelve
+el registro existente en vez de explotar con constraint violation (500).
+
+**`SearchBoeRegulationsUseCase` con fallback**: el catálogo del Motor
+(`/v1/boe/catalog`) tiene timeout de 5 s (timeout corto configurado por request).
+Si supera ese límite o devuelve vacío, hace fallback automático a
+`motor.listRegulations(MOTOR_BOE_CURSO_ID)` → las normas ya monitorizadas para
+el curso. Filtra localmente por el query del usuario. Así el modal "Añadir norma"
+funciona sin necesidad de ejecutar `POST /boe/catalog/sync` primero.
+
+**Validación del body en `POST /boe/sync`**: añadido `validateBody(syncChangesBody)`
+con Zod → `{ curso_id: string }` requerido.
+
+**`MOTOR_BOE_CURSO_ID` en `.env`**: nueva variable de entorno requerida cuando
+`MOTOR_BOE_BASE_URL` está configurado. Identifica el curso activo en el Motor para
+la oposición (justicia-tramitación: `1357e871b542425b`). Es un ID estable que
+actualiza el equipo IA cuando re-ingesta el temario oficial.
+
+### Mobile — nuevas pantallas y flujos
+
+**`BoeHomeScreen` — modal "Añadir norma"**:
+- Al abrir el modal, carga en paralelo las normas ya seguidas (`listRegulations`)
+  y el catálogo/sugerencias (`searchCatalog('')`).
+- Normas ya seguidas muestran badge gris "Siguiendo" en vez del botón "Seguir".
+- Guard en `handleFollow`: si `followedIds` ya contiene el `boe_identifier`, no
+  relanza la llamada a la API.
+- Al seguir con éxito: actualiza `followedIds` localmente y el contador
+  `watchedCount` sin cerrar el modal.
+
+**`BoeDetailScreen` — botón "Practicar" cross-bloque**:
+- Carga `affectedQuestionsCount` desde el detalle real de la API.
+- Si > 0, muestra un tercer CTA `tertiaryBtn` que navega a `GeneratorConfig`
+  con `{ questionCount: 10 }`.
+- Migrado de `useEffect` a `useFocusEffect` para recargar al volver.
+
+**`BoeUpdateSuccessScreen`**: nuevo CTA secundario "Practicar con preguntas
+actualizadas" → navega a `GeneratorConfig`.
+
+**`DashboardScreen` — alerta de leyes obsoletas con datos reales**:
+- `staleLawsCount` ya no es un mock (era `3`). Carga `boeApi.getFeed()` en
+  paralelo al resto del dashboard y usa `totalUnread` real.
+- Flag de módulo `_boeAlertShownThisSession` (no `useRef`): el pop-up de alerta
+  solo se muestra una vez por sesión de app aunque el componente se remonte.
+
+**`TrainingResultScreen` — hint card BOE**:
+- Tras guardar el intento, consulta `boeApi.getFeed()` fire-and-forget.
+- Si `totalUnread > 0` muestra una tarjeta de aviso antes del bloque "¿Qué
+  quieres hacer ahora?" con CTA "Revisar →" que navega a `BoeHome`.
+
+**`App.js` — Realtime BOE navega a detalle específico**:
+- `BoeRealtimeWatcher` extrae `payload.new?.id` del evento Supabase.
+- Si existe: banner navega a `BoeDetail` con `{ itemId: changeId }`.
+- Si no: navega a `BoeHome` (fallback anterior).
+
+### Limpieza `.env`
+
+- Eliminada indentación de 4 espacios en todas las líneas.
+- `MOTOR_BOE_OPENAI_KEY` vaciado (era copia exacta de `AI_API_KEY`; el código
+  ya tiene fallback automático `MOTOR_BOE_OPENAI_KEY ?? AI_API_KEY`).
+- `PASSWORD_RESET_REDIRECT_URL=opox://reset-password` añadido explícitamente.
+- `MOTOR_BOE_CURSO_ID=1357e871b542425b` añadido (faltaba).
+- `.env.example` actualizado con `MOTOR_BOE_CURSO_ID`.
+
+### Estado tras la sesión
+
+- Monitor BOE completamente funcional en dispositivo Android.
+- Modal "Añadir norma" muestra las 8 normas del Motor sin requerir sync del catálogo.
+- Flujo seguir → ver cambios → revisar detalle → mini-test → practicar: end-to-end.
+- Pendiente de terceros: `generateBoeMiniTest` con prompts reales (equipo IA,
+  `BRIEF_IA_BLOQUE10.md`) y ejecutar los dos patches SQL en Supabase.
+
+---
+
+## 2026-08-27 — Bloque 11 · Tienda OPOX — Conexión al backend y canje real
+
+Rama: `feat/revision-bloque-11-tienda`. MVP completo: eliminación de todos los mocks
+del mobile, corrección del bug de balance=0 y nuevo endpoint de canje de descuentos.
+
+### Bug crítico resuelto: saldo siempre 0
+
+Existían dos sistemas de Opopoints desconectados:
+- `registerActivity()` en `SupabaseDashboardRepository` escribía en `opopoints_ledger`
+  (tabla de auditoría de gamificación) pero **no** en `user_opopoints_ledger`.
+- `getBalance()` en la tienda lee únicamente `user_opopoints_ledger` → siempre devolvía 0.
+
+**Fix**: en `SupabaseDashboardRepository.registerActivity()`, cuando `input.points > 0`,
+insertar fila `type='earn'` en `user_opopoints_ledger` justo después del upsert de
+gamificación. El error es no-fatal (solo log). Sin cambio de interfaz ni de use cases.
+
+### Nuevo endpoint: canje de descuentos
+
+`POST /store/discounts/:id/redeem` — `RedeemDiscountUseCase`:
+- Verifica que el descuento existe y que el saldo es suficiente.
+- Inserta fila `spend` en el ledger.
+- Devuelve `{ walletItemId: '', code: discount.code, newBalance }` (no crea `user_wallet`
+  porque los descuentos son códigos precargados en BD, no artículos de cartera).
+
+Nuevos campos `cost: number; code: string;` en `StoreDiscount` (domain), `StoreDiscountDTO`
+(types) y mapping de `ListStoreDiscountsUseCase`. Ruta registrada en constants,
+handler en controller, inyección en container, método `redeemDiscount` en `store.js`.
+
+**Pendiente SQL** (ejecutar en Supabase SQL Editor):
+```sql
+ALTER TABLE store_discounts
+  ADD COLUMN IF NOT EXISTS cost integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS code  text    NOT NULL DEFAULT '';
+```
+
+### Pantallas mobile conectadas (eliminación de mocks)
+
+Todas las pantallas de la tienda siguen el patrón `useFocusEffect` + `cancelled` guard:
+
+| Pantalla | Antes | Después |
+|---|---|---|
+| `StoreHomeScreen` | `MOCK_PRODUCTS / DISCOUNTS / REAL_REWARDS` | `getBalance + listDiscounts + listProducts` en paralelo |
+| `StoreProductDetailScreen` | `setTimeout` fake + balance hardcoded | `getBalance + getProduct(id)` real |
+| `StoreDiscountsScreen` | `DISCOUNTS_DATA` hardcoded | `listDiscounts()` real |
+| `StoreConfirmRedeemScreen` | `setTimeout` sin API | `redeemDiscount / redeemProduct / obtainCommunityTest` según `redeemType` |
+| `StoreWalletScreen` | `WALLET_DATA` hardcoded | `getWallet()` real |
+| `StoreRealRewardsScreen` | `REWARDS_DATA` hardcoded | `getBalance + listProducts()` real |
+| `StoreRealRedeemConfirmScreen` | `setTimeout` fake | `redeemProduct(reward.id)` real |
+| `StoreMarketplaceScreen` | `MOCK_COMMUNITY_TESTS` | `listCommunityTests()` real; gratis → `obtainCommunityTest` directo |
+
+`StoreConfirmRedeemScreen` centraliza todos los tipos de canje con `redeemType:
+'product' | 'discount' | 'community_test'` recibido desde `route.params`. En éxito
+muestra `RedeemSuccessModal` con `newBalance` real y navega a `StoreWallet`.
+
+`StoreHowToEarnScreen`: textos actualizados para coincidir con `DAILY_GOAL_POINTS = 40`
+(antes mostraba `+15 O` por plan).
+
+### Estado tras la sesión
+
+- Tienda completamente conectada al backend: cero mocks en producción.
+- Bug de saldo 0 corregido: al completar el plan diario (40 O) el balance refleja los puntos.
+- Flujo canje end-to-end: descuento → confirmar → código real → cartera.
+- SQL `ADD COLUMN cost/code` ejecutado en Supabase.
+
+---
+
+## 2026-08-28 — Bloque 11 · Opopoints automáticos por tests + fixes UI tienda
+
+Rama: `feat/revision-bloque-11-tienda`. Motor de earn de Opopoints por rendimiento
+en tests y corrección de dos bugs de UI en la pantalla home de la tienda.
+
+### Motor de earn por tests (sin datos manuales en Supabase)
+
+Los Opopoints ahora se acumulan automáticamente al completar cualquier test, sin
+necesidad de insertar filas manualmente en la base de datos.
+
+**Fórmula de puntos en `SaveAttemptUseCase`**:
+- 1 O por cada respuesta correcta
+- × multiplicador de nota: ≥80% → ×1.5, ≥60% → ×1.2, resto → ×1.0
+- Cap diario de 100 O procedentes de tests (evita farming de tests cortos)
+
+**Cap diario — `getTodayTestEarnings(userId)`** añadido a `IStoreRepository` /
+`SupabaseStoreRepository`: suma filas `type='earn'` con `reason LIKE 'test_%'`
+creadas hoy (UTC). Consultado antes de cada insert para calcular el remanente.
+
+**`CompleteBoeMiniTestUseCase`**: al completar un mini-test BOE (3 preguntas)
+gana hasta 5 O proporcionales a los aciertos (`Math.round(score/total × 5)`).
+Usa `dashboardRepo.registerActivity` → el puente del Bloque 11 escribe en el ledger.
+
+**Flujo completo** (sin nuevas tablas ni rutas):
+```
+Test terminado
+  → SaveAttemptUseCase (Bloques 6/7/9)
+  → dashboardRepo.registerActivity({ reason: 'test_completed', points: N })
+  → insert earn en user_opopoints_ledger  ← puente del Bloque 11
+  → getBalance() devuelve saldo actualizado
+```
+
+Mini-test BOE:
+```
+CompleteBoeMiniTestUseCase (Bloque 10)
+  → dashboardRepo.registerActivity({ reason: 'test_boe_minitest', points: 0-5 })
+  → insert earn en user_opopoints_ledger
+```
+
+### Fixes UI StoreHomeScreen
+
+**Bug escalera en tabs**: `tabIndicator` con `position: 'absolute', bottom: 0` dentro
+de un `ScrollView` horizontal no anclaba correctamente en Android — cada tab calculaba
+su alto de forma diferente. Reemplazado por `borderBottomWidth: 2` directamente en
+el `TouchableOpacity`, con `borderBottomColor: 'transparent'` en inactivo y el color
+de acento en activo.
+
+**Suscripción desaparecía**: el `ScrollView` de planes no tenía espacio asignado
+porque la estructura padre no tenía `flex: 1`. Añadido `<View style={contentArea}>`
+con `flex: 1` envolviendo el área de contenido condicional (FlatList / ScrollView).
+
+**Tab Virtual eliminado**: el tab por defecto era `'virtual'` (sin contenido en BD).
+Eliminado de `TABS`; arranca en `'discounts'` (primer tab con datos reales).
+
+### Estado tras la sesión
+
+- Completar un test de 20 preguntas con 80% acierto → +24 O automáticos.
+- Mini-test BOE 3/3 → +5 O automáticos.
+- Plan diario completado → +40 O (canal previo, sin cambios).
+- Tienda muestra el saldo real al volver a la pantalla (useFocusEffect).
+- Tabs sin escalera, Suscripción visible, default en Descuentos.
+
+---
+
+## 2026-08-25 — Bloque 9 · Factoría de Apuntes — Fixes de upload en dispositivo Android
+
+Rama: `feat/revision-bloque-9-notas`. Sesión de depuración en dispositivo real
+(Android / Expo Go SDK 57). Se identificaron y cerraron 6 bugs que impedían el
+flujo completo upload → análisis → test desde apuntes.
+
+### Fix 1 · Supabase Storage no recibía los archivos subidos
+
+El repositorio pasaba un `Buffer` nativo de Node a la API de Supabase Storage.
+Supabase JS v2 requiere `Uint8Array` para uploads binarios.
+
+- **`SupabaseNotesRepository.uploadFile`**: `Buffer.from(base64, 'base64')` →
+  `new Uint8Array(Buffer.from(base64, 'base64'))`.
+
+### Fix 2 · `expo-file-system` deprecada en SDK 57
+
+`import * as FileSystem from 'expo-file-system'` está deprecated en SDK 57 y
+genera warning de consola. Todo el código de lectura de archivos migrado.
+
+### Fix 3 · `readAsStringAsync` no puede leer URIs `content://` de Android
+
+En SDK 57 la API legada de expo-file-system no soporta el esquema `content://`
+que Android usa para las URIs del Storage Access Framework (SAF). Crash silencioso
+→ el upload no llegaba al backend.
+
+- **`NotesUploadScreen.js`**: eliminado `readAsStringAsync`. Para PDFs se usa
+  `new FSFile(asset.uri).arrayBuffer()` (nueva API de `expo-file-system`) que
+  delega en el ContentResolver nativo y funciona con cualquier URI de Android.
+- Helper `bufferToBase64(buffer)`: convierte `ArrayBuffer` a base64 en chunks de
+  8 192 bytes para no reventar el call stack con documentos grandes.
+- Para fotos de cámara y galería: `ImagePicker.launchCameraAsync` /
+  `launchImageLibraryAsync` con `base64: true` — el picker hace la conversión
+  internamente, evitando FileSystem por completo.
+
+### Fix 4 · Nombre de archivo con ID numérico o UUID en Android
+
+`ImagePicker` en Android devuelve IDs de media store (`1000052094`) como nombre de
+archivo para fotos de galería, y UUIDs para fotos de cámara. Estos aparecían como
+título del apunte en la pantalla de detalle.
+
+- **`NotesUploadScreen.startAnalysis`**: detecta si el nombre base es un número
+  puro o un UUID (regex). Si es así, genera `Apunte DD mon AAAA.ext` con la fecha
+  local del dispositivo. PDFs y fotos con nombre real se dejan intactos.
+
+### Fix 5 · `key` prop warning y test de apuntes no arrancaba
+
+`NotesTestConfigScreen` navegaba al runner con preguntas en formato backend
+(`options: string[], correctIndex: number`), pero `QuestionActiveScreen` espera
+formato runner (`options: [{id, text, correct}]`). Primer síntoma: warning de `key`
+prop undefined; segundo: el test no podía calificar respuestas.
+
+- **`NotesTestConfigScreen.js`**: aplica `adaptGeneratedQuestions(res.data.questions)`
+  antes de navegar (mismo adapter que usa `GeneratorConfigScreen`).
+
+### Fix 6 · Número de páginas siempre "1" para PDFs multipágina
+
+El backend creaba el apunte con `pages = files.length` (1 para un PDF,
+sin importar sus páginas internas). El conteo real se conoce tras el OCR.
+
+- **`INotesRepository.updateStatus` patch**: nuevo campo opcional `pages?: number`.
+- **`SupabaseNotesRepository.updateStatus`**: escribe `pages` en BD si viene en el patch.
+- **`runAnalysisPipeline` (NotesUseCases.ts)**: tras OCR llama
+  `updateStatus({ progress: 33, pages: ocr.pages.length })` — el detalle mostrará
+  el número real en cuanto la IA real esté conectada.
+
+### Estado tras la sesión
+
+- Upload end-to-end funcional en Android (PDF + galería + cámara).
+- Archivos visibles en Supabase Storage con rutas correctas.
+- Test desde apunte arrancan sin errores de key/formato.
+- Etiquetas y conteo de páginas siguen dependiendo de la IA real
+  (`BRIEF_IA_BLOQUE9.md` pendiente de entrega por el equipo IA).
+
+---
+
+## 2026-08-25 — Diagnóstico Motor de IA + mejoras MotorAiClient
+
+Rama: `feat/revision-bloque-0`. El equipo de IA reportó que el endpoint de generación
+ya devuelve `correcta_idx`. Se activó `MOTOR_API_BASE_URL` en `.env` y se ejecutó un
+diagnóstico exhaustivo contra el Motor real.
+
+### Resultado del diagnóstico (`scripts/diagnostico_motor.js`)
+
+- Motor activo en `https://ingesta-demo.onrender.com` (cold start ~31s, Render free tier).
+- **INC-04 sigue sin resolver**: las preguntas del job result (`/v1/tests/generate` →
+  `/v1/jobs/{id}`) tienen `origen: "generada"` y NO incluyen `correcta_idx`.
+  Los campos del job son: `[id, enunciado, opciones, dificultad, tema_id, origen, ref_legislativa]`.
+- El equipo de IA probablemente testeó `/v1/courses/{id}/questions` (el banco), que SÍ
+  tiene `correcta_idx`. Pero esos IDs son del banco pre-ingestado, distintos a los
+  generados por LLM en el job.
+- El banco de preguntas sigue accesible y funciona correctamente.
+
+### Mejoras en `MotorAiClient.ts`
+
+**Fail-fast para INC-04**: cuando todas las preguntas del job son `origen="generada"`
+sin `correcta_idx`, el cliente lanza error inmediatamente sin intentar cargar el banco
+(que nunca tendrá esos IDs de LLM). Ahorra los ~164ms de carga del banco inútil.
+
+**Compatibilidad anticipada INC-04**: `MotorPreguntaJob` ahora incluye `correcta_idx?`
+y `explicacion?` opcionales. `mapPregunta()` usa `p.correcta_idx` del job result con
+prioridad sobre `full.correcta_idx` del banco. Cuando el equipo IA añada el campo al
+job, el cliente lo usará automáticamente sin más cambios.
+
+**Fix TS pre-existente**: `questionsResponseSchema` en `AiApiClient.ts` estaba
+declarada pero nunca usada (artefacto del Fix 4 de ayer). Eliminada.
+
+### Impacto en UX actual (Motor activo + INC-04 pendiente)
+
+Con el Motor activo, el flujo del Generador Infinito es:
+1. Motor lanza job (~387ms para 202)
+2. Polling hasta done (~57s para 3 preguntas)
+3. Fail-fast: todas "generada" sin correcta_idx → error inmediato
+4. `CompositeAiClient` captura → fallback a OpenAI (~10s)
+Total: ~67s por solicitud
+
+Sin el Motor (`MOTOR_API_BASE_URL` vacío): OpenAI directo ~10s.
+
+El blindaje `CompositeAiClient` garantiza que el usuario no ve error, pero sí espera
+más tiempo mientras el Motor esté activo con INC-04 pendiente.
+
+### Estado Motor
+
+Motor **activo** en `.env`. Si INC-04 tarda, considerar desactivar temporalmente para
+recuperar los ~57s de latencia. Para reactivar: ya solo hace falta que el equipo IA
+añada `correcta_idx` + `explicacion` al payload del job result — el cliente está listo.
+
+---
+
+## 2026-08-25 — Sesión de fixes · Generador, racha y zona horaria
+
+Rama: `feat/revision-bloque-0` (extendida más allá del alcance original de Bloque 0).
+Sesión de depuración en dispositivo. Se cerraron 5 bugs encadenados que impedían
+el flujo Generador infinito → guardar intento → completar tarea → subir racha.
+
+### Fix 1 · Generador infinito devolvía siempre la primera opción como correcta
+
+El Motor de IA generaba preguntas nuevas con LLM en cada request (no las servía
+del banco pre-ingestado). Como el workaround INC-04 depende de cruzar por ID
+contra el banco para conocer `correcta_idx`, y ninguno de los IDs generados
+existía en el banco, el mapeo caía al fallback `correctIndex = 0` en silencio.
+**Efecto real**: cada test corregía la primera opción como acertada, ensuciando
+estadísticas del usuario sin que este lo notara.
+
+Cambios:
+- **`MotorAiClient.ensureQuestionBank`**: paginar `/v1/courses/{id}/questions`
+  con `limit=200` (el Motor rechazaba `limit=1000` con 422). Aunque esto no
+  arregla el bug de fondo, evita el error de arranque.
+- **`MotorAiClient.generateQuestions`**: filtra preguntas cuyo id no existe
+  en el banco (no podemos calificarlas). Si quedan 0 útiles, lanza error.
+  `mapPregunta` recibe `full: MotorPreguntaFull` como parámetro requerido —
+  imposible ya devolver `correctIndex: 0` en silencio.
+- **`CompositeAiClient.generateQuestions` / `generateSurgicalTest`**: envuelto
+  en `try/catch` con fallback automático a OpenAI directo. Cualquier fallo del
+  Motor cae al cliente OpenAI sin romper la experiencia del usuario.
+- **`.env`**: `MOTOR_API_BASE_URL` desactivado temporalmente. Hasta que el
+  equipo IA arregle INC-04, el generador usa OpenAI directo (rápido y correcto).
+
+### Fix 2 · Timeouts del Generador infinito
+
+El Motor tarda ~10 s por pregunta generada (LLM en tiempo real). El TTL del
+mobile era 60 s y el timeout del backend 120 s → tests de 10+ preguntas
+cancelaban antes de terminar.
+
+- **`GeneratorConfigScreen`**: TTL aviso 15 s → 30 s, TTL kill 60 s → 240 s.
+- **`MotorAiClient.pollJobForPreguntas`**: `pollTimeoutMs` 120 s → 240 s.
+  Log de progreso `[motor-ai] job en progreso` cada 15 s con `elapsedMs`.
+
+### Fix 3 · Guardar intento fallaba con FK violation
+
+`training_attempt_responses.question_id` es FK a `training_questions.id`.
+Las preguntas generadas por IA nunca se insertan en `training_questions`, así
+que el UUID del mobile no existía en la tabla → violación de FK, el intento
+no se guardaba y el usuario veía "no responde".
+
+- **`SupabaseTrainingRepository.saveAttempt`**: antes de insertar, consulta
+  `SELECT id FROM training_questions WHERE id IN (...)` para saber qué IDs
+  existen realmente. Las preguntas ausentes se guardan con `question_id = null`
+  (permitido por el schema y comentado como tal).
+
+### Fix 4 · Parseo estricto tumbaba tests completos
+
+`AiApiClient.generateQuestions` validaba la respuesta OpenAI con un schema Zod
+monolítico. Si el modelo alucinaba 90 items malos y 10 buenos (patrón real:
+aplanar las opciones al mismo nivel que la pregunta), se descartaba todo el
+batch y el usuario veía "malformada".
+
+- **`AiApiClient.generateQuestions` / `generateSurgicalTest`**: parseo laxo del
+  array + validación por elemento con `generatedQuestionSchema.safeParse`. Los
+  buenos se conservan, los malos se descartan y se cuentan en log
+  `[ai-openai] preguntas descartadas por schema inválido`. El loop de 3 rondas
+  ya existente rellena las que faltan.
+
+### Fix 5 · Tarea de test no se marcaba como completada
+
+Al lanzar un test desde una tarea de planificación, el `taskId` no viajaba por
+la cadena de navegación. Al terminar el test, la tarea seguía sin marcar y no
+disparaba la racha del bloque 4.
+
+- **`PlanningTodayScreen.handleStartTask`**: propaga `taskId` al navegar.
+- **`GeneratorConfigScreen`** → **`QuestionActiveScreen`** → **`TrainingResultScreen`**:
+  cadena de propagación del `taskId` completa.
+- **`TrainingResultScreen`**: al montar, si hay `taskId`, llama
+  `planningApi.toggleTask(taskId, true)`.
+
+### Fix 6 · Racha solo subía al cruzar el objetivo diario
+
+`ToggleTaskUseCase` solo llamaba `registerActivity` cuando `completedCount === goalCount`.
+Un usuario que completaba una tarea sin llegar a la meta no veía racha ni ledger.
+
+- **`ToggleTaskUseCase`**: cada tarea completada llama `registerActivity` con
+  `points: 0`. Solo cuando se cruza el objetivo se dan los `DAILY_GOAL_POINTS`
+  y `goalCompleted: true` (para disparar el pop-up).
+
+### Fix 7 · Racha usaba UTC → desfase en zonas horarias
+
+`registerActivity` calculaba "hoy" con `new Date().toISOString().slice(0,10)` —
+en Colombia (UTC−5) una sesión a las 20:00h se registraba con la fecha UTC
+del día siguiente. Efecto: dos actividades del mismo día local podían quedar
+en dos días UTC distintos (racha sube de más), o al revés (racha no sube).
+
+- **`IDashboardRepository.registerActivity`**: nuevo parámetro `localDate?: string`.
+- **`SupabaseDashboardRepository.registerActivity`**: si viene `localDate`, lo
+  usa; si no, cae a UTC (retrocompatible).
+- **Use cases propagados**: `SaveAttemptUseCase`, `ToggleTaskUseCase`,
+  `CompleteChallengeUseCase`, `RegisterActivityUseCase` reciben y pasan `localDate`.
+- **Validators Zod**: `registerActivitySchema`, `saveAttemptSchema`,
+  `toggleTaskSchema`, nuevo `completeChallengeSchema` — regex `YYYY-MM-DD`.
+- **Ruta `POST /motivation/clans/:id/challenges/:challengeId/complete`**: ahora
+  con `validateBody(completeChallengeSchema)`.
+- **Types compartidos**: `SaveAttemptRequest.localDate?: string`.
+- **Mobile — inyección automática** en cada wrapper que dispara actividad:
+  `trainingApi.saveAttempt`, `planningApi.toggleTask`, `motivationApi.completeChallenge`,
+  `dashboardApi.registerActivity`. Cada uno añade `localDate: new Date().toLocaleDateString('sv')`
+  (locale sueco → `YYYY-MM-DD` en TZ del dispositivo).
+
+### Estado actual
+
+- Motor de IA del cliente **desactivado** (`MOTOR_API_BASE_URL` vacío en `.env`).
+  El generador infinito y el test quirúrgico usan OpenAI directo. Reactivar
+  requiere que el equipo IA arregle INC-04 (job result no expone `correcta_idx`).
+- Fallback en `CompositeAiClient` blindado: aunque se reactive el Motor, si
+  vuelve a fallar por INC-04 u otra causa, cae automáticamente a OpenAI.
+- Racha, ledger de Opopoints y tarea completada ya funcionan end-to-end desde
+  el flujo test + planificación.
+
+---
+
 ## 2026-08-23 — Bloque 4 · Planificación — Revisión post-testing (10 fixes)
 
 Rama: `feat/revision-bloque-4-planificacion` (nacida de `feat/bloque-13-notificaciones` tras merge a `main`).

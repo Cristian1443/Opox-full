@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     View,
@@ -136,6 +136,7 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     const [selectedOption, setSelectedOption] = useState(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [score, setScore] = useState(0);
+    const scoreRef = useRef(0);
 
     const currentQ = questions[currentIndex];
     const progress = (currentIndex + (isSubmitted ? 1 : 0)) / total;
@@ -160,13 +161,16 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     function handleConfirm() {
         if (!selectedOption) return;
         const correct = currentQ.options.find(o => o.id === selectedOption)?.isCorrect ?? false;
-        if (correct) setScore(s => s + 1);
+        if (correct) {
+            scoreRef.current += 1;
+            setScore(scoreRef.current);
+        }
         setIsSubmitted(true);
     }
 
     function handleNext() {
         if (isLastQuestion) {
-            boeApi.completeMiniTest(itemId, score, total).catch(() => {});
+            boeApi.completeMiniTest(itemId, scoreRef.current, total).catch(() => {});
             navigation.navigate('BoeUpdateSuccess', {
                 articleRef: title ?? currentQ.context,
             });

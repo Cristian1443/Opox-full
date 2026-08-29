@@ -28,6 +28,15 @@ export interface INotesRepository {
         storagePath: string | null;
     }): Promise<Note>;
 
+    // Sube un archivo a Supabase Storage y devuelve la ruta almacenada.
+    uploadFile(params: {
+        userId: string;
+        noteId: string;
+        fileName: string;
+        base64: string;
+        mimeType: string;
+    }): Promise<string>;
+
     // ── Actualización del pipeline ──────────────────────────────────────────
     updateStatus(
         id: string,
@@ -38,6 +47,8 @@ export interface INotesRepository {
             errorCode?: NoteAnalysisErrorCode | null;
             errorMessage?: string | null;
             questionsCount?: number;
+            storagePath?: string | null;
+            pages?: number;
         },
     ): Promise<void>;
 

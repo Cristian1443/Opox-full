@@ -5,11 +5,14 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import AccentSlider from '../../components/AccentSlider';
+import { notesApi } from '../../api';
+import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 // Colores confirmados contra Figma (frame GENERAR TEST, Bloque 9) sin
 // equivalente exacto en theme.js.
@@ -68,9 +71,7 @@ export default function NotesTestConfigScreen({ navigation, route }) {
     const [stepIdx, setStepIdx] = useState(DEFAULT_STEP_IDX);
     // Consistente con el Generador Infinito del Bloque 6 (aunque no está en el mockup).
     const [timed, setTimed] = useState(false);
-    // "Solo temas etiquetados": on = usa todas las etiquetas del apunte,
-    // off = sin restricción de tema. Figma confirma un único interruptor,
-    // no un selector manual por etiqueta.
+    const [starting, setStarting] = useState(false);
     const [onlyTaggedTopics, setOnlyTaggedTopics] = useState(true);
 
     // Cap del número de preguntas al techo real del documento.
@@ -81,20 +82,38 @@ export default function NotesTestConfigScreen({ navigation, route }) {
 
     const canStart = questionCount > 0;
 
-    const startTest = () => {
-        // Reutiliza el runner del Bloque 7 con source 'notes'.
-        // El backend tendrá que aceptar { noteId, questionCount, topics[], difficulty }
-        // en /training/generate o en un endpoint nuevo /notes/:id/generate-test.
-        navigation.replace('TrainingSession', {
-            source: 'notes',
-            noteId: note.id,
-            questionCount,
-            topics: onlyTaggedTopics ? note.tags : [],
-            difficulty: ['low', 'medium', 'high'][dificultadIdx],
-            examTitle: `Apuntes: ${note.title}`,
-            timedMode: timed,
-            secondsPerQuestion: 30,
-        });
+    const startTest = async () => {
+        if (!canStart || starting) return;
+        setStarting(true);
+        const topics = onlyTaggedTopics ? note.tags : [];
+        const difficulty = ['low', 'medium', 'high'][dificultadIdx];
+        try {
+            const res = await notesApi.generateTest(note.id, { questionCount, topics, difficulty, timed });
+            const questions = adaptGeneratedQuestions(res?.data?.questions ?? []);
+            navigation.replace('TrainingSession', {
+                source: 'notes',
+                noteId: note.id,
+                questions,
+                questionCount,
+                topics,
+                examTitle: `Apuntes: ${note.title}`,
+                timedMode: timed,
+                secondsPerQuestion: 30,
+            });
+        } catch {
+            navigation.replace('TrainingSession', {
+                source: 'notes',
+                noteId: note.id,
+                questions: [],
+                questionCount,
+                topics,
+                examTitle: `Apuntes: ${note.title}`,
+                timedMode: timed,
+                secondsPerQuestion: 30,
+            });
+        } finally {
+            setStarting(false);
+        }
     };
 
     return (
@@ -184,14 +203,16 @@ export default function NotesTestConfigScreen({ navigation, route }) {
 
             <View style={styles.actionSection}>
                 <TouchableOpacity
-                    style={[styles.btnPrimary, !canStart && styles.btnPrimaryDisabled]}
+                    style={[styles.btnPrimary, (!canStart || starting) && styles.btnPrimaryDisabled]}
                     onPress={startTest}
-                    disabled={!canStart}
+                    disabled={!canStart || starting}
                     activeOpacity={0.85}
                     accessibilityLabel="Generar y empezar"
                     accessibilityRole="button"
                 >
-                    <Text style={styles.btnPrimaryText}>Generar y empezar</Text>
+                    {starting
+                        ? <ActivityIndicator size="small" color={colors.white} />
+                        : <Text style={styles.btnPrimaryText}>Generar y empezar</Text>}
                 </TouchableOpacity>
             </View>
         </SafeAreaView>

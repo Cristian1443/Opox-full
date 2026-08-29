@@ -40,7 +40,12 @@ export interface MotorAiConfig {
 
 // ─── Tipos internos del Motor ─────────────────────────────────────────────────
 
-/** Schema real del Motor en /v1/tests/generate (job resultado). Sin correcta_idx. */
+/**
+ * Schema del Motor en /v1/tests/generate (job resultado).
+ * correcta_idx y explicacion son opcionales — presentes cuando INC-04 esté resuelto.
+ * origen: "generada" indica que el Motor generó la pregunta con LLM (no del banco),
+ * lo que significa que el ID no existirá en /v1/courses/{id}/questions.
+ */
 interface MotorPreguntaJob {
     id: string;
     enunciado: string;
@@ -49,6 +54,10 @@ interface MotorPreguntaJob {
     tema_id: string;
     origen?: string;
     ref_legislativa?: string;
+    // INC-04: el equipo IA añadirá estos campos al job result.
+    // Ya tipados aquí para usarlos directamente cuando estén disponibles.
+    correcta_idx?: number;
+    explicacion?: string;
 }
 
 /**
@@ -181,9 +190,6 @@ export class MotorAiClient implements AiApiContract {
 
         const data = res.data as Record<string, unknown>;
 
-        // Pre-cargar el banco de preguntas para enriquecer con correcta_idx
-        await this.ensureQuestionBank();
-
         let preguntas: MotorPreguntaJob[];
         if (res.status === 200) {
             // Respuesta síncrona desde caché
@@ -194,7 +200,62 @@ export class MotorAiClient implements AiApiContract {
             preguntas = await this.pollJobForPreguntas(jobId);
         }
 
-        return preguntas.map((p) => this.mapPregunta(p));
+        // Caso A (INC-04 resuelto): el job ya incluye correcta_idx en todas las preguntas.
+        // Caso B (INC-04 pendiente): las preguntas son origen="generada" sin correcta_idx.
+        //   → Fail-fast si NINGUNA tiene correcta_idx (evita cargar el banco en vano).
+        const todasGeneradasSinIdx = preguntas.every(
+            (p) => p.origen === 'generada' && typeof p.correcta_idx !== 'number',
+        );
+        if (todasGeneradasSinIdx && preguntas.length > 0) {
+            throw new Error(
+                '[MotorAiClient] todas las preguntas son origen="generada" sin correcta_idx (INC-04). ' +
+                'CompositeAiClient debe hacer fallback a OpenAI.',
+            );
+        }
+
+        // Separar las que ya traen correcta_idx en el job de las que necesitan el banco.
+        const conIdx = preguntas.filter((p) => typeof p.correcta_idx === 'number');
+        const sinIdx = preguntas.filter((p) => typeof p.correcta_idx !== 'number');
+
+        // Cargar el banco solo si hay preguntas sin correcta_idx que puedan estar en él.
+        if (sinIdx.length > 0) {
+            await this.ensureQuestionBank();
+        }
+
+        const mapped: GeneratedQuestion[] = [];
+        let droppedNoAnswer = 0;
+
+        // Preguntas que ya traen correcta_idx: mapear directamente.
+        for (const p of conIdx) {
+            mapped.push(this.mapPregunta(p, p as unknown as MotorPreguntaFull));
+        }
+
+        // Preguntas sin correcta_idx: buscar en banco por id (workaround INC-04).
+        for (const p of sinIdx) {
+            const full = this.questionBankCache.get(p.id);
+            if (!full || typeof full.correcta_idx !== 'number') {
+                droppedNoAnswer++;
+                continue;
+            }
+            mapped.push(this.mapPregunta(p, full));
+        }
+
+        if (droppedNoAnswer > 0) {
+            logger.warn('[motor-ai] preguntas descartadas sin correcta_idx', {
+                dropped: droppedNoAnswer,
+                kept: mapped.length,
+                total: preguntas.length,
+            });
+        }
+
+        if (mapped.length === 0) {
+            throw new Error(
+                '[MotorAiClient] el Motor devolvió 0 preguntas con correcta_idx conocido (INC-04). ' +
+                'CompositeAiClient debe hacer fallback a OpenAI.',
+            );
+        }
+
+        return mapped;
     }
 
     // ─── generateSurgicalTest ─────────────────────────────────────────────────
@@ -255,19 +316,30 @@ export class MotorAiClient implements AiApiContract {
 
     private async pollJobForPreguntas(jobId: string): Promise<MotorPreguntaJob[]> {
         const interval = this.config.pollIntervalMs ?? 3_000;
-        const timeout = this.config.pollTimeoutMs ?? 120_000;
+        const timeout = this.config.pollTimeoutMs ?? 240_000;
         const deadline = Date.now() + timeout;
+        const startedAt = Date.now();
 
-        logger.info('[motor-ai] polling job', { jobId });
+        logger.info('[motor-ai] polling job', { jobId, timeoutMs: timeout });
 
+        let iter = 0;
         while (Date.now() < deadline) {
             await new Promise<void>((r) => setTimeout(r, interval));
+            iter++;
 
             const job = await this.http.get<MotorJobResponse>(`/v1/jobs/${jobId}`);
             const { estado, resultado, error } = job.data;
 
             if (estado === 'done') {
-                logger.info('[motor-ai] job done', { jobId, count: resultado?.preguntas?.length });
+                const first = resultado?.preguntas?.[0] as Record<string, unknown> | undefined;
+                logger.info('[motor-ai] job done', {
+                    jobId,
+                    count: resultado?.preguntas?.length,
+                    elapsedMs: Date.now() - startedAt,
+                    sesionId: resultado?.sesion_id,
+                    firstKeys: first ? Object.keys(first) : [],
+                    firstSample: first,
+                });
                 return resultado?.preguntas ?? [];
             }
 
@@ -275,7 +347,14 @@ export class MotorAiClient implements AiApiContract {
                 throw new Error(`[MotorAiClient] job ${jobId} falló en el Motor: ${error}`);
             }
 
-            logger.debug('[motor-ai] job en progreso', { jobId, estado });
+            // Log cada ~15s (5 polls * 3s) para tener visibilidad del progreso.
+            if (iter % 5 === 0) {
+                logger.info('[motor-ai] job en progreso', {
+                    jobId,
+                    estado,
+                    elapsedMs: Date.now() - startedAt,
+                });
+            }
         }
 
         throw new Error(`[MotorAiClient] job ${jobId} no completó en ${timeout}ms`);
@@ -294,11 +373,20 @@ export class MotorAiClient implements AiApiContract {
         if (this.questionBankCache.size > 0 && age < this.CACHE_TTL_MS) return;
 
         try {
-            const res = await this.http.get<MotorPreguntaFull[]>(
-                `/v1/courses/${cursoId}/questions?limit=1000&offset=0`,
-                { headers: { 'X-OpenAI-Key': this.config.openAiKey } },
-            );
-            const preguntas = Array.isArray(res.data) ? res.data : [];
+            // El Motor limita `limit` a 200 por página, así que hay que paginar.
+            const PAGE_SIZE = 200;
+            const MAX_PAGES = 50; // salvavidas: 10k preguntas máximo
+            const preguntas: MotorPreguntaFull[] = [];
+            for (let page = 0; page < MAX_PAGES; page++) {
+                const offset = page * PAGE_SIZE;
+                const res = await this.http.get<MotorPreguntaFull[]>(
+                    `/v1/courses/${cursoId}/questions?limit=${PAGE_SIZE}&offset=${offset}`,
+                    { headers: { 'X-OpenAI-Key': this.config.openAiKey } },
+                );
+                const batch = Array.isArray(res.data) ? res.data : [];
+                preguntas.push(...batch);
+                if (batch.length < PAGE_SIZE) break;
+            }
             this.questionBankCache.clear();
             for (const p of preguntas) {
                 this.questionBankCache.set(p.id, p);
@@ -312,24 +400,20 @@ export class MotorAiClient implements AiApiContract {
         }
     }
 
-    private mapPregunta(p: MotorPreguntaJob): GeneratedQuestion {
-        // Enriquecer con correcta_idx y explicacion desde el banco (INC-04 workaround)
-        const full = this.questionBankCache.get(p.id);
-
-        if (!full) {
-            logger.warn('[motor-ai] pregunta no encontrada en question bank', { id: p.id });
-        }
-
+    private mapPregunta(p: MotorPreguntaJob, full: MotorPreguntaFull): GeneratedQuestion {
+        // p.correcta_idx toma precedencia cuando el job ya lo incluye (INC-04 resuelto).
+        // En caso contrario se usa full.correcta_idx del banco (workaround INC-04).
+        const correcta_idx = typeof p.correcta_idx === 'number' ? p.correcta_idx : full.correcta_idx;
         return {
             id: p.id,
             text: p.enunciado,
             options: p.opciones as [string, string, string, string],
-            correctIndex: (full?.correcta_idx ?? 0) as 0 | 1 | 2 | 3,
-            explanation: full?.explicacion ?? '',
+            correctIndex: correcta_idx as 0 | 1 | 2 | 3,
+            explanation: p.explicacion ?? full.explicacion ?? '',
             topicId: p.tema_id,
             topic: p.tema_id,
             difficulty: DIFF_FROM_MOTOR[p.dificultad] ?? 'medium',
-            articleRef: full?.evidencia?.cita ?? p.ref_legislativa ?? undefined,
+            articleRef: full.evidencia?.cita ?? p.ref_legislativa ?? undefined,
         };
     }
 }

@@ -26,14 +26,29 @@ export class SupabaseBoeRepository implements IBoeRepository {
         return (data ?? []).map(mapRegulation);
     }
 
-    async addRegulation(input: { userId: string; boeIdentifier: string; title: string }): Promise<BoeWatchedRegulation> {
+    async getRegulation(id: string, userId: string): Promise<BoeWatchedRegulation | null> {
         const { data, error } = await this.db
             .from('boe_watched_regulations')
-            .insert({
-                user_id: input.userId,
-                boe_identifier: input.boeIdentifier,
-                title: input.title,
-            })
+            .select('*')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (error) { logger.error('[boe-repo] getRegulation', { error }); return null; }
+        return data ? mapRegulation(data) : null;
+    }
+
+    async addRegulation(input: { userId: string; boeIdentifier: string; title: string; motorNormaId?: string }): Promise<BoeWatchedRegulation> {
+        const { data, error } = await this.db
+            .from('boe_watched_regulations')
+            .upsert(
+                {
+                    user_id: input.userId,
+                    boe_identifier: input.boeIdentifier,
+                    title: input.title,
+                    ...(input.motorNormaId ? { motor_norma_id: input.motorNormaId } : {}),
+                },
+                { onConflict: 'user_id,boe_identifier' },
+            )
             .select('*')
             .single();
         if (error) throw new Error(`[boe-repo] addRegulation: ${error.message}`);
@@ -206,7 +221,10 @@ export class SupabaseBoeRepository implements IBoeRepository {
             changeId = (existing as any).id;
             await this.db
                 .from('boe_changes')
-                .update({ affected_questions: input.affectedQuestions })
+                .update({
+                    affected_questions: input.affectedQuestions,
+                    ...(input.resumen != null ? { resumen: input.resumen } : {}),
+                })
                 .eq('id', changeId);
         } else {
             const { data, error } = await this.db
@@ -219,6 +237,7 @@ export class SupabaseBoeRepository implements IBoeRepository {
                     change_type: input.changeType,
                     affected_questions: input.affectedQuestions,
                     detected_at: input.detectedAt.toISOString(),
+                    ...(input.resumen != null ? { resumen: input.resumen } : {}),
                 })
                 .select('id')
                 .single();
@@ -261,6 +280,7 @@ function mapRegulation(row: any): BoeWatchedRegulation {
         title: row.title,
         followedAt: new Date(row.followed_at),
         lastCheckedAt: row.last_checked_at ? new Date(row.last_checked_at) : null,
+        motorNormaId: row.motor_norma_id ?? null,
     };
 }
 
@@ -275,6 +295,7 @@ function mapChange(row: any): BoeChange {
         affectedQuestions: row.affected_questions ?? 0,
         detectedAt: new Date(row.detected_at),
         createdAt: new Date(row.created_at),
+        resumen: row.resumen ?? null,
     };
 }
 

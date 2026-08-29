@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     ScrollView,
+    FlatList,
     TouchableOpacity,
     ActivityIndicator,
 } from 'react-native';
@@ -67,18 +68,82 @@ function SectionBlock({ section }) {
     );
 }
 
+// ─── Selector de temas ────────────────────────────────────────────────────────
+function TopicPicker({ oposicion, onSelect, onBack }) {
+    const [summaries, setSummaries] = useState([]);
+    const [loading, setLoading]     = useState(true);
+
+    useEffect(() => {
+        tutorApi.listSummaries(oposicion)
+            .then((res) => {
+                if (!res?.error && Array.isArray(res?.data)) setSummaries(res.data);
+            })
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, [oposicion]);
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Resúmenes</Text>
+                <View style={{ width: 24 }} />
+            </View>
+
+            {loading ? (
+                <View style={styles.loadingCenter}>
+                    <ActivityIndicator color={colors.accentOrange} size="large" />
+                </View>
+            ) : summaries.length === 0 ? (
+                <View style={styles.loadingCenter}>
+                    <Ionicons name="document-text-outline" size={44} color={colors.textDark} />
+                    <Text style={styles.emptyText}>No hay resúmenes disponibles</Text>
+                </View>
+            ) : (
+                <FlatList
+                    data={summaries}
+                    keyExtractor={(s) => s.topicId ?? s.id}
+                    contentContainerStyle={styles.pickerList}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={styles.topicRow}
+                            onPress={() => onSelect(item)}
+                            activeOpacity={0.75}
+                        >
+                            <View style={styles.topicIcon}>
+                                <Ionicons name="document-text-outline" size={20} color={colors.purple} />
+                            </View>
+                            <Text style={styles.topicName} numberOfLines={2}>{item.topicTitle}</Text>
+                            <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
+                        </TouchableOpacity>
+                    )}
+                />
+            )}
+        </SafeAreaView>
+    );
+}
+
+
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 export default function TutorSummariesScreen({ navigation, route }) {
     // topicId + oposicion llegan cuando se navega desde un selector de temas
-    const topicId   = route?.params?.topicId   ?? null;
-    const oposicion = route?.params?.oposicion  ?? 'aux-adm-estado';
+    const initialTopicId = route?.params?.topicId   ?? null;
+    const oposicion      = route?.params?.oposicion  ?? 'aux-adm-estado';
     // title y sections son el fallback cuando no hay topicId (o mientras carga)
-    const paramTitle    = route?.params?.title    ?? MOCK_SUMMARY.title;
+    const paramTitle    = route?.params?.title    ?? null;
     const paramSections = route?.params?.sections ?? null;
+
+    const [selectedTopic, setSelectedTopic] = useState(
+        initialTopicId ? { topicId: initialTopicId, topicTitle: paramTitle } : null
+    );
+    const topicId = selectedTopic?.topicId ?? null;
 
     const [summary, setSummary]     = useState(null);
     const [isLoading, setIsLoading] = useState(!!topicId && !paramSections);
 
+    // Hooks siempre antes de cualquier return condicional
     useEffect(() => {
         if (!topicId) return;
         setIsLoading(true);
@@ -90,7 +155,18 @@ export default function TutorSummariesScreen({ navigation, route }) {
             .finally(() => setIsLoading(false));
     }, [topicId, oposicion]);
 
-    const displayTitle    = summary?.topicTitle ?? paramTitle;
+    // Muestra el selector si aún no hay tema elegido
+    if (!selectedTopic) {
+        return (
+            <TopicPicker
+                oposicion={oposicion}
+                onSelect={(item) => setSelectedTopic(item)}
+                onBack={() => navigation.goBack()}
+            />
+        );
+    }
+
+    const displayTitle    = summary?.topicTitle ?? selectedTopic?.topicTitle ?? paramTitle ?? MOCK_SUMMARY.title;
     const displaySections = summary?.sections   ?? paramSections ?? MOCK_SUMMARY.sections;
 
     const Header = () => (
@@ -187,6 +263,51 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        gap: spacing.md,
+    },
+    emptyText: {
+        fontSize: 15,
+        color: colors.textSecondary,
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FIGMA.bulletStroke,
+    },
+    pickerTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+    },
+    pickerList: {
+        padding: spacing.md,
+        gap: spacing.sm,
+    },
+    topicRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.card,
+        borderRadius: 14,
+        padding: spacing.md,
+        gap: spacing.md,
+    },
+    topicIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: `${colors.purple}18`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    topicName: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '700',
+        color: colors.dark,
     },
     scrollBody: {
         paddingHorizontal: spacing.md,

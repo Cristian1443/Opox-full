@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,64 +10,16 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
+import { storeApi } from '../../api/store';
 
 const ACCENT = '#6C5CE7';
 const ACCENT_LIGHT = '#A29BFE';
 const PHASE2_COLOR = '#7B1FA2';
 
-const WALLET_DATA = [
-  {
-    id: '1',
-    partner: 'Uber Eats',
-    title: '1 mes gratis',
-    code: 'OPOX-UE-30',
-    status: 'active',
-    expiryDate: '24 jul 2026',
-    usedDate: null,
-    color: '#000000',
-    icon: 'restaurant-outline',
-    actionUrl: 'https://www.ubereats.com',
-  },
-  {
-    id: '2',
-    partner: 'Decathlon',
-    title: '-20% descuento',
-    code: 'DECA-20-OPOX',
-    status: 'active',
-    expiryDate: '30 ago 2026',
-    usedDate: null,
-    color: '#0082C3',
-    icon: 'fitness-outline',
-    actionUrl: null,
-  },
-  {
-    id: '3',
-    partner: 'FNAC',
-    title: '-15% libros',
-    code: 'FNAC-15-USED',
-    status: 'used',
-    expiryDate: '15 jun 2026',
-    usedDate: '02 jun 2026',
-    color: '#E91E63',
-    icon: 'book-outline',
-    actionUrl: null,
-  },
-  {
-    id: '4',
-    partner: 'Spotify',
-    title: '3 meses Premium',
-    code: 'SPOT-3M-OLD',
-    status: 'expired',
-    expiryDate: '01 may 2026',
-    usedDate: null,
-    color: '#1DB954',
-    icon: 'musical-notes-outline',
-    actionUrl: null,
-  },
-];
 
 const STATUS_LABELS = { active: 'Activo', used: 'Usado', expired: 'Caducado' };
 
@@ -175,10 +127,20 @@ const RewardCard = ({ item, navigation }) => {
 
 export default function StoreWalletScreen({ navigation }) {
   const { top: topInset } = useSafeAreaInsets();
+  const [walletData, setWalletData] = useState([]);
 
-  const activeItems = WALLET_DATA.filter((i) => i.status === 'active');
-  const usedItems = WALLET_DATA.filter((i) => i.status === 'used');
-  const expiredItems = WALLET_DATA.filter((i) => i.status === 'expired');
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    storeApi.getWallet().then(res => {
+      if (cancelled || !res?.data) return;
+      setWalletData(res.data);
+    });
+    return () => { cancelled = true; };
+  }, []));
+
+  const activeItems = walletData.filter((i) => i.status === 'active');
+  const usedItems = walletData.filter((i) => i.status === 'used');
+  const expiredItems = walletData.filter((i) => i.status === 'expired');
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
@@ -237,7 +199,7 @@ export default function StoreWalletScreen({ navigation }) {
           </>
         )}
 
-        {WALLET_DATA.length === 0 && (
+        {walletData.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="folder-open-outline" size={48} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No tienes recompensas todavía.</Text>

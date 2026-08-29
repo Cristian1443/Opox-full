@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,14 @@ import {
   TouchableOpacity,
   FlatList,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
+import { storeApi } from '../../api/store';
 
 const ACCENT = '#6C5CE7';
 const ACCENT_LIGHT = '#A29BFE';
@@ -20,14 +23,6 @@ const PHASE2_DARK = '#7B1FA2';
 const AVATAR_COLORS = ['#E1BEE7', '#BBDEFB', '#C8E6C9', '#FFF9C4', '#FFCCBC'];
 const avatarBg = (id) => AVATAR_COLORS[parseInt(id, 10) % AVATAR_COLORS.length];
 
-const MOCK_COMMUNITY_TESTS = [
-  { id: '1', title: 'Plazos administrativos · nivel difícil', author: 'Ana_G', avatar: 'A', rating: 4.8, totalMade: 320, price: 50, isFree: false, category: 'Derecho' },
-  { id: '2', title: 'Constitución · 50 preguntas', author: 'M_Rey', avatar: 'M', rating: 4.5, totalMade: 180, price: 0, isFree: true, category: 'Constitución' },
-  { id: '3', title: 'Derecho Civil · Casos prácticos', author: 'OpositorPro', avatar: 'O', rating: 4.9, totalMade: 500, price: 75, isFree: false, category: 'Civil' },
-  { id: '4', title: 'Historia de España · Resumen', author: 'HistoryFan', avatar: 'H', rating: 4.2, totalMade: 95, price: 30, isFree: false, category: 'Historia' },
-];
-
-const MOCK_USER_BALANCE = 1840;
 
 const FILTERS = [
   { key: 'all', label: 'Todos' },
@@ -102,23 +97,45 @@ const TestCard = ({ item, onPress, onObtain }) => (
 export default function StoreMarketplaceScreen({ navigation }) {
   const { bottom: bottomInset } = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState('all');
+  const [tests, setTests] = useState([]);
+  const [balance, setBalance] = useState(null);
 
-  const filteredTests = MOCK_COMMUNITY_TESTS.filter((test) => {
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    storeApi.getBalance().then(res => {
+      if (cancelled || !res?.data) return;
+      setBalance(res.data.balance);
+    });
+    storeApi.listCommunityTests().then(res => {
+      if (cancelled || !res?.data) return;
+      setTests(res.data.map(t => ({ ...t, avatar: t.author.substring(0, 1).toUpperCase() })));
+    });
+    return () => { cancelled = true; };
+  }, []));
+
+  const filteredTests = tests.filter((test) => {
     if (activeFilter === 'all') return true;
     return activeFilter === 'free' ? test.isFree : !test.isFree;
   });
 
-  const handleObtain = (item) => {
+  const handleObtain = async (item) => {
     if (item.isFree) {
+      const res = await storeApi.obtainCommunityTest(item.id);
+      if (res?.error) {
+        Alert.alert('Error', res.error.message ?? 'Inténtalo de nuevo');
+        return;
+      }
       navigation.navigate('StoreRedeemSuccess', {
         productName: item.title,
-        newBalance: MOCK_USER_BALANCE,
+        newBalance: res.data?.newBalance ?? (balance ?? 0),
       });
     } else {
       navigation.navigate('StoreConfirmRedeem', {
+        productId: item.id,
+        redeemType: 'community_test',
         product: { name: item.title, price: item.price, icon: 'document-text-outline' },
-        currentBalance: MOCK_USER_BALANCE,
-        newBalance: MOCK_USER_BALANCE - item.price,
+        currentBalance: balance ?? 0,
+        newBalance: (balance ?? 0) - item.price,
       });
     }
   };

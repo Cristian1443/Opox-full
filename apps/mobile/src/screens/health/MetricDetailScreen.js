@@ -1,5 +1,5 @@
 // Bloque 3 · Salud — Pantalla 3.4 · Detalle de métrica (genérica)
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import { getMetricHistory } from '../../services/HealthService';
 
 // Colores confirmados contra Figma (frame METRICA GENERICA, Bloque 3) sin
 // equivalente exacto en theme.js.
@@ -18,9 +19,6 @@ const FIGMA = {
     tabInactive: 'rgba(65,41,80,0.5)',
     infoCardBg: 'rgba(159,110,228,0.75)',
 };
-
-// Puntos simulados. Cuando entre el backend, sustituir por serie temporal real.
-const mockChartPoints = [10, 25, 15, 30, 20, 40, 35, 50, 45, 60, 55, 40, 65];
 
 const CHART_WIDTH = 331;
 const CHART_HEIGHT = 60;
@@ -54,16 +52,22 @@ function TrendLineChart({ points, max, color }) {
 export default function MetricDetailScreen({ navigation, route }) {
     const {
         title = 'HRV',
+        metricType = 'hrv',
         currentValue = 42,
         unit = 'ms',
         baseValue = 50,
         description = 'Una HRV baja respecto a tu media suele indicar fatiga o estrés acumulado. Es la señal principal del motor de fatiga.',
         trend = 'down',
-        lowerIsBetter = false, // Para métricas donde bajar de la base es mejor (ej. FC reposo).
+        lowerIsBetter = false,
     } = route?.params || {};
 
-    const [timeRange, setTimeRange] = useState('Día');
+    const [timeRange, setTimeRange] = useState('Semana');
+    const [chartPoints, setChartPoints] = useState([40, 45, 38, 50, 42, 48, 43]);
     const ranges = ['Día', 'Semana', 'Mes'];
+
+    useEffect(() => {
+        getMetricHistory(metricType, timeRange).then(setChartPoints);
+    }, [metricType, timeRange]);
 
     // Delta signed (positivo = subió respecto a base).
     const deltaRaw = currentValue - baseValue;
@@ -77,7 +81,7 @@ export default function MetricDetailScreen({ navigation, route }) {
         ? `Estable respecto a tu línea base (${baseValue} ${unit})`
         : `${delta} ${unit} ${deltaWord} de tu línea base (${baseValue} ${unit})`;
 
-    const chartMax = Math.max(...mockChartPoints, currentValue, baseValue) || 1;
+    const chartMax = Math.max(...chartPoints, currentValue, baseValue) || 1;
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -94,7 +98,7 @@ export default function MetricDetailScreen({ navigation, route }) {
                 {/* Gráfico */}
                 <View style={styles.chartWrap}>
                     <Text style={styles.baseLabel}>base {baseValue}{unit}</Text>
-                    <TrendLineChart points={mockChartPoints} max={chartMax} color={trendColor} />
+                    <TrendLineChart points={chartPoints} max={chartMax} color={trendColor} />
                 </View>
 
                 {/* Selector de rango temporal */}

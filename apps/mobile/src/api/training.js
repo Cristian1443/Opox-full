@@ -1,6 +1,9 @@
 import { api } from './client';
 import { API_ROUTES } from '@opox/constants';
 
+/** Fecha local del dispositivo (YYYY-MM-DD) — para que la racha use la TZ del usuario, no UTC. */
+const localDate = () => new Date().toLocaleDateString('sv');
+
 export const trainingApi = {
     listMocks: (oposicion) =>
         api.get(`${API_ROUTES.TRAINING.MOCKS}?oposicion=${encodeURIComponent(oposicion)}`, { auth: true }),
@@ -21,7 +24,7 @@ export const trainingApi = {
         api.post(API_ROUTES.TRAINING.SURGICAL, { oposicion, count }, { auth: true }),
 
     saveAttempt: (body) =>
-        api.post(API_ROUTES.TRAINING.ATTEMPTS, body, { auth: true }),
+        api.post(API_ROUTES.TRAINING.ATTEMPTS, { ...body, localDate: localDate() }, { auth: true }),
 
     listErrorPatterns: () =>
         api.get(API_ROUTES.TRAINING.ERROR_PATTERNS, { auth: true }),

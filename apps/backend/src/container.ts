@@ -100,12 +100,18 @@ import {
     CompleteBoeMiniTestUseCase,
     ListTopicsUseCase,
     SyncBoeChangesUseCase,
+    ListFollowedRegulationsUseCase,
+    FollowRegulationUseCase,
+    UnfollowRegulationUseCase,
+    SearchBoeRegulationsUseCase,
+    SyncBoeCatalogUseCase,
     // Bloque 11 · Tienda
     GetStoreBalanceUseCase,
     ListStoreProductsUseCase,
     GetStoreProductUseCase,
     RedeemProductUseCase,
     ListStoreDiscountsUseCase,
+    RedeemDiscountUseCase,
     GetWalletUseCase,
     GetWalletItemUseCase,
     ListCommunityTestsUseCase,
@@ -371,7 +377,7 @@ export function buildContainer() {
         generateQuestions: new GenerateQuestionsUseCase(aiApi),
         analyzePhoto: new AnalyzePhotoUseCase(aiApi),
         generateSurgicalTest: new GenerateSurgicalTestUseCase(aiApi, trainingRepo),
-        saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo),
+        saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo, storeRepo),
         listErrorPatterns: new ListErrorPatternsUseCase(trainingRepo),
         listBookmarks: new ListBookmarksUseCase(trainingRepo),
         saveBookmark: new SaveBookmarkUseCase(trainingRepo),
@@ -418,7 +424,7 @@ export function buildContainer() {
         getBoeMiniTest: new GetBoeMiniTestUseCase(boeRepo, aiApi),
         markBoeRead: new MarkBoeReadUseCase(boeRepo),
         toggleBoeBookmark: new ToggleBoeBookmarkUseCase(boeRepo),
-        completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo),
+        completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo, dashboardRepo),
         listTopics: new ListTopicsUseCase(boeRepo),
         syncBoeChanges: motorBoe
             ? new SyncBoeChangesUseCase(
@@ -427,6 +433,11 @@ export function buildContainer() {
                 (synced) => sendBoeAlert.execute(synced),
               )
             : undefined,
+        listBoeRegulations: new ListFollowedRegulationsUseCase(boeRepo),
+        followBoeRegulation: new FollowRegulationUseCase(boeRepo, motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        unfollowBoeRegulation: new UnfollowRegulationUseCase(boeRepo, motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        searchBoeCatalog: new SearchBoeRegulationsUseCase(motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        syncBoeCatalog: motorBoe ? new SyncBoeCatalogUseCase(motorBoe) : undefined,
 
         // Bloque 11 · Tienda
         getStoreBalance: new GetStoreBalanceUseCase(storeRepo),
@@ -434,6 +445,7 @@ export function buildContainer() {
         getStoreProduct: new GetStoreProductUseCase(storeRepo),
         redeemProduct: new RedeemProductUseCase(storeRepo),
         listStoreDiscounts: new ListStoreDiscountsUseCase(storeRepo),
+        redeemDiscount: new RedeemDiscountUseCase(storeRepo),
         getWallet: new GetWalletUseCase(storeRepo),
         getWalletItem: new GetWalletItemUseCase(storeRepo),
         listCommunityTests: new ListCommunityTestsUseCase(storeRepo),
@@ -517,6 +529,11 @@ export function buildContainer() {
         toggleBookmark: useCases.toggleBoeBookmark,
         completeMiniTest: useCases.completeBoeMiniTest,
         syncChanges: useCases.syncBoeChanges,
+        listRegulations: useCases.listBoeRegulations,
+        followRegulation: useCases.followBoeRegulation,
+        unfollowRegulation: useCases.unfollowBoeRegulation,
+        searchCatalog: useCases.searchBoeCatalog,
+        syncCatalog: useCases.syncBoeCatalog,
     });
 
     const storeController = new StoreController({
@@ -525,6 +542,7 @@ export function buildContainer() {
         getProduct: useCases.getStoreProduct,
         redeemProduct: useCases.redeemProduct,
         listDiscounts: useCases.listStoreDiscounts,
+        redeemDiscount: useCases.redeemDiscount,
         getWallet: useCases.getWallet,
         getWalletItem: useCases.getWalletItem,
         listCommunityTests: useCases.listCommunityTests,

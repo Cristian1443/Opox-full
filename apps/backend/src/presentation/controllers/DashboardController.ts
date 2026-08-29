@@ -157,6 +157,7 @@ export class DashboardController {
                 userId: req.authUser!.id,
                 reason: req.body.reason,
                 points: req.body.points,
+                localDate: req.body.localDate,
             });
             this.ok(res, 200, this.serializeGamification(gamification));
         } catch (err) { next(err); }

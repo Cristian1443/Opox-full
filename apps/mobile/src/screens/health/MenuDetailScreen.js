@@ -1,5 +1,5 @@
 // Bloque 3 · Salud — Pantalla 3.8c · Detalle de menú / receta
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -7,9 +7,12 @@ import {
     StyleSheet,
     TouchableOpacity,
     Alert,
+    Share,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../../theme';
+import { planningApi } from '../../api';
 
 // Colores confirmados contra Figma (frame DETALLE MENÚ/RECETA, Bloque 3)
 // sin equivalente exacto en theme.js.
@@ -48,12 +51,38 @@ export default function MenuDetailScreen({ navigation, route }) {
     const hasDetail = Array.isArray(paramsMenu?.meals) && paramsMenu.meals[0]?.label;
     const data = hasDetail ? paramsMenu : MENU_DETAIL;
 
-    const handleAddToCart = () => {
-        Alert.alert('Éxito', 'Ingredientes añadidos a tu lista de la compra.');
+    const [addingToPlan, setAddingToPlan] = useState(false);
+
+    const handleAddToCart = async () => {
+        // Genera la lista de ingredientes/comidas y la comparte vía Share nativo.
+        const lines = data.meals.map((m) => `• ${m.label}: ${m.name}${m.note ? ` (${m.note})` : ''}`);
+        const message = `🥗 ${data.title}\n\n${lines.join('\n')}`;
+        try {
+            await Share.share({ message, title: data.title });
+        } catch {
+            // El usuario canceló el share — no es un error.
+        }
     };
 
-    const handleAddToPlan = () => {
-        Alert.alert('Planificado', 'Este menú se ha añadido a tu planificación semanal.');
+    const handleAddToPlan = async () => {
+        if (addingToPlan) return;
+        setAddingToPlan(true);
+        try {
+            const today = new Date().toLocaleDateString('sv'); // YYYY-MM-DD en TZ local
+            const subtitle = data.meals.map((m) => m.name).join(' · ');
+            const res = await planningApi.createTask({
+                taskDate: today,
+                title: `🥗 ${data.title}`,
+                subtitle: subtitle.slice(0, 160),
+                kind: 'other',
+            });
+            if (res?.error) throw new Error(res.error);
+            Alert.alert('¡Añadido!', 'El menú está en tu plan de hoy.');
+        } catch {
+            Alert.alert('Error', 'No se pudo añadir al plan. Inténtalo de nuevo.');
+        } finally {
+            setAddingToPlan(false);
+        }
     };
 
     return (
@@ -97,8 +126,16 @@ export default function MenuDetailScreen({ navigation, route }) {
                 <TouchableOpacity style={styles.filledButton} activeOpacity={0.85} onPress={handleAddToCart}>
                     <Text style={styles.filledButtonText}>Lista de la compra</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineButton} activeOpacity={0.7} onPress={handleAddToPlan}>
-                    <Text style={styles.outlineButtonText}>Añadir al plan</Text>
+                <TouchableOpacity
+                    style={[styles.outlineButton, addingToPlan && styles.outlineButtonDisabled]}
+                    activeOpacity={0.7}
+                    onPress={handleAddToPlan}
+                    disabled={addingToPlan}
+                >
+                    {addingToPlan
+                        ? <ActivityIndicator size="small" color={colors.textDark} />
+                        : <Text style={styles.outlineButtonText}>Añadir al plan</Text>
+                    }
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -218,6 +255,9 @@ const styles = StyleSheet.create({
         borderColor: colors.textDark,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    outlineButtonDisabled: {
+        opacity: 0.6,
     },
     outlineButtonText: {
         fontFamily: 'Poppins-SemiBold',

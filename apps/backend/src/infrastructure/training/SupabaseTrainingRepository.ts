@@ -219,10 +219,26 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
         if (error || !data) throw new Error(`saveAttempt: ${error?.message}`);
 
         if (input.responses.length > 0) {
+            // question_id → FK a training_questions. Las preguntas generadas por IA
+            // no están persistidas ahí, así que hay que poner NULL o la FK falla.
+            // Consultamos qué IDs existen realmente y mapeamos los ausentes a null.
+            const candidateIds = input.responses
+                .map((r) => r.questionId)
+                .filter((id): id is string => typeof id === 'string');
+            const knownIds = new Set<string>();
+            if (candidateIds.length > 0) {
+                const { data: existing, error: checkErr } = await this.supabaseAdmin
+                    .from('training_questions')
+                    .select('id')
+                    .in('id', candidateIds);
+                if (checkErr) throw new Error(`saveAttempt check ids: ${checkErr.message}`);
+                for (const row of existing ?? []) knownIds.add((row as { id: string }).id);
+            }
+
             const rows = input.responses.map((r) => ({
                 attempt_id: attemptId,
                 user_id: input.userId,
-                question_id: r.questionId ?? null,
+                question_id: r.questionId && knownIds.has(r.questionId) ? r.questionId : null,
                 topic_id: r.topicId,
                 topic: r.topic,
                 question_text: r.questionText,

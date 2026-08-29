@@ -105,19 +105,38 @@ export class AiApiClient implements AiApiContract {
             });
 
             // Aceptamos { questions: [...] } o directamente [...] (los modelos varían).
-            const parsed = questionsResponseSchema.safeParse(raw);
-            if (!parsed.success) {
-                if (collected.length > 0) break; // nos quedamos con lo ya obtenido
-                throw new Error(`[AiApiClient] generateQuestions: respuesta OpenAI malformada — ${parsed.error.message}`);
+            // Parseo laxo: si el modelo alucina un elemento (p. ej. aplana opciones),
+            // lo descartamos individualmente en vez de tirar todo el batch.
+            const rawArr: unknown[] = Array.isArray(raw)
+                ? raw
+                : Array.isArray((raw as { questions?: unknown }).questions)
+                    ? ((raw as { questions: unknown[] }).questions)
+                    : [];
+            if (rawArr.length === 0) {
+                if (collected.length > 0) break;
+                throw new Error('[AiApiClient] generateQuestions: respuesta OpenAI sin array de preguntas');
             }
-            const arr = Array.isArray(parsed.data) ? parsed.data : parsed.data.questions;
-            if (arr.length === 0) break; // el modelo no tiene más que ofrecer
 
-            for (const q of arr) {
+            let rejected = 0;
+            for (const candidate of rawArr) {
+                const parsed = generatedQuestionSchema.safeParse(candidate);
+                if (!parsed.success) {
+                    rejected++;
+                    continue;
+                }
+                const q = parsed.data;
                 if (seenTexts.has(q.text)) continue;
                 seenTexts.add(q.text);
                 collected.push(normalizeQuestion(q, params.topicId, params.difficulty));
                 if (collected.length === params.count) break;
+            }
+
+            if (rejected > 0) {
+                logger.warn('[ai-openai] preguntas descartadas por schema inválido', {
+                    rejected,
+                    accepted: rawArr.length - rejected,
+                    round,
+                });
             }
         }
 
@@ -180,11 +199,26 @@ export class AiApiClient implements AiApiContract {
             maxTokens: 4096,
         });
 
-        const parsed = questionsResponseSchema.safeParse(raw);
-        if (!parsed.success) {
-            throw new Error(`[AiApiClient] generateSurgicalTest: respuesta OpenAI malformada — ${parsed.error.message}`);
+        // Parseo laxo — descartamos por elemento en vez de tirar todo el batch
+        // si el modelo alucina algún item (mismo tratamiento que generateQuestions).
+        const rawArr: unknown[] = Array.isArray(raw)
+            ? raw
+            : Array.isArray((raw as { questions?: unknown }).questions)
+                ? ((raw as { questions: unknown[] }).questions)
+                : [];
+        const arr: z.infer<typeof generatedQuestionSchema>[] = [];
+        let rejected = 0;
+        for (const candidate of rawArr) {
+            const parsed = generatedQuestionSchema.safeParse(candidate);
+            if (parsed.success) arr.push(parsed.data);
+            else rejected++;
         }
-        const arr = Array.isArray(parsed.data) ? parsed.data : parsed.data.questions;
+        if (rejected > 0) {
+            logger.warn('[ai-openai] surgical: preguntas descartadas por schema inválido', { rejected });
+        }
+        if (arr.length === 0) {
+            throw new Error('[AiApiClient] generateSurgicalTest: OpenAI no devolvió ninguna pregunta válida');
+        }
 
         // Reasignamos topicId/topic desde la distribución por si el modelo se salió.
         // Todas las preguntas del test quirúrgico van con dificultad 'hard' (brief).
@@ -326,11 +360,6 @@ const generatedQuestionSchema = z.object({
     difficultyScore: z.number().int().min(1).max(5).optional(),
     articleRef: z.string().optional(),
 });
-
-const questionsResponseSchema = z.union([
-    z.array(generatedQuestionSchema),
-    z.object({ questions: z.array(generatedQuestionSchema) }),
-]);
 
 const photoResponseSchema = z.object({
     concept: z.string().min(1).max(120),

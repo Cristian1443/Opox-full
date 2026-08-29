@@ -71,6 +71,8 @@ export interface BoeFeedSection {
 export interface BoeFeedResponse {
     sections: BoeFeedSection[];
     totalUnread: number;
+    /** 0 cuando el usuario no sigue ninguna norma — el mobile muestra un estado diferente al de "sin cambios" */
+    watchedRegulationsCount: number;
 }
 
 // ─── Comparativa (pantalla 10.3) ─────────────────────────────────────────────
@@ -133,6 +135,34 @@ export interface ToggleBookmarkResponse {
 
 export interface MarkReadResponse {
     isRead: boolean;
+}
+
+// ─── Gestión de normas seguidas ──────────────────────────────────────────────
+
+export interface FollowRegulationRequest {
+    /** Código oficial BOE-A-AAAA-NNNNN */
+    boeIdentifier: string;
+    /** Título oficial de la norma */
+    titulo: string;
+}
+
+export interface UnfollowRegulationResponse {
+    ok: boolean;
+}
+
+/** Resultado de búsqueda en el catálogo del Motor BOE */
+export interface BoeCatalogEntry {
+    id: string;
+    identificador_boe: string;
+    titulo: string;
+    url: string;
+    activa: boolean;
+}
+
+export interface BoeCatalogResult {
+    sincronizado: boolean;
+    total: number;
+    resultados: BoeCatalogEntry[];
 }
 
 // ─── Training topics (Bloque 6 Generador Infinito + Bloque 10 Mi Temario) ────

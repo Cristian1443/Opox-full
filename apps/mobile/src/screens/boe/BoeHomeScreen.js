@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
     StyleSheet,
@@ -7,6 +7,11 @@ import {
     ScrollView,
     TouchableOpacity,
     StatusBar,
+    TextInput,
+    ActivityIndicator,
+    Modal,
+    FlatList,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,11 +26,15 @@ function changeTypeToFeedType(ct) {
 }
 
 // ─── 10.1 · Monitor BOE · feed "LEYES ACTUALIZADAS" ───────────────────────────
-// Fiel al Figma (archivo OPOX_AI (2), Bloque 10, 905 x 2176px). Subtítulo
-// atenuado a rgba propia porque colors.textMuted (#343A3D) es sólido y el
-// diseño lo usa al 50% de opacidad.
+// Fiel al Figma (archivo OPOX_AI (2), Bloque 10, 905 x 2176px) para header,
+// filtro, tarjeta y estado "Todo en orden". El sistema de búsqueda/seguimiento
+// de normas (modal "Añadir norma") y los estados de carga no tienen
+// equivalente en el reference — son funcionalidad real imprescindible (sin
+// seguir ninguna norma no hay nada que monitorizar) y se conservan,
+// reestilizados con la misma paleta confirmada.
 const FIGMA = {
     subtitleMuted: 'rgba(52, 58, 61, 0.5)',
+    borderMuted: 'rgba(65, 41, 80, 0.3)',
 };
 
 // Mapeo confirmado por Figma: los 3 ítems mock ("Modificación del art. 14",
@@ -39,68 +48,13 @@ const TYPE_CFG = {
     review: { color: colors.ctaGreen, label: 'Informativa' },
 };
 
+// Solo "Mi temario"/"Guardados": "Toda mi opo" era mock puro (sin backend
+// real detrás) y se retiró al conectar el feed real — ver handleFollow/
+// watchedCount más abajo, que reemplazan por completo el sistema de mocks.
 const TABS = [
     { key: 'myTopics', label: 'Mi temario' },
-    { key: 'allOpo', label: 'Toda mi opo' },
     { key: 'saved', label: 'Guardados' },
 ];
-
-// Mock estructurado por tab — se sustituye por boeApi.getFeed() en Paso 2
-const MOCK_FEED = {
-    myTopics: [
-        {
-            section: 'Hoy',
-            items: [
-                {
-                    id: '1',
-                    type: 'critical',
-                    title: 'Modificación del art. 14 · Ley 39/2015',
-                    description: 'Cambia la obligación de relación electrónica para ciertos colectivos.',
-                    read: false,
-                },
-            ],
-        },
-        {
-            section: 'Ayer',
-            items: [
-                {
-                    id: '2',
-                    type: 'info',
-                    title: 'Nueva instrucción · Registro electrónico',
-                    description: 'Afecta a los plazos de presentación telemática.',
-                    read: false,
-                },
-            ],
-        },
-        {
-            section: '12 jun',
-            items: [
-                {
-                    id: '3',
-                    type: 'review',
-                    title: 'Corrección de errores · Ley 40/2015',
-                    description: 'Ajuste menor de redacción, sin impacto en el test.',
-                    read: true,
-                },
-            ],
-        },
-    ],
-    allOpo: [
-        {
-            section: 'Hoy',
-            items: [
-                {
-                    id: '4',
-                    type: 'info',
-                    title: 'RD 203/2021 — Reglamento LPACAP',
-                    description: 'Nuevo reglamento de desarrollo de la Ley 39/2015.',
-                    read: false,
-                },
-            ],
-        },
-    ],
-    saved: [],
-};
 
 // El feed real llega agrupado por sección (fecha) desde boeApi.getFeed(). El
 // Figma confirmado no muestra encabezados de sección: cada tarjeta lleva su
@@ -119,16 +73,12 @@ function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
     );
 }
 
-// Ícono de refrescar confirmado en Figma — capa nombrada genéricamente
-// "Capa_1" (mismo patrón de nombres reutilizados visto en Bloques 8/9).
-// Sustituye al botón de notificaciones que tenía esta pantalla; el acceso a
-// Notificaciones sigue disponible desde el header del Dashboard.
-function RefreshIcon({ size = 22, color = colors.accentOrange }) {
+function FilterIcon({ size = 20, color = colors.textDark }) {
     return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path d="M4 12a8 8 0 0114-5.3M20 12a8 8 0 01-14 5.3" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" />
-            <Path d="M18 3v4.5h-4.5" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M6 21v-4.5h4.5" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M4 6H20" stroke={color} strokeWidth={2} strokeLinecap="round" />
+            <Path d="M7 12H17" stroke={color} strokeWidth={2} strokeLinecap="round" />
+            <Path d="M10 18H14" stroke={color} strokeWidth={2} strokeLinecap="round" />
         </Svg>
     );
 }
@@ -144,52 +94,103 @@ function SuccessCheckIcon({ size = 96, color = colors.ctaGreen }) {
     );
 }
 
-function FilterIcon({ size = 20, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path d="M4 6H20" stroke={color} strokeWidth={2} strokeLinecap="round" />
-            <Path d="M7 12H17" stroke={color} strokeWidth={2} strokeLinecap="round" />
-            <Path d="M10 18H14" stroke={color} strokeWidth={2} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
 export default function BoeHomeScreen({ navigation }) {
     const [activeTab, setActiveTab] = useState('myTopics');
     const [readSet, setReadSet] = useState(() => new Set());
     const [bookmarkSet, setBookmarkSet] = useState(() => new Set());
-    const [demoEmpty, setDemoEmpty] = useState(false);
-    const [apiMyTopicsSections, setApiMyTopicsSections] = useState(null);
+    const [myTopicsSections, setMyTopicsSections] = useState([]);
+    const [watchedCount, setWatchedCount] = useState(null); // null = cargando
+    const [totalUnread, setTotalUnread] = useState(0);
 
-    // Recarga el feed: al entrar en foco (refleja cambios de isRead/isBookmarked
-    // hechos en Detalle, Comparativa o Mini-test) y también al pulsar el ícono
-    // de refrescar del header.
-    const loadFeed = useCallback(() => {
-        boeApi.getFeed().then(res => {
-            if (res?.data?.sections) {
-                const sections = res.data.sections.map(s => ({
-                    section: s.sectionTitle,
-                    items: s.data.map(c => ({
-                        id: c.id,
-                        type: changeTypeToFeedType(c.changeType),
-                        title: `${c.articulo} · ${c.shortTitle}`,
-                        description: c.affectedQuestionsCount > 0
-                            ? `${c.affectedQuestionsCount} pregunta${c.affectedQuestionsCount > 1 ? 's' : ''} afectada${c.affectedQuestionsCount > 1 ? 's' : ''}.`
-                            : 'Cambio detectado en tu temario.',
-                        read: c.isRead,
-                    })),
-                }));
-                setApiMyTopicsSections(sections);
-                const bmarks = new Set();
-                res.data.sections.flatMap(s => s.data).forEach(c => {
-                    if (c.isBookmarked) bmarks.add(c.id);
-                });
-                setBookmarkSet(bmarks);
+    // Sheet de búsqueda y seguimiento de normas ("Añadir norma")
+    const [searchVisible, setSearchVisible] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [followedIds, setFollowedIds] = useState(() => new Set());
+    const searchTimeout = useRef(null);
+
+    // Recarga el feed cada vez que la pantalla entra en foco, para reflejar
+    // cambios de isRead/isBookmarked producidos en Detalle, Comparativa o Mini-test.
+    useFocusEffect(
+        useCallback(() => {
+            boeApi.getFeed().then(res => {
+                if (!res?.error && res?.data) {
+                    const d = res.data;
+                    const sections = d.sections.map(s => ({
+                        section: s.sectionTitle,
+                        items: s.data.map(c => ({
+                            id: c.id,
+                            type: changeTypeToFeedType(c.changeType),
+                            title: `${c.articulo} · ${c.shortTitle}`,
+                            description: c.affectedQuestionsCount > 0
+                                ? `${c.affectedQuestionsCount} pregunta${c.affectedQuestionsCount > 1 ? 's' : ''} afectada${c.affectedQuestionsCount > 1 ? 's' : ''}.`
+                                : 'Cambio detectado en tu temario.',
+                            read: c.isRead,
+                        })),
+                    }));
+                    setMyTopicsSections(sections);
+                    setWatchedCount(d.watchedRegulationsCount ?? 0);
+                    setTotalUnread(d.totalUnread ?? 0);
+                    const bmarks = new Set();
+                    d.sections.flatMap(s => s.data).forEach(c => {
+                        if (c.isBookmarked) bmarks.add(c.id);
+                    });
+                    setBookmarkSet(bmarks);
+                } else {
+                    setWatchedCount(prev => prev ?? 0);
+                }
+            }).catch(() => { setWatchedCount(prev => prev ?? 0); });
+        }, [])
+    );
+
+    // Precarga sugerencias y normas ya seguidas cuando el modal abre
+    useEffect(() => {
+        if (!searchVisible) return;
+        boeApi.listRegulations().then(res => {
+            if (!res?.error && res?.data) {
+                setFollowedIds(new Set((res.data ?? []).map(r => r.boeIdentifier)));
             }
         }).catch(() => {});
-    }, []);
+        setSearchLoading(true);
+        boeApi.searchCatalog('', 20).then(res => {
+            if (!res?.error && res?.data) setSearchResults(res.data.resultados ?? []);
+        }).catch(() => {}).finally(() => setSearchLoading(false));
+    }, [searchVisible]);
 
-    useFocusEffect(useCallback(() => { loadFeed(); }, [loadFeed]));
+    function triggerSearch(q) {
+        setSearchQuery(q);
+        clearTimeout(searchTimeout.current);
+        if (!q.trim()) {
+            // Sin query: volver a mostrar todas las sugerencias cargadas al abrir
+            setSearchLoading(true);
+            boeApi.searchCatalog('', 20).then(res => {
+                if (!res?.error && res?.data) setSearchResults(res.data.resultados ?? []);
+            }).catch(() => {}).finally(() => setSearchLoading(false));
+            return;
+        }
+        searchTimeout.current = setTimeout(() => {
+            setSearchLoading(true);
+            boeApi.searchCatalog(q, 15).then(res => {
+                if (!res?.error && res?.data) {
+                    setSearchResults(res.data.resultados ?? []);
+                }
+            }).catch(() => {}).finally(() => setSearchLoading(false));
+        }, 400);
+    }
+
+    function handleFollow(entry) {
+        const boeId = entry.identificador_boe;
+        if (followedIds.has(boeId)) return; // ya seguida — no relanzar
+        boeApi.followRegulation(boeId, entry.titulo).then(res => {
+            if (!res?.error) {
+                setFollowedIds(prev => new Set([...prev, boeId]));
+                setWatchedCount(c => (c ?? 0) + 1);
+            } else {
+                Alert.alert('Error', res.error?.message ?? 'No se pudo añadir la norma.');
+            }
+        }).catch(() => Alert.alert('Error', 'No se pudo conectar con el servidor.'));
+    }
 
     function toggleBookmark(id) {
         setBookmarkSet(prev => {
@@ -201,17 +202,9 @@ export default function BoeHomeScreen({ navigation }) {
         boeApi.toggleBookmark(id).catch(() => {});
     }
 
-    const myTopicsSections = apiMyTopicsSections ?? MOCK_FEED.myTopics;
     const myTopicsItems = flattenSections(myTopicsSections);
-    const allOpoItems = flattenSections(MOCK_FEED.allOpo);
-    const allItemsFlat = [...myTopicsItems, ...allOpoItems];
-    const savedItems = allItemsFlat.filter(item => bookmarkSet.has(item.id));
-
-    const feedItems = demoEmpty ? [] : (
-        activeTab === 'saved' ? savedItems :
-        activeTab === 'myTopics' ? myTopicsItems :
-        allOpoItems
-    );
+    const savedItems = myTopicsItems.filter(item => bookmarkSet.has(item.id));
+    const feedItems = activeTab === 'saved' ? savedItems : myTopicsItems;
 
     function markRead(id) {
         setReadSet(prev => {
@@ -231,19 +224,6 @@ export default function BoeHomeScreen({ navigation }) {
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            {/* ── Demo row (quitar en producción) ─────────────────────────────── */}
-            <View style={styles.demoRow}>
-                <Text style={styles.demoLabel}>DEMO</Text>
-                <TouchableOpacity
-                    style={[styles.demoPill, demoEmpty && styles.demoPillActive]}
-                    onPress={() => setDemoEmpty(e => !e)}
-                >
-                    <Text style={[styles.demoPillText, demoEmpty && styles.demoPillTextActive]}>
-                        {demoEmpty ? '✓ Sin novedades' : 'Sin novedades'}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
             <View style={styles.screen}>
                 {/* ── Header ──────────────────────────────────────────────────── */}
                 <View style={styles.header}>
@@ -255,14 +235,24 @@ export default function BoeHomeScreen({ navigation }) {
                     >
                         <ChevronLeftIcon />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Monitor BOE</Text>
+                    <View style={styles.headerTitleRow}>
+                        <Text style={styles.headerTitle}>Monitor BOE</Text>
+                        {totalUnread > 0 && (
+                            <View style={styles.unreadBadge}>
+                                <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
+                            </View>
+                        )}
+                    </View>
+                    {/* Añadir norma a monitorizar — única vía persistente para seguir
+                        más normas una vez el temario ya tiene alguna (el CTA del
+                        estado vacío solo aparece antes de la primera). */}
                     <TouchableOpacity
                         style={styles.iconButton}
                         activeOpacity={0.7}
-                        onPress={loadFeed}
-                        accessibilityLabel="Actualizar"
+                        onPress={() => setSearchVisible(true)}
+                        accessibilityLabel="Seguir norma"
                     >
-                        <RefreshIcon />
+                        <Ionicons name="add-circle-outline" size={24} color={colors.accentOrange} />
                     </TouchableOpacity>
                 </View>
 
@@ -302,6 +292,26 @@ export default function BoeHomeScreen({ navigation }) {
                                 <Text style={styles.emptySubtitle}>
                                     Guarda artículos desde el feed para revisarlos después.
                                 </Text>
+                            </View>
+                        ) : watchedCount === null ? (
+                            /* ── Cargando ───────────────────────────────────────── */
+                            <ActivityIndicator style={{ marginTop: 60 }} color={colors.accentOrange} />
+                        ) : watchedCount === 0 ? (
+                            /* ── Empty: sin normas seguidas ────────────────────── */
+                            <View style={styles.empty}>
+                                <Ionicons name="telescope-outline" size={48} color={colors.textSecondary} />
+                                <Text style={styles.emptyTitle}>Empieza a monitorizar</Text>
+                                <Text style={styles.emptySubtitle}>
+                                    Añade las normas de tu temario y te avisaremos en cuanto el BOE publique un cambio que te afecte.
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.followCta}
+                                    onPress={() => setSearchVisible(true)}
+                                    accessibilityLabel="Añadir norma"
+                                >
+                                    <Ionicons name="add" size={18} color={colors.white} />
+                                    <Text style={styles.followCtaText}>Añadir norma</Text>
+                                </TouchableOpacity>
                             </View>
                         ) : (
                             /* ── Empty: temario al día (10.1·vacío) ────────────── */
@@ -356,6 +366,99 @@ export default function BoeHomeScreen({ navigation }) {
                     )}
                 </ScrollView>
             </View>
+
+            {/* ── Modal: buscar y seguir normas ──────────────────────────────── */}
+            <Modal
+                visible={searchVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => {
+                    setSearchVisible(false);
+                    setSearchQuery('');
+                    setSearchResults([]);
+                }}
+            >
+                <SafeAreaView style={styles.modalContainer} edges={['top', 'left', 'right']}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Añadir norma</Text>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setSearchVisible(false);
+                                setSearchQuery('');
+                                setSearchResults([]);
+                            }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            accessibilityLabel="Cerrar"
+                        >
+                            <Ionicons name="close" size={22} color={colors.textDark} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.searchBar}>
+                        <Ionicons name="search" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Buscar por nombre o identificador BOE…"
+                            placeholderTextColor={colors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={triggerSearch}
+                            autoFocus
+                            returnKeyType="search"
+                        />
+                        {searchLoading && <ActivityIndicator size="small" color={colors.accentOrange} />}
+                    </View>
+
+                    {searchResults.length === 0 && !searchLoading ? (
+                        <View style={styles.empty}>
+                            <Ionicons
+                                name={searchQuery.trim() ? 'search-outline' : 'book-outline'}
+                                size={40}
+                                color={colors.textSecondary}
+                            />
+                            <Text style={styles.emptyTitle}>
+                                {searchQuery.trim() ? 'Sin resultados' : 'Sin normas disponibles'}
+                            </Text>
+                            <Text style={styles.emptySubtitle}>
+                                {searchQuery.trim()
+                                    ? 'Prueba con otro término o identificador BOE (ej. BOE-A-2023-...).'
+                                    : 'Verifica que MOTOR_BOE_BASE_URL y MOTOR_BOE_CURSO_ID estén configurados en el backend.'}
+                            </Text>
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={searchResults}
+                            keyExtractor={item => item.id ?? item.identificador_boe}
+                            contentContainerStyle={{ padding: spacing.md }}
+                            renderItem={({ item }) => (
+                                <View style={styles.searchResultRow}>
+                                    <View style={{ flex: 1, marginRight: spacing.sm }}>
+                                        <Text style={styles.searchResultId}>{item.identificador_boe}</Text>
+                                        <Text style={styles.searchResultTitle} numberOfLines={2}>
+                                            {item.titulo}
+                                        </Text>
+                                    </View>
+                                    {followedIds.has(item.identificador_boe) ? (
+                                        <View style={styles.followedBadge}>
+                                            <Text style={styles.followedBadgeText}>Siguiendo</Text>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={styles.followBtn}
+                                            onPress={() => handleFollow(item)}
+                                            accessibilityLabel={`Seguir ${item.titulo}`}
+                                        >
+                                            <Text style={styles.followBtnText}>Seguir</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
+                            ItemSeparatorComponent={() => (
+                                <View style={{ height: 1, backgroundColor: colors.separator }} />
+                            )}
+                        />
+                    )}
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -384,12 +487,32 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    headerTitle: {
+    headerTitleRow: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+    },
+    headerTitle: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 21.3,
         color: colors.textDark,
         textAlign: 'center',
+    },
+    unreadBadge: {
+        backgroundColor: colors.statRed,
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 5,
+    },
+    unreadBadgeText: {
+        fontFamily: 'Poppins-Bold',
+        fontSize: 11,
+        color: colors.white,
     },
 
     // ── Filtro ────────────────────────────────────────────────────
@@ -470,7 +593,7 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
 
-    // ── Empty: tab Guardados ──────────────────────────────────────
+    // ── Empty (Guardados / sin normas / búsqueda sin resultados) ──
     empty: {
         flex: 1,
         alignItems: 'center',
@@ -491,6 +614,21 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: 19,
+    },
+    followCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: spacing.lg,
+        backgroundColor: colors.purple,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    followCtaText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 15,
+        color: colors.white,
     },
 
     // ── Empty: temario al día (10.1·vacío) ───────────────────────
@@ -517,39 +655,83 @@ const styles = StyleSheet.create({
         marginTop: spacing.sm,
     },
 
-    // ── Demo row ──────────────────────────────────────────────────
-    demoRow: {
+    // ── Modal de búsqueda / seguimiento de normas ──────────────────
+    modalContainer: {
+        flex: 1,
+        backgroundColor: colors.white,
+    },
+    modalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 6,
-        backgroundColor: '#FFFBE6',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0DC80',
+        borderBottomColor: colors.separator,
     },
-    demoLabel: {
+    modalTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 17,
+        color: colors.textDark,
+    },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        margin: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: FIGMA.borderMuted,
+    },
+    searchInput: {
+        flex: 1,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: colors.textDark,
+        padding: 0,
+    },
+    searchResultRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+    },
+    searchResultId: {
         fontFamily: 'Poppins-Bold',
         fontSize: 10,
-        color: '#BFA000',
-        letterSpacing: 0.5,
+        color: colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+        marginBottom: 3,
     },
-    demoPill: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+    searchResultTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+        lineHeight: 20,
+    },
+    followBtn: {
+        backgroundColor: `${colors.purple}1A`,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#BFA000',
+        borderColor: colors.purple,
     },
-    demoPillActive: {
-        backgroundColor: '#BFA000',
-    },
-    demoPillText: {
+    followBtnText: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 11,
-        color: '#BFA000',
+        fontSize: 13,
+        color: colors.purple,
     },
-    demoPillTextActive: {
-        color: colors.white,
+    followedBadge: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: colors.grayLight,
+    },
+    followedBadgeText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.textSecondary,
     },
 });

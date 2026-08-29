@@ -9,6 +9,8 @@ import {
     Animated,
     Easing,
     Alert,
+    FlatList,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -101,47 +103,102 @@ function Waveform({ waveAnim, isPlaying }) {
     );
 }
 
+// ─── Selector de episodios ────────────────────────────────────────────────────
+function EpisodePicker({ oposicion, onSelect, onBack }) {
+    const [episodes, setEpisodes] = useState([]);
+    const [loading, setLoading]   = useState(true);
+
+    useEffect(() => {
+        tutorApi.listEpisodes(oposicion)
+            .then((res) => {
+                if (!res?.error && Array.isArray(res?.data)) setEpisodes(res.data);
+            })
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, [oposicion]);
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Episodios</Text>
+                <View style={{ width: 24 }} />
+            </View>
+
+            {loading ? (
+                <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} />
+            ) : episodes.length === 0 ? (
+                <View style={styles.pickerEmpty}>
+                    <Ionicons name="headset-outline" size={44} color={colors.textDark} />
+                    <Text style={styles.pickerEmptyText}>No hay episodios disponibles</Text>
+                </View>
+            ) : (
+                <FlatList
+                    data={episodes}
+                    keyExtractor={(ep) => ep.id}
+                    contentContainerStyle={styles.pickerList}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={styles.episodeRow}
+                            onPress={() => onSelect(item)}
+                            activeOpacity={0.75}
+                        >
+                            <View style={styles.episodeIcon}>
+                                <Ionicons name="headset-outline" size={22} color={colors.accentOrange} />
+                            </View>
+                            <View style={styles.episodeInfo}>
+                                <Text style={styles.episodeName} numberOfLines={2}>{item.title}</Text>
+                                <Text style={styles.episodeDuration}>
+                                    {Math.floor((item.totalSeconds ?? TOTAL_SECONDS) / 60)} min
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
+                        </TouchableOpacity>
+                    )}
+                />
+            )}
+        </SafeAreaView>
+    );
+}
 export default function TutorPodcastScreen({ navigation, route }) {
-    const episodeId = route?.params?.episodeId ?? null;
+    const oposicion        = route?.params?.oposicion ?? 'aux-adm-estado';
+    const initialEpisodeId = route?.params?.episodeId ?? null;
 
-    const [title, setTitle]       = useState(route?.params?.title    ?? 'Constitución Española');
-    const [subtitle, setSubtitle] = useState(route?.params?.subtitle ?? 'Título I');
-    const [totalSecs, setTotalSecs] = useState(TOTAL_SECONDS);
+    // ── Todos los hooks deben ir ANTES de cualquier return condicional ─────────
+    const [selectedEpisode, setSelectedEpisode] = useState(
+        initialEpisodeId ? { id: initialEpisodeId, title: route?.params?.title, totalSeconds: null } : null
+    );
+    const [title, setTitle]                     = useState(route?.params?.title    ?? 'Constitución Española');
+    const [subtitle, setSubtitle]               = useState(route?.params?.subtitle ?? 'Título I');
+    const [totalSecs, setTotalSecs]             = useState(TOTAL_SECONDS);
+    const [isPlaying, setIsPlaying]             = useState(false);
+    const [elapsed, setElapsed]                 = useState(0);
+    const [speedIdx, setSpeedIdx]               = useState(2);
+    const [showExitModal, setShowExitModal]     = useState(false);
+    const [sleepMinutes, setSleepMinutes]       = useState(null);
 
-    const [isPlaying, setIsPlaying]       = useState(false);
-    const [elapsed, setElapsed]           = useState(0);
-    const [speedIdx, setSpeedIdx]         = useState(2);
-    const [showExitModal, setShowExitModal] = useState(false);
-    const [sleepMinutes, setSleepMinutes]   = useState(null);
-
-    const waveAnim     = useRef(new Animated.Value(0)).current;
-    const waveLoop     = useRef(null);
-    const timerRef     = useRef(null);
-    const sleepTimerRef = useRef(null);
+    const waveAnim        = useRef(new Animated.Value(0)).current;
+    const waveLoop        = useRef(null);
+    const timerRef        = useRef(null);
+    const sleepTimerRef   = useRef(null);
     const progressSaveRef = useRef(null);
+
+    const episodeId = selectedEpisode?.id ?? null;
 
     useEffect(() => () => clearTimeout(sleepTimerRef.current), []);
 
-    // Carga los metadatos y el progreso guardado del episodio
+    // Carga el progreso guardado del episodio (metadatos ya vienen del selector o params)
     useEffect(() => {
-        if (!episodeId) {
-            setElapsed(252); // posición demo cuando no hay episodio real
-            return;
-        }
-        Promise.all([
-            tutorApi.getEpisode(episodeId).catch(() => null),
-            tutorApi.getProgress(episodeId).catch(() => null),
-        ]).then(([epRes, progRes]) => {
-            if (!epRes?.error && epRes?.data) {
-                const ep = epRes.data;
-                setTitle(ep.title);
-                setSubtitle(ep.oposicion ?? '');
-                setTotalSecs(ep.totalSeconds ?? TOTAL_SECONDS);
-            }
-            if (!progRes?.error && progRes?.data?.positionSecs != null) {
-                setElapsed(progRes.data.positionSecs);
-            }
-        });
+        if (!episodeId) return;
+        tutorApi.getProgress(episodeId)
+            .then((progRes) => {
+                if (!progRes?.error && progRes?.data?.positionSecs != null) {
+                    setElapsed(progRes.data.positionSecs);
+                }
+            })
+            .catch(() => {});
     }, [episodeId]);
 
     // Guarda el progreso cada 10 s mientras se reproduce
@@ -153,11 +210,9 @@ export default function TutorPodcastScreen({ navigation, route }) {
         return () => clearInterval(progressSaveRef.current);
     }, [episodeId, isPlaying, elapsed]);
 
-    const speed = SPEEDS[speedIdx];
-    const progressPct = Math.min((elapsed / totalSecs) * 100, 100);
-
     // ── Animación de onda ─────────────────────────────────────────────────────
     useEffect(() => {
+        if (!selectedEpisode) return;
         if (isPlaying) {
             waveLoop.current = Animated.loop(
                 Animated.sequence([
@@ -165,7 +220,7 @@ export default function TutorPodcastScreen({ navigation, route }) {
                         toValue: 1,
                         duration: 480,
                         easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: false, // height no admite native driver
+                        useNativeDriver: false,
                     }),
                     Animated.timing(waveAnim, {
                         toValue: 0,
@@ -181,23 +236,23 @@ export default function TutorPodcastScreen({ navigation, route }) {
             waveAnim.setValue(0);
         }
         return () => waveLoop.current?.stop();
-    }, [isPlaying]);
+    }, [isPlaying, selectedEpisode]);
 
     // ── Timer simulado — TODO: reemplazar por expo-av cuando se integre audio real ──
     useEffect(() => {
-        if (isPlaying && elapsed < totalSecs) {
-            timerRef.current = setInterval(() => {
-                setElapsed((prev) => {
-                    if (prev + 1 >= totalSecs) {
-                        setIsPlaying(false);
-                        return totalSecs;
-                    }
-                    return prev + 1;
-                });
-            }, 1000 / speed);
-        }
+        if (!selectedEpisode || !isPlaying || elapsed >= totalSecs) return;
+        const speed = SPEEDS[speedIdx];
+        timerRef.current = setInterval(() => {
+            setElapsed((prev) => {
+                if (prev + 1 >= totalSecs) {
+                    setIsPlaying(false);
+                    return totalSecs;
+                }
+                return prev + 1;
+            });
+        }, 1000 / speed);
         return () => clearInterval(timerRef.current);
-    }, [isPlaying, speed, elapsed, totalSecs]);
+    }, [isPlaying, speedIdx, elapsed, totalSecs, selectedEpisode]);
 
     const skipBy = useCallback((delta) => {
         setElapsed((prev) => Math.max(0, Math.min(totalSecs, prev + delta)));
@@ -247,6 +302,25 @@ export default function TutorPodcastScreen({ navigation, route }) {
             { text: 'Cancelar', style: 'cancel' },
         ]);
     }, []);
+
+    const speed       = SPEEDS[speedIdx];
+    const progressPct = Math.min((elapsed / totalSecs) * 100, 100);
+
+    // ── Selector de episodios (return condicional DESPUÉS de todos los hooks) ──
+    if (!selectedEpisode) {
+        return (
+            <EpisodePicker
+                oposicion={oposicion}
+                onSelect={(ep) => {
+                    setTitle(ep.title);
+                    setSubtitle(ep.oposicion ?? oposicion);
+                    setTotalSecs(ep.totalSeconds ?? TOTAL_SECONDS);
+                    setSelectedEpisode(ep);
+                }}
+                onBack={() => navigation.goBack()}
+            />
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -365,7 +439,7 @@ export default function TutorPodcastScreen({ navigation, route }) {
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>¿Salir del podcast?</Text>
                         <Text style={styles.modalText}>
-                            Perderás el progreso de esta sesión de audio.
+                            El audio se detendrá. Tu progreso está guardado automáticamente.
                         </Text>
                         <View style={styles.modalBtns}>
                             <TouchableOpacity
@@ -542,6 +616,65 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: colors.textDark,
     },
+
+    pickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FIGMA.progressTrack,
+    },
+    pickerTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+    },
+    pickerList: {
+        padding: spacing.md,
+        gap: spacing.sm,
+    },
+    pickerEmpty: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.md,
+    },
+    pickerEmptyText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: FIGMA.subtitleMuted,
+    },
+    episodeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: FIGMA.controlBg,
+        borderRadius: 14,
+        padding: spacing.md,
+        gap: spacing.md,
+    },
+    episodeIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: `${colors.accentOrange}20`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    episodeInfo: { flex: 1 },
+    episodeName: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: 3,
+    },
+    episodeDuration: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: FIGMA.subtitleMuted,
+    },
+
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.45)',

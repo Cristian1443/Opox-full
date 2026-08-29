@@ -7,6 +7,7 @@ import {
     StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 
@@ -57,6 +58,22 @@ export default function BoeUpdateSuccessScreen({ route, navigation }) {
                 >
                     <Text style={styles.primaryBtnText}>Volver al feed</Text>
                 </TouchableOpacity>
+
+                {/* ── CTA secundario: practicar con preguntas actualizadas ──── */}
+                <TouchableOpacity
+                    style={styles.secondaryBtn}
+                    activeOpacity={0.78}
+                    onPress={() => navigation.navigate('GeneratorConfig', { questionCount: 10 })}
+                    accessibilityLabel="Practicar con preguntas actualizadas"
+                >
+                    <Ionicons name="barbell-outline" size={18} color={colors.ctaGreen} />
+                    <Text style={styles.secondaryBtnText}>Practicar con preguntas actualizadas</Text>
+                </TouchableOpacity>
+
+                {/* ── Hint ──────────────────────────────────────────────────── */}
+                <Text style={styles.hint}>
+                    Puedes seguir estudiando o revisar otros cambios.
+                </Text>
             </View>
         </SafeAreaView>
     );
@@ -103,5 +120,32 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
         color: colors.white,
+    },
+    secondaryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        width: '100%',
+        maxWidth: 322,
+        paddingVertical: 14,
+        borderRadius: 14.2,
+        borderWidth: 1,
+        borderColor: colors.ctaGreen,
+        marginTop: spacing.sm,
+    },
+    secondaryBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.ctaGreen,
+    },
+
+    // ── Hint ──────────────────────────────────────────────────────
+    hint: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.5,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginTop: spacing.lg,
     },
 });

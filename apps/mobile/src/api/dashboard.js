@@ -34,5 +34,9 @@ export const dashboardApi = {
     getGamification: () => api.get(API_ROUTES.DASHBOARD.GAMIFICATION, { auth: true }),
 
     registerActivity: (input) =>
-        api.post(API_ROUTES.DASHBOARD.GAMIFICATION_ACTIVITY, input, { auth: true }),
+        api.post(
+            API_ROUTES.DASHBOARD.GAMIFICATION_ACTIVITY,
+            { ...input, localDate: input?.localDate ?? new Date().toLocaleDateString('sv') },
+            { auth: true },
+        ),
 };

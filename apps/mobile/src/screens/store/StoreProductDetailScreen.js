@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,56 +6,57 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import InsufficientPointsModal from '../../components/InsufficientPointsModal';
+import { storeApi } from '../../api/store';
 
 const ACCENT = '#6C5CE7';
 const ACCENT_LIGHT = '#A29BFE';
-
-// Datos extra que el backend devolverá en el detalle del producto.
-// La home solo pasa nombre/precio/icono; aquí completamos hasta que exista el endpoint.
-const MOCK_EXTRA = {
-  subtitle: '500 preguntas extra elaboradas por examinadores humanos',
-  description: 'Accede a casos prácticos reales. Estos tests están diseñados para simular la dificultad real del examen, con explicaciones detalladas en cada respuesta.',
-  features: [
-    '500 preguntas de alta calidad',
-    'Casos prácticos reales',
-    'Explicaciones detalladas por examinadores',
-    'Actualizaciones mensuales',
-  ],
-};
 
 export default function StoreProductDetailScreen({ navigation, route }) {
   const item = route.params?.item ?? {};
   const insets = useSafeAreaInsets();
 
-  const [userBalance] = useState(1840);
-  const [isLoading, setIsLoading] = useState(false);
+  const [userBalance, setUserBalance] = useState(null);
+  const [product, setProduct] = useState(item);
   const [showErrorModal, setShowErrorModal] = useState(false);
 
-  const productCost = item.price ?? 0;
-  const remainingBalance = userBalance - productCost;
-  const canAfford = remainingBalance >= 0;
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    storeApi.getBalance().then(res => {
+      if (cancelled || !res?.data) return;
+      setUserBalance(res.data.balance);
+    });
+    if (item.id) {
+      storeApi.getProduct(item.id).then(res => {
+        if (cancelled || !res?.data) return;
+        setProduct(res.data);
+      });
+    }
+    return () => { cancelled = true; };
+  }, [item.id]));
+
+  const productCost = product.cost ?? item.cost ?? item.price ?? 0;
+  const remainingBalance = (userBalance ?? 0) - productCost;
+  const canAfford = userBalance !== null && remainingBalance >= 0;
 
   const handleRedeem = () => {
-    if (isLoading) return;
+    if (userBalance === null) return;
     if (!canAfford) {
       setShowErrorModal(true);
       return;
     }
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      navigation.navigate('StoreConfirmRedeem', {
-        product: item,
-        currentBalance: userBalance,
-        newBalance: remainingBalance,
-      });
-    }, 1200);
+    navigation.navigate('StoreConfirmRedeem', {
+      productId: item.id,
+      redeemType: 'product',
+      product: { name: product.title ?? item.name, icon: product.icon ?? item.icon, price: productCost },
+      currentBalance: userBalance,
+      newBalance: remainingBalance,
+    });
   };
 
   return (
@@ -71,7 +72,7 @@ export default function StoreProductDetailScreen({ navigation, route }) {
         >
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{item.name ?? 'Detalle del producto'}</Text>
+        <Text style={styles.headerTitle}>{product.title ?? item.name ?? 'Detalle del producto'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -83,20 +84,20 @@ export default function StoreProductDetailScreen({ navigation, route }) {
         <View style={styles.heroSection}>
           <View style={styles.iconContainer}>
             <Ionicons
-              name={item.icon ?? 'cube-outline'}
+              name={product.icon ?? item.icon ?? 'cube-outline'}
               size={64}
               color={ACCENT}
             />
           </View>
-          <Text style={styles.productTitle}>{item.name ?? '—'}</Text>
-          <Text style={styles.productSubtitle}>{MOCK_EXTRA.subtitle}</Text>
+          <Text style={styles.productTitle}>{product.title ?? item.name ?? '—'}</Text>
+          <Text style={styles.productSubtitle}>{product.subtitle ?? ''}</Text>
         </View>
 
         {/* Saldo y coste */}
         <View style={styles.balanceCard}>
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Tu saldo actual</Text>
-            <Text style={styles.rowValue}>{userBalance.toLocaleString()} O</Text>
+            <Text style={styles.rowValue}>{userBalance !== null ? userBalance.toLocaleString() : '—'} O</Text>
           </View>
 
           <View style={styles.divider} />
@@ -132,18 +133,27 @@ export default function StoreProductDetailScreen({ navigation, route }) {
         </View>
 
         {/* Descripción y características */}
-        <View style={styles.detailsCard}>
-          <Text style={styles.sectionTitle}>¿Qué incluye?</Text>
-          <Text style={styles.descriptionText}>{MOCK_EXTRA.description}</Text>
-
-          <Text style={styles.featuresTitle}>Características</Text>
-          {MOCK_EXTRA.features.map((feature, i) => (
-            <View key={i} style={styles.featureRow}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={styles.featureText}>{feature}</Text>
-            </View>
-          ))}
-        </View>
+        {(product.description || (product.conditions?.length > 0)) && (
+          <View style={styles.detailsCard}>
+            {product.description ? (
+              <>
+                <Text style={styles.sectionTitle}>¿Qué incluye?</Text>
+                <Text style={styles.descriptionText}>{product.description}</Text>
+              </>
+            ) : null}
+            {product.conditions?.length > 0 ? (
+              <>
+                <Text style={styles.featuresTitle}>Condiciones</Text>
+                {product.conditions.map((c, i) => (
+                  <View key={i} style={styles.featureRow}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                    <Text style={styles.featureText}>{c}</Text>
+                  </View>
+                ))}
+              </>
+            ) : null}
+          </View>
+        )}
       </ScrollView>
 
       {/* Footer fijo */}
@@ -151,17 +161,13 @@ export default function StoreProductDetailScreen({ navigation, route }) {
         <TouchableOpacity
           style={[styles.redeemButton, !canAfford && styles.redeemButtonDisabled]}
           onPress={handleRedeem}
-          disabled={isLoading}
-          accessibilityLabel={`Canjear ${item.name ?? 'producto'} por ${productCost} Opopoints`}
+          disabled={userBalance === null}
+          accessibilityLabel={`Canjear ${product.title ?? item.name ?? 'producto'} por ${productCost} Opopoints`}
         >
-          {isLoading ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <>
-              <Text style={styles.redeemButtonText}>Canjear ahora</Text>
-              <Text style={styles.redeemSubtext}>Por {productCost} Opopoints</Text>
-            </>
-          )}
+          <>
+            <Text style={styles.redeemButtonText}>Canjear ahora</Text>
+            <Text style={styles.redeemSubtext}>Por {productCost} Opopoints</Text>
+          </>
         </TouchableOpacity>
       </View>
 

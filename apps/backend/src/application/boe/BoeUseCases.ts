@@ -1,9 +1,15 @@
-import type { IBoeRepository, BoeChange, BoeChangeFragment, BoeChangeType } from '../../domain';
+import type { IBoeRepository, IDashboardRepository, BoeChange, BoeChangeFragment, BoeChangeType, BoeWatchedRegulation } from '../../domain';
 import { computeBoeDiff } from './boeDiff';
 import {
     BoeChangeNotFoundError,
 } from '../../domain';
-import type { AiApiContract, BoeMiniTestQuestionDto, MotorBoeContract, MotorCambio } from '@opox/types';
+import type {
+    AiApiContract,
+    BoeMiniTestQuestionDto,
+    MotorBoeContract,
+    MotorCambio,
+    MotorBoeCatalogResult,
+} from '@opox/types';
 import type {
     BoeFeedSection,
     BoeFeedResponse,
@@ -20,15 +26,27 @@ export class GetBoeFeedUseCase {
     constructor(private readonly repo: IBoeRepository) {}
 
     async execute(userId: string): Promise<BoeFeedResponse> {
-        const changes = await this.repo.getFeedChanges(userId);
+        const [changes, regulations] = await Promise.all([
+            this.repo.getFeedChanges(userId),
+            this.repo.listRegulations(userId),
+        ]);
 
         const now = new Date();
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-        const thisWeek: typeof changes = [];
-        const earlier: typeof changes = [];
+        // Prioridad: críticos primero (modificacion/derogacion > tipografica), luego más reciente
+        const sorted = [...changes].sort((a, b) => {
+            const priority = (c: typeof a) =>
+                c.changeType === 'tipografica' ? 0 : c.affectedQuestions > 0 ? 2 : 1;
+            const diff = priority(b) - priority(a);
+            if (diff !== 0) return diff;
+            return b.detectedAt.getTime() - a.detectedAt.getTime();
+        });
 
-        for (const c of changes) {
+        const thisWeek: typeof sorted = [];
+        const earlier: typeof sorted = [];
+
+        for (const c of sorted) {
             if (c.detectedAt >= weekAgo) {
                 thisWeek.push(c);
             } else {
@@ -36,7 +54,7 @@ export class GetBoeFeedUseCase {
             }
         }
 
-        const toChange = (c: typeof changes[number]) => ({
+        const toChange = (c: typeof sorted[number]) => ({
             id: c.id,
             boeIdentifier: c.boeIdentifier,
             regulationTitle: c.regulationTitle,
@@ -59,7 +77,7 @@ export class GetBoeFeedUseCase {
 
         const totalUnread = changes.filter((c) => !c.isRead).length;
 
-        return { sections, totalUnread };
+        return { sections, totalUnread, watchedRegulationsCount: regulations.length };
     }
 }
 
@@ -214,12 +232,25 @@ export class ToggleBoeBookmarkUseCase {
 // ─── Guardar resultado del mini-test ─────────────────────────────────────────
 
 export class CompleteBoeMiniTestUseCase {
-    constructor(private readonly repo: IBoeRepository) {}
+    constructor(
+        private readonly repo: IBoeRepository,
+        private readonly dashboardRepo: IDashboardRepository,
+    ) {}
 
     async execute(changeId: string, userId: string, score: number, total: number): Promise<void> {
         const change = await this.repo.getChange(changeId);
         if (!change) throw new BoeChangeNotFoundError();
         await this.repo.saveMiniTestResult({ userId, changeId, score, total });
+
+        // Opopoints: máx 5 por mini-test BOE (3 preguntas), proporcional a aciertos
+        const miniTestPoints = total > 0 ? Math.round((score / total) * 5) : 0;
+        if (miniTestPoints > 0) {
+            await this.dashboardRepo.registerActivity({
+                userId,
+                reason: 'test_boe_minitest',
+                points: miniTestPoints,
+            });
+        }
     }
 }
 
@@ -230,6 +261,129 @@ export class ListTopicsUseCase {
 
     async execute(oposicion: string): Promise<TrainingTopic[]> {
         return this.repo.listTopics(oposicion);
+    }
+}
+
+// ─── Gestión de normas seguidas ───────────────────────────────────────────────
+
+export class ListFollowedRegulationsUseCase {
+    constructor(private readonly repo: IBoeRepository) {}
+
+    async execute(userId: string): Promise<BoeWatchedRegulation[]> {
+        return this.repo.listRegulations(userId);
+    }
+}
+
+export class FollowRegulationUseCase {
+    constructor(
+        private readonly repo: IBoeRepository,
+        private readonly motor: MotorBoeContract | null,
+        private readonly defaultCursoId: string | null,
+    ) {}
+
+    async execute(userId: string, boeIdentifier: string, titulo: string): Promise<BoeWatchedRegulation> {
+        let motorNormaId: string | undefined;
+
+        if (this.motor && this.defaultCursoId) {
+            try {
+                const norma = await this.motor.followRegulation(this.defaultCursoId, boeIdentifier, titulo);
+                motorNormaId = norma.id;
+            } catch (err: any) {
+                // 409 = ya está en seguimiento en el Motor — no es error
+                if (err?.response?.status !== 409) {
+                    logger.warn('[boe] followRegulation motor error (non-fatal)', { boeIdentifier, err: err?.message });
+                }
+            }
+        }
+
+        return this.repo.addRegulation({ userId, boeIdentifier, title: titulo, motorNormaId });
+    }
+}
+
+export class UnfollowRegulationUseCase {
+    constructor(
+        private readonly repo: IBoeRepository,
+        private readonly motor: MotorBoeContract | null,
+        private readonly defaultCursoId: string | null,
+    ) {}
+
+    async execute(regulationId: string, userId: string): Promise<void> {
+        const regulation = await this.repo.getRegulation(regulationId, userId);
+        if (!regulation) return;
+
+        // Eliminar de nuestra BD primero
+        await this.repo.removeRegulation(regulationId, userId);
+
+        // Dejar de seguir en el Motor si tenemos el motor_norma_id
+        if (this.motor && this.defaultCursoId && regulation.motorNormaId) {
+            await this.motor.stopFollowingRegulation(regulation.motorNormaId, this.defaultCursoId)
+                .catch(err => logger.warn('[boe] stopFollowingRegulation motor error (non-fatal)', { err: err?.message }));
+        }
+    }
+}
+
+export class SearchBoeRegulationsUseCase {
+    constructor(
+        private readonly motor: MotorBoeContract | null,
+        private readonly defaultCursoId: string | null,
+    ) {}
+
+    async execute(query: string, limit = 20): Promise<MotorBoeCatalogResult> {
+        if (!this.motor) {
+            return { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
+        }
+
+        // Intentar catálogo del Motor (timeout corto configurado en MotorBoeClient.searchCatalog)
+        let result: MotorBoeCatalogResult = { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
+        try {
+            result = await this.motor.searchCatalog(query, limit);
+        } catch {
+            // Catálogo no disponible (timeout, red) — ir directo al fallback
+            logger.info('[boe] searchCatalog timeout/error — usando listRegulations como fallback');
+        }
+
+        // Fallback: mostrar las normas que el Motor ya monitoriza para el curso
+        if ((!result.sincronizado || result.resultados.length === 0) && this.defaultCursoId) {
+            try {
+                const normas = await this.motor.listRegulations(this.defaultCursoId);
+                const q = query.trim().toLowerCase();
+                const filtradas = q
+                    ? normas.filter(n =>
+                        n.titulo.toLowerCase().includes(q) ||
+                        n.identificador_boe.toLowerCase().includes(q),
+                    )
+                    : normas;
+                return {
+                    sincronizado: false,
+                    total: filtradas.length,
+                    ultima_sincronizacion: null,
+                    resultados: filtradas.slice(0, limit).map(n => ({
+                        id: n.id,
+                        identificador_boe: n.identificador_boe,
+                        titulo: n.titulo,
+                        url: n.url,
+                        activa: n.activa,
+                    })),
+                };
+            } catch {
+                // Fallback también falló — devolver vacío
+            }
+        }
+
+        return result;
+    }
+}
+
+export class SyncBoeCatalogUseCase {
+    constructor(
+        private readonly motor: MotorBoeContract | null,
+    ) {}
+
+    async execute(desde?: string): Promise<{ jobId: string }> {
+        if (!this.motor) throw new Error('Motor BOE no configurado (MOTOR_BOE_BASE_URL)');
+        const jobId = await this.motor.syncCatalog(desde);
+        logger.info('[boe] syncCatalog job launched', { jobId, desde });
+        return { jobId };
     }
 }
 
@@ -269,6 +423,11 @@ export class SyncBoeChangesUseCase {
                 const input = buildChangeInput(mc);
                 await this.repo.upsertChange(input);
                 synced++;
+                // Regenerar preguntas afectadas en el Motor (fire-and-forget)
+                if (mc.preguntas_afectadas.length > 0) {
+                    this.motor.regenerateQuestions(mc.id, cursoId)
+                        .catch(err => logger.warn('[boe] regenerateQuestions error (non-fatal)', { id: mc.id, err: err?.message }));
+                }
             } catch (e) {
                 logger.warn('[boe] syncChanges skip', { id: mc.id, error: e });
                 skipped++;
@@ -322,6 +481,7 @@ function buildChangeInput(mc: MotorCambio) {
         affectedQuestions: mc.preguntas_afectadas?.length ?? 0,
         detectedAt: new Date(mc.detectado),
         fragmentos,
+        resumen: mc.resumen || undefined,
     };
 }
 
@@ -347,6 +507,8 @@ function buildHint(change: BoeChange, fragments: BoeChangeFragment[]): string {
         tipografica: 'Esta es una corrección de errata',
     };
     const label = typeLabels[change.changeType] ?? 'Este artículo ha cambiado';
+    // Usar el resumen del Motor si está disponible — es más limpio que truncar el texto
+    if (change.resumen) return `${label}. ${change.resumen}`;
     const despues = fragments.find((f) => f.fragType === 'despues')?.text ?? '';
     const snippet = despues.length > 120 ? despues.slice(0, 117) + '...' : despues;
     return `${label}. Redacción vigente: "${snippet}"`;

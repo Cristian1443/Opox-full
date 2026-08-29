@@ -9,6 +9,11 @@ import type {
     ToggleBoeBookmarkUseCase,
     CompleteBoeMiniTestUseCase,
     SyncBoeChangesUseCase,
+    ListFollowedRegulationsUseCase,
+    FollowRegulationUseCase,
+    UnfollowRegulationUseCase,
+    SearchBoeRegulationsUseCase,
+    SyncBoeCatalogUseCase,
 } from '../../application';
 
 function ok<T>(res: Response, status: number, data: T): void {
@@ -26,6 +31,11 @@ export class BoeController {
             toggleBookmark: ToggleBoeBookmarkUseCase;
             completeMiniTest: CompleteBoeMiniTestUseCase;
             syncChanges?: SyncBoeChangesUseCase;
+            listRegulations: ListFollowedRegulationsUseCase;
+            followRegulation: FollowRegulationUseCase;
+            unfollowRegulation: UnfollowRegulationUseCase;
+            searchCatalog: SearchBoeRegulationsUseCase;
+            syncCatalog?: SyncBoeCatalogUseCase;
         },
     ) {}
 
@@ -102,6 +112,55 @@ export class BoeController {
             const { curso_id } = req.body as { curso_id: string };
             const result = await this.deps.syncChanges.execute(curso_id);
             ok(res, 200, result);
+        } catch (e) { next(e); }
+    };
+
+    // GET /boe/regulations
+    listRegulations = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const result = await this.deps.listRegulations.execute(req.authUser!.id);
+            ok(res, 200, result);
+        } catch (e) { next(e); }
+    };
+
+    // POST /boe/regulations
+    followRegulation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { boeIdentifier, titulo } = req.body as { boeIdentifier: string; titulo: string };
+            const result = await this.deps.followRegulation.execute(req.authUser!.id, boeIdentifier, titulo);
+            ok(res, 201, result);
+        } catch (e) { next(e); }
+    };
+
+    // DELETE /boe/regulations/:id
+    unfollowRegulation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const regulationId = req.params['id'] as string;
+            await this.deps.unfollowRegulation.execute(regulationId, req.authUser!.id);
+            res.status(204).end();
+        } catch (e) { next(e); }
+    };
+
+    // GET /boe/catalog/search?q=&limit=
+    searchCatalog = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const query = (req.query['q'] as string) ?? '';
+            const limit = Math.min(Number(req.query['limit'] ?? 20), 50);
+            const result = await this.deps.searchCatalog.execute(query, limit);
+            ok(res, 200, result);
+        } catch (e) { next(e); }
+    };
+
+    // POST /boe/catalog/sync
+    syncCatalog = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.syncCatalog) {
+                res.status(503).json({ ok: false, error: 'Motor BOE no configurado (MOTOR_BOE_BASE_URL)' });
+                return;
+            }
+            const { desde } = req.body as { desde?: string };
+            const result = await this.deps.syncCatalog.execute(desde);
+            ok(res, 202, result);
         } catch (e) { next(e); }
     };
 }

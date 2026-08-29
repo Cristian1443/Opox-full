@@ -15,10 +15,12 @@ import type {
 export interface IBoeRepository {
     // ── Normas en seguimiento ───────────────────────────────────────────────
     listRegulations(userId: string): Promise<BoeWatchedRegulation[]>;
+    getRegulation(id: string, userId: string): Promise<BoeWatchedRegulation | null>;
     addRegulation(data: {
         userId: string;
         boeIdentifier: string;
         title: string;
+        motorNormaId?: string;
     }): Promise<BoeWatchedRegulation>;
     removeRegulation(id: string, userId: string): Promise<void>;
 

@@ -43,6 +43,7 @@ export const saveAttemptSchema = z.object({
     topicId: z.string().min(1).max(60).optional(),
     difficulty: difficultySchema.optional(),
     durationSecs: z.number().int().positive().optional(),
+    localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     responses: z.array(responseInputSchema).min(1).max(150),
 });
 

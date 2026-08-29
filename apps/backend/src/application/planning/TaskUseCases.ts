@@ -52,7 +52,7 @@ export class ToggleTaskUseCase {
         private readonly onGoalCompleted?: (userId: string) => Promise<void>,
     ) { }
 
-    async execute(input: { userId: string; taskId: string; done: boolean }): Promise<ToggleTaskResult> {
+    async execute(input: { userId: string; taskId: string; done: boolean; localDate?: string }): Promise<ToggleTaskResult> {
         const task = await this.planningRepo.toggleTask(input);
         if (!input.done) return { task, goalCompleted: false };
 
@@ -62,19 +62,25 @@ export class ToggleTaskUseCase {
         ]);
         const completedCount = todayTasks.filter((t) => t.done).length;
 
-        // Umbral exacto: dispara solo la vez que se cruza el objetivo (ajustado
-        // por intensidad), no en cada toggle posterior sobre el mismo día.
+        // Umbral exacto: dispara los puntos y el pop-up solo la vez que se cruza
+        // el objetivo (ajustado por intensidad), no en cada toggle posterior.
         const goalCount = applyIntensity(plan.testsPerDay, plan.intensity);
-        if (completedCount === goalCount) {
-            const gamification = await this.dashboardRepo.registerActivity({
-                userId: input.userId,
-                reason: 'daily_goal_completed',
-                points: DAILY_GOAL_POINTS,
-            });
+        const crossedGoal = completedCount === goalCount;
+
+        // La racha debe subir con la primera tarea del día, no esperar al objetivo.
+        // Puntos: 0 en cada tarea, DAILY_GOAL_POINTS solo al cruzar el umbral.
+        const gamification = await this.dashboardRepo.registerActivity({
+            userId: input.userId,
+            reason: crossedGoal ? 'daily_goal_completed' : 'task_completed',
+            points: crossedGoal ? DAILY_GOAL_POINTS : 0,
+            localDate: input.localDate,
+        });
+
+        if (crossedGoal) {
             await this.onGoalCompleted?.(input.userId).catch(() => {});
             return { task, goalCompleted: true, gamification };
         }
 
-        return { task, goalCompleted: false };
+        return { task, goalCompleted: false, gamification };
     }
 }

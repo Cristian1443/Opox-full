@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     StyleSheet,
     View,
@@ -84,22 +85,27 @@ export default function BoeDetailScreen({ route, navigation }) {
     // esta pantalla de detalle (no navega ni refiltra nada aquí).
     const [filterTab, setFilterTab] = useState('temario');
 
-    useEffect(() => {
-        boeApi.getDetail(itemId).then(res => {
-            if (res?.data) {
-                const d = res.data;
-                setApiDetail({
-                    title: `${d.articulo} · ${d.shortTitle}`,
-                    subtitle: d.regulationTitle,
-                    type: changeTypeToDetailType(d.changeType),
-                    summary: d.hint,
-                    source: d.sourceDescription,
-                    date: new Date(d.detectedAt).toLocaleDateString('es-ES'),
-                });
-                setBookmarked(d.isBookmarked);
-            }
-        }).catch(() => {});
-    }, [itemId]);
+    const [affectedCount, setAffectedCount] = useState(0);
+
+    useFocusEffect(
+        useCallback(() => {
+            boeApi.getDetail(itemId).then(res => {
+                if (res?.data) {
+                    const d = res.data;
+                    setApiDetail({
+                        title: `${d.articulo} · ${d.shortTitle}`,
+                        subtitle: d.regulationTitle,
+                        type: changeTypeToDetailType(d.changeType),
+                        summary: d.hint,
+                        source: d.sourceDescription,
+                        date: new Date(d.detectedAt).toLocaleDateString('es-ES'),
+                    });
+                    setBookmarked(d.isBookmarked);
+                    setAffectedCount(d.affectedQuestionsCount ?? 0);
+                }
+            }).catch(() => {});
+        }, [itemId]),
+    );
 
     const detail = apiDetail ?? mockDetail;
     const type = routeType ?? detail.type;
@@ -215,6 +221,20 @@ export default function BoeDetailScreen({ route, navigation }) {
                                 <Text style={styles.secondaryButtonText}>Mini-test</Text>
                             </TouchableOpacity>
                         </View>
+                    )}
+
+                    {affectedCount > 0 && type !== 'review' && (
+                        <TouchableOpacity
+                            style={[styles.tertiaryButton, { borderColor: cfg.color, backgroundColor: cfg.bg }]}
+                            activeOpacity={0.78}
+                            onPress={() => navigation.navigate('GeneratorConfig', { questionCount: 10 })}
+                            accessibilityLabel={`Practicar las ${affectedCount} preguntas afectadas`}
+                        >
+                            <Ionicons name="barbell-outline" size={18} color={cfg.color} />
+                            <Text style={[styles.tertiaryButtonText, { color: cfg.color }]}>
+                                Practicar · {affectedCount} pregunta{affectedCount > 1 ? 's' : ''} afectada{affectedCount > 1 ? 's' : ''}
+                            </Text>
+                        </TouchableOpacity>
                     )}
                 </ScrollView>
             </View>
@@ -369,5 +389,19 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 15,
         color: colors.textDark,
+    },
+    tertiaryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        paddingVertical: 14,
+        borderRadius: 14.2,
+        borderWidth: 1,
+        marginTop: spacing.sm + 4,
+    },
+    tertiaryButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
     },
 });

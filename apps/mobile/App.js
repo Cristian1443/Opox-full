@@ -158,7 +158,10 @@ function BoeRealtimeWatcher({ onNewChange }) {
       .channel('boe-realtime-alerts')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'boe_changes' }, (payload) => {
         const title = payload.new?.article_title ?? 'Cambio legislativo detectado';
-        onNewChange({ title, body: 'Hay una actualización en tu temario. Toca para verla.', type: 'boe_alert', data: { screen: 'BoeHome' } });
+        const changeId = payload.new?.id;
+        const screen = changeId ? 'BoeDetail' : 'BoeHome';
+        const params = changeId ? { itemId: changeId } : {};
+        onNewChange({ title, body: 'Hay una actualización en tu temario. Toca para verla.', type: 'boe_alert', data: { screen, params } });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };

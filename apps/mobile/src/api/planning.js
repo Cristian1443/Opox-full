@@ -20,7 +20,7 @@ export const planningApi = {
     },
     createTask: (input) => api.post(API_ROUTES.PLANNING.TASKS, input, { auth: true }),
     toggleTask: (taskId, done) =>
-        api.patch(API_ROUTES.PLANNING.TASK_TOGGLE.replace(':id', taskId), { done }, { auth: true }),
+        api.patch(API_ROUTES.PLANNING.TASK_TOGGLE.replace(':id', taskId), { done, localDate: localDate() }, { auth: true }),
 
     getWeek: ({ weekStart, selectedDate } = {}) => {
         const params = new URLSearchParams({ localDate: localDate() });

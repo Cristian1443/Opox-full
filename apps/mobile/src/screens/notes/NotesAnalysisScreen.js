@@ -297,7 +297,7 @@ export default function NotesAnalysisScreen({ navigation, route }) {
                 onReview={() => {
                     setOcrErrorVisible(false);
                     navigation.replace('NoteDetail', {
-                        noteId: noteId ?? 'mock-note-id',
+                        noteId: noteId,
                         justCreated: true,
                         needsReview: true,
                     });
@@ -315,20 +315,20 @@ export default function NotesAnalysisScreen({ navigation, route }) {
                 onStartTest={() => {
                     setSuccessVisible(false);
                     navigation.replace('NotesTestConfig', {
-                        noteId: noteId ?? 'mock-note-id',
+                        noteId: noteId,
                     });
                 }}
                 onViewDocument={() => {
                     setSuccessVisible(false);
                     navigation.replace('NoteDetail', {
-                        noteId: noteId ?? 'mock-note-id',
+                        noteId: noteId,
                         justCreated: true,
                     });
                 }}
                 onRequestClose={() => {
                     setSuccessVisible(false);
                     navigation.replace('NoteDetail', {
-                        noteId: noteId ?? 'mock-note-id',
+                        noteId: noteId,
                         justCreated: true,
                     });
                 }}

@@ -94,8 +94,40 @@ export class UploadNoteUseCase {
             fileName: params.fileName,
             kind: params.kind,
             pages: params.files.length,
-            storagePath: null, // TODO(bloque9): subir a Supabase Storage y guardar path.
+            storagePath: null,
         });
+
+        // Subida a Supabase Storage (no bloquea la respuesta al móvil).
+        // Si falla, logueamos y continuamos — el pipeline IA puede usar el base64 en memoria.
+        void (async () => {
+            try {
+                let primaryPath: string | null = null;
+                for (let i = 0; i < params.files.length; i++) {
+                    const f = params.files[i]!;
+                    const ext = f.mimeType === 'application/pdf' ? '.pdf'
+                        : f.mimeType === 'image/png'             ? '.png'
+                        : '.jpg';
+                    const fileName = params.files.length === 1
+                        ? params.fileName
+                        : `page-${i + 1}${ext}`;
+                    const storagePath = await this.repo.uploadFile({
+                        userId   : params.userId,
+                        noteId   : note.id,
+                        fileName,
+                        base64   : f.base64,
+                        mimeType : f.mimeType,
+                    });
+                    if (i === 0) primaryPath = storagePath;
+                }
+                if (primaryPath) {
+                    await this.repo.updateStatus(note.id, params.userId, { storagePath: primaryPath });
+                }
+            } catch (storageErr) {
+                // Storage no disponible: el pipeline sigue con base64 en memoria.
+                const msg = storageErr instanceof Error ? storageErr.message : String(storageErr);
+                console.error('[notes] Storage upload failed:', msg);
+            }
+        })();
 
         // Arrancamos el pipeline en background — no bloqueamos la respuesta.
         // En una versión con colas esto pasaría a un job worker (BullMQ, etc.).
@@ -247,7 +279,7 @@ async function runAnalysisPipeline(
                 ocrConfidence: page.ocrConfidence,
             });
         }
-        await repo.updateStatus(note.id, note.userId, { progress: 33 });
+        await repo.updateStatus(note.id, note.userId, { progress: 33, pages: ocr.pages.length });
 
         // Fase 2 — tags
         await repo.updateStatus(note.id, note.userId, { status: 'processing_topics', progress: 45 });

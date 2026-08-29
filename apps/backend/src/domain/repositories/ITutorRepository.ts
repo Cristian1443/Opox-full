@@ -20,6 +20,7 @@ export interface ITutorRepository {
         userId: string;
         role: 'user' | 'assistant';
         content: string;
+        suggestedActions?: Array<{ label: string; icon: string }> | null;
     }): Promise<TutorMessage>;
 
     // ── Flashcards ────────────────────────────────────────────────────────────

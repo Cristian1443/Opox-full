@@ -143,6 +143,7 @@ export default function PlanningTodayScreen({ navigation }) {
             navigation.navigate('GeneratorConfig', {
                 topicId: params.topicId,
                 questionCount: params.count,
+                taskId: task.id,
             });
         }
     };

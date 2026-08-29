@@ -11,7 +11,7 @@ export class GetGamificationUseCase {
 export class RegisterActivityUseCase {
     constructor(private readonly dashboardRepo: IDashboardRepository) { }
 
-    execute(input: { userId: string; reason: string; points: number }): Promise<UserGamification> {
+    execute(input: { userId: string; reason: string; points: number; localDate?: string }): Promise<UserGamification> {
         return this.dashboardRepo.registerActivity(input);
     }
 }

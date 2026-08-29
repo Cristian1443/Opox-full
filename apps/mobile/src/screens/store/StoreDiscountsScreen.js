@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,74 +8,13 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import InsufficientPointsModal from '../../components/InsufficientPointsModal';
+import { storeApi } from '../../api/store';
 
 const ACCENT = '#6C5CE7';
-
-const DISCOUNTS_DATA = [
-  {
-    id: '1',
-    partner: 'FNAC',
-    discount: '-15%',
-    description: 'En libros y material de estudio',
-    cost: 250,
-    expiry: '60 días',
-    expiryDays: 60,
-    icon: 'book-outline',
-    color: '#E91E63',
-    isExpired: false,
-  },
-  {
-    id: '2',
-    partner: 'Cafetería Study',
-    discount: '5€',
-    description: 'En cafetería para tus jornadas',
-    cost: 180,
-    expiry: '30 días',
-    expiryDays: 30,
-    icon: 'cafe-outline',
-    color: '#795548',
-    isExpired: false,
-  },
-  {
-    id: '3',
-    partner: 'Papelería Online',
-    discount: '-10%',
-    description: 'Subrayadores, fichas, agendas',
-    cost: 120,
-    expiry: '15 días',
-    expiryDays: 15,
-    icon: 'pricetags-outline',
-    color: '#3F51B5',
-    isExpired: false,
-  },
-  {
-    id: '4',
-    partner: 'GymPartner',
-    discount: '2 meses gratis',
-    description: 'Suscripción al gimnasio',
-    cost: 300,
-    expiry: '10 días',
-    expiryDays: 10,
-    icon: 'fitness-outline',
-    color: '#F44336',
-    isExpired: false,
-  },
-  {
-    id: '5',
-    partner: 'Librería Antigua',
-    discount: '-20%',
-    description: 'Libros de segunda mano',
-    cost: 100,
-    expiry: '2 días',
-    expiryDays: 2,
-    icon: 'book-outline',
-    color: '#9C27B0',
-    isExpired: true,
-  },
-];
 
 const partnerAbbr = (name) => {
   const w = name.trim().split(/\s+/);
@@ -95,24 +34,52 @@ const getExpiryBg = (days) => {
 };
 
 export default function StoreDiscountsScreen({ navigation }) {
-  const [userBalance] = useState(1840);
+  const [userBalance, setUserBalance] = useState(null);
+  const [discountsData, setDiscountsData] = useState([]);
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
   const [selectedDiscount, setSelectedDiscount] = useState(null);
 
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    storeApi.getBalance().then(res => {
+      if (cancelled || !res?.data) return;
+      setUserBalance(res.data.balance);
+    });
+    storeApi.listDiscounts().then(res => {
+      if (cancelled || !res?.data) return;
+      setDiscountsData(res.data.map(d => ({
+        id: d.id,
+        partner: d.partner,
+        discount: d.discount,
+        description: d.subtitle,
+        cost: d.cost,
+        expiry: d.expiryDate,
+        expiryDays: 30,
+        icon: d.icon,
+        color: d.color,
+        isExpired: false,
+      })));
+    });
+    return () => { cancelled = true; };
+  }, []));
+
   const handleRedeem = (discount) => {
-    if (userBalance < discount.cost) {
+    const bal = userBalance ?? 0;
+    if (userBalance === null || bal < discount.cost) {
       setSelectedDiscount(discount);
       setShowInsufficientModal(true);
       return;
     }
     navigation.navigate('StoreConfirmRedeem', {
+      productId: discount.id,
+      redeemType: 'discount',
       product: {
         name: `${discount.discount} en ${discount.partner}`,
         price: discount.cost,
         icon: discount.icon,
       },
-      currentBalance: userBalance,
-      newBalance: userBalance - discount.cost,
+      currentBalance: bal,
+      newBalance: bal - discount.cost,
     });
   };
 
@@ -182,7 +149,9 @@ export default function StoreDiscountsScreen({ navigation }) {
 
       <View style={styles.balanceBanner}>
         <Text style={styles.balanceLabel}>Tus Opopoints:</Text>
-        <Text style={styles.balanceAmount}>{userBalance.toLocaleString()} O</Text>
+        <Text style={styles.balanceAmount}>
+          {userBalance !== null ? userBalance.toLocaleString() : '—'} O
+        </Text>
       </View>
 
       <ScrollView
@@ -197,9 +166,9 @@ export default function StoreDiscountsScreen({ navigation }) {
           </Text>
         </View>
 
-        {DISCOUNTS_DATA.map(renderDiscountCard)}
+        {discountsData.map(renderDiscountCard)}
 
-        {DISCOUNTS_DATA.length === 0 && (
+        {discountsData.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="gift-outline" size={48} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No hay descuentos disponibles por ahora.</Text>
@@ -211,7 +180,7 @@ export default function StoreDiscountsScreen({ navigation }) {
         visible={showInsufficientModal}
         onClose={() => setShowInsufficientModal(false)}
         cost={selectedDiscount?.cost ?? 0}
-        currentBalance={userBalance}
+        currentBalance={userBalance ?? 0}
         navigation={navigation}
       />
     </SafeAreaView>

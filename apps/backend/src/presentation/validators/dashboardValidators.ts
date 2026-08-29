@@ -23,4 +23,5 @@ export const createNotificationSchema = z.object({
 export const registerActivitySchema = z.object({
     reason: z.string().min(1).max(60),
     points: z.coerce.number().int().min(-1000).max(1000),
+    localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
