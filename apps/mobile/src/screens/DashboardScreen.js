@@ -14,7 +14,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import NudgeModal from '../components/NudgeModal';
 import BoeAlertBanner from '../components/BoeAlertBanner';
 import AlertCardModal from '../components/AlertCardModal';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { dashboardApi, planningApi } from '../api';
 import { colors } from '../theme';
 
@@ -458,6 +457,18 @@ const NUDGES = {
     },
 };
 
+// Ícono confirmado en Figma para el pop-up "TEMARIO DESACTUALIZADO" (10.1) —
+// círculo + barra de aviso en naranja, sin círculo de fondo detrás.
+function StaleLawsWarningIcon({ size = 48, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 48 48">
+            <Circle cx={24} cy={24} r={22} stroke={color} strokeWidth={3} fill="none" />
+            <Path d="M24 14V27" stroke={color} strokeWidth={3.2} strokeLinecap="round" />
+            <Circle cx={24} cy={34} r={1.8} fill={color} />
+        </Svg>
+    );
+}
+
 // ─── Pantalla principal (2.1 Dashboard + 2.2 Acceso rápido) ─────────────────
 export default function DashboardScreen({ navigation }) {
     const insets = useSafeAreaInsets();
@@ -804,19 +815,13 @@ export default function DashboardScreen({ navigation }) {
             {/* Pop-up temario desactualizado (10.1·alerta) — en Paso 2 lo dispara dashboardApi.getSummary() → staleLawsCount */}
             <AlertCardModal
                 visible={staleAlertVisible}
-                iconBg="#FDEBE9"
+                iconBg="transparent"
                 iconSize={80}
-                icon={
-                    <MaterialCommunityIcons
-                        name="alert-circle-outline"
-                        size={42}
-                        color="#FF3B30"
-                    />
-                }
+                icon={<StaleLawsWarningIcon />}
                 title={`${staleLawsCount} ${staleLawsCount === 1 ? 'ley' : 'leyes'} de tu temario ${staleLawsCount === 1 ? 'ha cambiado' : 'han cambiado'}`}
                 description="Para no estudiar contenido desfasado, revísalas y pon tu temario al día."
                 primaryLabel="Revisar cambios"
-                primaryColor="#FF3B30"
+                primaryColor={colors.ctaGreen}
                 onPrimaryPress={() => {
                     setStaleAlertVisible(false);
                     navigation.navigate('BoeHome');

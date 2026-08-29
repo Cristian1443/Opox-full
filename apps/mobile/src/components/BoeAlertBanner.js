@@ -8,10 +8,20 @@ import {
     Animated,
     Modal,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, spacing } from '../theme';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { colors } from '../theme';
 
 const { width } = Dimensions.get('window');
+
+// ─── Fiel al Figma (PushAlertaBoeNotification.tsx) ────────────────────────────
+// Mockup de una notificación push tal como aparecería en la pantalla de
+// bloqueo del teléfono; este es su único uso real en la app (banner in-app
+// cuando llega una alerta BOE con la app en foreground) — no es un componente
+// compartido con otros bloques, así que se puede ajustar 1:1 al diseño.
+const FIGMA = {
+    subtitleMuted: 'rgba(52, 58, 61, 0.5)',
+    bodyMuted: 'rgba(52, 58, 61, 0.7)',
+};
 
 /**
  * Banner de alerta BOE estilo notificación push del SO (lock-screen).
@@ -24,7 +34,7 @@ const { width } = Dimensions.get('window');
  *   title       — título de la alerta (default: "¡Alerta BOE!")
  *   body        — cuerpo del mensaje
  *   onPress     — tap en la tarjeta → navegar al detalle BOE
- *   onDismiss   — tap fuera o swipe → cerrar sin navegar
+ *   onDismiss   — tap fuera, swipe o botón cerrar → cerrar sin navegar
  */
 export default function BoeAlertBanner({
     visible,
@@ -96,38 +106,35 @@ export default function BoeAlertBanner({
                     {/* La tarjeta no propaga el tap al overlay */}
                     <TouchableOpacity
                         style={styles.card}
-                        activeOpacity={0.88}
+                        activeOpacity={0.9}
                         onPress={onPress}
                         accessibilityLabel={`Alerta BOE: ${title}. Tocar para ver el detalle.`}
                     >
-                        {/* Icono de la app */}
-                        <View style={styles.appIcon}>
-                            <MaterialCommunityIcons
-                                name="scale-balance"
-                                size={24}
-                                color={colors.white}
-                            />
-                        </View>
-
-                        {/* Texto */}
-                        <View style={styles.textBlock}>
-                            <View style={styles.metaRow}>
-                                <Text style={styles.appName}>OPOX</Text>
-                                <Text style={styles.timestamp}>ahora</Text>
+                        <View style={styles.header}>
+                            {/* Icono de la app — se mantiene la balanza (icono real
+                                de OPOX para contenido legal) en vez del glifo
+                                genérico de marcador de posición del mockup. */}
+                            <View style={styles.appIcon}>
+                                <MaterialCommunityIcons
+                                    name="scale-balance"
+                                    size={17}
+                                    color={colors.white}
+                                />
                             </View>
-                            <Text style={styles.alertTitle}>{title}</Text>
-                            <Text style={styles.alertBody} numberOfLines={3}>
-                                {body.replace(/\. Toca.*$/, '.')}
-                                {body.includes('Toca') && (
-                                    <Text style={styles.bodyHighlight}>
-                                        {' Toca para ver el cambio y hacer un mini-test.'}
-                                    </Text>
-                                )}
-                            </Text>
+                            <Text style={styles.appName}>Opox.ai</Text>
+                            <View style={styles.spacer} />
+                            <Text style={styles.time}>ahora</Text>
+                            <TouchableOpacity
+                                onPress={onDismiss}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                accessibilityLabel="Cerrar notificación"
+                            >
+                                <Ionicons name="close" size={14} color={FIGMA.subtitleMuted} />
+                            </TouchableOpacity>
                         </View>
 
-                        {/* Punto verde "nueva notificación" */}
-                        <View style={styles.newDot} />
+                        <Text style={styles.alertTitle}>{title}</Text>
+                        <Text style={styles.alertBody} numberOfLines={3}>{body}</Text>
                     </TouchableOpacity>
                 </Animated.View>
             </TouchableOpacity>
@@ -148,75 +155,57 @@ const styles = StyleSheet.create({
         maxWidth: 400,
     },
     card: {
-        backgroundColor: colors.card,
+        backgroundColor: 'rgba(255,255,255,0.92)',
         borderRadius: 16,
-        padding: spacing.md,
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: spacing.md,
+        padding: 14,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.18,
         shadowRadius: 12,
         elevation: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.05)',
     },
 
-    // ── App icon ──────────────────────────────────────────────────
-    appIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: '#E2483D', // acento BOE
-        justifyContent: 'center',
+    // ── Encabezado: ícono + nombre app + hora + cerrar ─────────────
+    header: {
+        flexDirection: 'row',
         alignItems: 'center',
-        flexShrink: 0,
+    },
+    appIcon: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        backgroundColor: colors.accentOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    appName: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.textDark,
+        marginLeft: 8,
+    },
+    spacer: {
+        flex: 1,
+    },
+    time: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 10,
+        color: FIGMA.subtitleMuted,
+        marginRight: 8,
     },
 
     // ── Texto ─────────────────────────────────────────────────────
-    textBlock: {
-        flex: 1,
-    },
-    metaRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 3,
-    },
-    appName: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: colors.text,
-        letterSpacing: 0.3,
-    },
-    timestamp: {
-        fontSize: 11,
-        color: colors.textSecondary,
-    },
     alertTitle: {
+        fontFamily: 'Poppins-Bold',
         fontSize: 15,
-        fontWeight: '800',
-        color: '#E2483D', // rojo para urgencia
-        marginBottom: 3,
+        color: colors.textDark,
+        marginTop: 8,
     },
     alertBody: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        lineHeight: 19,
-    },
-    bodyHighlight: {
-        color: colors.text,
-        fontWeight: '600',
-    },
-
-    // ── Punto verde "nuevo" ───────────────────────────────────────
-    newDot: {
-        width: 9,
-        height: 9,
-        borderRadius: 5,
-        backgroundColor: colors.success,
-        marginTop: 4,
-        flexShrink: 0,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.5,
+        color: FIGMA.bodyMuted,
+        marginTop: 2,
+        lineHeight: 17,
     },
 });
