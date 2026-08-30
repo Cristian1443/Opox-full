@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { authApi } from '../api';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authApi, settingsApi } from '../api';
 import { colors } from '../theme';
+
+const TONE_KEY = 'opox.ai.tone';
+const PERSONALITY_LABELS = { cercano: 'Cercano', equilibrado: 'Equilibrado', exigente: 'Exigente' };
 
 function getInitials(name) {
   if (!name) return '?';
@@ -18,16 +23,44 @@ function resetToSplash(navigation) {
 
 export default function SettingsScreen({ navigation }) {
   const [user, setUser] = useState(null);
+  const [toneLabel, setToneLabel] = useState('Equilibrado');
+  const [probLabel, setProbLabel] = useState(null); // null = sin datos aún
 
-  useEffect(() => {
-    authApi.me().then(({ data }) => { if (data) setUser(data); });
-  }, []);
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+
+    async function load() {
+      // Perfil de usuario
+      const { data } = await authApi.me();
+      if (!cancelled && data) setUser(data);
+
+      // Tono: AsyncStorage primero (rápido), luego backend como fuente de verdad
+      try {
+        const raw = await AsyncStorage.getItem(TONE_KEY);
+        if (!cancelled && raw) {
+          const parsed = JSON.parse(raw);
+          setToneLabel(PERSONALITY_LABELS[parsed.personality] ?? 'Equilibrado');
+        }
+      } catch { /* fallo silencioso */ }
+
+      const prefsRes = await settingsApi.getPreferences();
+      if (!cancelled && !prefsRes?.error && prefsRes?.data?.personality) {
+        setToneLabel(PERSONALITY_LABELS[prefsRes.data.personality] ?? 'Equilibrado');
+      }
+
+      // Probabilidad de aprobado desde pro-stats
+      const statsRes = await settingsApi.getProStats();
+      if (!cancelled && !statsRes?.error && statsRes?.data) {
+        setProbLabel(`${statsRes.data.passedProbabilityPct}% Prob. Aprobado`);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, []));
 
   const oposicionLine = [user?.oposicion, user?.especialidad].filter(Boolean).join(' · ')
     || 'Configura tu oposición';
-
-  // TODO: leer estado de suscripción real desde RevenueCat/backend
-  const subscriptionSubtext = 'Premium · renueva 14 jul';
 
   const SETTINGS = [
     {
@@ -44,23 +77,21 @@ export default function SettingsScreen({ navigation }) {
           id: 'suscripcion',
           title: 'Suscripción',
           icon: 'card-outline',
-          subtext: subscriptionSubtext,
+          subtext: 'Gestionar plan',
           onPress: () => navigation.navigate('ConfigSubscription'),
         },
         {
           id: 'dispositivos',
           title: 'Dispositivos conectados',
           icon: 'pulse-outline',
-          subtext: 'Sin dispositivos',
-          // TODO: cargar count real desde user_devices (Bloque 3)
+          subtext: 'Wearables y salud',
           onPress: () => navigation.navigate('ConfigDevices'),
         },
         {
           id: 'tono-ia',
           title: 'Tono de la IA',
           icon: 'chatbubbles-outline',
-          subtext: 'Equilibrado',
-          // TODO: leer preferencia desde perfil Supabase o AsyncStorage
+          subtext: toneLabel,
           onPress: () => navigation.navigate('ConfigTone'),
         },
       ],
@@ -72,16 +103,14 @@ export default function SettingsScreen({ navigation }) {
           id: 'estadisticas',
           title: 'Estadísticas Pro',
           icon: 'bar-chart-outline',
-          subtext: '78% Prob. Aprobado',
-          // TODO: calcular desde training_attempt_responses — endpoint GET /config/pro-stats
+          subtext: probLabel ?? 'Calculando…',
           onPress: () => navigation.navigate('ConfigStats'),
         },
         {
           id: 'accesibilidad',
           title: 'Accesibilidad',
           icon: 'accessibility-outline',
-          subtext: 'Tema automático',
-          // Preferencia local — AsyncStorage, no necesita backend
+          subtext: 'Tema y fuente',
           onPress: () => navigation.navigate('ConfigAccessibility'),
         },
         {
@@ -123,7 +152,6 @@ export default function SettingsScreen({ navigation }) {
               <Text style={styles.badgeText} numberOfLines={1}>{oposicionLine}</Text>
             </View>
           </View>
-          {/* Cerrar — va a la derecha (no back, Settings es un destino de tab) */}
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
@@ -164,7 +192,7 @@ export default function SettingsScreen({ navigation }) {
           </View>
         ))}
 
-        {/* ACCIONES DE SESIÓN — separadas por seguridad UX */}
+        {/* ACCIONES DE SESIÓN */}
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.logoutBtn}
@@ -257,7 +285,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  // Elimina borde inferior del último item para evitar doble línea con el grupo
   rowLast: { borderBottomWidth: 0 },
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
   rowTexts: { flex: 1 },
@@ -278,5 +305,4 @@ const styles = StyleSheet.create({
   logoutText: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
   deleteLink: { paddingVertical: 4 },
   deleteText: { fontSize: 13, fontWeight: '600', color: colors.error },
-
 });

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme';
+import { settingsApi } from '../../api';
 
 const TONE_KEY = 'opox.ai.tone';
 
@@ -31,16 +32,16 @@ const PREVIEW_TEXTS = {
   exigente:   '"Artículo 14 correcto. No bajes el ritmo. Siguiente."',
 };
 
-async function loadTone() {
+async function loadToneLocal() {
   try {
     const raw = await AsyncStorage.getItem(TONE_KEY);
-    return raw ? { ...DEFAULT_TONE, ...JSON.parse(raw) } : DEFAULT_TONE;
+    return raw ? { ...DEFAULT_TONE, ...JSON.parse(raw) } : null;
   } catch {
-    return DEFAULT_TONE;
+    return null;
   }
 }
 
-async function saveTone(tone) {
+async function saveToneLocal(tone) {
   try {
     await AsyncStorage.setItem(TONE_KEY, JSON.stringify(tone));
   } catch { /* fallo silencioso */ }
@@ -50,13 +51,42 @@ export default function ConfigToneScreen({ navigation }) {
   const [tone, setTone] = useState(DEFAULT_TONE);
 
   useEffect(() => {
-    loadTone().then(setTone);
+    let cancelled = false;
+    async function load() {
+      // 1. Cargar inmediatamente desde AsyncStorage para respuesta instantánea
+      const local = await loadToneLocal();
+      if (!cancelled && local) setTone(local);
+
+      // 2. Preferir datos del backend (source of truth multi-dispositivo)
+      const res = await settingsApi.getPreferences();
+      if (!cancelled && !res?.error && res?.data) {
+        const { personality, detailLevel, directHints, motivational } = res.data;
+        const fromBackend = {
+          personality:  personality  ?? DEFAULT_TONE.personality,
+          detailLevel:  detailLevel  ?? DEFAULT_TONE.detailLevel,
+          directHints:  directHints  ?? DEFAULT_TONE.directHints,
+          motivational: motivational ?? DEFAULT_TONE.motivational,
+        };
+        setTone(fromBackend);
+        saveToneLocal(fromBackend);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   const update = useCallback((patch) => {
     setTone((prev) => {
       const next = { ...prev, ...patch };
-      saveTone(next);
+      // Persistir localmente de forma síncrona para UX instantánea
+      saveToneLocal(next);
+      // Sincronizar con backend en background
+      settingsApi.updatePreferences({
+        personality:  next.personality,
+        detailLevel:  next.detailLevel,
+        directHints:  next.directHints,
+        motivational: next.motivational,
+      }).catch(() => { /* error silencioso — ya está en AsyncStorage */ });
       return next;
     });
   }, []);

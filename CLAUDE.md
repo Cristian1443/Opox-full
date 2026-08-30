@@ -456,6 +456,13 @@ las crea con defaults (`equilibrado`, `detailLevel:1`, `theme:auto`, `fontScale:
 Valida `personality` ∈ `{cercano,equilibrado,exigente}`, `theme` ∈ `{auto,light,dark}`,
 `detailLevel` ∈ `{0,1,2}`.
 
+**Mapeo mobile → backend para accesibilidad** (revisión 2026-08-30):
+- Mobile `'claro'/'oscuro'` → API `'light'/'dark'` (CHECK constraint lo exige).
+- Mobile `'pequeno'/'medio'/'grande'` → API `fontScale: 0.85/1.0/1.15`.
+- Mobile `reduceAnimations` → API `reduceMotion`.
+- `highContrast` no tiene columna en backend → solo persiste en `AsyncStorage('opox.accessibility')`.
+Los mapeos están en `ConfigAccessibilityScreen.js` (`THEME_TO_API`, `FONT_TO_SCALE`, etc.).
+
 **`GET /config/pro-stats`**: calcula en tiempo real desde `training_attempt_responses`
 (agregación por `topic_id`) + streak desde `user_gamification`. Devuelve
 `accuracyPct`, `passedProbabilityPct` (heurística: accuracy×0.85 + streak×0.5),
@@ -618,7 +625,7 @@ pnpm lint                       # lint completo
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
 | 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-28: motor earn automático por tests (1 O/acierto × multiplicador, cap 100 O/día), mini-test BOE hasta 5 O, `getTodayTestEarnings` en repo. Revisión 2026-08-27: puente earn→ledger, `POST /store/discounts/:id/redeem`, 8 pantallas sin mocks, canje por `redeemType`, fixes tabs UI. |
-| 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
+| 12 | Configuración | Frontend + backend completo. Revisión 2026-08-30: 6 gaps cerrados — feedback → endpoint real, tono IA sincronizado con backend (multi-dispositivo), accesibilidad con mapeo enum mobile↔backend, stats con datos reales de training_attempt_responses, subtextos del menú maestro desde API, export modal honesto. Gaps pendientes: ThemeContext global, chat soporte (Intercom), RevenueCat (suscripción), Bloque 3 (dispositivos), tono→TutorChat, velocidad en radar. |
 | 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import FeedbackSuccessModal from './FeedbackSuccessModal';
+import { settingsApi } from '../../api';
 
 const MAX_CHARS = 500;
 
@@ -50,8 +51,11 @@ export default function ConfigFeedbackScreen({ navigation }) {
 
     setIsSubmitting(true);
     try {
-      // TODO: POST /config/feedback — body: { type: selectedType, message }
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const res = await settingsApi.submitFeedback({ type: selectedType, message: message.trim() });
+      if (res?.error) {
+        Alert.alert('Error', 'No se pudo enviar el feedback. Inténtalo de nuevo.');
+        return;
+      }
       setMessage('');
       setSelectedType('suggestion');
       setShowModal(true);

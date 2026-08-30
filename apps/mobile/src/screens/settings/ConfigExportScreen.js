@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
-  Switch, Alert, ActivityIndicator, Share,
+  Switch, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import ReportSuccessModal from './ReportSuccessModal';
+import { settingsApi } from '../../api';
 
 // TODO: implementar generación real → POST /config/pro-stats/export
 // Body: { period, includeProbability, includeSoftSkills, includeHistory, includeEvolution }
@@ -78,26 +79,6 @@ export default function ConfigExportScreen({ navigation }) {
 
   const periodLabel = PERIOD_OPTIONS.find((p) => p.key === period)?.label || period;
 
-  const handleModalShare = async () => {
-    setShowModal(false);
-    try {
-      // TODO: reemplazar message/url por el PDF real cuando exista el endpoint
-      await Share.share({
-        title: 'Mi informe OPOX',
-        message: 'Adjunto mi informe de rendimiento generado con OPOX.',
-        // url: pdfUrl,
-      });
-    } catch {
-      // el usuario canceló el share — no es un error
-    }
-  };
-
-  const handleModalSave = () => {
-    setShowModal(false);
-    // TODO: expo-file-system → guardar PDF en Downloads cuando exista el endpoint
-    Alert.alert('Próximamente', 'La descarga directa estará disponible en la siguiente versión.');
-  };
-
   const toggleInclude = (key) => {
     setIncludes((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -111,8 +92,12 @@ export default function ConfigExportScreen({ navigation }) {
 
     setIsGenerating(true);
     try {
-      // TODO: reemplazar por llamada real → POST /config/pro-stats/export
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const periodMap = { mes: 'month', trimestre: 'all', todo: 'all' };
+      const res = await settingsApi.exportProStats(periodMap[period] ?? 'month');
+      if (res?.error) {
+        Alert.alert('Error', 'No se pudo procesar la solicitud. Inténtalo de nuevo.');
+        return;
+      }
       setShowModal(true);
     } finally {
       setIsGenerating(false);
@@ -199,8 +184,6 @@ export default function ConfigExportScreen({ navigation }) {
       <ReportSuccessModal
         visible={showModal}
         periodLabel={periodLabel}
-        onShare={handleModalShare}
-        onSave={handleModalSave}
         onClose={() => setShowModal(false)}
       />
     </SafeAreaView>

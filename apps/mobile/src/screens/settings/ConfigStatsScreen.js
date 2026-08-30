@@ -1,29 +1,12 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../../theme';
-
-// TODO: cargar desde GET /config/pro-stats (training_attempt_responses + training_error_patterns)
-const MOCK_STATS = {
-  probability: 78,
-  trend: '+6%',
-  trendLabel: 'este mes · vas por buen camino',
-  softSkills: [
-    { key: 'memoria', label: 'Memoria', value: 78 },
-    { key: 'resistencia', label: 'Resistencia', value: 65 },
-    { key: 'velocidad', label: 'Velocidad', value: 82 },
-    { key: 'concentracion', label: 'Concentr.', value: 70 },
-    { key: 'conocimiento', label: 'Conocim.', value: 85 },
-  ],
-  laws: [
-    { name: 'Constitución', percent: 95 },
-    { name: 'Ley 39/2015', percent: 88 },
-    { name: 'Ley 40/2015', percent: 72 },
-  ],
-};
+import { settingsApi } from '../../api';
 
 // Posiciones del pentágono para el radar (relativas a un contenedor 200×200)
 // Ángulo inicial a las 12h (top center), sentido horario
@@ -35,14 +18,50 @@ const PENTAGON = [
   { dx: -68,  dy: -22 },  // upper-left
 ];
 
-// Escala el radio según el valor (0-100) sobre el radio máximo
 function scaledPos(index, value) {
   const base = PENTAGON[index];
   const scale = value / 100;
   return { x: 100 + base.dx * scale, y: 100 + base.dy * scale };
 }
 
-// Barra de progreso por ley como sub-componente para evitar estilos función
+// Deriva heurísticas de soft-skills a partir de las stats reales disponibles
+function deriveSoftSkills(stats) {
+  const {
+    accuracyPct = 0,
+    studyStreakDays = 0,
+    topicsAttempted = 0,
+    topicsStrong = 0,
+    topicBreakdown = [],
+  } = stats;
+
+  // Consistencia de memoria: promedio ponderado de accuracy por tema
+  const memoriaScore = topicBreakdown.length > 0
+    ? Math.round(topicBreakdown.reduce((acc, t) => acc + t.accuracyPct, 0) / topicBreakdown.length)
+    : accuracyPct;
+
+  // Resistencia: streak (30 días → 100%)
+  const resistenciaScore = Math.min(Math.round(studyStreakDays * 100 / 30), 100);
+
+  // Conocimientos: accuracy global
+  const conocimientoScore = accuracyPct;
+
+  // Concentración: % de temas fuertes sobre temas intentados
+  const concentracionScore = topicsAttempted > 0
+    ? Math.round((topicsStrong / topicsAttempted) * 100)
+    : 0;
+
+  // Velocidad: no hay datos de tiempo → valor fijo representativo del mercado
+  const velocidadScore = 0;
+
+  return [
+    { key: 'memoria',       label: 'Memoria',    value: memoriaScore },
+    { key: 'resistencia',   label: 'Resistencia', value: resistenciaScore },
+    { key: 'conocimiento',  label: 'Conocim.',   value: conocimientoScore },
+    { key: 'concentracion', label: 'Concentr.',  value: concentracionScore },
+    { key: 'velocidad',     label: 'Velocidad',  value: velocidadScore },
+  ];
+}
+
 function LawBar({ name, percent, isLast }) {
   const barColor = percent >= 85 ? colors.success : percent >= 65 ? '#3B82F6' : colors.error;
   return (
@@ -58,7 +77,6 @@ function LawBar({ name, percent, isLast }) {
   );
 }
 
-// Cabecera de sección con icono (inválido poner Ionicons dentro de Text en RN)
 function SectionHeader({ icon, iconColor, title }) {
   return (
     <View style={styles.sectionHeader}>
@@ -68,12 +86,41 @@ function SectionHeader({ icon, iconColor, title }) {
   );
 }
 
-export default function ConfigStatsScreen({ navigation }) {
-  const stats = MOCK_STATS;
+function StatPill({ label, value, color }) {
+  return (
+    <View style={[styles.statPill, { borderColor: color }]}>
+      <Text style={[styles.statPillValue, { color }]}>{value}</Text>
+      <Text style={styles.statPillLabel}>{label}</Text>
+    </View>
+  );
+}
 
-  const handleExport = () => {
-    navigation.navigate('ConfigExport');
-  };
+export default function ConfigStatsScreen({ navigation }) {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const res = await settingsApi.getProStats();
+      if (!cancelled) {
+        if (!res?.error && res?.data) {
+          setStats(res.data);
+        }
+        setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []));
+
+  const handleExport = () => navigation.navigate('ConfigExport');
+
+  const softSkills = stats ? deriveSoftSkills(stats) : [];
+  const avgSkill = softSkills.length > 0
+    ? softSkills.reduce((a, s) => a + s.value, 0) / softSkills.length
+    : 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -101,80 +148,111 @@ export default function ConfigStatsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Calculando estadísticas…</Text>
+        </View>
+      ) : !stats ? (
+        <View style={styles.loadingContainer}>
+          <Ionicons name="bar-chart-outline" size={48} color="#CBD5E1" />
+          <Text style={styles.emptyText}>Completa algunos tests para ver tus estadísticas.</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* PROBABILIDAD DE APROBADO */}
-        <View style={styles.card}>
-          <SectionHeader icon="trending-up-outline" iconColor={colors.success} title="Probabilidad de Aprobado" />
-          <View style={styles.probCenter}>
-            <Text style={styles.probValue}>{stats.probability}%</Text>
-            <Text style={styles.probLabel}>NIVEL DE CONFIANZA</Text>
-            <View style={styles.trendBadge}>
-              <Ionicons name="arrow-up" size={13} color={colors.success} />
-              <Text style={styles.trendText}>
-                {stats.trend} {stats.trendLabel}
-              </Text>
+          {/* PROBABILIDAD DE APROBADO */}
+          <View style={styles.card}>
+            <SectionHeader icon="trending-up-outline" iconColor={colors.success} title="Probabilidad de Aprobado" />
+            <View style={styles.probCenter}>
+              <Text style={styles.probValue}>{stats.passedProbabilityPct}%</Text>
+              <Text style={styles.probLabel}>NIVEL DE CONFIANZA</Text>
+              <View style={styles.pillRow}>
+                <StatPill label="Preguntas" value={stats.totalQuestions} color="#3B82F6" />
+                <StatPill label="Acierto" value={`${stats.accuracyPct}%`} color={colors.success} />
+                <StatPill label="Racha" value={`${stats.studyStreakDays}d`} color="#F59E0B" />
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* SOFT SKILLS — Radar visual aproximado */}
-        <View style={styles.card}>
-          <SectionHeader icon="stats-chart-outline" iconColor="#3B82F6" title="Soft Skills" />
-          <View style={styles.radarContainer}>
-            {/* Círculos de referencia */}
-            {[1, 0.66, 0.33].map((scale) => (
-              <View
-                key={scale}
-                style={[styles.radarRing, {
-                  width: 160 * scale,
-                  height: 160 * scale,
-                  borderRadius: 80 * scale,
-                  marginLeft: -(160 * scale) / 2,
-                  marginTop: -(160 * scale) / 2,
-                }]}
-              />
-            ))}
-
-            {/* Labels de skills posicionadas en pentágono */}
-            {stats.softSkills.map((skill, idx) => {
-              const pos = scaledPos(idx, 100); // label siempre en borde exterior
-              return (
+          {/* SOFT SKILLS — Radar visual */}
+          <View style={styles.card}>
+            <SectionHeader icon="stats-chart-outline" iconColor="#3B82F6" title="Soft Skills" />
+            <View style={styles.radarContainer}>
+              {[1, 0.66, 0.33].map((scale) => (
                 <View
-                  key={skill.key}
-                  style={[styles.radarLabel, { left: pos.x - 26, top: pos.y - 16 }]}
-                >
-                  <Text style={styles.radarLabelText}>{skill.label}</Text>
-                  <Text style={styles.radarLabelValue}>{skill.value}</Text>
-                </View>
-              );
-            })}
+                  key={scale}
+                  style={[styles.radarRing, {
+                    width: 160 * scale,
+                    height: 160 * scale,
+                    borderRadius: 80 * scale,
+                    marginLeft: -(160 * scale) / 2,
+                    marginTop: -(160 * scale) / 2,
+                  }]}
+                />
+              ))}
 
-            {/* Polígono de datos aproximado — círculo interior coloreado escalado al promedio */}
-            <View style={[styles.radarData, {
-              width: 160 * (stats.softSkills.reduce((a, s) => a + s.value, 0) / stats.softSkills.length / 100),
-              height: 160 * (stats.softSkills.reduce((a, s) => a + s.value, 0) / stats.softSkills.length / 100),
-            }]} />
+              {softSkills.map((skill, idx) => {
+                const pos = scaledPos(idx, 100);
+                return (
+                  <View
+                    key={skill.key}
+                    style={[styles.radarLabel, { left: pos.x - 26, top: pos.y - 16 }]}
+                  >
+                    <Text style={styles.radarLabelText}>{skill.label}</Text>
+                    <Text style={[
+                      styles.radarLabelValue,
+                      skill.value === 0 && { color: '#CBD5E1' },
+                    ]}>
+                      {skill.value > 0 ? skill.value : '—'}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              <View style={[styles.radarData, {
+                width: 160 * (avgSkill / 100),
+                height: 160 * (avgSkill / 100),
+              }]} />
+            </View>
+            <Text style={styles.radarNote}>
+              Velocidad requiere datos de tiempo por pregunta (próximamente)
+            </Text>
           </View>
-          <Text style={styles.radarNote}>Evolución de tus habilidades blandas</Text>
-        </View>
 
-        {/* DOMINIO POR LEY */}
-        <View style={styles.card}>
-          <SectionHeader icon="book-outline" iconColor="#F59E0B" title="Dominio por Ley" />
-          <View style={styles.lawList}>
-            {stats.laws.map((law, idx) => (
-              <LawBar
-                key={law.name}
-                name={law.name}
-                percent={law.percent}
-                isLast={idx === stats.laws.length - 1}
-              />
-            ))}
+          {/* DOMINIO POR LEY — datos reales del backend */}
+          {stats.topicBreakdown.length > 0 && (
+            <View style={styles.card}>
+              <SectionHeader icon="book-outline" iconColor="#F59E0B" title="Dominio por Ley" />
+              <View style={styles.lawList}>
+                {stats.topicBreakdown.map((t, idx) => (
+                  <LawBar
+                    key={t.topicId}
+                    name={t.topic || t.topicId}
+                    percent={t.accuracyPct}
+                    isLast={idx === stats.topicBreakdown.length - 1}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* RESUMEN — temas fuertes / débiles */}
+          <View style={[styles.card, styles.summaryCard]}>
+            <View style={styles.summaryItem}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <Text style={styles.summaryLabel}>Temas dominados</Text>
+              <Text style={[styles.summaryValue, { color: colors.success }]}>{stats.topicsStrong}</Text>
+            </View>
+            <View style={[styles.summaryItem, styles.summaryItemLast]}>
+              <Ionicons name="alert-circle" size={20} color={colors.error} />
+              <Text style={styles.summaryLabel}>Temas a reforzar</Text>
+              <Text style={[styles.summaryValue, { color: colors.error }]}>{stats.topicsWeak}</Text>
+            </View>
           </View>
-        </View>
 
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -209,6 +287,17 @@ const styles = StyleSheet.create({
   },
   exportText: { fontSize: 14, fontWeight: '700', color: '#3B82F6' },
 
+  // Loading / empty
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 32,
+  },
+  loadingText: { fontSize: 14, color: '#64748B' },
+  emptyText: { fontSize: 15, color: '#64748B', textAlign: 'center', lineHeight: 22 },
+
   // Scroll
   scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, gap: 16 },
 
@@ -240,17 +329,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 4,
   },
-  trendBadge: {
-    flexDirection: 'row',
+
+  // Pills de stats
+  pillRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  statPill: {
+    flex: 1,
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    marginTop: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    backgroundColor: '#F8FAFC',
   },
-  trendText: { fontSize: 12, fontWeight: '600', color: colors.success },
+  statPillValue: { fontSize: 16, fontWeight: '800' },
+  statPillLabel: { fontSize: 10, fontWeight: '600', color: '#64748B', marginTop: 2 },
 
   // Radar
   radarContainer: {
@@ -298,4 +389,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 4 },
+
+  // Resumen
+  summaryCard: { padding: 0, overflow: 'hidden' },
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  summaryItemLast: { borderBottomWidth: 0 },
+  summaryLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  summaryValue: { fontSize: 18, fontWeight: '800' },
 });

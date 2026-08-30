@@ -7,18 +7,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme';
+import { settingsApi } from '../../api';
 
 const A11Y_KEY = 'opox.accessibility';
 
 const DEFAULT = {
-  theme: 'auto',       // 'claro' | 'auto' | 'oscuro'
+  theme: 'auto',       // 'claro' | 'auto' | 'oscuro'  (valores UI internos)
   fontSize: 'medio',   // 'pequeno' | 'medio' | 'grande'
-  highContrast: false,
+  highContrast: false, // solo local — no en backend
   reduceAnimations: false,
 };
 
-// TODO(bloque-12): propagar via ThemeContext para que afecte a todas las pantallas
-// Por ahora el screen hace preview local del tema seleccionado.
+// Mapeos entre valores UI y valores del backend
+const THEME_TO_API   = { claro: 'light', auto: 'auto', oscuro: 'dark' };
+const THEME_FROM_API = { light: 'claro', auto: 'auto', dark: 'oscuro' };
+const FONT_TO_SCALE  = { pequeno: 0.85, medio: 1.0, grande: 1.15 };
+function scaleToFont(scale) {
+  if (scale <= 0.9) return 'pequeno';
+  if (scale <= 1.05) return 'medio';
+  return 'grande';
+}
 
 const THEME_OPTIONS = [
   { key: 'claro', label: 'Claro', icon: 'sunny-outline' },
@@ -34,16 +42,16 @@ const FONT_SIZE_OPTIONS = [
 
 const PREVIEW_TEXT_SIZE = { pequeno: 13, medio: 16, grande: 20 };
 
-async function loadA11y() {
+async function loadA11yLocal() {
   try {
     const raw = await AsyncStorage.getItem(A11Y_KEY);
-    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
+    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : null;
   } catch {
-    return DEFAULT;
+    return null;
   }
 }
 
-async function saveA11y(prefs) {
+async function saveA11yLocal(prefs) {
   try {
     await AsyncStorage.setItem(A11Y_KEY, JSON.stringify(prefs));
   } catch { /* fallo silencioso */ }
@@ -54,13 +62,47 @@ export default function ConfigAccessibilityScreen({ navigation }) {
   const [prefs, setPrefs] = useState(DEFAULT);
 
   useEffect(() => {
-    loadA11y().then(setPrefs);
+    let cancelled = false;
+    async function load() {
+      // 1. AsyncStorage primero para respuesta instantánea
+      const local = await loadA11yLocal();
+      if (!cancelled && local) setPrefs(local);
+
+      // 2. Backend como source of truth (theme, fontScale, reduceMotion)
+      const res = await settingsApi.getPreferences();
+      if (!cancelled && !res?.error && res?.data) {
+        const { theme, fontScale, reduceMotion } = res.data;
+        const merged = {
+          ...(local ?? DEFAULT),
+          theme:           THEME_FROM_API[theme] ?? (local?.theme ?? DEFAULT.theme),
+          fontSize:        scaleToFont(fontScale ?? 1.0),
+          reduceAnimations: reduceMotion ?? (local?.reduceAnimations ?? false),
+          // highContrast permanece solo local
+        };
+        setPrefs(merged);
+        saveA11yLocal(merged);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   const update = useCallback((patch) => {
     setPrefs((prev) => {
       const next = { ...prev, ...patch };
-      saveA11y(next);
+      saveA11yLocal(next);
+
+      // Sincronizar con backend los campos soportados
+      const apiPatch = {};
+      if (patch.theme !== undefined)            apiPatch.theme       = THEME_TO_API[next.theme] ?? 'auto';
+      if (patch.fontSize !== undefined)         apiPatch.fontScale   = FONT_TO_SCALE[next.fontSize] ?? 1.0;
+      if (patch.reduceAnimations !== undefined) apiPatch.reduceMotion = next.reduceAnimations;
+      // highContrast no existe en backend → no se sincroniza
+
+      if (Object.keys(apiPatch).length > 0) {
+        settingsApi.updatePreferences(apiPatch)
+          .catch(() => { /* error silencioso — ya persistido localmente */ });
+      }
       return next;
     });
   }, []);
@@ -69,7 +111,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
   const isDark = prefs.theme === 'oscuro'
     || (prefs.theme === 'auto' && systemScheme === 'dark');
 
-  const D = isDark ? DARK : LIGHT; // tokens de color del tema activo
+  const D = isDark ? DARK : LIGHT;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: D.bg }]} edges={['top', 'left', 'right']}>
@@ -160,7 +202,6 @@ export default function ConfigAccessibilityScreen({ navigation }) {
               );
             })}
           </View>
-          {/* Preview del tamaño seleccionado */}
           <View style={[styles.previewText, { backgroundColor: D.bg }]}>
             <Text style={{ fontSize: PREVIEW_TEXT_SIZE[prefs.fontSize], color: D.text }}>
               Este es un ejemplo de texto con el tamaño seleccionado.

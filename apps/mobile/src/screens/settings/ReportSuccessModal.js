@@ -24,7 +24,7 @@ const COLORS = {
   buttonText: '#FFFFFF',
 };
 
-export default function ReportSuccessModal({ visible, periodLabel, onShare, onSave, onClose }) {
+export default function ReportSuccessModal({ visible, periodLabel, onClose }) {
   const slideAnim = useRef(new Animated.Value(height * 0.2)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -75,36 +75,20 @@ export default function ReportSuccessModal({ visible, periodLabel, onShare, onSa
               <Ionicons name="checkmark-circle" size={36} color={COLORS.success} />
             </View>
 
-            <Text style={styles.title}>Informe listo</Text>
+            <Text style={styles.title}>Solicitud enviada</Text>
             <Text style={styles.description}>
-              Tu PDF de rendimiento
-              {periodLabel ? ` de ${periodLabel.toLowerCase()}` : ''} se ha generado correctamente.
+              Tu informe{periodLabel ? ` de ${periodLabel.toLowerCase()}` : ''} se está generando.
+              Recibirás una notificación cuando esté listo para descargar.
             </Text>
 
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnPrimary]}
-                onPress={onShare}
-                activeOpacity={0.85}
-                accessibilityLabel="Compartir informe PDF"
-              >
-                <Ionicons name="share-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.btnText}>Compartir</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.btn, styles.btnSecondary]}
-                onPress={onSave}
-                activeOpacity={0.7}
-                accessibilityLabel="Guardar informe en el móvil"
-              >
-                <Ionicons name="download-outline" size={18} color={COLORS.primaryText} />
-                <Text style={styles.btnTextSecondary}>Guardar en el móvil</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} accessibilityLabel="Cerrar">
-              <Text style={styles.closeText}>Cerrar</Text>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPrimary]}
+              onPress={onClose}
+              activeOpacity={0.85}
+              accessibilityLabel="Cerrar"
+            >
+              <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+              <Text style={styles.btnText}>Entendido</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </Animated.View>
@@ -158,14 +142,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginHorizontal: 8,
   },
-  actions: {
-    width: '100%',
-    gap: 12,
-  },
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
     paddingVertical: 14,
     borderRadius: 12,
     gap: 8,
@@ -175,27 +156,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.buttonPrimary,
     borderColor: COLORS.buttonPrimary,
   },
-  btnSecondary: {
-    backgroundColor: 'transparent',
-    borderColor: COLORS.border,
-  },
   btnText: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.buttonText,
-  },
-  btnTextSecondary: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.primaryText,
-  },
-  closeBtn: {
-    marginTop: 12,
-    paddingVertical: 10,
-  },
-  closeText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.secondaryText,
   },
 });

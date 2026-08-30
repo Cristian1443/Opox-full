@@ -5,6 +5,79 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-30 — Bloque 12 · Revisión y conexión al backend
+
+Rama: `feat/revision-bloque-12-config`. Diagnóstico exhaustivo y corrección de 6 gaps
+críticos/moderados que dejaban las pantallas de configuración desconectadas del backend.
+
+### Gaps cerrados
+
+**GAP-12-04 · Feedback conectado al endpoint real**
+`ConfigFeedbackScreen` llamaba a `setTimeout` en lugar del API. Ahora llama
+`settingsApi.submitFeedback({ type, message })` contra `POST /config/feedback`, que
+inserta en `user_feedback` en Supabase. El feedback del usuario ya persiste en BD.
+
+**GAP-12-01 + GAP-12-06 · Tono de IA sincronizado con el backend**
+`ConfigToneScreen` guardaba solo en `AsyncStorage('opox.ai.tone')`. Ahora:
+- Al abrir: carga AsyncStorage primero (UX instantánea) y luego el backend como fuente
+  de verdad multi-dispositivo.
+- Al cambiar: persiste AsyncStorage síncronamente + `settingsApi.updatePreferences` en
+  background. Los campos `personality`, `detailLevel`, `directHints`, `motivational`
+  se sincronizan con `user_preferences` en Supabase.
+
+**GAP-12-02 + GAP-12-03 (enum) · Accesibilidad conectada + fix mismatch de esquema**
+`ConfigAccessibilityScreen` tenía tres desincronizaciones con el backend:
+- `'claro'/'oscuro'` → backend espera `'light'/'dark'` (CHECK constraint lo rechazaba)
+- `'pequeno'/'medio'/'grande'` → backend usa `fontScale: numeric` (0.85/1.0/1.15)
+- `reduceAnimations` → backend llama `reduceMotion`
+Añadidos mapeos bidireccionales `THEME_TO_API/FROM_API`, `FONT_TO_SCALE/scaleToFont`.
+`highContrast` no existe en el backend → sigue en AsyncStorage únicamente.
+La pantalla ahora carga del backend al entrar y sincroniza los campos soportados.
+
+**GAP-12-03 (stats) · ConfigStatsScreen con datos reales de `GET /config/pro-stats`**
+La pantalla mostraba `MOCK_STATS` estático. Ahora usa `useFocusEffect` +
+`settingsApi.getProStats()`. El gauge de probabilidad y las barras de dominio por ley
+muestran datos reales de `training_attempt_responses`. Las soft-skills se derivan
+heurísticamente de los datos disponibles:
+- Conocimientos → `accuracyPct`
+- Resistencia → `streakDays/30 × 100`
+- Memoria → promedio de accuracy por tema
+- Concentración → temas fuertes / temas intentados
+- Velocidad → 0 (requiere datos de tiempo por pregunta, aún sin implementar)
+
+**GAP-12-05 · SettingsScreen con subtextos reales**
+El menú maestro cargaba subtextos hardcodeados. Ahora usa `useFocusEffect` para cargar:
+- Tono IA: lee de AsyncStorage (instante) y luego del backend para confirmar.
+- Probabilidad: llama `settingsApi.getProStats()` y muestra el porcentaje real.
+- Suscripción y Dispositivos: subtextos genéricos (pendiente RevenueCat / Bloque 3).
+
+**GAP-12-08 · ReportSuccessModal honesto**
+El modal mostraba "Informe listo" con botones "Compartir"/"Guardar" cuando el PDF
+no existía (backend devuelve `downloadUrl: null`). Ahora dice "Solicitud enviada"
+con un único botón "Entendido", y `ConfigExportScreen` ya llama al endpoint real
+`settingsApi.exportProStats(period)`.
+
+### Gaps no resueltos (requieren trabajo externo)
+
+| Gap | Razón |
+|-----|-------|
+| GAP-12-07 ThemeContext global | Requiere refactor de App.js y todas las pantallas |
+| GAP-12-09 Chat de soporte | Requiere integración Intercom/Crisp/Zendesk |
+| GAP-12-10 Suscripción real | Requiere RevenueCat SDK |
+| GAP-12-11 Dispositivos reales | Requiere backend Bloque 3 (user_devices) |
+| GAP-12-12 Tono → TutorChat | Requiere que Bloque 8 lea `GetPreferencesUseCase` |
+| Velocidad en radar | Requiere columna de tiempo por pregunta en training_attempt_responses |
+
+### Estado tras la sesión
+
+- Feedback del usuario persiste en Supabase.
+- Preferencias de tono y accesibilidad sincronizadas en backend, multi-dispositivo.
+- Estadísticas pro muestran datos reales (probabilidad, accuracy, racha, dominio por ley).
+- Menú maestro muestra datos actualizados en cada visita.
+- Export PDF llama al endpoint real y comunica honestamente el estado pendiente.
+
+---
+
 ## 2026-08-26 — Merge rediseño Figma Bloques 8 y 9 en rama BOE
 
 Rama: `feat/revision-bloque-10-boe`. Integración de `feat/bloque-8-9-rediseno-figma`
