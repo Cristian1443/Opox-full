@@ -92,11 +92,12 @@ export class TutorController {
 
     sendMessage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const { content } = req.body as { content: string };
+            const { content, personality } = req.body as { content: string; personality?: string };
             const { userMessage, aiMessage } = await this.deps.sendMessage.execute({
                 conversationId: (req.params.id as string),
                 userId: req.authUser!.id,
                 content,
+                personality,
             });
             ok(res, 201, { userMessage: this.serializeMessage(userMessage), aiMessage: this.serializeMessage(aiMessage) });
         } catch (err) { next(err); }

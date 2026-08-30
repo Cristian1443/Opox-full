@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
-import { tutorApi } from '../../api';
+import { tutorApi, settingsApi } from '../../api';
 
 // Colores confirmados contra Figma (frame CHAT TUTOR IA, Bloque 8) sin
 // equivalente exacto en theme.js.
@@ -34,14 +34,25 @@ const FIGMA = {
 const nowTime = () =>
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-// Mensaje inicial dinámico: si viene con técnica del bloque 3, lo menciona
-const buildInitialMessages = (technique) => [
+// Saludo inicial adaptado por tono de IA
+function buildGreeting(technique, personality) {
+    if (technique) {
+        return `Hola, veo que vienes del módulo "${technique}". ¿Qué dudas tienes sobre este tema?`;
+    }
+    if (personality === 'cercano') {
+        return '¡Hola! Soy tu Tutor IA, ¡aquí estoy para lo que necesites! ¿Sobre qué tema del temario te puedo echar una mano hoy?';
+    }
+    if (personality === 'exigente') {
+        return 'Tutor IA disponible. Indica el tema del temario que necesitas trabajar.';
+    }
+    return '¡Hola! Soy tu Tutor IA. ¿Sobre qué tema del temario quieres que te eche una mano hoy?';
+}
+
+const buildInitialMessages = (technique, personality = 'equilibrado') => [
     {
         id: '0',
         isAI: true,
-        text: technique
-            ? `Hola, veo que vienes del módulo "${technique}". ¿Qué dudas tienes sobre este tema?`
-            : '¡Hola! Soy tu Tutor IA. ¿Sobre qué tema del temario quieres que te eche una mano hoy?',
+        text: buildGreeting(technique, personality),
         timestamp: nowTime(),
         actions: null,
     },
@@ -126,9 +137,18 @@ export default function TutorChatScreen({ navigation, route }) {
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const scrollRef = useRef(null);
     const conversationIdRef = useRef(null);
+    const personalityRef = useRef('equilibrado');
 
-    // Crea la conversación en el backend al montar la pantalla
+    // Crea la conversación y carga el tono de IA al montar la pantalla
     useEffect(() => {
+        settingsApi.getPreferences()
+            .then((res) => {
+                if (!res?.error && res?.data?.personality) {
+                    personalityRef.current = res.data.personality;
+                }
+            })
+            .catch(() => {});
+
         tutorApi.createConversation('Nueva conversación', technique)
             .then((res) => {
                 if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
@@ -155,7 +175,7 @@ export default function TutorChatScreen({ navigation, route }) {
         try {
             const cid = conversationIdRef.current;
             if (!cid) throw new Error('no-conv');
-            const res = await tutorApi.sendMessage(cid, userText);
+            const res = await tutorApi.sendMessage(cid, userText, personalityRef.current);
             if (res?.error || !res?.data) throw new Error('api-err');
             const ai = res.data.aiMessage;
             addMessage({
@@ -248,7 +268,7 @@ export default function TutorChatScreen({ navigation, route }) {
                             {
                                 text: 'Nueva conversación',
                                 onPress: async () => {
-                                    setMessages(buildInitialMessages(technique));
+                                    setMessages(buildInitialMessages(technique, personalityRef.current));
                                     setInputText('');
                                     try {
                                         const res = await tutorApi.createConversation('Nueva conversación', technique);

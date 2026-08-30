@@ -53,6 +53,7 @@ export interface ProStats {
     topicsStrong: number;   // accuracy >= 80 %
     topicsWeak: number;     // accuracy < 50 %
     topicBreakdown: ProStatsTopicBreakdown[];
+    avgSecsPerQuestion: number | null; // null = sin datos de tiempo todavía
     computedAt: string; // ISO
 }
 

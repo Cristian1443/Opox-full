@@ -1,103 +1,87 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
+  Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../../theme';
+import { healthApi } from '../../api';
 
-// TODO: cargar desde user_connected_devices — endpoint GET /health/devices (Bloque 3 backend pendiente)
-const MOCK_DEVICES = [
-  {
-    id: '1',
-    name: 'Apple Watch',
-    icon: 'watch-outline',
-    isConnected: true,
-    lastSync: '2 min',
-  },
-  {
-    id: '2',
-    name: 'Garmin',
-    icon: 'pulse-outline',
-    isConnected: false,
-    lastSync: null,
-  },
-];
+// Formatea una fecha ISO a "X min", "X h" o "X d" para mostrar como lastSync
+function formatRelative(isoString) {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 60) return `${Math.max(1, diffMin)} min`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `${diffH} h`;
+  return `${Math.round(diffH / 24)} d`;
+}
 
-function DeviceCard({ device, onConnect, onDisconnect }) {
+function DeviceCard({ device, onDisconnect }) {
   return (
     <View style={styles.deviceCard}>
       <View style={styles.deviceLeft}>
-        <View style={[
-          styles.deviceIcon,
-          device.isConnected && styles.deviceIconConnected,
-        ]}>
-          <Ionicons
-            name={device.icon}
-            size={26}
-            color={device.isConnected ? '#3B82F6' : '#CBD5E1'}
-          />
+        <View style={styles.deviceIconConnected}>
+          <Ionicons name={device.icon || 'watch-outline'} size={26} color="#3B82F6" />
         </View>
         <View style={styles.deviceInfo}>
-          <Text style={styles.deviceName}>{device.name}</Text>
-          {device.isConnected
-            ? (
-              <Text style={styles.statusConnected}>
-                Sincronizado hace {device.lastSync}
-              </Text>
-            ) : (
-              <Text style={styles.statusDisconnected}>No conectado</Text>
-            )
-          }
+          <Text style={styles.deviceName}>{device.deviceName}</Text>
+          <Text style={styles.statusConnected}>
+            Conectado hace {formatRelative(device.connectedAt)}
+          </Text>
         </View>
       </View>
 
-      {device.isConnected ? (
-        <TouchableOpacity
-          style={styles.disconnectBtn}
-          onPress={() => onDisconnect(device.id)}
-          activeOpacity={0.7}
-          accessibilityLabel={`Quitar ${device.name}`}
-        >
-          <Text style={styles.disconnectText}>Quitar</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          style={styles.connectBtn}
-          onPress={() => onConnect(device.id)}
-          activeOpacity={0.7}
-          accessibilityLabel={`Conectar ${device.name}`}
-        >
-          <Text style={styles.connectText}>Conectar</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={styles.disconnectBtn}
+        onPress={() => onDisconnect(device)}
+        activeOpacity={0.7}
+        accessibilityLabel={`Quitar ${device.deviceName}`}
+      >
+        <Text style={styles.disconnectText}>Quitar</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 export default function ConfigDevicesScreen({ navigation }) {
-  const [devices, setDevices] = useState(MOCK_DEVICES);
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Conectar → reutiliza el flujo de pairing del Bloque 3 (ya implementado)
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const res = await healthApi.getDevices();
+      if (!cancelled) {
+        setDevices(!res?.error && Array.isArray(res?.data) ? res.data : []);
+        setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []));
+
   const handleConnect = () => {
     navigation.navigate('ConnectDevice');
   };
 
-  const handleDisconnect = (id) => {
-    const device = devices.find((d) => d.id === id);
+  const handleDisconnect = (device) => {
     Alert.alert(
       'Quitar dispositivo',
-      `¿Seguro que quieres desconectar ${device?.name}? Dejarás de recibir datos de fatiga.`,
+      `¿Seguro que quieres desconectar ${device.deviceName}? Dejarás de recibir datos de fatiga.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Quitar',
           style: 'destructive',
-          onPress: () => {
-            // TODO: llamar a endpoint DELETE /health/devices/:id (Bloque 3 backend)
-            setDevices((prev) =>
-              prev.map((d) => d.id === id ? { ...d, isConnected: false, lastSync: null } : d),
-            );
+          onPress: async () => {
+            const res = await healthApi.deleteDevice(device.id);
+            if (!res?.error) {
+              setDevices((prev) => prev.filter((d) => d.id !== device.id));
+            }
           },
         },
       ],
@@ -131,23 +115,46 @@ export default function ConfigDevicesScreen({ navigation }) {
           Tus datos de salud se procesan de forma segura. Puedes desconectar cuando quieras.
         </Text>
 
-        {devices.length > 0 ? (
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : devices.length > 0 ? (
           <View style={styles.deviceList}>
             {devices.map((device) => (
               <DeviceCard
                 key={device.id}
                 device={device}
-                onConnect={handleConnect}
                 onDisconnect={handleDisconnect}
               />
             ))}
           </View>
         ) : (
-          // Estado vacío — cuando no hay ningún dispositivo en la lista
           <View style={styles.emptyState}>
             <Ionicons name="watch-outline" size={48} color="#CBD5E1" />
             <Text style={styles.emptyText}>No tienes dispositivos conectados.</Text>
+            <TouchableOpacity
+              style={styles.connectBtnLarge}
+              onPress={handleConnect}
+              activeOpacity={0.85}
+              accessibilityLabel="Conectar dispositivo"
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.connectBtnText}>Conectar dispositivo</Text>
+            </TouchableOpacity>
           </View>
+        )}
+
+        {devices.length > 0 && (
+          <TouchableOpacity
+            style={styles.addMore}
+            onPress={handleConnect}
+            activeOpacity={0.7}
+            accessibilityLabel="Añadir otro dispositivo"
+          >
+            <Ionicons name="add-circle-outline" size={18} color="#3B82F6" />
+            <Text style={styles.addMoreText}>Añadir dispositivo</Text>
+          </TouchableOpacity>
         )}
 
       </ScrollView>
@@ -158,7 +165,6 @@ export default function ConfigDevicesScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -172,7 +178,6 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: '#1E293B' },
   headerRight: { width: 40 },
 
-  // Intro
   scroll: { paddingBottom: 40 },
   description: {
     fontSize: 14,
@@ -191,10 +196,10 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  // Lista de dispositivos
+  loadingBox: { alignItems: 'center', marginTop: 40 },
+
   deviceList: { marginTop: 16, gap: 10, paddingHorizontal: 16 },
 
-  // Card de dispositivo
   deviceCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -206,30 +211,19 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   deviceLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  deviceIcon: {
+  deviceIconConnected: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
-  deviceIconConnected: { backgroundColor: '#EFF6FF' },
   deviceInfo: { flex: 1 },
   deviceName: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 3 },
   statusConnected: { fontSize: 12, fontWeight: '500', color: colors.success },
-  statusDisconnected: { fontSize: 12, color: '#64748B' },
 
-  // Botones de acción
-  connectBtn: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginLeft: 12,
-  },
-  connectText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
   disconnectBtn: {
     backgroundColor: '#FEE2E2',
     borderWidth: 1,
@@ -241,11 +235,27 @@ const styles = StyleSheet.create({
   },
   disconnectText: { fontSize: 13, fontWeight: '700', color: colors.error },
 
-  // Estado vacío
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 60,
-    gap: 12,
-  },
+  emptyState: { alignItems: 'center', marginTop: 60, gap: 12, paddingHorizontal: 24 },
   emptyText: { fontSize: 15, color: '#64748B', textAlign: 'center' },
+  connectBtnLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  connectBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+
+  addMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  addMoreText: { fontSize: 14, fontWeight: '600', color: '#3B82F6' },
 });

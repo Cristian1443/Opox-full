@@ -5,6 +5,8 @@
 
 export const API_ROUTES = {
     HEALTH: '/health',
+    HEALTH_DEVICES: '/health/devices',
+    HEALTH_DEVICE: '/health/devices/:deviceId',
 
     AUTH: {
         REGISTER: '/auth/register',

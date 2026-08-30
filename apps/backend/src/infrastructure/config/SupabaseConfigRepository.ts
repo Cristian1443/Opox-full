@@ -89,7 +89,7 @@ export class SupabaseConfigRepository implements IConfigRepository {
         // Agregación sobre training_attempt_responses (una fila por pregunta respondida)
         const { data: rows, error } = await this.db
             .from('training_attempt_responses')
-            .select('topic_id, topic, is_correct')
+            .select('topic_id, topic, is_correct, time_secs')
             .eq('user_id', userId);
 
         if (error) logger.error('[config-repo] getProStats responses', { error });
@@ -102,7 +102,7 @@ export class SupabaseConfigRepository implements IConfigRepository {
             .maybeSingle();
         const streakDays = (gam as { streak_days?: number } | null)?.streak_days ?? 0;
 
-        const safeRows = (rows ?? []) as Array<{ topic_id: string; topic: string; is_correct: boolean }>;
+        const safeRows = (rows ?? []) as Array<{ topic_id: string; topic: string; is_correct: boolean; time_secs: number | null }>;
 
         // Totales globales
         const totalQuestions = safeRows.length;
@@ -138,6 +138,11 @@ export class SupabaseConfigRepository implements IConfigRepository {
         const topicsStrong = topicBreakdown.filter(t => t.accuracyPct >= 80).length;
         const topicsWeak   = topicBreakdown.filter(t => t.accuracyPct < 50).length;
 
+        const rowsWithTime = safeRows.filter(r => r.time_secs != null);
+        const avgSecsPerQuestion = rowsWithTime.length > 0
+            ? Math.round(rowsWithTime.reduce((sum, r) => sum + (r.time_secs as number), 0) / rowsWithTime.length)
+            : null;
+
         return {
             totalQuestions,
             correctQuestions,
@@ -148,6 +153,7 @@ export class SupabaseConfigRepository implements IConfigRepository {
             topicsStrong,
             topicsWeak,
             topicBreakdown,
+            avgSecsPerQuestion,
             computedAt: new Date(),
         };
     }

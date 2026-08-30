@@ -50,8 +50,10 @@ function deriveSoftSkills(stats) {
     ? Math.round((topicsStrong / topicsAttempted) * 100)
     : 0;
 
-  // Velocidad: no hay datos de tiempo → valor fijo representativo del mercado
-  const velocidadScore = 0;
+  // Velocidad: tiempo medio por pregunta (≤30 s → 100%, 90 s → 0%)
+  const velocidadScore = stats.avgSecsPerQuestion != null
+    ? Math.max(0, Math.min(100, Math.round(100 - (stats.avgSecsPerQuestion / 90) * 100)))
+    : 0;
 
   return [
     { key: 'memoria',       label: 'Memoria',    value: memoriaScore },
@@ -215,9 +217,11 @@ export default function ConfigStatsScreen({ navigation }) {
                 height: 160 * (avgSkill / 100),
               }]} />
             </View>
-            <Text style={styles.radarNote}>
-              Velocidad requiere datos de tiempo por pregunta (próximamente)
-            </Text>
+            {stats.avgSecsPerQuestion == null && (
+              <Text style={styles.radarNote}>
+                Completa tests para ver tu velocidad media por pregunta
+              </Text>
+            )}
           </View>
 
           {/* DOMINIO POR LEY — datos reales del backend */}
