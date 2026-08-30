@@ -57,24 +57,53 @@ no existía (backend devuelve `downloadUrl: null`). Ahora dice "Solicitud enviad
 con un único botón "Entendido", y `ConfigExportScreen` ya llama al endpoint real
 `settingsApi.exportProStats(period)`.
 
-### Gaps no resueltos (requieren trabajo externo)
+### Gaps cerrados (segunda pasada — mismo día)
+
+**A · Tono IA → TutorChat**
+`TutorChatScreen` carga `settingsApi.getPreferences()` en el mount y guarda `personality`
+en un ref. Cada `sendMessage` pasa el tono al backend. `tutorApi.sendMessage` acepta
+`personality` como tercer param opcional. `sendMessageBody` Zod amplía el schema con
+`personality?: enum`. `buildStubAiResponse` varía el texto según cercano/equilibrado/exigente.
+`buildInitialMessages` también varía el saludo inicial por tono.
+
+**B · Velocidad en radar de soft-skills**
+`QuestionActiveScreen` rastrea `questionStartTimeRef = Date.now()`, se resetea en cada
+cambio de pregunta y registra `timeSecs` en el array `answers` al confirmar o agotar tiempo.
+`TrainingResultScreen.buildResponses` incluye `timeSecs` en cada respuesta → persiste en
+`training_attempt_responses.time_secs` (columna ya existente). `getProStats` amplía el
+select con `time_secs`, calcula `avgSecsPerQuestion` (null si no hay datos) y lo devuelve.
+`ConfigStatsScreen.deriveSoftSkills` usa `stats.avgSecsPerQuestion` (fórmula: `max(0, 100 - avg/90*100)`)
+en lugar de 0 fijo. La nota del radar se muestra solo si aún no hay datos de velocidad.
+
+**D · Dispositivos conectados con backend real**
+- SQL: `bloque3_health_devices.sql` — tabla `user_connected_devices` con RLS owner-all.
+- Dominio: entidad `UserDevice`, interfaz `IHealthRepository`, 3 use cases
+  (`GetDevicesUseCase`, `RegisterDeviceUseCase`, `DeleteDeviceUseCase`).
+- Infra: `SupabaseHealthRepository` (get/upsert por `user_id+platform`/delete).
+- Presentación: `HealthController` ampliado (GET/POST/DELETE `/health/devices`),
+  `healthRoutes.ts` actualizado, `server.ts` pasa controller + authMiddleware.
+- Container: `healthRepo` instanciado, use cases y controller cableados.
+- Mobile: `healthApi` en `apps/mobile/src/api/health.js`, exportado del barrel.
+  `ConfigDevicesScreen` reescrito sin mocks — `useFocusEffect` + `healthApi.getDevices()`.
+  `PairingScreen` registra el dispositivo en el backend fire-and-forget al completar permisos.
+- Constantes: `HEALTH_DEVICES` y `HEALTH_DEVICE` añadidas a `API_ROUTES`.
+
+### Gaps pendientes
 
 | Gap | Razón |
 |-----|-------|
-| GAP-12-07 ThemeContext global | Requiere refactor de App.js y todas las pantallas |
+| C · ThemeContext global | Requiere refactor de App.js y todas las pantallas (espera diseño aprobado) |
 | GAP-12-09 Chat de soporte | Requiere integración Intercom/Crisp/Zendesk |
 | GAP-12-10 Suscripción real | Requiere RevenueCat SDK |
-| GAP-12-11 Dispositivos reales | Requiere backend Bloque 3 (user_devices) |
-| GAP-12-12 Tono → TutorChat | Requiere que Bloque 8 lea `GetPreferencesUseCase` |
-| Velocidad en radar | Requiere columna de tiempo por pregunta en training_attempt_responses |
+| GAP-12-07 PDF real en Export | Requiere pdfkit/puppeteer en backend (`TODO(bloque-12)`) |
 
-### Estado tras la sesión
+### Estado final de la rama
 
-- Feedback del usuario persiste en Supabase.
-- Preferencias de tono y accesibilidad sincronizadas en backend, multi-dispositivo.
-- Estadísticas pro muestran datos reales (probabilidad, accuracy, racha, dominio por ley).
-- Menú maestro muestra datos actualizados en cada visita.
-- Export PDF llama al endpoint real y comunica honestamente el estado pendiente.
+- Feedback, tono y accesibilidad sincronizados con backend.
+- Estadísticas pro con datos reales incluyendo velocidad por pregunta.
+- Dispositivos conectados persistidos en Supabase, ConfigDevicesScreen sin mocks.
+- Tono de IA se propaga a TutorChat en tiempo real.
+- SQL pendiente de correr en Supabase: `bloque3_health_devices.sql`.
 
 ---
 
