@@ -50,10 +50,25 @@ function toDomainNotification(row: NotificationRow): Notification {
     });
 }
 
+function todayUtc(): string {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayUtc(): string {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+}
+
 function toDomainGamification(row: GamificationRow): UserGamification {
+    const last = row.last_activity_date;
+    const today = todayUtc();
+    const yesterday = yesterdayUtc();
+    // La racha caduca si la última actividad no fue hoy ni ayer (UTC)
+    const effectiveStreak = (last === today || last === yesterday) ? row.current_streak : 0;
     return UserGamification.create({
         userId: row.user_id,
-        currentStreak: row.current_streak,
+        currentStreak: effectiveStreak,
         longestStreak: row.longest_streak,
         opopointsBalance: row.opopoints_balance,
         lastActivityDate: row.last_activity_date,

@@ -59,6 +59,6 @@ export interface ProStats {
 
 export interface ProStatsExportResult {
     period: string; // 'week' | 'month' | 'all'
-    downloadUrl: string | null; // stub null hasta implementar PDF real
+    downloadUrl: string;
     message: string;
 }

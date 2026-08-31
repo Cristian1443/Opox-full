@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -24,7 +25,7 @@ const COLORS = {
   buttonText: '#FFFFFF',
 };
 
-export default function ReportSuccessModal({ visible, periodLabel, onClose }) {
+export default function ReportSuccessModal({ visible, periodLabel, downloadUrl, onClose }) {
   const slideAnim = useRef(new Animated.Value(height * 0.2)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -75,20 +76,31 @@ export default function ReportSuccessModal({ visible, periodLabel, onClose }) {
               <Ionicons name="checkmark-circle" size={36} color={COLORS.success} />
             </View>
 
-            <Text style={styles.title}>Solicitud enviada</Text>
+            <Text style={styles.title}>Informe generado</Text>
             <Text style={styles.description}>
-              Tu informe{periodLabel ? ` de ${periodLabel.toLowerCase()}` : ''} se está generando.
-              Recibirás una notificación cuando esté listo para descargar.
+              Tu informe{periodLabel ? ` de ${periodLabel.toLowerCase()}` : ''} está listo.
+              Ábrelo en el navegador para verlo o descargarlo.
             </Text>
 
+            {downloadUrl ? (
+              <TouchableOpacity
+                style={[styles.btn, styles.btnPrimary]}
+                onPress={() => { Linking.openURL(downloadUrl); onClose(); }}
+                activeOpacity={0.85}
+                accessibilityLabel="Abrir PDF"
+              >
+                <Ionicons name="open-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.btnText}>Abrir PDF</Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity
-              style={[styles.btn, styles.btnPrimary]}
+              style={[styles.btn, styles.btnSecondary]}
               onPress={onClose}
               activeOpacity={0.85}
               accessibilityLabel="Cerrar"
             >
-              <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-              <Text style={styles.btnText}>Entendido</Text>
+              <Text style={[styles.btnText, styles.btnTextSecondary]}>Cerrar</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </Animated.View>
@@ -155,10 +167,18 @@ const styles = StyleSheet.create({
   btnPrimary: {
     backgroundColor: COLORS.buttonPrimary,
     borderColor: COLORS.buttonPrimary,
+    marginBottom: 8,
+  },
+  btnSecondary: {
+    backgroundColor: 'transparent',
+    borderColor: COLORS.border,
   },
   btnText: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.buttonText,
+  },
+  btnTextSecondary: {
+    color: COLORS.secondaryText,
   },
 });

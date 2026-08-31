@@ -339,6 +339,16 @@ export default function TutorChatScreen({ navigation, route }) {
                     >
                         <Ionicons name="mic-outline" size={22} color={colors.accentOrange} />
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.sendBtn, (!inputText.trim() || isTyping) && styles.sendBtnDisabled]}
+                        onPress={handleSend}
+                        disabled={!inputText.trim() || isTyping}
+                        accessibilityLabel="Enviar mensaje"
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="arrow-up" size={18} color={colors.white} />
+                    </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -495,4 +505,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         flexShrink: 0,
     },
+    sendBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.accentOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    sendBtnDisabled: { opacity: 0.4 },
 });

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
-  Switch, Alert, ActivityIndicator,
+  Switch, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -76,6 +76,7 @@ export default function ConfigExportScreen({ navigation }) {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState(null);
 
   const periodLabel = PERIOD_OPTIONS.find((p) => p.key === period)?.label || period;
 
@@ -94,10 +95,11 @@ export default function ConfigExportScreen({ navigation }) {
     try {
       const periodMap = { mes: 'month', trimestre: 'all', todo: 'all' };
       const res = await settingsApi.exportProStats(periodMap[period] ?? 'month');
-      if (res?.error) {
-        Alert.alert('Error', 'No se pudo procesar la solicitud. Inténtalo de nuevo.');
+      if (res?.error || !res?.data?.downloadUrl) {
+        Alert.alert('Error', 'No se pudo generar el informe. Inténtalo de nuevo.');
         return;
       }
+      setDownloadUrl(res.data.downloadUrl);
       setShowModal(true);
     } finally {
       setIsGenerating(false);
@@ -184,7 +186,8 @@ export default function ConfigExportScreen({ navigation }) {
       <ReportSuccessModal
         visible={showModal}
         periodLabel={periodLabel}
-        onClose={() => setShowModal(false)}
+        downloadUrl={downloadUrl}
+        onClose={() => { setShowModal(false); setDownloadUrl(null); }}
       />
     </SafeAreaView>
   );

@@ -1,5 +1,7 @@
 declare const API_ROUTES: {
     readonly HEALTH: string;
+    readonly HEALTH_DEVICES: string;
+    readonly HEALTH_DEVICE: string;
 
     readonly AUTH: {
         readonly REGISTER: string;

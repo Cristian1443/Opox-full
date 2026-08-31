@@ -83,6 +83,27 @@ export class SupabaseConfigRepository implements IConfigRepository {
         if (error) logger.error('[config-repo] submitFeedback', { error });
     }
 
+    // ── Exportar PDF ──────────────────────────────────────────────────────────
+
+    async storePdfReport(userId: string, period: string, pdfBuffer: Buffer): Promise<string> {
+        const BUCKET = 'pro-stats-exports';
+        // Crear el bucket si no existe (idempotente)
+        await this.db.storage.createBucket(BUCKET, { public: false }).catch(() => {});
+
+        const filename = `${userId}/${period}_${Date.now()}.pdf`;
+        const { error: uploadError } = await this.db.storage
+            .from(BUCKET)
+            .upload(filename, pdfBuffer, { contentType: 'application/pdf', upsert: true });
+        if (uploadError) throw new Error(`storePdfReport upload: ${uploadError.message}`);
+
+        const { data, error: urlError } = await this.db.storage
+            .from(BUCKET)
+            .createSignedUrl(filename, 3600); // 1 hora
+        if (urlError || !data?.signedUrl) throw new Error(`storePdfReport url: ${urlError?.message}`);
+
+        return data.signedUrl;
+    }
+
     // ── Pro Stats ─────────────────────────────────────────────────────────────
 
     async getProStats(userId: string): Promise<ProStats> {
