@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: opox-backend
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --no-frozen-lockfile
+    startCommand: pnpm --filter @opox/backend start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: CORS_ORIGINS
+        value: http://localhost:8081,http://localhost:19006
+      - key: PASSWORD_RESET_REDIRECT_URL
+        value: opox://reset-password
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: AI_API_BASE_URL
+        value: https://api.openai.com/v1
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_API_DEFAULT_MODEL
+        value: gpt-4o-mini
+      - key: MOTOR_API_BASE_URL
+        value: https://ia.opox.jaeverba.com
+      - key: MOTOR_API_KEY
+        sync: false
+      - key: MOTOR_DEFAULT_CURSO_ID
+        value: 1357e871b542425b
+      - key: MOTOR_BOE_BASE_URL
+        value: https://ia.opox.jaeverba.com
+      - key: MOTOR_BOE_API_KEY
+        sync: false
+      - key: MOTOR_BOE_CURSO_ID
+        sync: false
+      - key: REVENUECAT_WEBHOOK_SECRET
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
