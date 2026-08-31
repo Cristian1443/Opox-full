@@ -4,9 +4,11 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --no-frozen-lockfile
+    buildCommand: npm install -g pnpm@9.15.0 && pnpm install --no-frozen-lockfile
     startCommand: pnpm --filter @opox/backend start
     envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
       - key: NODE_ENV
         value: production
       - key: LOG_LEVEL
