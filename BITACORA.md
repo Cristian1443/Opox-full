@@ -57,7 +57,7 @@ no existía (backend devuelve `downloadUrl: null`). Ahora dice "Solicitud enviad
 con un único botón "Entendido", y `ConfigExportScreen` ya llama al endpoint real
 `settingsApi.exportProStats(period)`.
 
-### Gaps cerrados (segunda pasada — mismo día)
+### Gaps cerrados (segunda pasada — mismo día — A, B, D)
 
 **A · Tono IA → TutorChat**
 `TutorChatScreen` carga `settingsApi.getPreferences()` en el mount y guarda `personality`
@@ -88,6 +88,36 @@ en lugar de 0 fijo. La nota del radar se muestra solo si aún no hay datos de ve
   `PairingScreen` registra el dispositivo en el backend fire-and-forget al completar permisos.
 - Constantes: `HEALTH_DEVICES` y `HEALTH_DEVICE` añadidas a `API_ROUTES`.
 
+### Gaps cerrados (tercera pasada — mismo día — racha, botón chat, PDF)
+
+**Fix · Racha no se reseteaba al romper la racha**
+`toDomainGamification` en `SupabaseDashboardRepository` devolvía el valor bruto de
+`current_streak` sin comprobar si había expirado. Ahora calcula `effectiveStreak`:
+si `last_activity_date` no es hoy ni ayer (UTC), devuelve 0. `withActivity()` del
+dominio era correcto — el error era solo en lectura. Se añaden helpers `todayUtc()`
+y `yesterdayUtc()` locales.
+
+**Fix · TutorChat sin botón de envío visible**
+`TutorChatScreen` tenía `returnKeyType="send"` en un `TextInput` multiline — en
+Android no muestra tecla de envío. Añadido botón redondo naranja (`arrow-up`,
+Ionicons) a la derecha del input. Se deshabilita (opacity 0.4) cuando el campo
+está vacío o el tutor está escribiendo (`isTyping`).
+
+**GAP-12-07 · PDF real en Export (implementado)**
+- Backend: `pdfkit` instalado. `ExportProStatsUseCase` genera PDF A4 con cabecera
+  morada, resumen de stats (acierto, probabilidad, racha, velocidad) y tabla de
+  desglose por temas con colores verde/naranja/rojo según rendimiento.
+  Sube el buffer a Supabase Storage (`pro-stats-exports`, bucket privado auto-creado)
+  y devuelve una URL firmada con 1 hora de validez. Devuelve 200 (antes 202 stub).
+- `IConfigRepository`: nuevo método `storePdfReport(userId, period, buffer): Promise<string>`.
+- `ConfigController.serializeProStats`: incluía `avgSecsPerQuestion` (error silencioso
+  detectado — la velocidad del radar nunca llegaba al cliente).
+- Mobile: `ConfigExportScreen` abre la URL con `Linking.openURL` (navegador del sistema).
+  `ReportSuccessModal` renovado: título "Informe generado", botón "Abrir PDF" primario
+  + "Cerrar" secundario.
+- TS bonus: `SupabaseNotesRepository.updateStatus` faltaba `pages?: number` en el tipo
+  del patch; `index.d.ts` de `@opox/constants` añade `HEALTH_DEVICES`/`HEALTH_DEVICE`.
+
 ### Gaps pendientes
 
 | Gap | Razón |
@@ -95,7 +125,6 @@ en lugar de 0 fijo. La nota del radar se muestra solo si aún no hay datos de ve
 | C · ThemeContext global | Requiere refactor de App.js y todas las pantallas (espera diseño aprobado) |
 | GAP-12-09 Chat de soporte | Requiere integración Intercom/Crisp/Zendesk |
 | GAP-12-10 Suscripción real | Requiere RevenueCat SDK |
-| GAP-12-07 PDF real en Export | Requiere pdfkit/puppeteer en backend (`TODO(bloque-12)`) |
 
 ### Estado final de la rama
 
@@ -103,6 +132,9 @@ en lugar de 0 fijo. La nota del radar se muestra solo si aún no hay datos de ve
 - Estadísticas pro con datos reales incluyendo velocidad por pregunta.
 - Dispositivos conectados persistidos en Supabase, ConfigDevicesScreen sin mocks.
 - Tono de IA se propaga a TutorChat en tiempo real.
+- Racha caduca correctamente cuando el usuario pierde un día (leída en BD, no solo en escritura).
+- TutorChat con botón de envío visible en Android.
+- Export genera PDF real (pdfkit + Supabase Storage) y devuelve URL firmada al móvil.
 - SQL pendiente de correr en Supabase: `bloque3_health_devices.sql`.
 
 ---
