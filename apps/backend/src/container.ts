@@ -159,6 +159,7 @@ import {
     MotorBoeClient,
 } from './infrastructure';
 import {
+    HealthController,
     AuthController,
     DashboardController,
     PlanningController,
