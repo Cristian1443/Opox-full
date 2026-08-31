@@ -9,18 +9,22 @@ import {
   Share,
   Linking,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path, Rect } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 
-const ACCENT = '#6C5CE7';
-const ACCENT_LIGHT = '#A29BFE';
-const PHASE2_COLOR = '#7B1FA2';
-
-const partnerAbbr = (name) => {
-  const w = name.trim().split(/\s+/);
-  return w.length >= 2 ? (w[0][0] + w[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+// ─── 11.4 · Tu código ───────────────────────────────────────────────────────
+// Fiel al Figma (CodigoCanjeadoScreen.tsx). El QR es un patrón geométrico
+// decorativo — el propio reference lo documenta como "sin datos reales", así
+// que se reproduce igual en vez de añadir una librería de generación de QR
+// real. Las condiciones y el aviso de soporte del real no aparecen en esta
+// captura de Figma; se omiten aquí porque ya se muestran antes en
+// RecompensaDetalleScreen (antes de confirmar el canje), así que no se
+// pierde esa información, solo se evita repetirla.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  cardBorder: 'rgba(65, 41, 80, 0.3)',
 };
 
 const FALLBACK = {
@@ -32,17 +36,53 @@ const FALLBACK = {
   expiryDate: '24 jul 2026',
   color: '#000000',
   icon: 'restaurant-outline',
-  conditions: [
-    'Válido solo en España',
-    'Requiere cuenta verificada de Opox',
-    'El código caduca a los 30 días de canjearlo',
-    'Solo para usuarios sin Uber One activo',
-  ],
   deepLink: 'https://www.ubereats.com',
 };
 
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** Patrón geométrico decorativo que simula un código QR (sin datos reales). */
+function QrPlaceholder({ size = 180 }) {
+  const cell = size / 9;
+  const pattern = [
+    [1, 1, 1, 0, 1, 0, 1, 1, 1],
+    [1, 0, 1, 0, 0, 1, 1, 0, 1],
+    [1, 0, 1, 1, 0, 1, 0, 0, 1],
+    [0, 0, 0, 1, 0, 0, 1, 1, 0],
+    [1, 1, 0, 0, 1, 1, 0, 1, 1],
+    [0, 1, 1, 0, 1, 0, 1, 0, 0],
+    [1, 0, 1, 1, 0, 1, 0, 1, 1],
+    [1, 0, 0, 1, 0, 0, 1, 0, 1],
+    [1, 1, 1, 0, 1, 1, 1, 0, 1],
+  ];
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Rect x={0} y={0} width={size} height={size} fill={colors.white} />
+      {pattern.map((row, rowIndex) =>
+        row.map((cellValue, colIndex) =>
+          cellValue ? (
+            <Rect
+              key={`${rowIndex}-${colIndex}`}
+              x={colIndex * cell}
+              y={rowIndex * cell}
+              width={cell}
+              height={cell}
+              fill={colors.textDark}
+            />
+          ) : null
+        )
+      )}
+    </Svg>
+  );
+}
+
 export default function StoreCodeDetailScreen({ navigation, route }) {
-  const { top: topInset } = useSafeAreaInsets();
   const { codeData = FALLBACK } = route?.params ?? {};
   const [copied, setCopied] = useState(false);
 
@@ -62,115 +102,67 @@ export default function StoreCodeDetailScreen({ navigation, route }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* Header gradiente que cubre el status bar */}
-      <LinearGradient
-        colors={[PHASE2_COLOR, ACCENT]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.headerGradient, { paddingTop: topInset + 12 }]}
-      >
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <View style={styles.header}>
         <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
           accessibilityLabel="Volver"
         >
-          <Ionicons name="chevron-back" size={24} color={colors.white} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Tu código</Text>
-        </View>
-
-        <View style={{ width: 40 }} />
-      </LinearGradient>
+        <Text style={styles.headerTitle}>Tu código</Text>
+        <View style={styles.iconButton} />
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Tarjeta principal */}
-        <View style={styles.codeCard}>
-          <View style={styles.partnerHeader}>
-            <View style={[styles.partnerAvatar, { backgroundColor: codeData.color }]}>
-              <Text style={styles.partnerAvatarText}>{partnerAbbr(codeData.partner)}</Text>
-            </View>
-            <Text style={styles.partnerName}>{codeData.partner}</Text>
+        {/* ── Marca + oferta ──────────────────────────────────────────── */}
+        <View style={styles.brandBlock}>
+          <View style={[styles.brandIcon, { backgroundColor: codeData.color ?? colors.purple }]}>
+            <Ionicons name={codeData.icon ?? 'gift-outline'} size={30} color={colors.white} />
           </View>
-
-          <Text style={styles.rewardTitle}>{codeData.title}</Text>
-          <Text style={styles.rewardSubtitle}>{codeData.subtitle}</Text>
-
-          {/* Sección del código */}
-          <View style={styles.codeSection}>
-            <Text style={styles.codeLabel}>TU CÓDIGO</Text>
-            <View style={styles.codeBox}>
-              <Text style={styles.codeText}>{codeData.code}</Text>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.copyButton, copied && styles.copyButtonCopied]}
-              onPress={handleCopyCode}
-              accessibilityLabel={copied ? 'Código compartido' : 'Compartir código'}
-            >
-              <Ionicons
-                name={copied ? 'checkmark-circle' : 'copy-outline'}
-                size={18}
-                color={copied ? colors.success : ACCENT}
-              />
-              <Text style={[styles.copyButtonText, copied && styles.copyButtonTextCopied]}>
-                {copied ? 'Compartido' : 'Copiar código'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Fecha de caducidad */}
-          <View style={styles.expiryRow}>
-            <Ionicons name="time-outline" size={18} color="#FF9F43" />
-            <Text style={styles.expiryText}>
-              Caduca el{' '}
-              <Text style={styles.expiryDate}>{codeData.expiryDate}</Text>
-            </Text>
-          </View>
-
-          {/* CTA principal */}
-          {!!codeData.deepLink && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleOpenPartner}
-              accessibilityLabel={`Ir a ${codeData.partner}`}
-            >
-              <Ionicons name="arrow-forward-circle" size={22} color={colors.white} />
-              <Text style={styles.actionButtonText}>Ir a {codeData.partner}</Text>
-            </TouchableOpacity>
-          )}
+          <Text style={styles.offerLabel}>{codeData.partner} · {codeData.title}</Text>
+          {codeData.subtitle ? <Text style={styles.offerSubtitle}>{codeData.subtitle}</Text> : null}
         </View>
 
-        {/* Condiciones */}
-        {(codeData.conditions ?? []).length > 0 && (
-          <View style={styles.conditionsCard}>
-            <View style={styles.conditionsHeader}>
-              <Ionicons name="document-text-outline" size={20} color={ACCENT} />
-              <Text style={styles.conditionsTitle}>Condiciones de uso</Text>
-            </View>
-            {codeData.conditions.map((cond, index) => (
-              <View key={index} style={styles.conditionItem}>
-                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-                <Text style={styles.conditionText}>{cond}</Text>
-              </View>
-            ))}
-          </View>
+        {/* ── Código ──────────────────────────────────────────────────── */}
+        <Text style={styles.codeLabel}>CÓDIGO</Text>
+        <View style={styles.codeRow}>
+          <Text style={styles.codeText}>{codeData.code}</Text>
+          <TouchableOpacity
+            activeOpacity={0.6}
+            onPress={handleCopyCode}
+            accessibilityLabel={copied ? 'Código compartido' : 'Compartir código'}
+          >
+            <Text style={[styles.copyText, copied && styles.copyTextDone]}>
+              {copied ? 'Compartido' : 'Copiar'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── QR (decorativo, ver nota arriba) ───────────────────────── */}
+        <View style={styles.qrWrap}>
+          <QrPlaceholder />
+        </View>
+
+        <TouchableOpacity style={styles.primaryButton} activeOpacity={0.85} onPress={handleCopyCode}>
+          <Text style={styles.primaryButtonText}>Copiar código</Text>
+        </TouchableOpacity>
+
+        {!!codeData.deepLink && (
+          <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.7} onPress={handleOpenPartner}>
+            <Text style={styles.secondaryButtonText}>+ Ir a {codeData.partner}</Text>
+          </TouchableOpacity>
         )}
 
-        {/* Info adicional */}
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle-outline" size={20} color={ACCENT} />
-          <Text style={styles.infoText}>
-            Si tienes problemas al canjear el código, contacta con el soporte de {codeData.partner} o con nosotros a través de la configuración de la app.
-          </Text>
-        </View>
+        <Text style={styles.expiryText}>Caduca el {codeData.expiryDate}</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -179,241 +171,129 @@ export default function StoreCodeDetailScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
-  // Header
-  headerGradient: {
-    paddingBottom: 24,
-    paddingHorizontal: 16,
+
+  // ── Header ────────────────────────────────────────────────────
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  backButton: {
-    padding: 4,
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  phase2BadgeContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  phase2BadgeText: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.white,
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
   },
-  // Scroll
+
+  // ── Contenido ─────────────────────────────────────────────────
   scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  // Code card
-  codeCard: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
+  brandBlock: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  partnerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    gap: 12,
-    alignSelf: 'flex-start',
-  },
-  partnerAvatar: {
-    width: 48,
-    height: 48,
+  brandIcon: {
+    width: 64,
+    height: 64,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  partnerAvatarText: {
-    color: '#FFFFFF',
+  offerLabel: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  partnerName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  rewardTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: PHASE2_COLOR,
+    color: colors.textDark,
+    marginTop: 10,
     textAlign: 'center',
+  },
+  offerSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11.5,
+    color: FIGMA.textMuted,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  codeLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 11,
+    color: colors.textDark,
     marginBottom: 8,
   },
-  rewardSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 21,
-  },
-  // Code section
-  codeSection: {
-    width: '100%',
+  codeRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  codeLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: 10,
-    letterSpacing: 1,
-  },
-  codeBox: {
-    backgroundColor: colors.background,
-    borderWidth: 2,
-    borderColor: ACCENT,
-    borderRadius: 14,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    marginBottom: 14,
-    width: '100%',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
+    borderRadius: 10.7,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: spacing.lg,
   },
   codeText: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: ACCENT,
-    letterSpacing: 2,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 13,
+    color: FIGMA.textMuted,
   },
-  copyButton: {
-    flexDirection: 'row',
+  copyText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: colors.accentOrange,
+  },
+  copyTextDone: {
+    color: colors.ctaGreen,
+  },
+
+  qrWrap: {
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 20,
-    backgroundColor: colors.grayLight,
+    marginBottom: spacing.lg,
   },
-  copyButtonCopied: {
-    backgroundColor: colors.successBg,
-  },
-  copyButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: ACCENT,
-  },
-  copyButtonTextCopied: {
-    color: colors.success,
-  },
-  // Expiry
-  expiryRow: {
-    flexDirection: 'row',
+
+  primaryButton: {
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.accentOrange,
     alignItems: 'center',
-    backgroundColor: '#FFF3E0',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginBottom: 20,
-    gap: 8,
-    alignSelf: 'stretch',
-  },
-  expiryText: {
-    fontSize: 14,
-    color: colors.text,
-    flex: 1,
-  },
-  expiryDate: {
-    fontWeight: '700',
-    color: '#FF9F43',
-  },
-  // Action button
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: ACCENT_LIGHT,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 16,
-    width: '100%',
     justifyContent: 'center',
-    gap: 10,
-    shadowColor: ACCENT_LIGHT,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: spacing.sm + 4,
   },
-  actionButtonText: {
-    fontSize: 17,
-    fontWeight: '800',
+  primaryButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
     color: colors.white,
   },
-  // Conditions card
-  conditionsCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  conditionsHeader: {
-    flexDirection: 'row',
+  secondaryButton: {
+    height: 61.3,
+    borderRadius: 14.2,
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 14,
+    justifyContent: 'center',
+    marginBottom: spacing.sm + 4,
   },
-  conditionsTitle: {
+  secondaryButtonText: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    fontWeight: '800',
-    color: colors.text,
+    color: colors.textDark,
   },
-  conditionItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-    gap: 8,
-  },
-  conditionText: {
-    fontSize: 14,
-    color: colors.text,
-    flex: 1,
-    lineHeight: 20,
-  },
-  // Info box
-  infoBox: {
-    backgroundColor: colors.grayLight,
-    padding: 16,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 19,
+  expiryText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: FIGMA.textMuted,
+    textAlign: 'center',
   },
 });

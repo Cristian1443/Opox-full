@@ -9,30 +9,75 @@ import {
   Alert,
   Modal,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import { authApi } from '../../api';
 
-const { width } = Dimensions.get('window');
-
-const COLORS = {
-  background: '#F8FAFC',
-  card: '#FFFFFF',
-  primaryText: '#1E293B',
-  secondaryText: '#64748B',
-  border: '#E2E8F0',
-  danger: '#EF4444',
-  dangerBg: '#FEF2F2',
-  warningBg: '#FFF7ED',
-  warningText: '#C2410C',
-  warningBodyText: '#9A3412',
-  accentBlue: '#3B82F6',
+// ─── 12.3 (pantalla) + 12.12 (modal) · Eliminar cuenta ──────────────────────
+// El TSX de referencia (ConfiguracionModalesScreen.tsx → EliminarCuentaModal)
+// solo captura el modal de confirmación — no la pantalla completa. La pantalla
+// real (banner de aviso, tarjeta de Acciones con Cerrar sesión/Eliminar
+// cuenta, enlace de soporte) es funcionalidad real sin captura propia en
+// Figma; se conserva íntegra y se reestiliza con el mismo lenguaje visual
+// (Poppins, colors.*) del resto del bloque 12. El modal se reconcilia con el
+// texto confirmado por Figma: título "¿Eliminar tu cuenta?" (real decía
+// "¿Eliminar definitivamente?"), subtítulo sin la frase final "¿Estás seguro
+// de que quieres continuar?" (no confirmada por Figma), botón secundario
+// como enlace de texto plano (no botón con caja) y el ícono de papelera en
+// vez del círculo con "X". La lógica real (animación slide+fade,
+// authApi.logout/deleteAccount, resetToSplash) se conserva íntegra.
+const FIGMA = {
+  overlay: 'rgba(0, 0, 0, 0.55)',
+  textMuted: 'rgba(65, 41, 80, 0.7)',
+  separator: 'rgba(65, 41, 80, 0.12)',
+  warningBg: 'rgba(246, 150, 36, 0.1)',
+  warningBorder: 'rgba(246, 150, 36, 0.3)',
 };
 
 function resetToSplash(navigation) {
   navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+}
+
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function WarningIcon({ size = 22, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M12 3L22 20H2L12 3Z" stroke={color} strokeWidth={1.6} fill="none" strokeLinejoin="round" />
+      <Path d="M12 9.5V14" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Path d="M12 17.2V17.3" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function LogoutIcon({ size = 22, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16 17L21 12L16 7" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M21 12H9" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function TrashIcon({ size = 40, color = colors.statRed }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M4 7H20" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+      <Path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3H13.5A1.5 1.5 0 0 1 15 4.5V7" stroke={color} strokeWidth={1.6} fill="none" strokeLinejoin="round" />
+      <Path d="M6.5 7L7.3 19.5A2 2 0 0 0 9.3 21.3H14.7A2 2 0 0 0 16.7 19.5L17.5 7" stroke={color} strokeWidth={1.6} fill="none" strokeLinejoin="round" />
+      <Path d="M10 11V17" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+      <Path d="M14 11V17" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+    </Svg>
+  );
 }
 
 export default function ConfigDeleteAccountScreen({ navigation }) {
@@ -43,33 +88,15 @@ export default function ConfigDeleteAccountScreen({ navigation }) {
   const openConfirmModal = () => {
     setShowConfirmModal(true);
     Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 7,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        duration: 250,
-      }),
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 50, friction: 7 }),
+      Animated.timing(fadeAnim, { toValue: 1, useNativeDriver: true, duration: 300 }),
     ]).start();
   };
 
   const closeConfirmModal = () => {
     Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 300,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 7,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        duration: 200,
-      }),
+      Animated.spring(slideAnim, { toValue: 300, useNativeDriver: true, tension: 50, friction: 7 }),
+      Animated.timing(fadeAnim, { toValue: 0, useNativeDriver: true, duration: 200 }),
     ]).start(() => setShowConfirmModal(false));
   };
 
@@ -98,313 +125,263 @@ export default function ConfigDeleteAccountScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.card} />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* HEADER */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          style={styles.iconButton}
           activeOpacity={0.7}
+          onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
-          style={styles.headerBack}
         >
-          <Ionicons name="chevron-back" size={24} color={COLORS.primaryText} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Eliminar cuenta</Text>
-        <View style={styles.headerRight} />
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* ADVERTENCIA */}
+        {/* ── Aviso ─────────────────────────────────────────────────────── */}
         <View style={styles.warningBox}>
-          <View style={styles.warningTitleRow}>
-            <Ionicons name="warning-outline" size={18} color={COLORS.warningText} />
-            <Text style={styles.warningTitle}>Atención: Esta acción es irreversible</Text>
+          <WarningIcon />
+          <View style={styles.warningTextWrap}>
+            <Text style={styles.warningTitle}>Atención: esta acción es irreversible</Text>
+            <Text style={styles.warningBody}>
+              Al eliminar tu cuenta perderás tu progreso, Opopoints, racha y todos tus datos de forma permanente.
+            </Text>
           </View>
-          <Text style={styles.warningText}>
-            Al eliminar tu cuenta, perderás todo tu progreso, Opopoints y tu racha de estudio.
-            Esta acción no se puede deshacer.
-          </Text>
         </View>
 
-        {/* ACCIONES */}
+        {/* ── Acciones ──────────────────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>ACCIONES</Text>
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Acciones</Text>
-
           <TouchableOpacity
-            style={styles.actionRow}
+            style={styles.row}
             onPress={handleLogout}
             activeOpacity={0.7}
             accessibilityLabel="Cerrar sesión"
           >
-            <View style={styles.actionTexts}>
-              <Text style={styles.actionLabel}>Cerrar sesión</Text>
-              <Text style={styles.actionSubtext}>Solo sal de la app, no borramos tus datos</Text>
-            </View>
-            <Ionicons name="log-out-outline" size={20} color={COLORS.secondaryText} />
+            <LogoutIcon />
+            <Text style={styles.rowLabel}>Cerrar sesión</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionRow, styles.lastRow]}
+            style={[styles.row, styles.rowBorder]}
             onPress={openConfirmModal}
             activeOpacity={0.7}
-            accessibilityLabel="Eliminar cuenta permanentemente"
+            accessibilityLabel="Eliminar cuenta"
           >
-            <View style={styles.actionTexts}>
-              <Text style={[styles.actionLabel, { color: COLORS.danger }]}>Eliminar cuenta</Text>
-              <Text style={[styles.actionSubtext, { color: COLORS.danger }]}>Borrar todo permanentemente</Text>
-            </View>
-            <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
+            <TrashIcon size={22} />
+            <Text style={[styles.rowLabel, styles.rowLabelDanger]}>Eliminar cuenta</Text>
           </TouchableOpacity>
         </View>
 
-        {/* SOPORTE */}
+        {/* ── Soporte ───────────────────────────────────────────────────── */}
         <TouchableOpacity
           style={styles.supportLink}
           onPress={() => navigation.navigate('ConfigHelp')}
           activeOpacity={0.7}
+          accessibilityLabel="Contactar con soporte"
         >
-          <Text style={styles.supportText}>
-            ¿Tienes dudas antes de eliminar tu cuenta?{'\n'}
-            <Text style={styles.supportLinkText}>Contacta con soporte</Text>
-          </Text>
+          <Text style={styles.supportLinkText}>¿Tienes dudas? Contacta con soporte</Text>
         </TouchableOpacity>
-
       </ScrollView>
 
-      {/* MODAL CONFIRMACIÓN DESTRUCTIVA */}
-      <Modal
-        visible={showConfirmModal}
-        transparent
-        animationType="none"
-        onRequestClose={closeConfirmModal}
-      >
-        <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
-          <Animated.View
-            style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}
-          >
-            <View style={styles.modalIcon}>
-              <Ionicons name="close-circle" size={32} color={COLORS.danger} />
-            </View>
+      {/* ── Modal de confirmación ────────────────────────────────────── */}
+      <Modal visible={showConfirmModal} transparent animationType="none" onRequestClose={closeConfirmModal}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeConfirmModal}>
+          <Animated.View style={{ transform: [{ translateY: slideAnim }], opacity: fadeAnim }}>
+            <TouchableOpacity style={styles.modalCard} activeOpacity={1}>
+              <TrashIcon />
+              <Text style={styles.modalTitle}>¿Eliminar tu cuenta?</Text>
+              <Text style={styles.modalSubtitle}>
+                Perderás tu progreso, Opopoints y racha. Esta acción es irreversible.
+              </Text>
 
-            <Text style={styles.modalTitle}>¿Eliminar definitivamente?</Text>
-            <Text style={styles.modalDescription}>
-              Perderás tu progreso, Opopoints y racha. Esta acción es irreversible.
-              ¿Estás seguro de que quieres continuar?
-            </Text>
-
-            <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
+                style={styles.dangerButton}
+                onPress={handleConfirmDelete}
+                activeOpacity={0.85}
+                accessibilityLabel="Eliminar definitivamente"
+              >
+                <Text style={styles.dangerButtonText}>Eliminar definitivamente</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.secondaryLink}
                 onPress={closeConfirmModal}
                 activeOpacity={0.7}
                 accessibilityLabel="Cancelar"
               >
-                <Text style={styles.modalButtonTextCancel}>Cancelar</Text>
+                <Text style={styles.secondaryLinkText}>Cancelar</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonConfirm]}
-                onPress={handleConfirmDelete}
-                activeOpacity={0.85}
-                accessibilityLabel="Confirmar eliminación de cuenta"
-              >
-                <Text style={styles.modalButtonTextConfirm}>Eliminar definitivamente</Text>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </Animated.View>
-        </Animated.View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
 
-  // Header
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  headerBack: { padding: 8 },
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
     flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
     textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.primaryText,
   },
-  headerRight: { width: 40 },
 
-  // Scroll
-  scroll: { paddingBottom: 40 },
+  // ── Contenido ─────────────────────────────────────────────────
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
 
-  // Advertencia
+  // ── Aviso ─────────────────────────────────────────────────────
   warningBox: {
-    marginHorizontal: 16,
-    marginTop: 24,
-    backgroundColor: COLORS.warningBg,
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.warningText,
-  },
-  warningTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    gap: 12,
+    backgroundColor: FIGMA.warningBg,
+    borderWidth: 1,
+    borderColor: FIGMA.warningBorder,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: spacing.lg,
   },
-  warningTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.warningText,
+  warningTextWrap: {
     flex: 1,
   },
-  warningText: {
+  warningTitle: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 13,
-    color: COLORS.warningBodyText,
+    color: colors.textDark,
+    marginBottom: 4,
+  },
+  warningBody: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12,
+    color: FIGMA.textMuted,
     lineHeight: 18,
   },
 
-  // Card
-  card: {
-    backgroundColor: COLORS.card,
-    marginHorizontal: 16,
-    marginTop: 24,
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primaryText,
-    marginBottom: 16,
-  },
-
-  // Filas de acción
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  lastRow: { borderBottomWidth: 0 },
-  actionTexts: { flex: 1, marginRight: 12 },
-  actionLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: COLORS.primaryText,
-  },
-  actionSubtext: {
+  // ── Acciones ──────────────────────────────────────────────────
+  sectionLabel: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 12,
-    color: COLORS.secondaryText,
-    marginTop: 4,
+    color: colors.textDark,
+    marginBottom: spacing.sm + 4,
+  },
+  card: {
+    borderWidth: 1,
+    borderColor: FIGMA.separator,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 16,
+  },
+  rowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: FIGMA.separator,
+  },
+  rowLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+  },
+  rowLabelDanger: {
+    color: colors.statRed,
   },
 
-  // Enlace soporte
+  // ── Soporte ───────────────────────────────────────────────────
   supportLink: {
-    marginHorizontal: 16,
-    marginTop: 20,
     alignItems: 'center',
-  },
-  supportText: {
-    fontSize: 13,
-    color: COLORS.secondaryText,
-    textAlign: 'center',
-    lineHeight: 20,
+    marginTop: spacing.lg,
+    paddingVertical: 8,
   },
   supportLinkText: {
-    color: COLORS.accentBlue,
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12.5,
+    color: colors.purple,
   },
 
-  // Modal
+  // ── Modal ─────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: FIGMA.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    width: width * 0.85,
-    backgroundColor: COLORS.card,
-    borderRadius: 20,
-    padding: 24,
+  modalCard: {
+    width: 348,
+    maxWidth: '88%',
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: COLORS.dangerBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.primaryText,
-    marginBottom: 12,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 17,
+    color: colors.textDark,
+    marginTop: 16,
     textAlign: 'center',
   },
-  modalDescription: {
-    fontSize: 15,
-    color: COLORS.secondaryText,
+  modalSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12,
+    color: FIGMA.textMuted,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 18,
+    marginTop: 8,
     marginBottom: 24,
-    marginHorizontal: 4,
   },
-  modalButtons: {
+  dangerButton: {
     width: '100%',
-    gap: 12,
-  },
-  modalButton: {
-    paddingVertical: 14,
+    height: 50,
     borderRadius: 12,
+    backgroundColor: colors.statRed,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modalButtonCancel: {
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  dangerButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 15,
+    color: colors.white,
   },
-  modalButtonTextCancel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.primaryText,
+  secondaryLink: {
+    marginTop: 14,
+    paddingVertical: 6,
   },
-  modalButtonConfirm: {
-    backgroundColor: COLORS.danger,
-  },
-  modalButtonTextConfirm: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  secondaryLinkText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    color: colors.textDark,
   },
 });

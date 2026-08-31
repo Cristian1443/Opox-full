@@ -13,28 +13,37 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import FeedbackSuccessModal from './FeedbackSuccessModal';
+
+// ─── 12.9 · Tu opinión ──────────────────────────────────────────────────────
+// Fiel al Figma (FeedbackScreen.tsx). La validación de mensaje vacío, el
+// spinner de envío, el contador de caracteres (límite real del backend,
+// 500) y el modal de éxito son funcionalidad real sin equivalente en
+// Figma — se conservan íntegros.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  segmentBorder: 'rgba(65, 41, 80, 0.2)',
+  textareaBorder: 'rgba(65, 41, 80, 0.15)',
+  placeholderMuted: 'rgba(65, 41, 80, 0.4)',
+};
 
 const MAX_CHARS = 500;
 
-const COLORS = {
-  background: '#F8FAFC',
-  card: '#FFFFFF',
-  primaryText: '#1E293B',
-  secondaryText: '#64748B',
-  border: '#E2E8F0',
-  accentBlue: '#3B82F6',
-  accentYellow: '#F59E0B',
-  accentPurple: '#8B5CF6',
-  danger: '#FF3B30',
-};
-
 const FEEDBACK_TYPES = [
-  { id: 'suggestion', label: 'Sugerencia', icon: 'bulb', color: COLORS.accentYellow },
-  { id: 'bug', label: 'Error', icon: 'bug', color: COLORS.danger },
-  { id: 'other', label: 'Otro', icon: 'chatbubble-ellipses', color: COLORS.accentPurple },
+  { id: 'suggestion', label: 'Sugerencia' },
+  { id: 'bug', label: 'Error' },
+  { id: 'other', label: 'Otro' },
 ];
+
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 export default function ConfigFeedbackScreen({ navigation }) {
   const [selectedType, setSelectedType] = useState('suggestion');
@@ -63,253 +72,208 @@ export default function ConfigFeedbackScreen({ navigation }) {
   const canSubmit = message.trim().length > 0 && !isSubmitting;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.card} />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
       <KeyboardAvoidingView
         style={styles.kbContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-          accessibilityLabel="Volver"
-          style={styles.headerBack}
-        >
-          <Ionicons name="chevron-back" size={24} color={COLORS.primaryText} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tu opinión</Text>
-        <View style={styles.headerRight} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        <View style={styles.intro}>
-          <Text style={styles.introText}>¿Qué mejorarías en OPOX?</Text>
-          <Text style={styles.introSubtext}>Cuéntanos qué mejorarías. Lo leemos todo.</Text>
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            activeOpacity={0.7}
+            onPress={() => navigation.goBack()}
+            accessibilityLabel="Volver"
+          >
+            <ChevronLeftIcon />
+          </TouchableOpacity>
+          <View style={styles.headerTitles}>
+            <Text style={styles.headerTitle}>Tu opinión</Text>
+            <Text style={styles.headerSubtitle}>Cuéntanos qué mejorarías. Lo leemos todo.</Text>
+          </View>
+          <View style={styles.iconButton} />
         </View>
 
-        {/* TIPO DE FEEDBACK */}
-        <Text style={styles.sectionTitle}>TIPO</Text>
-        <View style={styles.card}>
-          <View style={styles.typeGrid}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {/* ── Tipo ──────────────────────────────────────────────────── */}
+          <Text style={styles.sectionLabel}>TIPO</Text>
+          <View style={styles.segmentedRow}>
             {FEEDBACK_TYPES.map((type) => {
               const isSelected = selectedType === type.id;
               return (
                 <TouchableOpacity
                   key={type.id}
-                  style={[
-                    styles.typeOption,
-                    isSelected
-                      ? { backgroundColor: type.color, borderColor: type.color }
-                      : styles.typeOptionInactive,
-                  ]}
+                  style={[styles.segmentButton, isSelected && styles.segmentButtonActive]}
                   onPress={() => setSelectedType(type.id)}
                   activeOpacity={0.7}
                   accessibilityLabel={`Tipo ${type.label}`}
                 >
-                  <Ionicons
-                    name={type.icon}
-                    size={20}
-                    color={isSelected ? '#FFFFFF' : COLORS.secondaryText}
-                  />
-                  <Text style={[
-                    styles.typeLabel,
-                    { color: isSelected ? '#FFFFFF' : COLORS.secondaryText },
-                    isSelected && styles.typeLabelSelected,
-                  ]}>
+                  <Text style={[styles.segmentText, isSelected && styles.segmentTextActive]}>
                     {type.label}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-        </View>
 
-        {/* MENSAJE */}
-        <Text style={styles.sectionTitle}>MENSAJE</Text>
-        <View style={styles.card}>
+          {/* ── Mensaje ───────────────────────────────────────────────── */}
           <TextInput
-            style={styles.textInput}
+            style={styles.textarea}
             placeholder="Escribe aquí tu mensaje..."
-            placeholderTextColor={COLORS.secondaryText}
+            placeholderTextColor={FIGMA.placeholderMuted}
             value={message}
             onChangeText={setMessage}
             multiline
-            numberOfLines={5}
             textAlignVertical="top"
             maxLength={MAX_CHARS}
           />
           <Text style={[
             styles.charCount,
-            message.length > MAX_CHARS * 0.8 && { color: message.length >= MAX_CHARS ? COLORS.danger : '#F59E0B' },
+            message.length > MAX_CHARS * 0.8 && { color: message.length >= MAX_CHARS ? colors.statRed : colors.accentOrange },
           ]}>
             {message.length}/{MAX_CHARS}
           </Text>
-        </View>
 
-        {/* BOTÓN ENVIAR */}
-        <TouchableOpacity
-          style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={!canSubmit}
-          activeOpacity={0.85}
-          accessibilityLabel="Enviar feedback"
-        >
-          {isSubmitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="paper-plane" size={20} color="#FFFFFF" />
-              <Text style={styles.submitText}>Enviar feedback</Text>
-            </>
-          )}
-        </TouchableOpacity>
+          {/* ── Botón enviar ──────────────────────────────────────────── */}
+          <TouchableOpacity
+            style={[styles.ctaButton, !canSubmit && styles.ctaButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={!canSubmit}
+            activeOpacity={0.85}
+            accessibilityLabel="Enviar feedback"
+          >
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Text style={styles.ctaButtonText}>Enviar feedback</Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
 
-      </ScrollView>
-
-      <FeedbackSuccessModal
-        visible={showModal}
-        onClose={() => {
-          setShowModal(false);
-          navigation.goBack();
-        }}
-      />
+        <FeedbackSuccessModal
+          visible={showModal}
+          onClose={() => {
+            setShowModal(false);
+            navigation.goBack();
+          }}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  kbContainer: { flex: 1 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  kbContainer: {
+    flex: 1,
+  },
 
-  // Header
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  headerBack: { padding: 8 },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.primaryText,
-  },
-  headerRight: { width: 40 },
-
-  // Scroll
-  scroll: { paddingBottom: 40 },
-
-  // Intro
-  intro: {
-    marginHorizontal: 16,
-    marginTop: 20,
-    marginBottom: 4,
-  },
-  introText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.primaryText,
-    marginBottom: 4,
-  },
-  introSubtext: {
-    fontSize: 14,
-    color: COLORS.secondaryText,
-    lineHeight: 20,
-  },
-
-  // Sección
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.secondaryText,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
-  },
-
-  // Card
-  card: {
-    backgroundColor: COLORS.card,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-
-  // Tipo
-  typeGrid: { flexDirection: 'row', gap: 10 },
-  typeOption: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1.5,
+  iconButton: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
   },
-  typeOptionInactive: {
-    backgroundColor: '#F8FAFC',
-    borderColor: COLORS.border,
+  headerTitles: {
+    flex: 1,
+    alignItems: 'center',
   },
-  typeLabel: { fontSize: 13, fontWeight: '500' },
-  typeLabelSelected: { fontWeight: '700' },
+  headerTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+  },
+  headerSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
+  },
 
-  // Texto
-  textInput: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    padding: 12,
-    minHeight: 100,
-    fontSize: 15,
-    color: COLORS.primaryText,
+  // ── Contenido ─────────────────────────────────────────────────
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sectionLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: colors.textDark,
+    marginBottom: spacing.sm + 4,
+  },
+
+  // ── Tipo ──────────────────────────────────────────────────────
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: spacing.md,
+  },
+  segmentButton: {
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: FIGMA.segmentBorder,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  segmentButtonActive: {
+    borderColor: colors.purple,
+  },
+  segmentText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: FIGMA.textMuted,
+  },
+  segmentTextActive: {
+    color: colors.purple,
+  },
+
+  // ── Mensaje ───────────────────────────────────────────────────
+  textarea: {
+    borderWidth: 1,
+    borderColor: FIGMA.textareaBorder,
+    borderRadius: 10.7,
+    padding: 14,
+    minHeight: 140,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12.5,
+    color: colors.textDark,
   },
   charCount: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: colors.textSecondary,
     textAlign: 'right',
-    fontSize: 12,
-    color: COLORS.secondaryText,
     marginTop: 6,
   },
 
-  // Botón enviar
-  submitButton: {
-    backgroundColor: COLORS.accentBlue,
-    paddingVertical: 16,
-    borderRadius: 12,
+  // ── Botón enviar ──────────────────────────────────────────────
+  ctaButton: {
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.purple,
     alignItems: 'center',
-    flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 24,
-    marginHorizontal: 16,
-    shadowColor: COLORS.accentBlue,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    marginTop: spacing.xl,
   },
-  submitButtonDisabled: { opacity: 0.5 },
-  submitText: {
+  ctaButtonDisabled: {
+    opacity: 0.5,
+  },
+  ctaButtonText: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.white,
   },
 });

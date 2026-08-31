@@ -8,18 +8,18 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import InsufficientPointsModal from '../../components/InsufficientPointsModal';
 
-const ACCENT = '#6C5CE7';
-const ACCENT_LIGHT = '#A29BFE';
-const PHASE2_COLOR = '#7B1FA2';
-
-const partnerAbbr = (name) => {
-  const w = name.trim().split(/\s+/);
-  return w.length >= 2 ? (w[0][0] + w[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+// ─── 11.4 · Detalle de recompensa real ─────────────────────────────────────
+// Fiel al Figma (RecompensaDetalleScreen.tsx, título en Figma = nombre de la
+// marca real "Uber Eats" — el propio dato real `reward.partner`, ya
+// genérico en el backend, cumple ese mismo rol). El desglose de saldo (te
+// alcanza/no te alcanza) es funcionalidad real que Figma no modela — se
+// conserva como nota de una línea, igual que en StoreProductDetailScreen.
+const FIGMA = {
+  bodyMuted: 'rgba(52, 58, 61, 0.7)',
 };
 
 const FALLBACK_REWARD = {
@@ -41,10 +41,25 @@ const FALLBACK_REWARD = {
   stock: 12,
 };
 
-export default function StoreRealRewardDetailScreen({ navigation, route }) {
-  const { top: topInset } = useSafeAreaInsets();
-  const { bottom: bottomInset } = useSafeAreaInsets();
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
+function GemIcon({ size = 22, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M5 8L2 3L7 3L12 3L17 3L22 3L19 8L12 21L5 8Z" fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+      <Path d="M2 3L22 3M5 8L19 8M9 3L12 8L15 3" stroke={color} strokeWidth={1.2} fill="none" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export default function StoreRealRewardDetailScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const { reward = FALLBACK_REWARD } = route?.params ?? {};
   const [userBalance] = useState(1840);
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
@@ -70,131 +85,77 @@ export default function StoreRealRewardDetailScreen({ navigation, route }) {
     });
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-      <StatusBar barStyle="light-content" />
+  const description = reward.subtitle && reward.description
+    ? `${reward.subtitle} ${reward.description}`
+    : reward.subtitle ?? reward.description ?? '';
 
-      {/* Header gradiente que cubre el status bar */}
-      <LinearGradient
-        colors={[PHASE2_COLOR, ACCENT]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.headerGradient, { paddingTop: topInset + 12 }]}
-      >
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <View style={styles.header}>
         <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
           accessibilityLabel="Volver"
         >
-          <Ionicons name="chevron-back" size={24} color={colors.white} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Recompensa Real</Text>
-        </View>
-
-        <View style={{ width: 40 }} />
-      </LinearGradient>
+        <Text style={styles.headerTitle} numberOfLines={1}>{reward.partner}</Text>
+        <View style={styles.iconButton} />
+      </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 100 }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
-        <View style={[styles.heroSection, { backgroundColor: reward.color ?? ACCENT }]}>
-          <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>{partnerAbbr(reward.partner)}</Text>
-          </View>
-          <Text style={styles.heroPartner}>{reward.partner}</Text>
-        </View>
-        <View style={styles.titleSection}>
-          <Text style={styles.rewardTitle}>{reward.title}</Text>
-          {!!reward.subtitle && <Text style={styles.rewardSubtitle}>{reward.subtitle}</Text>}
-          {!!reward.description && <Text style={styles.description}>{reward.description}</Text>}
+        {/* ── Banner de marca (color sólido, ver hallazgo de marca) ────── */}
+        <View style={[styles.banner, { backgroundColor: reward.color ?? colors.purple }]}>
+          <Text style={styles.bannerText}>{reward.partner}</Text>
         </View>
 
-        {/* Resumen de coste */}
-        <View style={styles.balanceCard}>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Saldo actual</Text>
-            <Text style={styles.rowValue}>{userBalance.toLocaleString()} O</Text>
-          </View>
+        <Text style={styles.offerTitle}>{reward.title}</Text>
+        {description ? <Text style={styles.description}>{description}</Text> : null}
 
-          <View style={styles.divider} />
-
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Coste de la recompensa</Text>
-            <Text style={[styles.rowValue, { color: PHASE2_COLOR }]}>{reward.cost} O</Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={[
-            styles.resultRow,
-            { backgroundColor: canAfford ? colors.successBg : colors.errorBg },
-          ]}>
-            <Text style={[styles.rowLabel, { color: canAfford ? colors.text : colors.error }]}>
-              Te quedarán
-            </Text>
-            <Text style={[styles.rowValueLarge, { color: canAfford ? colors.success : colors.error }]}>
-              {newBalance.toLocaleString()} O
-            </Text>
-          </View>
-
-          {!canAfford && (
-            <Text style={styles.errorText}>
-              No tienes suficientes puntos para canjear esta recompensa.
-            </Text>
-          )}
-        </View>
-
-        {/* Condiciones */}
-        <View style={styles.conditionsCard}>
-          <View style={styles.conditionsHeader}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={ACCENT} />
-            <Text style={styles.conditionsTitle}>Condiciones de uso</Text>
-          </View>
-
-          {(reward.conditions ?? []).map((cond, index) => (
-            <View key={index} style={styles.conditionItem}>
-              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-              <Text style={styles.conditionText}>{cond}</Text>
+        {reward.conditions?.length > 0 && (
+          <>
+            <Text style={styles.conditionsLabel}>CONDICIONES</Text>
+            <View style={styles.termsList}>
+              {reward.conditions.map((term) => (
+                <Text key={term} style={styles.termItem}>· {term}</Text>
+              ))}
             </View>
-          ))}
+          </>
+        )}
+        {reward.expiry ? <Text style={styles.expiryNote}>{reward.expiry}</Text> : null}
 
-          <View style={styles.expiryWarning}>
-            <Ionicons name="time-outline" size={16} color="#FF9F43" />
-            <Text style={styles.expiryText}>{reward.expiry}</Text>
-          </View>
+        <View style={styles.priceRow}>
+          <Text style={styles.price}>{reward.cost.toLocaleString('es-ES')}</Text>
+          <GemIcon />
         </View>
+        <Text style={[styles.balanceNote, !canAfford && styles.balanceNoteError]}>
+          {canAfford
+            ? `Tienes ${userBalance.toLocaleString('es-ES')} · te quedarán ${newBalance.toLocaleString('es-ES')}`
+            : `Tienes ${userBalance.toLocaleString('es-ES')} · te faltan ${Math.abs(newBalance).toLocaleString('es-ES')}`}
+        </Text>
 
-        {/* Info adicional */}
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle-outline" size={20} color={ACCENT} />
-          <Text style={styles.infoText}>
-            El código será generado automáticamente tras el canje y estará disponible en tu Cartera.
-          </Text>
-        </View>
+        <Text style={styles.infoNote}>
+          El código se generará automáticamente tras el canje y estará disponible en tu Cartera.
+        </Text>
       </ScrollView>
 
-      {/* Footer sticky */}
-      <View style={[styles.footer, { paddingBottom: bottomInset + 12 }]}>
+      {/* ── CTA fijo al fondo ─────────────────────────────────────────── */}
+      <View style={[styles.footer, { paddingBottom: spacing.sm + insets.bottom }]}>
         <TouchableOpacity
-          style={[styles.redeemButton, !canAfford && styles.redeemButtonDisabled]}
+          style={styles.ctaButton}
+          activeOpacity={0.85}
           onPress={handleRedeem}
-          disabled={!canAfford}
-          accessibilityLabel={canAfford ? 'Canjear recompensa' : 'Saldo insuficiente'}
+          accessibilityLabel="Canjear recompensa"
         >
-          <>
-            <Text style={styles.redeemButtonText}>
-              {canAfford ? 'Canjear recompensa' : 'Saldo insuficiente'}
-            </Text>
-            {canAfford && (
-              <Text style={styles.redeemSubtext}>Por {reward.cost} Opopoints</Text>
-            )}
-          </>
+          <Text style={styles.ctaButtonText}>Canjear recompensa</Text>
         </TouchableOpacity>
-        <Text style={styles.warningText}>Esta acción es irreversible.</Text>
       </View>
 
       <InsufficientPointsModal
@@ -211,268 +172,127 @@ export default function StoreRealRewardDetailScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
-  // Header
-  headerGradient: {
-    paddingBottom: 24,
-    paddingHorizontal: 16,
+
+  // ── Header ────────────────────────────────────────────────────
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  backButton: {
-    padding: 4,
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  phase2BadgeContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  phase2BadgeText: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
+  },
+
+  // ── Contenido ─────────────────────────────────────────────────
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 120,
+  },
+  banner: {
+    height: 140,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  bannerText: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 26,
     color: colors.white,
   },
-  // Scroll
-  scrollContent: {
-    paddingTop: 0,
-  },
-  // Hero
-  heroSection: {
-    height: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  heroBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  heroPartner: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  titleSection: {
-    backgroundColor: colors.white,
-    marginHorizontal: 16,
-    marginTop: -1,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  rewardTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: PHASE2_COLOR,
-    marginBottom: 6,
-  },
-  rewardSubtitle: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    marginBottom: 6,
-    lineHeight: 22,
+  offerTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 17,
+    color: colors.textDark,
+    textAlign: 'center',
   },
   description: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 21,
-  },
-  // Balance card
-  balanceCard: {
-    backgroundColor: colors.white,
-    marginHorizontal: 16,
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  rowLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  rowValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  rowValueLarge: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.separator,
-    marginVertical: 12,
-  },
-  resultRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  errorText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12.5,
+    color: FIGMA.bodyMuted,
     textAlign: 'center',
-    color: colors.error,
-    fontSize: 13,
-    marginTop: 10,
-    fontWeight: '600',
-  },
-  // Conditions
-  conditionsCard: {
-    backgroundColor: colors.white,
-    marginHorizontal: 16,
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  conditionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  conditionsTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  conditionItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-    gap: 8,
-  },
-  conditionText: {
-    fontSize: 14,
-    color: colors.text,
-    flex: 1,
-    lineHeight: 20,
-  },
-  expiryWarning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF3E0',
-    padding: 12,
-    borderRadius: 12,
-    gap: 8,
+    lineHeight: 18,
     marginTop: 8,
   },
-  expiryText: {
-    fontSize: 13,
-    color: '#FF9F43',
-    fontWeight: '600',
-    flex: 1,
-  },
-  // Info box
-  infoBox: {
-    backgroundColor: colors.grayLight,
-    marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 16,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 19,
-  },
-  // Footer sticky
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.white,
-    paddingTop: 14,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.separator,
-    alignItems: 'center',
-  },
-  redeemButton: {
-    backgroundColor: ACCENT_LIGHT,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    shadowColor: ACCENT_LIGHT,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  redeemButtonDisabled: {
-    backgroundColor: colors.textSecondary,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  redeemButtonText: {
-    color: colors.white,
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  redeemSubtext: {
-    color: 'rgba(255,255,255,0.82)',
+  conditionsLabel: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 12,
+    color: colors.textDark,
+    marginTop: spacing.lg,
+    marginBottom: 8,
+  },
+  termsList: {
+    gap: 4,
+  },
+  termItem: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11.5,
+    color: FIGMA.bodyMuted,
+    lineHeight: 17,
+  },
+  expiryNote: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 11.5,
+    color: colors.accentOrange,
+    marginTop: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.lg,
+  },
+  price: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 20,
+    color: colors.accentOrange,
+  },
+  balanceNote: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: colors.textSecondary,
     marginTop: 4,
   },
-  warningText: {
-    color: colors.error,
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 10,
+  balanceNoteError: {
+    color: colors.statRed,
+  },
+  infoNote: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    lineHeight: 17,
+    marginTop: spacing.lg,
+  },
+
+  // ── CTA fijo al fondo ─────────────────────────────────────────
+  footer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  ctaButton: {
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.accentOrange,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: colors.white,
   },
 });

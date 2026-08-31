@@ -8,15 +8,30 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { colors } from '../theme';
 
-const ACCENT = '#6C5CE7';
 const { width } = Dimensions.get('window');
 
-// ─── Pop-up "¡Canje realizado!" (mockup 11.3·ok) ─────────────────────────────
-// Modal centrado con animación fade+spring. Se muestra sobre StoreConfirmRedeemScreen
-// tras un canje exitoso.
+// ─── 11.3 · Canje realizado ────────────────────────────────────────────────
+// Fiel al Figma (TiendaModalesScreen.tsx → CanjeRealizadoModal). Único
+// consumidor: StoreConfirmRedeemScreen, tras un canje exitoso.
+const FIGMA = {
+  cardBorder: 'rgba(65, 41, 80, 0.3)',
+};
+
+// Ícono confirmado en Figma: círculo + check verde, sin círculo de fondo
+// adicional detrás (mismo lenguaje visual que el resto de modales de éxito
+// de la app — NotesDigitizedModal, BoeUpdateSuccessScreen).
+function SuccessCheckIcon({ size = 56, color = colors.ctaGreen }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Circle cx={24} cy={24} r={22} stroke={color} strokeWidth={3} fill="none" />
+      <Path d="M14 24.5L20.5 31L34 16.5" stroke={color} strokeWidth={3.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // Props:
 //   visible        — controla la visibilidad
 //   productName    — nombre del producto canjeado
@@ -58,7 +73,6 @@ export default function RedeemSuccessModal({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      {/* Overlay oscuro — tappable para cerrar */}
       <TouchableOpacity
         style={styles.overlay}
         activeOpacity={1}
@@ -66,43 +80,24 @@ export default function RedeemSuccessModal({
         accessibilityLabel="Cerrar"
       />
 
-      {/* Tarjeta centrada */}
       <View style={styles.centeredContainer} pointerEvents="box-none">
         <Animated.View style={[styles.card, { opacity, transform: [{ scale }] }]}>
-
-          {/* Icono de éxito */}
-          <View style={styles.successIcon}>
-            <Ionicons name="checkmark-circle" size={64} color={colors.success} />
-          </View>
+          <SuccessCheckIcon />
 
           <Text style={styles.title}>¡Canje realizado!</Text>
 
           <Text style={styles.message}>
-            El <Text style={styles.productNameHighlight}>{productName}</Text> ya está en tu cuenta.
+            {`El ${productName ?? 'producto'} ya está en tu cuenta. Saldo restante: ${(newBalance ?? 0).toLocaleString('es-ES')} Opopoints.`}
           </Text>
 
-          {/* Saldo restante */}
-          <View style={styles.balanceCard}>
-            <View style={styles.balanceRow}>
-              <Ionicons name="wallet-outline" size={18} color={colors.textSecondary} />
-              <Text style={styles.balanceLabel}>Saldo restante</Text>
-            </View>
-            <Text style={styles.balanceAmount}>
-              {(newBalance ?? 0).toLocaleString()} O
-            </Text>
-          </View>
-
-          {/* CTA principal */}
           <TouchableOpacity
             style={styles.continueButton}
             onPress={handleContinue}
             accessibilityLabel="Empezar a usar el producto"
           >
-            <Ionicons name="chevron-forward" size={20} color={colors.white} />
             <Text style={styles.continueButtonText}>Empezar a usarlo</Text>
           </TouchableOpacity>
 
-          {/* CTA secundario */}
           <TouchableOpacity
             style={styles.closeLink}
             onPress={onClose}
@@ -119,7 +114,7 @@ export default function RedeemSuccessModal({
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   centeredContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -129,99 +124,50 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.white,
-    borderRadius: 24,
-    width: width * 0.88,
-    padding: 28,
+    borderRadius: 10.7,
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
+    width: width * 0.9,
+    maxWidth: 348,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  successIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.successBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.text,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
     textAlign: 'center',
-    marginBottom: 10,
+    marginTop: 16,
   },
   message: {
-    fontSize: 15,
-    color: colors.textSecondary,
+    fontFamily: 'Poppins-Light',
+    fontSize: 13.8,
+    color: colors.textDark,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 20,
+    lineHeight: 19,
+    marginTop: 8,
   },
-  productNameHighlight: {
-    fontWeight: '700',
-    color: ACCENT,
-  },
-  // Saldo
-  balanceCard: {
-    width: '100%',
-    backgroundColor: colors.background,
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  balanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  balanceLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  balanceAmount: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.success,
-  },
-  // Botones
   continueButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: ACCENT,
-    paddingVertical: 15,
-    paddingHorizontal: 28,
-    borderRadius: 14,
     width: '100%',
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.accentOrange,
+    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 12,
+    marginTop: 20,
   },
   continueButtonText: {
-    color: colors.white,
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    fontWeight: '800',
+    color: colors.white,
   },
   closeLink: {
-    paddingVertical: 10,
+    marginTop: 14,
   },
   closeLinkText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins-Light',
+    fontSize: 13.8,
+    color: colors.textDark,
   },
 });

@@ -3,24 +3,139 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { authApi } from '../api';
-import { colors } from '../theme';
+import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
+import { authApi, storeApi } from '../api';
+import { colors, spacing } from '../theme';
 
-function getInitials(name) {
-  if (!name) return '?';
-  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('');
-}
+// ─── 12.1 · Ajustes · hub principal ────────────────────────────────────────
+// Fiel al Figma (HomeConfigScreen.tsx). El reference no muestra la fila
+// "Tu opinión" (Feedback) ni las acciones de sesión (cerrar sesión / eliminar
+// cuenta) — son funcionalidad real imprescindible (sin logout no hay forma
+// de salir de la cuenta) y se conservan, añadidas al final de la lista plana
+// que sí confirma Figma. El saldo de Opopoints en el header es un dato real
+// (mismo sistema de Bloque 11 · Tienda) que el archivo real no mostraba
+// todavía — se conecta aquí con storeApi.getBalance().
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  separator: 'rgba(65, 41, 80, 0.12)',
+  highlightBg: '#F5F5F7',
+};
 
 function resetToSplash(navigation) {
   navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
 }
 
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function ChevronRightIcon({ size = 18, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M9 5L16 12L9 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function AvatarIcon({ size = 96 }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx={12} cy={12} r={11} stroke={colors.purple} strokeWidth={1.4} fill="none" />
+      <Circle cx={12} cy={9.5} r={3.3} stroke={colors.purple} strokeWidth={1.4} fill="none" />
+      <Path d="M5.5 19C6.8 16.2 9.1 14.7 12 14.7C14.9 14.7 17.2 16.2 18.5 19" stroke={colors.purple} strokeWidth={1.4} fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function PersonIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx={12} cy={8} r={3.4} stroke={color} strokeWidth={1.6} fill="none" />
+      <Path d="M5 20C6 16.5 8.7 14.7 12 14.7C15.3 14.7 18 16.5 19 20" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function CardIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect x={2.5} y={5} width={19} height={14} rx={2.2} stroke={color} strokeWidth={1.6} fill="none" />
+      <Line x1={2.5} y1={9.5} x2={21.5} y2={9.5} stroke={color} strokeWidth={1.6} />
+    </Svg>
+  );
+}
+
+function DeviceIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect x={7} y={2} width={10} height={20} rx={2} stroke={color} strokeWidth={1.6} fill="none" />
+      <Line x1={10.5} y1={18.3} x2={13.5} y2={18.3} stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function SparkleIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M12 3L13.6 9.4L20 11L13.6 12.6L12 19L10.4 12.6L4 11L10.4 9.4L12 3Z" fill={color} />
+    </Svg>
+  );
+}
+
+function ChartIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect x={3.5} y={13} width={3.4} height={7.5} rx={0.8} fill={color} />
+      <Rect x={10.3} y={8} width={3.4} height={12.5} rx={0.8} fill={color} />
+      <Rect x={17.1} y={4} width={3.4} height={16.5} rx={0.8} fill={color} />
+    </Svg>
+  );
+}
+
+function AccessibilityIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx={12} cy={12} r={9.5} stroke={color} strokeWidth={1.5} fill="none" />
+      <Circle cx={12} cy={7.3} r={1.6} fill={color} />
+      <Path d="M6 10.2C8 10.9 10 11.2 12 11.2C14 11.2 16 10.9 18 10.2M12 11.2V20M12 14.5L9 20M12 14.5L15 20" stroke={color} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function HelpIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx={12} cy={12} r={9.5} stroke={color} strokeWidth={1.5} fill="none" />
+      <Circle cx={12} cy={12} r={4} stroke={color} strokeWidth={1.3} fill="none" />
+      <Line x1={5.3} y1={5.3} x2={9.2} y2={9.2} stroke={color} strokeWidth={1.3} />
+      <Line x1={18.7} y1={5.3} x2={14.8} y2={9.2} stroke={color} strokeWidth={1.3} />
+      <Line x1={5.3} y1={18.7} x2={9.2} y2={14.8} stroke={color} strokeWidth={1.3} />
+      <Line x1={18.7} y1={18.7} x2={14.8} y2={14.8} stroke={color} strokeWidth={1.3} />
+    </Svg>
+  );
+}
+
+// Sin equivalente en Figma (la fila "Tu opinión" no está en el reference) —
+// bocadillo de chat genérico, mismo lenguaje visual que el resto de íconos.
+function FeedbackIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M3 5.5C3 4.1 4.1 3 5.5 3H18.5C19.9 3 21 4.1 21 5.5V14.5C21 15.9 19.9 17 18.5 17H9L4.5 20.5V17H5.5C4.1 17 3 15.9 3 14.5V5.5Z" stroke={color} strokeWidth={1.5} fill="none" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export default function SettingsScreen({ navigation }) {
   const [user, setUser] = useState(null);
+  const [opopoints, setOpopoints] = useState(null);
 
   useEffect(() => {
     authApi.me().then(({ data }) => { if (data) setUser(data); });
+    storeApi.getBalance().then((res) => { if (res?.data) setOpopoints(res.data.balance); });
   }, []);
 
   const oposicionLine = [user?.oposicion, user?.especialidad].filter(Boolean).join(' · ')
@@ -29,76 +144,67 @@ export default function SettingsScreen({ navigation }) {
   // TODO: leer estado de suscripción real desde RevenueCat/backend
   const subscriptionSubtext = 'Premium · renueva 14 jul';
 
-  const SETTINGS = [
+  const MENU_ROWS = [
     {
-      group: 'CUENTA',
-      items: [
-        {
-          id: 'perfil',
-          title: 'Perfil y biometría',
-          icon: 'person-outline',
-          subtext: oposicionLine,
-          onPress: () => navigation.navigate('ConfigPerfil'),
-        },
-        {
-          id: 'suscripcion',
-          title: 'Suscripción',
-          icon: 'card-outline',
-          subtext: subscriptionSubtext,
-          onPress: () => navigation.navigate('ConfigSubscription'),
-        },
-        {
-          id: 'dispositivos',
-          title: 'Dispositivos conectados',
-          icon: 'pulse-outline',
-          subtext: 'Sin dispositivos',
-          // TODO: cargar count real desde user_devices (Bloque 3)
-          onPress: () => navigation.navigate('ConfigDevices'),
-        },
-        {
-          id: 'tono-ia',
-          title: 'Tono de la IA',
-          icon: 'chatbubbles-outline',
-          subtext: 'Equilibrado',
-          // TODO: leer preferencia desde perfil Supabase o AsyncStorage
-          onPress: () => navigation.navigate('ConfigTone'),
-        },
-      ],
+      id: 'perfil',
+      icon: PersonIcon,
+      label: 'Perfil y biometría',
+      subtitle: oposicionLine,
+      onPress: () => navigation.navigate('ConfigPerfil'),
     },
     {
-      group: 'APLICACIÓN',
-      items: [
-        {
-          id: 'estadisticas',
-          title: 'Estadísticas Pro',
-          icon: 'bar-chart-outline',
-          subtext: '78% Prob. Aprobado',
-          // TODO: calcular desde training_attempt_responses — endpoint GET /config/pro-stats
-          onPress: () => navigation.navigate('ConfigStats'),
-        },
-        {
-          id: 'accesibilidad',
-          title: 'Accesibilidad',
-          icon: 'accessibility-outline',
-          subtext: 'Tema automático',
-          // Preferencia local — AsyncStorage, no necesita backend
-          onPress: () => navigation.navigate('ConfigAccessibility'),
-        },
-        {
-          id: 'ayuda',
-          title: 'Ayuda y soporte',
-          icon: 'help-circle-outline',
-          subtext: 'FAQ y Chat',
-          onPress: () => navigation.navigate('ConfigHelp'),
-        },
-        {
-          id: 'feedback',
-          title: 'Tu opinión',
-          icon: 'chatbubble-outline',
-          subtext: 'Sugerencias y errores',
-          onPress: () => navigation.navigate('ConfigFeedback'),
-        },
-      ],
+      id: 'suscripcion',
+      icon: CardIcon,
+      label: 'Suscripción',
+      subtitle: subscriptionSubtext,
+      highlighted: true,
+      onPress: () => navigation.navigate('ConfigSubscription'),
+    },
+    {
+      id: 'dispositivos',
+      icon: DeviceIcon,
+      label: 'Dispositivos conectados',
+      // TODO: cargar count real desde user_devices (Bloque 3)
+      subtitle: 'Sin dispositivos',
+      onPress: () => navigation.navigate('ConfigDevices'),
+    },
+    {
+      id: 'tono-ia',
+      icon: SparkleIcon,
+      label: 'Tono de la IA',
+      // TODO: leer preferencia desde perfil Supabase o AsyncStorage
+      subtitle: 'Equilibrado',
+      onPress: () => navigation.navigate('ConfigTone'),
+    },
+    {
+      id: 'estadisticas',
+      icon: ChartIcon,
+      label: 'Estadísticas Pro',
+      // TODO: calcular desde training_attempt_responses — endpoint GET /config/pro-stats
+      subtitle: '78% Prob. Aprobado',
+      onPress: () => navigation.navigate('ConfigStats'),
+    },
+    {
+      id: 'accesibilidad',
+      icon: AccessibilityIcon,
+      label: 'Accesibilidad',
+      // Preferencia local — AsyncStorage, no necesita backend
+      subtitle: 'Tema automático',
+      onPress: () => navigation.navigate('ConfigAccessibility'),
+    },
+    {
+      id: 'ayuda',
+      icon: HelpIcon,
+      label: 'Ayuda y soporte',
+      subtitle: 'FAQ y Chat',
+      onPress: () => navigation.navigate('ConfigHelp'),
+    },
+    {
+      id: 'feedback',
+      icon: FeedbackIcon,
+      label: 'Tu opinión',
+      subtitle: 'Sugerencias y errores',
+      onPress: () => navigation.navigate('ConfigFeedback'),
     },
   ];
 
@@ -108,63 +214,56 @@ export default function SettingsScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* HEADER con perfil */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <View style={styles.profileRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{getInitials(user?.displayName)}</Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName} numberOfLines={1}>{user?.displayName || 'Opositor'}</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText} numberOfLines={1}>{oposicionLine}</Text>
-            </View>
-          </View>
-          {/* Cerrar — va a la derecha (no back, Settings es un destino de tab) */}
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-            accessibilityLabel="Cerrar ajustes"
-            style={styles.closeBtn}
-          >
-            <Ionicons name="close" size={24} color="#64748B" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Volver"
+        >
+          <ChevronLeftIcon />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Ajustes</Text>
+        <View style={styles.iconButton} />
+      </View>
+
+      {/* ── Perfil ──────────────────────────────────────────────────── */}
+      <View style={styles.profileBlock}>
+        <AvatarIcon />
+        <Text style={styles.userName} numberOfLines={1}>{user?.displayName || 'Opositor'}</Text>
+        <Text style={styles.userPoints}>
+          {opopoints !== null ? opopoints.toLocaleString('es-ES') : '—'} OpoPoints
+        </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {SETTINGS.map((section) => (
-          <View key={section.group}>
-            <Text style={styles.sectionTitle}>{section.group}</Text>
-            <View style={styles.group}>
-              {section.items.map((item, idx) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.row, idx === section.items.length - 1 && styles.rowLast]}
-                  onPress={item.onPress}
-                  activeOpacity={0.7}
-                  accessibilityLabel={item.title}
-                >
-                  <View style={styles.rowLeft}>
-                    <Ionicons name={item.icon} size={22} color="#64748B" />
-                    <View style={styles.rowTexts}>
-                      <Text style={styles.rowTitle}>{item.title}</Text>
-                      {item.subtext ? (
-                        <Text style={styles.rowSub} numberOfLines={1}>{item.subtext}</Text>
-                      ) : null}
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ))}
+        {MENU_ROWS.map((row) => {
+          const Icon = row.icon;
+          return (
+            <TouchableOpacity
+              key={row.id}
+              style={[styles.row, row.highlighted && styles.rowHighlighted]}
+              activeOpacity={0.7}
+              onPress={row.onPress}
+              accessibilityLabel={row.label}
+            >
+              <Icon />
+              <View style={styles.rowTextWrap}>
+                <Text style={styles.rowLabel}>{row.label}</Text>
+                {row.subtitle ? (
+                  <Text style={styles.rowSubtitle} numberOfLines={1}>{row.subtitle}</Text>
+                ) : null}
+              </View>
+              <ChevronRightIcon />
+            </TouchableOpacity>
+          );
+        })}
 
-        {/* ACCIONES DE SESIÓN — separadas por seguridad UX */}
+        {/* ── Acciones de sesión — reales, sin equivalente en Figma ──── */}
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.logoutBtn}
@@ -184,99 +283,114 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-
-  // Header
-  header: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.white,
   },
-  profileRow: {
+
+  // ── Header ────────────────────────────────────────────────────
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#1B2A4A',
+  iconButton: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
-  userInfo: { flex: 1 },
-  userName: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginBottom: 4 },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.success,
+  headerTitle: {
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
   },
-  badgeText: { fontSize: 11, fontWeight: '600', color: colors.success },
-  closeBtn: { padding: 4 },
 
-  // Scroll
-  scroll: { paddingBottom: 32 },
-
-  // Secciones
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
-  },
-  group: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
+  // ── Perfil ────────────────────────────────────────────────────
+  profileBlock: {
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.lg,
     borderBottomWidth: 1,
-    borderColor: '#E2E8F0',
+    borderBottomColor: FIGMA.separator,
+  },
+  userName: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: colors.textDark,
+    marginTop: 10,
+  },
+  userPoints: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+  },
+
+  // ── Lista ─────────────────────────────────────────────────────
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 10,
   },
-  // Elimina borde inferior del último item para evitar doble línea con el grupo
-  rowLast: { borderBottomWidth: 0 },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
-  rowTexts: { flex: 1 },
-  rowTitle: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
-  rowSub: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  rowHighlighted: {
+    backgroundColor: FIGMA.highlightBg,
+  },
+  rowTextWrap: {
+    flex: 1,
+  },
+  rowLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+  },
+  rowSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+  },
 
-  // Footer
-  footer: { paddingHorizontal: 16, paddingTop: 32, alignItems: 'center', gap: 12 },
+  // ── Acciones de sesión ────────────────────────────────────────
+  footer: {
+    paddingTop: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.sm + 4,
+  },
   logoutBtn: {
     width: '100%',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: FIGMA.separator,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
   },
-  logoutText: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
-  deleteLink: { paddingVertical: 4 },
-  deleteText: { fontSize: 13, fontWeight: '600', color: colors.error },
-
+  logoutText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 15,
+    color: colors.textDark,
+  },
+  deleteLink: {
+    paddingVertical: 4,
+  },
+  deleteText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    color: colors.statRed,
+  },
 });

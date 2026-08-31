@@ -4,9 +4,21 @@ import {
   Switch, Alert, ActivityIndicator, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import ReportSuccessModal from './ReportSuccessModal';
+
+// ─── 12.7 · Exportar informe ────────────────────────────────────────────────
+// Fiel al Figma (ExportarInformeScreen.tsx). El flujo real de generación
+// (validación de selección vacía, spinner "Generando…", modal de éxito con
+// compartir/guardar) es funcionalidad real que Figma no modela — se
+// conserva íntegro, solo se reestiliza. ReportSuccessModal aún no tiene
+// referencia de Figma propia, se deja sin tocar por ahora.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  segmentBorder: 'rgba(65, 41, 80, 0.3)',
+  toggleBorder: 'rgba(65, 41, 80, 0.12)',
+};
 
 // TODO: implementar generación real → POST /config/pro-stats/export
 // Body: { period, includeProbability, includeSoftSkills, includeHistory, includeEvolution }
@@ -19,49 +31,26 @@ const PERIOD_OPTIONS = [
 ];
 
 const INCLUDE_OPTIONS = [
-  { key: 'probability', label: 'Probabilidad de aprobado', icon: 'trending-up-outline' },
-  { key: 'softSkills', label: 'Radar de soft-skills', icon: 'stats-chart-outline' },
-  { key: 'history', label: 'Historial de tests', icon: 'document-text-outline' },
-  { key: 'evolution', label: 'Evolución por temas', icon: 'bar-chart-outline' },
+  { key: 'probability', label: 'Probabilidad de aprobado' },
+  { key: 'softSkills', label: 'Radar de soft-skills' },
+  { key: 'history', label: 'Historial de tests' },
+  { key: 'evolution', label: 'Evolución por temas' },
 ];
 
-function PeriodOption({ label, isSelected, onPress }) {
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
   return (
-    <TouchableOpacity
-      style={[styles.periodOption, isSelected && styles.periodOptionSelected]}
-      onPress={onPress}
-      activeOpacity={0.7}
-      accessibilityLabel={`Periodo ${label}`}
-    >
-      <Text style={[styles.periodText, isSelected && styles.periodTextSelected]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
   );
 }
 
-function ToggleOption({ label, icon, value, onValueChange, isLast }) {
+function DownloadIcon({ size = 18, color = colors.white }) {
   return (
-    <TouchableOpacity
-      style={[styles.optionRow, isLast && styles.optionRowLast]}
-      onPress={() => onValueChange(!value)}
-      activeOpacity={0.7}
-      accessibilityLabel={`${label} ${value ? 'activado' : 'desactivado'}`}
-    >
-      <View style={styles.optionLeft}>
-        <View style={styles.iconBox}>
-          <Ionicons name={icon} size={14} color="#3B82F6" />
-        </View>
-        <Text style={styles.optionLabel}>{label}</Text>
-      </View>
-      <Switch
-        trackColor={{ false: '#E2E8F0', true: '#93C5FD' }}
-        thumbColor={value ? '#FFFFFF' : '#F4F4F4'}
-        onValueChange={onValueChange}
-        value={value}
-        accessibilityLabel={label}
-      />
-    </TouchableOpacity>
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M12 3V15M12 15L7 10M12 15L17 10" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5 19H19" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
   );
 }
 
@@ -69,9 +58,9 @@ export default function ConfigExportScreen({ navigation }) {
   const [period, setPeriod] = useState('trimestre');
   const [includes, setIncludes] = useState({
     probability: true,
-    softSkills: true,
-    history: false,
-    evolution: true,
+    softSkills: false,
+    history: true,
+    evolution: false,
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -120,60 +109,62 @@ export default function ConfigExportScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* HEADER */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          style={styles.iconButton}
           activeOpacity={0.7}
+          onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
-          style={styles.headerBack}
         >
-          <Ionicons name="chevron-back" size={24} color="#1E293B" />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Exportar informe</Text>
-        <View style={styles.headerRight} />
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle}>Exportar informe</Text>
+          <Text style={styles.headerSubtitle}>Genera un PDF de tu rendimiento para tu tutor o academia.</Text>
+        </View>
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        <Text style={styles.description}>
-          Genera un PDF de tu rendimiento para tu tutor o academia.
-        </Text>
-
-        {/* PERIODO */}
-        <Text style={styles.sectionTitle}>PERIODO</Text>
-        <View style={styles.card}>
-          <View style={styles.periodRow}>
-            {PERIOD_OPTIONS.map(({ key, label }) => (
-              <PeriodOption
+        {/* ── Periodo ───────────────────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>PERIODO</Text>
+        <View style={styles.segmentedRow}>
+          {PERIOD_OPTIONS.map(({ key, label }) => {
+            const isActive = period === key;
+            return (
+              <TouchableOpacity
                 key={key}
-                label={label}
-                isSelected={period === key}
+                style={[styles.segmentButton, isActive && styles.segmentButtonActive]}
                 onPress={() => setPeriod(key)}
-              />
-            ))}
-          </View>
+                activeOpacity={0.7}
+                accessibilityLabel={`Periodo ${label}`}
+              >
+                <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* INCLUIR */}
-        <Text style={styles.sectionTitle}>INCLUIR</Text>
-        <View style={styles.card}>
-          {INCLUDE_OPTIONS.map(({ key, label, icon }, idx) => (
-            <ToggleOption
-              key={key}
-              label={label}
-              icon={icon}
+        {/* ── Incluir ───────────────────────────────────────────────────── */}
+        <Text style={[styles.sectionLabel, styles.sectionSpacing]}>INCLUIR</Text>
+        {INCLUDE_OPTIONS.map(({ key, label }, idx) => (
+          <View key={key} style={[styles.toggleRow, idx > 0 && styles.toggleRowBorder]}>
+            <Text style={styles.toggleLabel}>{label}</Text>
+            <Switch
               value={includes[key]}
               onValueChange={() => toggleInclude(key)}
-              isLast={idx === INCLUDE_OPTIONS.length - 1}
+              trackColor={{ false: '#E2E2E6', true: colors.purple }}
+              thumbColor={colors.white}
+              accessibilityLabel={`${label} ${includes[key] ? 'activado' : 'desactivado'}`}
             />
-          ))}
-        </View>
+          </View>
+        ))}
 
-        {/* BOTÓN GENERAR */}
+        {/* ── Botón generar ─────────────────────────────────────────────── */}
         <TouchableOpacity
           style={[styles.generateBtn, isGenerating && styles.generateBtnDisabled]}
           onPress={handleGenerate}
@@ -183,17 +174,16 @@ export default function ConfigExportScreen({ navigation }) {
         >
           {isGenerating ? (
             <>
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={colors.white} />
               <Text style={styles.generateBtnText}>Generando…</Text>
             </>
           ) : (
             <>
-              <Ionicons name="download-outline" size={20} color="#FFFFFF" />
+              <DownloadIcon />
               <Text style={styles.generateBtnText}>Generar PDF</Text>
             </>
           )}
         </TouchableOpacity>
-
       </ScrollView>
 
       <ReportSuccessModal
@@ -208,111 +198,116 @@ export default function ConfigExportScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
 
-  // Header
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  headerBack: { padding: 8 },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  headerRight: { width: 40 },
-
-  // Scroll
-  scroll: { paddingBottom: 40 },
-  description: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    marginHorizontal: 24,
-    marginTop: 20,
-    lineHeight: 20,
-  },
-
-  // Secciones
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-    padding: 12,
-  },
-
-  // Periodo
-  periodRow: { flexDirection: 'row', gap: 8 },
-  periodOption: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-  },
-  periodOptionSelected: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
-  },
-  periodText: { fontSize: 14, fontWeight: '500', color: '#64748B' },
-  periodTextSelected: { fontWeight: '700', color: '#3B82F6' },
-
-  // Opciones de inclusión
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  optionRowLast: { borderBottomWidth: 0 },
-  optionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  iconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
-    backgroundColor: '#EFF6FF',
+  iconButton: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionLabel: { fontSize: 14, fontWeight: '500', color: '#1E293B', flex: 1 },
+  headerTitles: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+  },
+  headerSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
+  },
 
-  // Botón generar
+  // ── Contenido ─────────────────────────────────────────────────
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sectionLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: colors.textDark,
+    marginBottom: spacing.sm + 4,
+  },
+  sectionSpacing: {
+    marginTop: spacing.lg,
+  },
+
+  // ── Periodo ───────────────────────────────────────────────────
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  segmentButton: {
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  segmentButtonActive: {
+    borderColor: FIGMA.segmentBorder,
+  },
+  segmentText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: FIGMA.textMuted,
+  },
+  segmentTextActive: {
+    color: colors.textDark,
+  },
+
+  // ── Incluir ───────────────────────────────────────────────────
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  toggleRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: FIGMA.toggleBorder,
+  },
+  toggleLabel: {
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    color: colors.textDark,
+  },
+
+  // ── Botón generar ─────────────────────────────────────────────
   generateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#3B82F6',
-    marginHorizontal: 16,
-    marginTop: 24,
-    paddingVertical: 15,
-    borderRadius: 12,
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.purple,
+    marginTop: spacing.xl,
   },
-  generateBtnDisabled: { opacity: 0.7 },
-  generateBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  generateBtnDisabled: {
+    opacity: 0.7,
+  },
+  generateBtnText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: colors.white,
+  },
 });

@@ -9,40 +9,42 @@ import {
   Share,
   Linking,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import { storeApi } from '../../api/store';
 
-const ACCENT = '#6C5CE7';
-const ACCENT_LIGHT = '#A29BFE';
-const PHASE2_COLOR = '#7B1FA2';
-
+// ─── 11.3 · Mi cartera ──────────────────────────────────────────────────────
+// Fiel al Figma (MiCarteraScreen.tsx). El backend real ya devuelve un tercer
+// estado, "expired" (caducado), que Figma no contempla (solo modela
+// Activas/Usadas) — se conserva con el mismo tratamiento visual atenuado de
+// "Usadas" para no perder esa información. El preview del código + acción
+// de copiar/abrir enlace es funcionalidad real sin equivalente en Figma.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  textDisabled: 'rgba(65, 41, 80, 0.3)',
+  cardBorder: 'rgba(65, 41, 80, 0.3)',
+  greenBg: 'rgba(36, 189, 144, 0.06)',
+};
 
 const STATUS_LABELS = { active: 'Activo', used: 'Usado', expired: 'Caducado' };
 
-const getStatusColor = (status) => {
-  if (status === 'active') return colors.success;
-  if (status === 'expired') return colors.error;
-  return colors.textSecondary;
-};
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
-const getStatusBg = (status) => {
-  if (status === 'active') return colors.successBg;
-  if (status === 'expired') return colors.errorBg;
-  return colors.grayLight;
-};
+function RewardRow({ item, navigation }) {
+  const isActive = item.status === 'active';
+  const isExpired = item.status === 'expired';
 
-const partnerAbbr = (name) => {
-  const w = name.trim().split(/\s+/);
-  return w.length >= 2 ? (w[0][0] + w[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
-};
-
-const RewardCard = ({ item, navigation }) => {
   const handlePress = () => {
-    if (item.status !== 'active') return;
+    if (!isActive) return;
     navigation.navigate('StoreCodeDetail', {
       codeData: {
         partner: item.partner,
@@ -70,38 +72,28 @@ const RewardCard = ({ item, navigation }) => {
     } catch (_) {}
   };
 
-  const isActive = item.status === 'active';
+  const caption = item.status === 'used' && item.usedDate
+    ? `Usado el ${item.usedDate}`
+    : isExpired
+      ? `Caducó el ${item.expiryDate}`
+      : `Caduca el ${item.expiryDate}`;
 
   return (
     <TouchableOpacity
-      style={[styles.card, !isActive && styles.cardInactive]}
+      style={[styles.row, isActive ? styles.rowActive : styles.rowMuted]}
       onPress={handlePress}
       disabled={!isActive}
       activeOpacity={0.8}
       accessibilityLabel={`${item.partner} ${item.title}, ${STATUS_LABELS[item.status]}`}
     >
-      <View style={[styles.partnerAvatar, { backgroundColor: item.color }]}>
-        <Text style={styles.partnerAvatarText}>{partnerAbbr(item.partner)}</Text>
+      <View style={[styles.iconWrap, { backgroundColor: isActive ? item.color : `${item.color}4D` }]}>
+        <Ionicons name={item.icon ?? 'gift-outline'} size={18} color={colors.white} />
       </View>
-
-      <View style={styles.cardInfo}>
-        <View style={styles.cardTopRow}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.partner} · {item.title}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusBg(item.status) }]}>
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-              {STATUS_LABELS[item.status]}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.cardSubtitle}>
-          {item.status === 'used' && item.usedDate
-            ? `Usado el ${item.usedDate}`
-            : item.status === 'expired'
-            ? `Caducó el ${item.expiryDate}`
-            : `Caduca el ${item.expiryDate}`}
+      <View style={styles.rowTextWrap}>
+        <Text style={[styles.rowTitle, !isActive && styles.rowTitleMuted]} numberOfLines={1}>
+          {item.partner} · {item.title}
         </Text>
-
+        <Text style={[styles.rowCaption, !isActive && styles.rowCaptionMuted]}>{caption}</Text>
         {isActive && (
           <View style={styles.codeRow}>
             <View style={styles.codePreview}>
@@ -114,19 +106,25 @@ const RewardCard = ({ item, navigation }) => {
             >
               <Ionicons
                 name={item.actionUrl ? 'open-outline' : 'copy-outline'}
-                size={14}
-                color={ACCENT}
+                size={13}
+                color={colors.ctaGreen}
               />
             </TouchableOpacity>
           </View>
         )}
       </View>
+      <Text style={[
+        styles.statusText,
+        isActive && styles.statusTextActive,
+        isExpired && styles.statusTextExpired,
+      ]}>
+        {STATUS_LABELS[item.status]}
+      </Text>
     </TouchableOpacity>
   );
-};
+}
 
 export default function StoreWalletScreen({ navigation }) {
-  const { top: topInset } = useSafeAreaInsets();
   const [walletData, setWalletData] = useState([]);
 
   useFocusEffect(useCallback(() => {
@@ -143,30 +141,22 @@ export default function StoreWalletScreen({ navigation }) {
   const expiredItems = walletData.filter((i) => i.status === 'expired');
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      <LinearGradient
-        colors={[PHASE2_COLOR, ACCENT]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.headerGradient, { paddingTop: topInset + 12 }]}
-      >
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <View style={styles.header}>
         <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
           accessibilityLabel="Volver"
         >
-          <Ionicons name="chevron-back" size={24} color={colors.white} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Mi cartera</Text>
-          <Text style={styles.headerSubtitle}>Tus códigos y recompensas canjeadas</Text>
-        </View>
-
-        <View style={{ width: 40 }} />
-      </LinearGradient>
+        <Text style={styles.headerTitle}>Mi cartera</Text>
+        <View style={styles.iconButton} />
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -174,37 +164,49 @@ export default function StoreWalletScreen({ navigation }) {
       >
         {activeItems.length > 0 && (
           <>
-            <Text style={styles.sectionHeader}>ACTIVAS</Text>
+            <Text style={styles.sectionLabel}>ACTIVAS</Text>
             {activeItems.map((item) => (
-              <RewardCard key={item.id} item={item} navigation={navigation} />
+              <RewardRow key={item.id} item={item} navigation={navigation} />
             ))}
           </>
         )}
 
         {usedItems.length > 0 && (
           <>
-            <Text style={styles.sectionHeader}>USADAS</Text>
+            <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>USADAS</Text>
             {usedItems.map((item) => (
-              <RewardCard key={item.id} item={item} navigation={navigation} />
+              <RewardRow key={item.id} item={item} navigation={navigation} />
             ))}
           </>
         )}
 
+        {/* "Caducadas" — real, sin equivalente en Figma (solo modela Activas/Usadas) */}
         {expiredItems.length > 0 && (
           <>
-            <Text style={styles.sectionHeader}>CADUCADAS</Text>
+            <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>CADUCADAS</Text>
             {expiredItems.map((item) => (
-              <RewardCard key={item.id} item={item} navigation={navigation} />
+              <RewardRow key={item.id} item={item} navigation={navigation} />
             ))}
           </>
         )}
 
         {walletData.length === 0 && (
           <View style={styles.emptyState}>
-            <Ionicons name="folder-open-outline" size={48} color={colors.textSecondary} />
+            <Ionicons name="folder-open-outline" size={44} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No tienes recompensas todavía.</Text>
           </View>
         )}
+
+        {/* Banner de venta cruzada — ver hallazgo 2: su propósito en esta
+            pantalla no es obvio, pero está anidado correctamente en Figma
+            (no es un nodo huérfano), así que se implementa sin gate. */}
+        <TouchableOpacity
+          style={styles.ctaButton}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('StoreSubscription')}
+        >
+          <Text style={styles.ctaButtonText}>Suscribirme a premium</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -213,148 +215,156 @@ export default function StoreWalletScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
-  // Header
-  headerGradient: {
-    paddingBottom: 24,
-    paddingHorizontal: 16,
+
+  // ── Header ────────────────────────────────────────────────────
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  backButton: {
-    padding: 4,
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: 8,
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.white,
-    marginBottom: 4,
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
   },
-  headerSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.82)',
-    lineHeight: 18,
-  },
-  // Scroll
+
+  // ── Contenido ─────────────────────────────────────────────────
   scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
   },
-  // Section headers
-  sectionHeader: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.textSecondary,
-    letterSpacing: 0.8,
-    marginTop: 16,
+  sectionLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: colors.textDark,
     marginBottom: 10,
   },
-  // Cards
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
+  sectionLabelSpaced: {
+    marginTop: spacing.lg,
+  },
+
+  // ── Filas ─────────────────────────────────────────────────────
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+  },
+  rowActive: {
     borderWidth: 1,
-    borderColor: colors.separator,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    borderColor: colors.ctaGreen,
+    backgroundColor: FIGMA.greenBg,
   },
-  cardInactive: {
-    opacity: 0.6,
+  rowMuted: {
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
+    opacity: 0.7,
   },
-  partnerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
-  partnerAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  cardInfo: {
+  rowTextWrap: {
     flex: 1,
   },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 3,
+  rowTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    color: colors.textDark,
   },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-    flex: 1,
-    marginRight: 8,
+  rowTitleMuted: {
+    color: FIGMA.textDisabled,
   },
-  cardSubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 6,
+  rowCaption: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+    marginTop: 2,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    flexShrink: 0,
+  rowCaptionMuted: {
+    color: FIGMA.textDisabled,
   },
   statusText: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 11,
-    fontWeight: '700',
+    color: FIGMA.textDisabled,
+  },
+  statusTextActive: {
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.ctaGreen,
+  },
+  statusTextExpired: {
+    color: colors.statRed,
   },
   codeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 6,
   },
   codePreview: {
-    backgroundColor: colors.grayLight,
+    backgroundColor: `${colors.ctaGreen}1A`,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
   codePreviewText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: ACCENT,
+    fontFamily: 'Poppins-Bold',
+    fontSize: 11.5,
+    color: colors.ctaGreen,
     letterSpacing: 1,
   },
   actionChip: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: colors.grayLight,
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: `${colors.ctaGreen}1A`,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Empty
+
+  // ── Vacío ─────────────────────────────────────────────────────
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
   },
   emptyText: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 14,
     color: colors.textSecondary,
-    marginTop: 12,
+    marginTop: spacing.md,
+  },
+
+  // ── Banner de venta cruzada ───────────────────────────────────
+  ctaButton: {
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.accentOrange,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+  },
+  ctaButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: colors.white,
   },
 });

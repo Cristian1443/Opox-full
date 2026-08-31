@@ -4,25 +4,82 @@ import {
   Switch, Modal, TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { authApi } from '../../api';
-import { colors } from '../../theme';
+import { colors, spacing } from '../../theme';
 import {
   isBiometricLinked, detectBiometricType, biometricLabel,
   setupBiometric, disableBiometric,
 } from '../../lib/biometric';
 
-function getInitials(name) {
-  if (!name) return '?';
-  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('');
+// ─── 12.2 · Perfil y biometría ─────────────────────────────────────────────
+// Fiel al Figma (PerfilYBiometriaScreen.tsx). El hallazgo de nomenclatura
+// ("EXPLORAR" en vez de "SEGURIDAD" en el árbol de capas) es solo un
+// problema interno de Figma, sin impacto en el contenido. La detección real
+// de biometría (oculta el interruptor si el dispositivo no la soporta, pide
+// confirmación al desactivar) y los modales de edición de nombre/email son
+// funcionalidad real que Figma no modela — se conservan.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  separator: 'rgba(65, 41, 80, 0.12)',
+  cardBorder: 'rgba(65, 41, 80, 0.3)',
+};
+
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
 }
 
-// Icono en cuadro coloreado reutilizable dentro de la pantalla
-function IconBox({ name, size = 20, color = '#3B82F6', bg = '#EFF6FF' }) {
+function ChevronRightIcon({ size = 18, color = colors.textDark }) {
   return (
-    <View style={[styles.iconBox, { backgroundColor: bg }]}>
-      <Ionicons name={name} size={size} color={color} />
-    </View>
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M9 5L16 12L9 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function AvatarIcon({ size = 110 }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx={12} cy={12} r={11} stroke={colors.purple} strokeWidth={1.4} fill="none" />
+      <Circle cx={12} cy={9.5} r={3.3} stroke={colors.purple} strokeWidth={1.4} fill="none" />
+      <Path d="M5.5 19C6.8 16.2 9.1 14.7 12 14.7C14.9 14.7 17.2 16.2 18.5 19" stroke={colors.purple} strokeWidth={1.4} fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function FaceIdIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M4 8V6C4 4.9 4.9 4 6 4H8M16 4H18C19.1 4 20 4.9 20 6V8M20 16V18C20 19.1 19.1 20 18 20H16M8 20H6C4.9 20 4 19.1 4 18V16" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <Circle cx={9} cy={11} r={0.9} fill={color} />
+      <Circle cx={15} cy={11} r={0.9} fill={color} />
+      <Path d="M9 15C10 15.8 14 15.8 15 15" stroke={color} strokeWidth={1.4} fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function FingerprintIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M12 3C7 3 3 7 3 12V15" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <Path d="M12 3C17 3 21 7 21 12V13" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <Path d="M8 20C6.7 18 6 15.9 6 13.5C6 10.5 8.7 8 12 8C15.3 8 18 10.5 18 13.5C18 14.4 17.9 15.2 17.6 16" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <Path d="M12 20C10.3 17.8 9.3 16 9.3 13.5C9.3 12.1 10.5 11 12 11C13.5 11 14.7 12.1 14.7 13.5C14.7 14.6 14.5 15.5 14.1 16.4" stroke={color} strokeWidth={1.4} fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function LockIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M7 10V7.5C7 5 8.8 3 12 3C15.2 3 17 5 17 7.5V10" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+      <Path d="M5.5 10H18.5V19.5C18.5 20.3 17.8 21 17 21H7C6.2 21 5.5 20.3 5.5 19.5V10Z" stroke={color} strokeWidth={1.6} fill="none" strokeLinejoin="round" />
+      <Line x1={12} y1={14} x2={12} y2={17} stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
   );
 }
 
@@ -64,7 +121,6 @@ export default function ConfigPerfilScreen({ navigation }) {
     loadBiometric();
   }, [loadProfile, loadBiometric]);
 
-  // --- Editar nombre ---
   const handleOpenNameModal = () => {
     setNameInput(user?.displayName || '');
     setNameModalVisible(true);
@@ -80,13 +136,11 @@ export default function ConfigPerfilScreen({ navigation }) {
     setNameModalVisible(false);
   };
 
-  // --- Biometría ---
   const handleBioToggle = async (value) => {
     if (bioLoading) return;
     setBioLoading(true);
 
     if (value) {
-      // Activar biometría
       const { ok, error } = await setupBiometric();
       if (ok) {
         setBioEnabled(true);
@@ -94,7 +148,6 @@ export default function ConfigPerfilScreen({ navigation }) {
         Alert.alert('No se pudo activar', error || 'Inténtalo de nuevo.');
       }
     } else {
-      // Desactivar — pedir confirmación
       Alert.alert(
         'Desactivar biometría',
         'Tendrás que usar tu contraseña para acceder. ¿Continuar?',
@@ -115,14 +168,12 @@ export default function ConfigPerfilScreen({ navigation }) {
     setBioLoading(false);
   };
 
-  // --- Cambiar contraseña ---
   const handleChangePassword = () => {
     // Inicia el flujo de reset por email (Bloque 1)
     // TODO(bloque-12): implementar cambio in-app cuando el backend exponga PATCH /auth/password
     navigation.navigate('RecuperarPassword');
   };
 
-  // --- Foto (stub) ---
   const handleEditPhoto = () => {
     // TODO(bloque-12): expo-image-picker + endpoint de subida a Supabase Storage
     Alert.alert('Cambiar foto', 'Función disponible próximamente.');
@@ -132,152 +183,110 @@ export default function ConfigPerfilScreen({ navigation }) {
     || 'Sin configurar';
 
   const bioLabel = bioType !== 'none' ? biometricLabel(bioType) : null;
+  const BioIcon = bioType === 'face' ? FaceIdIcon : FingerprintIcon;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* HEADER */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          style={styles.iconButton}
           activeOpacity={0.7}
+          onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
-          style={styles.headerBack}
         >
-          <Ionicons name="chevron-back" size={24} color="#1E293B" />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Perfil y Biometría</Text>
-        <View style={styles.headerRight} />
+        <Text style={styles.headerTitle}>Perfil y biometría</Text>
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* AVATAR centrado */}
-        <View style={styles.avatarSection}>
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              {loading
-                ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={styles.avatarText}>{getInitials(user?.displayName)}</Text>
-              }
-            </View>
-            <TouchableOpacity
-              style={styles.cameraBtn}
-              onPress={handleEditPhoto}
-              activeOpacity={0.8}
-              accessibilityLabel="Cambiar foto de perfil"
-            >
-              <Ionicons name="camera" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+        {/* ── Avatar ──────────────────────────────────────────────────── */}
+        <View style={styles.avatarBlock}>
+          <AvatarIcon />
           {!loading && (
-            <Text style={styles.avatarName}>{user?.displayName || 'Opositor'}</Text>
+            <Text style={styles.avatarName} numberOfLines={1}>{user?.displayName || 'Opositor'}</Text>
           )}
+          <TouchableOpacity activeOpacity={0.7} onPress={handleEditPhoto}>
+            <Text style={styles.cambiarFoto}>Cambiar foto</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* DATOS PERSONALES */}
-        <Text style={styles.sectionTitle}>DATOS PERSONALES</Text>
+        {/* ── Datos personales ───────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>DATOS PERSONALES</Text>
         <View style={styles.card}>
-
-          {/* Nombre */}
           <TouchableOpacity
             style={styles.row}
             onPress={handleOpenNameModal}
             activeOpacity={0.7}
             accessibilityLabel="Editar nombre"
           >
-            <View style={styles.rowLeft}>
-              <IconBox name="person-outline" color="#3B82F6" bg="#EFF6FF" />
-              <View style={styles.rowTexts}>
-                <Text style={styles.rowLabel}>Nombre</Text>
-                <Text style={styles.rowValue}>{user?.displayName || '—'}</Text>
-              </View>
+            <View style={styles.rowTextWrap}>
+              <Text style={styles.rowSmallLabel}>Nombre y apellidos</Text>
+              <Text style={styles.rowValue}>{user?.displayName || '—'}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+            <ChevronRightIcon />
           </TouchableOpacity>
 
-          {/* Email */}
           <TouchableOpacity
-            style={styles.row}
+            style={[styles.row, styles.rowBorder]}
             onPress={() => setEmailModalVisible(true)}
             activeOpacity={0.7}
             accessibilityLabel="Ver email"
           >
-            <View style={styles.rowLeft}>
-              <IconBox name="mail-outline" color="#3B82F6" bg="#EFF6FF" />
-              <View style={styles.rowTexts}>
-                <Text style={styles.rowLabel}>Email</Text>
-                <Text style={styles.rowValue}>{user?.email || '—'}</Text>
-              </View>
+            <View style={styles.rowTextWrap}>
+              <Text style={styles.rowSmallLabel}>Email</Text>
+              <Text style={styles.rowValue}>{user?.email || '—'}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+            <ChevronRightIcon />
           </TouchableOpacity>
 
-          {/* Oposición — solo lectura */}
-          <View style={[styles.row, styles.rowLast]}>
-            <View style={styles.rowLeft}>
-              <IconBox name="briefcase-outline" color="#64748B" bg="#F1F5F9" />
-              <View style={styles.rowTexts}>
-                <Text style={styles.rowLabel}>Oposición</Text>
-                {/* TODO(bloque-12): ¿hay pantalla dedicada para cambiar oposición? */}
-                <Text style={styles.rowValueMuted}>{oposicionLine}</Text>
-              </View>
+          {/* Oposición — sin chevron: campo informativo, sin pantalla de edición dedicada */}
+          <View style={[styles.row, styles.rowBorder]}>
+            <View style={styles.rowTextWrap}>
+              <Text style={styles.rowSmallLabel}>Oposición</Text>
+              <Text style={styles.rowValue}>{oposicionLine}</Text>
             </View>
-            {/* Sin chevron — campo informativo */}
           </View>
         </View>
 
-        {/* SEGURIDAD */}
-        <Text style={styles.sectionTitle}>SEGURIDAD</Text>
+        {/* ── Seguridad ───────────────────────────────────────────────── */}
+        <Text style={[styles.sectionLabel, styles.securityLabel]}>SEGURIDAD</Text>
         <View style={styles.card}>
-
-          {/* Toggle biométrico — solo si el dispositivo lo soporta */}
           {bioType !== 'none' && (
             <View style={styles.row}>
-              <View style={styles.rowLeft}>
-                <IconBox
-                  name={bioType === 'face' ? 'scan-outline' : 'finger-print-outline'}
-                  color={colors.success}
-                  bg="#ECFDF5"
-                />
-                <View style={styles.rowTexts}>
-                  <Text style={styles.rowLabel}>{bioLabel || 'Biometría'}</Text>
-                  <Text style={styles.rowValue}>Acceso rápido</Text>
-                </View>
+              <BioIcon />
+              <View style={styles.rowTextWrap}>
+                <Text style={styles.rowTitle}>{bioLabel}</Text>
+                <Text style={styles.rowSubtitle}>Acceso biométrico</Text>
               </View>
               <Switch
-                trackColor={{ false: '#E2E8F0', true: '#D1FAE5' }}
-                thumbColor={bioEnabled ? '#FFFFFF' : '#F4F4F4'}
-                onValueChange={handleBioToggle}
                 value={bioEnabled}
+                onValueChange={handleBioToggle}
                 disabled={bioLoading}
-                accessibilityLabel={`${bioLabel || 'Biometría'} ${bioEnabled ? 'activada' : 'desactivada'}`}
+                trackColor={{ false: '#E2E2E6', true: colors.purple }}
+                thumbColor={colors.white}
+                accessibilityLabel={`${bioLabel} ${bioEnabled ? 'activada' : 'desactivada'}`}
               />
             </View>
           )}
-
-          {/* Cambiar contraseña */}
           <TouchableOpacity
-            style={[styles.row, styles.rowLast]}
+            style={[styles.row, bioType !== 'none' && styles.rowBorder]}
             onPress={handleChangePassword}
             activeOpacity={0.7}
             accessibilityLabel="Cambiar contraseña"
           >
-            <View style={styles.rowLeft}>
-              <IconBox name="lock-closed-outline" color="#3B82F6" bg="#EFF6FF" />
-              <View style={styles.rowTexts}>
-                <Text style={styles.rowLabel}>Contraseña</Text>
-                <Text style={styles.rowValue}>Cambiar contraseña</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+            <LockIcon />
+            <Text style={[styles.rowTitle, { flex: 1 }]}>Cambiar contraseña</Text>
+            <ChevronRightIcon />
           </TouchableOpacity>
         </View>
-
       </ScrollView>
 
-      {/* MODAL editar nombre */}
+      {/* ── Modal: editar nombre ─────────────────────────────────────── */}
       <Modal
         transparent
         visible={nameModalVisible}
@@ -290,7 +299,7 @@ export default function ConfigPerfilScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Tu nombre completo"
-              placeholderTextColor="#AEB5C2"
+              placeholderTextColor={FIGMA.textMuted}
               value={nameInput}
               onChangeText={setNameInput}
               autoFocus
@@ -303,7 +312,7 @@ export default function ConfigPerfilScreen({ navigation }) {
               accessibilityLabel="Guardar nombre"
             >
               {nameSaving
-                ? <ActivityIndicator color="#FFFFFF" size="small" />
+                ? <ActivityIndicator color={colors.white} size="small" />
                 : <Text style={styles.btnText}>Guardar</Text>
               }
             </TouchableOpacity>
@@ -318,7 +327,7 @@ export default function ConfigPerfilScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* MODAL email — informativo */}
+      {/* ── Modal: cambiar email (informativo) ───────────────────────── */}
       <Modal
         transparent
         visible={emailModalVisible}
@@ -358,131 +367,162 @@ export default function ConfigPerfilScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
 
-  // Header
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  headerBack: { padding: 8 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#1E293B' },
-  headerRight: { width: 40 }, // balanceo para centrar el título
-
-  // Avatar
-  avatarSection: { alignItems: 'center', paddingTop: 24, paddingBottom: 8 },
-  avatarWrap: { position: 'relative', marginBottom: 10 },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#1B2A4A',
+  iconButton: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
   },
-  avatarText: { fontSize: 32, fontWeight: '700', color: '#FFFFFF' },
-  cameraBtn: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#3B82F6',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  headerTitle: {
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
+  },
+
+  // ── Contenido ─────────────────────────────────────────────────
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  avatarBlock: {
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    marginBottom: spacing.lg,
   },
-  avatarName: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
-
-  // Scroll
-  scroll: { paddingBottom: 40 },
-
-  // Sección
-  sectionTitle: {
+  avatarName: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: colors.textDark,
+    marginTop: 10,
+  },
+  cambiarFoto: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginHorizontal: 16,
-    marginTop: 24,
+    color: FIGMA.textMuted,
+    marginTop: 6,
+  },
+  sectionLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: colors.textDark,
     marginBottom: 8,
   },
-
-  // Card
-  card: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
+  securityLabel: {
+    marginTop: spacing.lg,
   },
-
-  // Filas
+  card: {
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
-  rowLast: { borderBottomWidth: 0 },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  rowTexts: { flex: 1 },
-  rowLabel: { fontSize: 12, color: '#64748B', marginBottom: 2 },
-  rowValue: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
-  rowValueMuted: { fontSize: 15, fontWeight: '500', color: '#64748B' },
-
-  // IconBox
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
+  rowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: FIGMA.separator,
+  },
+  rowTextWrap: {
+    flex: 1,
+  },
+  rowSmallLabel: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10,
+    color: FIGMA.textMuted,
+    marginBottom: 2,
+  },
+  rowValue: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+  },
+  rowTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+  },
+  rowSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+    marginTop: 2,
   },
 
-  // Modal compartido
+  // ── Modal compartido ──────────────────────────────────────────
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15,27,51,0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.lg,
   },
-  modalCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, width: '100%' },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: '#0F1B33', marginBottom: 12 },
-  modalBody: { fontSize: 13, color: '#5A6373', lineHeight: 19, marginBottom: 16 },
+  modalCard: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
+    padding: spacing.lg,
+    width: '100%',
+  },
+  modalTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: colors.textDark,
+    marginBottom: 12,
+  },
+  modalBody: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#E4E8F0',
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
+    fontFamily: 'Poppins-Regular',
     fontSize: 14,
-    color: '#1B2A4A',
+    color: colors.textDark,
     marginBottom: 12,
   },
   btn: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accentOrange,
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: 'center',
   },
-  btnDisabled: { opacity: 0.5 },
-  btnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  cancel: { textAlign: 'center', color: '#8A92A0', fontSize: 12, fontWeight: '700' },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  btnText: {
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.white,
+    fontSize: 14,
+  },
+  cancel: {
+    textAlign: 'center',
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
 });

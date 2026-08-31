@@ -7,16 +7,20 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Circle, Rect, Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
+import AlertCardModal from '../../components/AlertCardModal';
 import { storeApi } from '../../api/store';
 
-const ACCENT = '#6C5CE7';
-const PHASE2_COLOR = '#7B1FA2';
-
+// ─── 11.4 · Confirmar canje real ───────────────────────────────────────────
+// Fiel al Figma (TiendaModalesScreen.tsx → ConfirmarCanjeRealModal). El
+// nombre de marca real citado en el diseño ("Uber Eats") se sustituye aquí
+// solo en este comentario por respeto a la marca registrada — el nombre
+// real del partner (reward.partner) sigue viniendo del backend sin cambios,
+// ya que es contenido de negocio real, no un artefacto de diseño.
 const FALLBACK = {
   reward: {
     partner: 'Uber Eats',
@@ -29,22 +33,47 @@ const FALLBACK = {
   newBalance: 340,
 };
 
+function WarningIcon({ size = 56, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Circle cx={24} cy={24} r={22} stroke={color} strokeWidth={3} fill="none" />
+      <Path d="M24 14V27" stroke={color} strokeWidth={3.2} strokeLinecap="round" />
+      <Circle cx={24} cy={34} r={1.8} fill={color} />
+    </Svg>
+  );
+}
+
+// Ícono de "pago rechazado" (ver hallazgo "Modo_de_aislamiento" en Figma).
+// Se conserva el glifo de tarjeta bloqueada del diseño como metáfora
+// genérica de "no se pudo completar el canje con el partner" — la app no
+// gestiona tarjetas de pago propias, el fallo es del lado del partner/API.
+function CardBlockedIcon({ size = 48, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect x={2} y={5} width={16} height={11} rx={2} stroke={color} strokeWidth={1.4} fill="none" />
+      <Path d="M2 9H18" stroke={color} strokeWidth={1.4} />
+      <Circle cx={18} cy={16} r={4.5} stroke={color} strokeWidth={1.4} fill="none" />
+      <Circle cx={21} cy={16} r={4.5} stroke={color} strokeWidth={1.4} fill="none" />
+    </Svg>
+  );
+}
+
 export default function StoreRealRedeemConfirmScreen({ navigation, route }) {
   const { bottom: bottomInset } = useSafeAreaInsets();
   const {
     reward = FALLBACK.reward,
-    currentBalance = FALLBACK.currentBalance,
     newBalance = FALLBACK.newBalance,
   } = route?.params ?? {};
 
   const [isLoading, setIsLoading] = useState(false);
+  const [showDeclined, setShowDeclined] = useState(false);
 
   const handleConfirm = async () => {
     setIsLoading(true);
     const res = await storeApi.redeemProduct(reward.id);
     setIsLoading(false);
     if (res?.error) {
-      Alert.alert('Error al canjear', res.error.message ?? 'Inténtalo de nuevo');
+      setShowDeclined(true);
       return;
     }
     navigation.navigate('StoreRealRewardSuccess', {
@@ -58,70 +87,34 @@ export default function StoreRealRedeemConfirmScreen({ navigation, route }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.closeButton}
+          style={styles.iconButton}
           disabled={isLoading}
           accessibilityLabel="Cancelar y volver"
         >
-          <Ionicons name="close" size={24} color={colors.text} />
+          <Ionicons name="close" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Confirmar canje real</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 100 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 120 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner de advertencia */}
-        <View style={styles.warningBanner}>
-          <Ionicons name="alert-circle" size={22} color={colors.error} />
-          <Text style={styles.warningText}>
-            <Text style={styles.warningBold}>ATENCIÓN: </Text>
-            Esta operación es irreversible. Los Opopoints no se devolverán.
+        <View style={styles.hero}>
+          <WarningIcon />
+          <Text style={styles.title}>Confirmar canje real</Text>
+          <Text style={styles.subtitle}>
+            Vas a gastar <Text style={styles.bold}>{reward.cost.toLocaleString('es-ES')} Opopoints</Text> en el mes de{' '}
+            <Text style={styles.bold}>{reward.partner}</Text>. Esto no se puede deshacer.
           </Text>
-        </View>
-
-        {/* Tarjeta resumen */}
-        <View style={styles.summaryCard}>
-          <View style={[styles.iconWrapper, { backgroundColor: (reward.color ?? ACCENT) + '18' }]}>
-            <Ionicons name={reward.icon ?? 'gift-outline'} size={48} color={reward.color ?? ACCENT} />
-          </View>
-
-          <Text style={styles.rewardPartner}>{reward.partner}</Text>
-          <Text style={styles.rewardTitle}>{reward.title}</Text>
-
-          <View style={styles.divider} />
-
-          {/* Balance breakdown */}
-          <View style={styles.balanceSection}>
-            <View style={styles.balanceRow}>
-              <Text style={styles.rowLabel}>Saldo actual</Text>
-              <Text style={styles.rowValue}>{currentBalance.toLocaleString()} O</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.balanceRow}>
-              <Text style={styles.rowLabel}>Vas a gastar</Text>
-              <Text style={[styles.rowValue, { color: colors.error }]}>{reward.cost} O</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={[styles.resultRow, { backgroundColor: colors.successBg }]}>
-              <Text style={[styles.rowLabel, { color: colors.success }]}>Te quedarán</Text>
-              <Text style={[styles.rowValueLarge, { color: colors.success }]}>
-                {newBalance.toLocaleString()} O
-              </Text>
-            </View>
-          </View>
 
           <View style={styles.termsBox}>
-            <Ionicons name="document-text-outline" size={18} color={colors.textSecondary} />
+            <Ionicons name="document-text-outline" size={16} color={colors.textSecondary} />
             <Text style={styles.termsText}>
               Al confirmar, aceptas los términos de uso de {reward.partner} y el canje de tus puntos.
             </Text>
@@ -129,33 +122,48 @@ export default function StoreRealRedeemConfirmScreen({ navigation, route }) {
         </View>
       </ScrollView>
 
-      {/* Footer sticky */}
-      <View style={[styles.footer, { paddingBottom: bottomInset + 12 }]}>
+      {/* ── CTA fijo al fondo ─────────────────────────────────────────── */}
+      <View style={[styles.footer, { paddingBottom: spacing.sm + bottomInset }]}>
         <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => navigation.goBack()}
-          disabled={isLoading}
-          accessibilityLabel="Cancelar"
-        >
-          <Text style={styles.cancelButtonText}>Cancelar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.confirmButton, isLoading && styles.confirmButtonLoading]}
+          style={styles.confirmButton}
           onPress={handleConfirm}
           disabled={isLoading}
           accessibilityLabel="Confirmar canje"
         >
           {isLoading ? (
-            <ActivityIndicator color={colors.white} />
+            <ActivityIndicator size="small" color={colors.white} />
           ) : (
-            <>
-              <Ionicons name="shield-checkmark" size={20} color={colors.white} />
-              <Text style={styles.confirmButtonText}>Sí, canjear</Text>
-            </>
+            <Text style={styles.confirmButtonText}>Sí, canjear</Text>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.cancelLink}
+          onPress={() => navigation.goBack()}
+          disabled={isLoading}
+          accessibilityLabel="Cancelar"
+        >
+          <Text style={styles.cancelLinkText}>Cancelar</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* ── Pop-up: pago rechazado ──────────────────────────────────────── */}
+      <AlertCardModal
+        visible={showDeclined}
+        iconBg="transparent"
+        iconSize={64}
+        icon={<CardBlockedIcon />}
+        title="No se ha podido cobrar"
+        description={`No hemos podido completar el canje con ${reward.partner}. Revisa tu conexión o inténtalo de nuevo en unos minutos.`}
+        primaryLabel="Reintentar"
+        primaryColor={colors.accentOrange}
+        onPrimaryPress={() => {
+          setShowDeclined(false);
+          handleConfirm();
+        }}
+        secondaryLabel="Cancelar"
+        onSecondaryPress={() => setShowDeclined(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -163,187 +171,100 @@ export default function StoreRealRedeemConfirmScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
+
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  closeButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  warningBanner: {
-    flexDirection: 'row',
-    backgroundColor: colors.errorBg,
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 20,
-    gap: 10,
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    borderColor: colors.error,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.error,
-    lineHeight: 20,
-  },
-  warningBold: {
-    fontWeight: '800',
-  },
-  summaryCard: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  iconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
+  iconButton: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
-  rewardPartner: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  rewardTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
+  headerTitle: {
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
     textAlign: 'center',
-    marginBottom: 4,
-    lineHeight: 28,
   },
-  divider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: colors.separator,
-    marginVertical: 14,
+
+  // ── Contenido ─────────────────────────────────────────────────
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
   },
-  balanceSection: {
-    width: '100%',
-  },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  hero: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  rowLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '600',
+  title: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
-  rowValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
+  subtitle: {
+    fontFamily: 'Poppins-Light',
+    fontSize: 13.8,
+    color: colors.textDark,
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: spacing.sm,
   },
-  rowValueLarge: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  resultRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  bold: {
+    fontFamily: 'Poppins-SemiBold',
   },
   termsBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.grayLight,
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 20,
     gap: 8,
-    width: '100%',
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.sm,
   },
   termsText: {
     flex: 1,
+    fontFamily: 'Poppins-Regular',
     fontSize: 12,
     color: colors.textSecondary,
     lineHeight: 17,
   },
-  // Footer
+
+  // ── CTA fijo al fondo ─────────────────────────────────────────
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    gap: 12,
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.separator,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 16,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
   },
   confirmButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 16,
-    backgroundColor: colors.error,
+    width: '100%',
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.accentOrange,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    shadowColor: colors.error,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  confirmButtonLoading: {
-    opacity: 0.75,
   },
   confirmButtonText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
     color: colors.white,
+  },
+  cancelLink: {
+    marginTop: 14,
+    paddingVertical: 4,
+  },
+  cancelLinkText: {
+    fontFamily: 'Poppins-Light',
+    fontSize: 13.8,
+    color: colors.textDark,
   },
 });

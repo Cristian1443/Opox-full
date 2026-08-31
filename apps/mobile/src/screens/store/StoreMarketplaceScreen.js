@@ -8,21 +8,22 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path, Polygon } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import { storeApi } from '../../api/store';
 
-const ACCENT = '#6C5CE7';
-const ACCENT_LIGHT = '#A29BFE';
-const PHASE2_DARK = '#7B1FA2';
-
-// Paleta rotativa para avatares — evita lógica hardcoded por nombre de autor
-const AVATAR_COLORS = ['#E1BEE7', '#BBDEFB', '#C8E6C9', '#FFF9C4', '#FFCCBC'];
-const avatarBg = (id) => AVATAR_COLORS[parseInt(id, 10) % AVATAR_COLORS.length];
-
+// ─── 11.2 · Tienda · Tests de la comunidad ─────────────────────────────────
+// Fiel al Figma (MarketplaceTestsScreen.tsx). Los filtros Todos/Gratis/
+// Premium son funcionalidad real sin equivalente en Figma, se conservan.
+// Había dos entradas redundantes para publicar un test (ícono "+" del
+// header y botón fijo al fondo) — Figma solo confirma la segunda, así que
+// se retira el ícono duplicado del header.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  separator: 'rgba(65, 41, 80, 0.12)',
+};
 
 const FILTERS = [
   { key: 'all', label: 'Todos' },
@@ -30,72 +31,60 @@ const FILTERS = [
   { key: 'paid', label: 'Premium' },
 ];
 
-const StarRating = ({ rating }) => (
-  <View style={styles.starsContainer}>
-    {[...Array(5)].map((_, i) => (
-      <Ionicons
-        key={i}
-        name={i < Math.floor(rating) ? 'star' : 'star-outline'}
-        size={14}
-        color={i < Math.floor(rating) ? '#FFC107' : colors.grayMid}
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function StarIcon({ size = 11, color = '#F9BB00' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Polygon
+        points="12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6"
+        fill={color}
       />
-    ))}
-    <Text style={styles.ratingText}>{rating}</Text>
-  </View>
-);
+    </Svg>
+  );
+}
 
-const TestCard = ({ item, onPress, onObtain }) => (
-  <TouchableOpacity
-    style={styles.card}
-    onPress={onPress}
-    activeOpacity={0.88}
-    accessibilityLabel={`Test: ${item.title}, ${item.isFree ? 'Gratis' : item.price + ' Opopoints'}`}
-  >
-    <View style={styles.cardHeader}>
-      <View style={styles.authorContainer}>
-        <View style={[styles.avatar, { backgroundColor: avatarBg(item.id) }]}>
-          <Text style={styles.avatarText}>{item.avatar}</Text>
+function TestRow({ item, index, onPress, onObtain }) {
+  return (
+    <TouchableOpacity
+      style={[styles.row, index === 0 && styles.rowFirst]}
+      activeOpacity={0.7}
+      onPress={onPress}
+      accessibilityLabel={`Test: ${item.title}, ${item.isFree ? 'Gratis' : item.price + ' Opopoints'}`}
+    >
+      <View style={styles.rowTextWrap}>
+        <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>por {item.author}</Text>
+          {item.category ? <Text style={styles.metaText}>· {item.category}</Text> : null}
+          <StarIcon />
+          <Text style={styles.metaText}>{item.rating}</Text>
+          <Text style={styles.metaText}>· {item.totalMade} hechos</Text>
         </View>
-        <Text style={styles.authorName}>{item.author}</Text>
+        <Text style={item.isFree ? styles.freeText : styles.priceText}>
+          {item.isFree ? 'Gratis' : `${item.price} Opopoints`}
+        </Text>
       </View>
-      <View style={styles.categoryBadge}>
-        <Text style={styles.categoryText}>{item.category}</Text>
-      </View>
-    </View>
-
-    <Text style={styles.testTitle} numberOfLines={2}>{item.title}</Text>
-
-    <View style={styles.ratingRow}>
-      <StarRating rating={item.rating} />
-      <Text style={styles.madeText}>{item.totalMade} hechos</Text>
-    </View>
-
-    <View style={styles.cardFooter}>
-      {item.isFree ? (
-        <View style={styles.freeBadge}>
-          <Ionicons name="gift-outline" size={15} color={colors.success} />
-          <Text style={styles.freeText}>Gratis</Text>
-        </View>
-      ) : (
-        <View style={styles.priceBadge}>
-          <Ionicons name="pricetags-outline" size={15} color={PHASE2_DARK} />
-          <Text style={styles.priceText}>{item.price} O</Text>
-        </View>
-      )}
-
       <TouchableOpacity
-        style={[styles.actionButton, item.isFree ? styles.actionButtonFree : styles.actionButtonPaid]}
+        style={styles.obtenerPill}
+        activeOpacity={0.7}
         onPress={onObtain}
         accessibilityLabel={item.isFree ? `Obtener ${item.title} gratis` : `Comprar ${item.title} por ${item.price} Opopoints`}
       >
-        <Text style={styles.actionButtonText}>Obtener</Text>
+        <Text style={styles.obtenerPillText}>Obtener</Text>
       </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+}
 
 export default function StoreMarketplaceScreen({ navigation }) {
-  const { bottom: bottomInset } = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState('all');
   const [tests, setTests] = useState([]);
   const [balance, setBalance] = useState(null);
@@ -108,7 +97,7 @@ export default function StoreMarketplaceScreen({ navigation }) {
     });
     storeApi.listCommunityTests().then(res => {
       if (cancelled || !res?.data) return;
-      setTests(res.data.map(t => ({ ...t, avatar: t.author.substring(0, 1).toUpperCase() })));
+      setTests(res.data);
     });
     return () => { cancelled = true; };
   }, []));
@@ -140,52 +129,35 @@ export default function StoreMarketplaceScreen({ navigation }) {
     }
   };
 
-  const renderItem = ({ item }) => (
-    <TestCard
-      item={item}
-      onPress={() => navigation.navigate('StoreTestDetail', { test: item })}
-      onObtain={() => handleObtain(item)}
-    />
-  );
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            accessibilityLabel="Volver"
-          >
-            <Ionicons name="chevron-back" size={24} color={ACCENT} />
-          </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>Tests de la comunidad</Text>
-            <Text style={styles.subtitle}>
-              Tests creados por otros opositores. Valóralos tras hacerlos.
-            </Text>
-          </View>
-        </View>
         <TouchableOpacity
-          style={styles.publishButton}
-          onPress={() => navigation.navigate('StorePublishTest')}
-          accessibilityLabel="Publicar un test"
+          style={styles.iconButton}
+          activeOpacity={0.7}
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Volver"
         >
-          <Ionicons name="add" size={24} color={colors.white} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle}>Tests de la comunidad</Text>
+          <Text style={styles.headerSubtitle}>Tests creados por otros opositores. Valóralos tras hacerlos.</Text>
+        </View>
+        <View style={styles.iconButton} />
       </View>
 
-      {/* Filtros */}
-      <View style={styles.filtersContainer}>
+      {/* Filtros — real, sin equivalente en Figma */}
+      <View style={styles.filtersRow}>
         {FILTERS.map((filter) => {
           const isActive = activeFilter === filter.key;
           return (
             <TouchableOpacity
               key={filter.key}
-              style={[styles.filterButton, isActive && styles.filterButtonActive]}
+              style={[styles.filterChip, isActive && styles.filterChipActive]}
               onPress={() => setActiveFilter(filter.key)}
               accessibilityLabel={filter.label}
               accessibilityState={{ selected: isActive }}
@@ -200,24 +172,31 @@ export default function StoreMarketplaceScreen({ navigation }) {
 
       <FlatList
         data={filteredTests}
-        renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset + 90 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
+        renderItem={({ item, index }) => (
+          <TestRow
+            item={item}
+            index={index}
+            onPress={() => navigation.navigate('StoreTestDetail', { test: item })}
+            onObtain={() => handleObtain(item)}
+          />
+        )}
         ListEmptyComponent={
           <Text style={styles.emptyText}>No hay tests en esta categoría.</Text>
         }
       />
 
-      {/* Footer fijo publicar */}
-      <View style={[styles.publishFooter, { paddingBottom: bottomInset + 12 }]}>
+      {/* ── Botón fijo: publicar test ─────────────────────────────────── */}
+      <View style={[styles.publishFooter, { paddingBottom: spacing.sm + insets.bottom }]}>
         <TouchableOpacity
-          style={styles.publishFooterButton}
+          style={styles.publishButton}
+          activeOpacity={0.85}
           onPress={() => navigation.navigate('StorePublishTest')}
           accessibilityLabel="Publicar un test en la comunidad"
         >
-          <Ionicons name="add" size={20} color={colors.white} />
-          <Text style={styles.publishFooterText}>+ Publicar mi test</Text>
+          <Text style={styles.publishButtonText}>+ Publicar mi test</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -227,272 +206,146 @@ export default function StoreMarketplaceScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
-  // Header
+
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    flex: 1,
-    gap: 4,
-  },
-  backButton: {
-    paddingTop: 2,
-    marginRight: 4,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  phase2BadgeContainer: {
-    backgroundColor: PHASE2_DARK,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  phase2BadgeText: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  publishButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: ACCENT_LIGHT,
+  iconButton: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
-    marginTop: 2,
-    shadowColor: ACCENT_LIGHT,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  // Filtros
-  filtersContainer: {
+  headerTitles: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+  },
+  headerSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // ── Filtros ───────────────────────────────────────────────────
+  filtersRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     gap: 8,
   },
-  filterButton: {
+  filterChip: {
     paddingVertical: 7,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     backgroundColor: colors.grayLight,
   },
-  filterButtonActive: {
-    backgroundColor: ACCENT_LIGHT,
+  filterChipActive: {
+    backgroundColor: colors.purple,
   },
   filterText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12,
     color: colors.textSecondary,
   },
   filterTextActive: {
+    fontFamily: 'Poppins-SemiBold',
     color: colors.white,
   },
-  // Lista
+
+  // ── Lista ─────────────────────────────────────────────────────
   listContent: {
-    padding: 16,
+    paddingHorizontal: spacing.lg,
   },
-  // Tarjeta
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  authorContainer: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  authorName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  categoryBadge: {
-    backgroundColor: colors.grayLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  categoryText: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  testTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 10,
-    lineHeight: 21,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.text,
-    marginLeft: 4,
-  },
-  madeText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginLeft: 'auto',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
+    gap: 12,
+    paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: colors.separator,
+    borderTopColor: FIGMA.separator,
   },
-  freeBadge: {
+  rowFirst: {
+    borderTopWidth: 0,
+  },
+  rowTextWrap: {
+    flex: 1,
+  },
+  rowTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.successBg,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    gap: 5,
+    gap: 4,
+    marginTop: 4,
+    flexWrap: 'wrap',
   },
-  freeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.success,
-  },
-  priceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3E5F5',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    gap: 5,
+  metaText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
   },
   priceText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: PHASE2_DARK,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 10.5,
+    color: colors.accentOrange,
+    marginTop: 4,
   },
-  actionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 10,
+  freeText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 10.5,
+    color: colors.ctaGreen,
+    marginTop: 4,
   },
-  actionButtonFree: {
-    backgroundColor: colors.success,
+  obtenerPill: {
+    backgroundColor: `${colors.ctaGreen}1A`,
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
   },
-  actionButtonPaid: {
-    backgroundColor: ACCENT_LIGHT,
-  },
-  actionButtonText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '800',
+  obtenerPillText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 11,
+    color: colors.ctaGreen,
   },
   emptyText: {
     textAlign: 'center',
     marginTop: 40,
+    fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     fontSize: 14,
   },
-  // Footer publicar
+
+  // ── Botón fijo: publicar ──────────────────────────────────────
   publishFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.white,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.separator,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  publishFooterButton: {
-    backgroundColor: PHASE2_DARK,
-    flexDirection: 'row',
+  publishButton: {
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.textDark,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 16,
-    gap: 6,
-    shadowColor: PHASE2_DARK,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  publishFooterText: {
-    color: colors.white,
+  publishButtonText: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    fontWeight: '800',
+    color: colors.white,
   },
 });
