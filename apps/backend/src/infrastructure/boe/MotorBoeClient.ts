@@ -5,7 +5,7 @@ import type { MotorBoeContract, MotorBoeNorma, MotorBoeCatalogResult } from '@op
 /**
  * Cliente HTTP para el Motor BOE externo.
  *
- * Base URL: https://ingesta-demo.onrender.com  (Render, host consolidado con Motor RAG desde 2026-08-18)
+ * Base URL: https://ia.opox.jaeverba.com  (uvicorn propio, host consolidado con Motor RAG)
  * Configurado con MOTOR_BOE_BASE_URL y MOTOR_BOE_API_KEY en apps/backend/.env.
  *
  * Autenticación:
