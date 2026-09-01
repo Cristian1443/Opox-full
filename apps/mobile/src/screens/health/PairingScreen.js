@@ -18,6 +18,7 @@ import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 import ConnectionSuccessModal from '../../components/ConnectionSuccessModal';
 import { requestHealthPermissions, isHealthAvailable } from '../../services/HealthService';
+import { healthApi } from '../../api';
 
 // Colores confirmados contra Figma (frame EMPAREJANDO, Bloque 3) sin
 // equivalente exacto en theme.js.
@@ -153,6 +154,13 @@ export default function PairingScreen({ navigation, route }) {
                 setPhase('denied');
                 return;
             }
+
+            // Registra el dispositivo en el backend (fire-and-forget)
+            healthApi.registerDevice(
+                deviceName,
+                device?.platform ?? (deviceName.toLowerCase().includes('apple') ? 'ios_healthkit' : 'health_connect'),
+                device?.icon ?? 'watch-outline',
+            ).catch(() => {});
 
             setPhase('complete');
         }

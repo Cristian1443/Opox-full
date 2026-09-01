@@ -5,6 +5,8 @@
 
 export const API_ROUTES = {
     HEALTH: '/health',
+    HEALTH_DEVICES: '/health/devices',
+    HEALTH_DEVICE: '/health/devices/:deviceId',
 
     AUTH: {
         REGISTER: '/auth/register',
@@ -72,6 +74,8 @@ export const API_ROUTES = {
         FEED:                     '/boe/feed',
         REGULATIONS:              '/boe/regulations',
         REGULATION:               '/boe/regulations/:id',
+        CATALOG_SEARCH:           '/boe/catalog/search',
+        CATALOG_SYNC:             '/boe/catalog/sync',
         CHANGE_DETAIL:            '/boe/changes/:id',
         CHANGE_COMPARISON:        '/boe/changes/:id/comparison',
         CHANGE_MINI_TEST:         '/boe/changes/:id/mini-test',
@@ -115,6 +119,7 @@ export const API_ROUTES = {
         PRODUCT:                '/store/products/:id',
         REDEEM:                 '/store/products/:id/redeem',
         DISCOUNTS:              '/store/discounts',
+        DISCOUNT_REDEEM:        '/store/discounts/:id/redeem',
         WALLET:                 '/store/wallet',
         WALLET_ITEM:            '/store/wallet/:id',
         COMMUNITY_TESTS:        '/store/community-tests',

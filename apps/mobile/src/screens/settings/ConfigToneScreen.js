@@ -3,10 +3,24 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import AccentSlider from '../../components/AccentSlider';
+import { colors, spacing } from '../../theme';
+import { settingsApi } from '../../api';
+
+// ─── 12.4 · Tono de la IA ───────────────────────────────────────────────────
+// Fiel al Figma (TonoDeLaIAScreen.tsx). El slider de nivel de detalle
+// reutiliza AccentSlider (componente compartido de Bloque 9) — su pulgar
+// blanco con borde oscuro ya coincide exactamente con lo que confirma Figma
+// aquí. La persistencia real en AsyncStorage/backend y el texto de vista
+// previa dinámico por personalidad (Figma solo muestra el ejemplo "cercano")
+// se conservan.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  segmentBorder: 'rgba(65, 41, 80, 0.2)',
+  sliderTrack: '#F3E1CC',
+};
 
 const TONE_KEY = 'opox.ai.tone';
 
@@ -31,278 +45,297 @@ const PREVIEW_TEXTS = {
   exigente:   '"Artículo 14 correcto. No bajes el ritmo. Siguiente."',
 };
 
-async function loadTone() {
+async function loadToneLocal() {
   try {
     const raw = await AsyncStorage.getItem(TONE_KEY);
-    return raw ? { ...DEFAULT_TONE, ...JSON.parse(raw) } : DEFAULT_TONE;
+    return raw ? { ...DEFAULT_TONE, ...JSON.parse(raw) } : null;
   } catch {
-    return DEFAULT_TONE;
+    return null;
   }
 }
 
-async function saveTone(tone) {
+async function saveToneLocal(tone) {
   try {
     await AsyncStorage.setItem(TONE_KEY, JSON.stringify(tone));
   } catch { /* fallo silencioso */ }
+}
+
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
 }
 
 export default function ConfigToneScreen({ navigation }) {
   const [tone, setTone] = useState(DEFAULT_TONE);
 
   useEffect(() => {
-    loadTone().then(setTone);
+    let cancelled = false;
+    async function load() {
+      // 1. Cargar inmediatamente desde AsyncStorage para respuesta instantánea
+      const local = await loadToneLocal();
+      if (!cancelled && local) setTone(local);
+
+      // 2. Preferir datos del backend (source of truth multi-dispositivo)
+      const res = await settingsApi.getPreferences();
+      if (!cancelled && !res?.error && res?.data) {
+        const { personality, detailLevel, directHints, motivational } = res.data;
+        const fromBackend = {
+          personality:  personality  ?? DEFAULT_TONE.personality,
+          detailLevel:  detailLevel  ?? DEFAULT_TONE.detailLevel,
+          directHints:  directHints  ?? DEFAULT_TONE.directHints,
+          motivational: motivational ?? DEFAULT_TONE.motivational,
+        };
+        setTone(fromBackend);
+        saveToneLocal(fromBackend);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   const update = useCallback((patch) => {
     setTone((prev) => {
       const next = { ...prev, ...patch };
-      saveTone(next);
+      // Persistir localmente de forma síncrona para UX instantánea
+      saveToneLocal(next);
+      // Sincronizar con backend en background
+      settingsApi.updatePreferences({
+        personality:  next.personality,
+        detailLevel:  next.detailLevel,
+        directHints:  next.directHints,
+        motivational: next.motivational,
+      }).catch(() => { /* error silencioso — ya está en AsyncStorage */ });
       return next;
     });
   }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* HEADER */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          style={styles.iconButton}
           activeOpacity={0.7}
+          onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
-          style={styles.headerBack}
         >
-          <Ionicons name="chevron-back" size={24} color="#1E293B" />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tono de la IA</Text>
-        <View style={styles.headerRight} />
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle}>Tono de la IA</Text>
+          <Text style={styles.headerSubtitle}>Cómo quieres que te hable tu Tutor IA.</Text>
+        </View>
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        <Text style={styles.description}>
-          Cómo quieres que te hable tu{' '}
-          <Text style={{ color: colors.primary }}>Tutor IA</Text>.
-        </Text>
-
-        {/* PERSONALIDAD */}
-        <Text style={styles.sectionTitle}>PERSONALIDAD</Text>
-        <View style={styles.card}>
-          <View style={styles.personalityRow}>
-            {PERSONALITY_OPTIONS.map(({ key, label }) => {
-              const isSelected = tone.personality === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.personalityTab, isSelected && styles.personalityTabSelected]}
-                  onPress={() => update({ personality: key })}
-                  activeOpacity={0.7}
-                  accessibilityLabel={`Personalidad ${label}`}
-                >
-                  <Text style={[styles.personalityTabText, isSelected && styles.personalityTabTextSelected]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+        {/* ── Personalidad ────────────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>PERSONALIDAD</Text>
+        <View style={styles.segmentedRow}>
+          {PERSONALITY_OPTIONS.map(({ key, label }) => {
+            const isSelected = tone.personality === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[styles.segmentButton, isSelected && styles.segmentButtonActive]}
+                onPress={() => update({ personality: key })}
+                activeOpacity={0.7}
+                accessibilityLabel={`Personalidad ${label}`}
+              >
+                <Text style={[styles.segmentText, isSelected && styles.segmentTextActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* NIVEL DE DETALLE */}
-        <View style={styles.detailCard}>
-          <View style={styles.detailHeader}>
-            <Text style={styles.detailTitle}>Nivel de detalle</Text>
-            <Text style={styles.detailValue}>{DETAIL_LABELS[tone.detailLevel ?? 1]}</Text>
+        {/* ── Nivel de detalle ────────────────────────────────────────── */}
+        <Text style={styles.detailLabel}>Nivel de detalle</Text>
+        <AccentSlider
+          steps={3}
+          valueIdx={tone.detailLevel ?? 1}
+          onChange={(idx) => update({ detailLevel: idx })}
+          accentColor={colors.accentOrange}
+          trackColor={FIGMA.sliderTrack}
+        />
+        <View style={styles.sliderLabelsRow}>
+          {DETAIL_LABELS.map((label, idx) => (
+            <TouchableOpacity key={label} onPress={() => update({ detailLevel: idx })}>
+              <Text style={styles.sliderLabelText}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── Toggles ─────────────────────────────────────────────────── */}
+        <View style={styles.toggleRow}>
+          <View style={styles.rowTextWrap}>
+            <Text style={styles.rowTitle}>Pistas más directas</Text>
+            <Text style={styles.rowSubtitle}>Acércate más a la respuesta</Text>
           </View>
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={2}
-            step={1}
-            value={tone.detailLevel ?? 1}
-            onValueChange={(v) => update({ detailLevel: v })}
-            minimumTrackTintColor={colors.primary}
-            maximumTrackTintColor="#E2E8F0"
-            thumbTintColor={colors.primary}
+          <Switch
+            value={tone.directHints}
+            onValueChange={(v) => update({ directHints: v })}
+            trackColor={{ false: '#E2E2E6', true: colors.purple }}
+            thumbColor={colors.white}
+            accessibilityLabel={`Pistas directas ${tone.directHints ? 'activadas' : 'desactivadas'}`}
           />
-          <View style={styles.detailLabelRow}>
-            <Text style={styles.detailLabelText}>Conciso</Text>
-            <Text style={styles.detailLabelText}>Extenso</Text>
-          </View>
         </View>
 
-        {/* TOGGLES */}
-        <View style={styles.card}>
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleTexts}>
-              <Text style={styles.toggleTitle}>Pistas más directas</Text>
-              <Text style={styles.toggleSub}>Acércate más a la respuesta</Text>
-            </View>
-            <Switch
-              trackColor={{ false: '#E2E8F0', true: colors.primary }}
-              thumbColor={tone.directHints ? '#FFFFFF' : '#F4F4F4'}
-              onValueChange={(v) => update({ directHints: v })}
-              value={tone.directHints}
-              accessibilityLabel={`Pistas directas ${tone.directHints ? 'activadas' : 'desactivadas'}`}
-            />
+        <View style={styles.toggleRow}>
+          <View style={styles.rowTextWrap}>
+            <Text style={styles.rowTitle}>Motivación en los avisos</Text>
+            <Text style={styles.rowSubtitle}>Mensajes de ánimo</Text>
           </View>
-
-          <View style={[styles.toggleRow, styles.toggleRowLast]}>
-            <View style={styles.toggleTexts}>
-              <Text style={styles.toggleTitle}>Motivación en los avisos</Text>
-              <Text style={styles.toggleSub}>Mensajes de ánimo</Text>
-            </View>
-            <Switch
-              trackColor={{ false: '#E2E8F0', true: colors.primary }}
-              thumbColor={tone.motivational ? '#FFFFFF' : '#F4F4F4'}
-              onValueChange={(v) => update({ motivational: v })}
-              value={tone.motivational}
-              accessibilityLabel={`Mensajes motivacionales ${tone.motivational ? 'activados' : 'desactivados'}`}
-            />
-          </View>
+          <Switch
+            value={tone.motivational}
+            onValueChange={(v) => update({ motivational: v })}
+            trackColor={{ false: '#E2E2E6', true: colors.purple }}
+            thumbColor={colors.white}
+            accessibilityLabel={`Mensajes motivacionales ${tone.motivational ? 'activados' : 'desactivados'}`}
+          />
         </View>
 
-        {/* VISTA PREVIA */}
-        <View style={styles.previewCard}>
+        {/* ── Vista previa ────────────────────────────────────────────── */}
+        <View style={styles.previewBubble}>
           <Text style={styles.previewText}>{PREVIEW_TEXTS[tone.personality]}</Text>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
 
-  // Header
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  headerBack: { padding: 8 },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  headerRight: { width: 40 },
-
-  // Scroll
-  scroll: { paddingBottom: 40 },
-  description: {
-    fontSize: 14,
-    color: '#64748B',
-    marginHorizontal: 16,
-    marginTop: 20,
-    lineHeight: 20,
-  },
-
-  // Sección
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
-  },
-
-  // Card base
-  card: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-  },
-
-  // Personalidad — tabs
-  personalityRow: { flexDirection: 'row' },
-  personalityTab: {
-    flex: 1,
-    paddingVertical: 12,
+  iconButton: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    borderRadius: 10,
-    margin: 4,
+    justifyContent: 'center',
   },
-  personalityTabSelected: {
-    borderColor: '#1E293B',
+  headerTitles: {
+    flex: 1,
+    alignItems: 'center',
   },
-  personalityTabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#64748B',
+  headerTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
   },
-  personalityTabTextSelected: {
-    fontWeight: '700',
-    color: '#1E293B',
+  headerSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
   },
 
-  // Nivel de detalle — Slider
-  detailCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+  // ── Contenido ─────────────────────────────────────────────────
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  detailHeader: {
+  sectionLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: colors.textDark,
+    marginBottom: 10,
+  },
+
+  // ── Personalidad ──────────────────────────────────────────────
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: spacing.lg,
+  },
+  segmentButton: {
+    borderWidth: 1,
+    borderColor: FIGMA.segmentBorder,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  segmentButtonActive: {
+    borderColor: colors.purple,
+  },
+  segmentText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: FIGMA.textMuted,
+  },
+  segmentTextActive: {
+    color: colors.purple,
+  },
+
+  // ── Nivel de detalle ──────────────────────────────────────────
+  detailLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+    marginBottom: 14,
+  },
+  sliderLabelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: spacing.lg,
   },
-  detailTitle: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
-  detailValue: { fontSize: 15, fontWeight: '700', color: colors.primary },
-  slider: { width: '100%', height: 40 },
-  detailLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
-  detailLabelText: { fontSize: 12, color: '#94A3B8' },
+  sliderLabelText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+  },
 
-  // Toggles
+  // ── Toggles ───────────────────────────────────────────────────
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingVertical: 12,
   },
-  toggleRowLast: { borderBottomWidth: 0 },
-  toggleTexts: { flex: 1, marginRight: 12 },
-  toggleTitle: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  toggleSub: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  rowTextWrap: {
+    flex: 1,
+  },
+  rowTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+  },
+  rowSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+  },
 
-  // Vista previa
-  previewCard: {
-    backgroundColor: '#EDE9FE',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
+  // ── Vista previa ──────────────────────────────────────────────
+  previewBubble: {
+    backgroundColor: colors.purple,
+    borderRadius: 14,
+    padding: spacing.md,
+    marginTop: spacing.sm + 4,
   },
   previewText: {
-    fontSize: 14,
-    color: '#1E293B',
-    lineHeight: 21,
-    fontStyle: 'italic',
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12,
+    color: colors.white,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

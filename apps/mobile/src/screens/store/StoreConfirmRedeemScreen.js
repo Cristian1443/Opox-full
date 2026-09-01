@@ -7,13 +7,24 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import RedeemSuccessModal from '../../components/RedeemSuccessModal';
+import { storeApi } from '../../api/store';
 
-const ACCENT = '#6C5CE7';
+// ─── 11.3 · Confirmar canje ────────────────────────────────────────────────
+// Fiel al Figma (TiendaModalesScreen.tsx → ConfirmarCanjeModal). El TSX lo
+// compone como Modal solo como convención de previsualización (mismo patrón
+// que en Bloques 9/10); se mantiene como pantalla completa real, a la que
+// se llega tras "Canjear ahora" en el detalle del producto.
+const FIGMA = {
+  balanceMuted: 'rgba(65, 41, 80, 0.5)',
+  cardBorder: 'rgba(65, 41, 80, 0.3)',
+};
 
 const MOCK_FALLBACK = {
   product: { name: 'Pack de Tests Premium', icon: 'document-text-outline', price: 500 },
@@ -21,19 +32,36 @@ const MOCK_FALLBACK = {
   newBalance: 1340,
 };
 
+function GemIcon({ size = 56, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M5 8L2 3L7 3L12 3L17 3L22 3L19 8L12 21L5 8Z" fill="none" stroke={color} strokeWidth={1.2} strokeLinejoin="round" />
+      <Path d="M2 3L22 3M5 8L19 8M9 3L12 8L15 3" stroke={color} strokeWidth={1} fill="none" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export default function StoreConfirmRedeemScreen({ navigation, route }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [redeemResult, setRedeemResult] = useState(null);
 
-  const { product, currentBalance, newBalance } = route?.params ?? MOCK_FALLBACK;
+  const { product, currentBalance, newBalance, productId, redeemType } = route?.params ?? MOCK_FALLBACK;
   const productCost = product?.price ?? (currentBalance - newBalance);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setShowSuccess(true);
-    }, 1500);
+    let res;
+    if (redeemType === 'discount') res = await storeApi.redeemDiscount(productId);
+    else if (redeemType === 'community_test') res = await storeApi.obtainCommunityTest(productId);
+    else res = await storeApi.redeemProduct(productId);
+    setIsLoading(false);
+    if (res?.error) {
+      Alert.alert('Error al canjear', res.error.message ?? 'Inténtalo de nuevo');
+      return;
+    }
+    setRedeemResult(res?.data ?? null);
+    setShowSuccess(true);
   };
 
   const handleCancel = () => {
@@ -42,13 +70,16 @@ export default function StoreConfirmRedeemScreen({ navigation, route }) {
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
-    navigation.navigate('StoreHome');
+    navigation.navigate('StoreWallet');
   };
 
   const handleSuccessContinue = () => {
     setShowSuccess(false);
-    // TODO: navegar al destino del producto según su tipo (TrainingHome, etc.)
-    navigation.navigate('StoreHome');
+    if (redeemType === 'community_test') {
+      navigation.navigate('StoreMarketplace');
+    } else {
+      navigation.navigate('StoreWallet');
+    }
   };
 
   const insets = useSafeAreaInsets();
@@ -57,76 +88,38 @@ export default function StoreConfirmRedeemScreen({ navigation, route }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.closeButton}
+          style={styles.iconButton}
           onPress={handleCancel}
           disabled={isLoading}
           accessibilityLabel="Cerrar"
         >
-          <Ionicons name="close" size={24} color={colors.text} />
+          <Ionicons name="close" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Confirmar canje</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.summaryCard}>
-          {/* Icono del producto */}
-          <View style={styles.iconWrapper}>
-            <Ionicons
-              name={product?.icon ?? 'cube-outline'}
-              size={48}
-              color={ACCENT}
-            />
-          </View>
-
-          <Text style={styles.productName}>{product?.name ?? '—'}</Text>
-          <Text style={styles.productDesc}>
-            Vas a canjear este producto por {productCost.toLocaleString()} Opopoints.
+        <View style={styles.hero}>
+          <GemIcon />
+          <Text style={styles.title}>Confirmar canje</Text>
+          <Text style={styles.subtitle}>
+            Vas a canjear el <Text style={styles.bold}>{product?.name ?? '—'}</Text> por{' '}
+            <Text style={styles.bold}>{productCost.toLocaleString('es-ES')} Opopoints</Text>. Te quedarán {newBalance.toLocaleString('es-ES')}.
           </Text>
-
-          <View style={styles.divider} />
-
-          {/* Saldo resultante */}
-          <View style={styles.balanceSection}>
-            <Text style={styles.balanceLabel}>Te quedarán</Text>
-            <View style={styles.balanceResult}>
-              <Ionicons name="wallet-outline" size={24} color={colors.success} />
-              <Text style={styles.balanceAmount}>{newBalance.toLocaleString()} O</Text>
-            </View>
-            <Text style={styles.balanceNote}>
-              Saldo actual: {currentBalance.toLocaleString()} O
-            </Text>
-          </View>
-
-          {/* Aviso */}
-          <View style={styles.warningBox}>
-            <Ionicons name="alert-circle-outline" size={20} color={colors.textSecondary} />
-            <Text style={styles.warningText}>
-              Esta operación es irreversible. Asegúrate de que deseas continuar.
-            </Text>
-          </View>
         </View>
       </ScrollView>
 
-      {/* Footer fijo con dos botones */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+      {/* ── CTA fijo al fondo ─────────────────────────────────────────── */}
+      <View style={[styles.footer, { paddingBottom: spacing.sm + insets.bottom }]}>
         <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={handleCancel}
-          disabled={isLoading}
-          accessibilityLabel="Cancelar el canje"
-        >
-          <Text style={styles.cancelButtonText}>Cancelar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.confirmButton, isLoading && styles.confirmButtonLoading]}
+          style={styles.confirmButton}
           onPress={handleConfirm}
           disabled={isLoading}
           accessibilityLabel="Confirmar el canje"
@@ -134,18 +127,24 @@ export default function StoreConfirmRedeemScreen({ navigation, route }) {
           {isLoading ? (
             <ActivityIndicator size="small" color={colors.white} />
           ) : (
-            <>
-              <Ionicons name="checkmark-circle-outline" size={20} color={colors.white} />
-              <Text style={styles.confirmButtonText}>Confirmar canje</Text>
-            </>
+            <Text style={styles.confirmButtonText}>Confirmar canje</Text>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.cancelLink}
+          onPress={handleCancel}
+          disabled={isLoading}
+          accessibilityLabel="Cancelar el canje"
+        >
+          <Text style={styles.cancelLinkText}>Cancelar</Text>
         </TouchableOpacity>
       </View>
 
       <RedeemSuccessModal
         visible={showSuccess}
         productName={product?.name}
-        newBalance={newBalance}
+        newBalance={redeemResult?.newBalance ?? newBalance}
         onContinue={handleSuccessContinue}
         onClose={handleSuccessClose}
       />
@@ -156,169 +155,86 @@ export default function StoreConfirmRedeemScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
+
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  closeButton: {
-    padding: 8,
-    marginLeft: -8,
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
   },
+
+  // ── Contenido ─────────────────────────────────────────────────
   scrollContent: {
-    padding: 20,
     flexGrow: 1,
+    paddingHorizontal: spacing.lg,
   },
-  // Tarjeta resumen
-  summaryCard: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  iconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#EDE7F6',
+  hero: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-  },
-  productName: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  productDesc: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-  divider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: colors.separator,
-    marginVertical: 20,
-  },
-  // Saldo resultante
-  balanceSection: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  balanceLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  balanceResult: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.successBg,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 14,
     gap: 8,
   },
-  balanceAmount: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.success,
+  title: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
-  balanceNote: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 10,
-  },
-  // Aviso irreversible
-  warningBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: colors.background,
-    padding: 14,
-    borderRadius: 12,
-    marginTop: 4,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  warningText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    flex: 1,
+  subtitle: {
+    fontFamily: 'Poppins-Light',
+    fontSize: 13.8,
+    color: colors.textDark,
+    textAlign: 'center',
     lineHeight: 19,
+    paddingHorizontal: spacing.sm,
   },
-  // Footer
+  bold: {
+    fontFamily: 'Poppins-SemiBold',
+  },
+
+  // ── CTA fijo al fondo ─────────────────────────────────────────
   footer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 12,
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.separator,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 14,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
   },
   confirmButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 14,
-    backgroundColor: ACCENT,
+    width: '100%',
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.accentOrange,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  confirmButtonLoading: {
-    backgroundColor: colors.grayMid,
-    shadowOpacity: 0,
-    elevation: 0,
   },
   confirmButtonText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
     color: colors.white,
+  },
+  cancelLink: {
+    marginTop: 14,
+    paddingVertical: 4,
+  },
+  cancelLinkText: {
+    fontFamily: 'Poppins-Light',
+    fontSize: 13.8,
+    color: colors.textDark,
   },
 });

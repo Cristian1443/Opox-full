@@ -10,7 +10,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Rect, Circle, Line } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
@@ -65,42 +65,14 @@ const devicesData = [
     },
 ];
 
-// ─── Iconos aproximados (ver nota: no son el asset exportado) ───────────────
-function WatchIcon({ size = 28, color = colors.accentOrange }) {
-    return (
-        <Svg width={size} height={size * 1.15} viewBox="0 0 24 28">
-            <Rect x="4" y="1" width="10" height="4" rx="1.5" stroke={color} strokeWidth={1.6} fill="none" />
-            <Rect x="4" y="23" width="10" height="4" rx="1.5" stroke={color} strokeWidth={1.6} fill="none" />
-            <Rect x="2.5" y="6" width="13" height="16" rx="4" stroke={color} strokeWidth={1.8} fill="none" />
-            <Line x1="18" y1="11" x2="20.5" y2="11" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-            <Line x1="18" y1="17" x2="20.5" y2="17" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function RoundWatchIcon({ size = 28, color = colors.accentOrange }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Circle cx="12" cy="12" r="8.5" stroke={color} strokeWidth={1.8} fill="none" />
-            <Path d="M12 7.5V12L15 14" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <Line x1="12" y1="1.8" x2="12" y2="3.4" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
-function PhoneIcon({ size = 24, color = colors.accentOrange }) {
-    return (
-        <Svg width={size} height={size * 1.4} viewBox="0 0 20 28">
-            <Rect x="1.5" y="1.5" width="17" height="25" rx="3.5" stroke={color} strokeWidth={1.8} fill="none" />
-            <Line x1="7" y1="23" x2="13" y2="23" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-        </Svg>
-    );
-}
-
+// Reloj (Apple Watch / Garmin) y celular (Fitbit/Pixel, Samsung, solo
+// smartphone) con los iconos estándar del sistema — más nítidos y
+// reconocibles que un trazo SVG a mano en tamaños pequeños.
 function DeviceIcon({ type }) {
-    if (type === 'watch') return <WatchIcon />;
-    if (type === 'roundWatch') return <RoundWatchIcon />;
-    return <PhoneIcon />;
+    if (type === 'watch' || type === 'roundWatch') {
+        return <Ionicons name="watch-outline" size={30} color={colors.accentOrange} />;
+    }
+    return <Ionicons name="phone-portrait-outline" size={28} color={colors.accentOrange} />;
 }
 
 export default function ConnectDeviceScreen({ navigation }) {

@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from 'axios';
 import { logger } from '@opox/utils';
-import type { MotorBoeContract } from '@opox/types';
+import type { MotorBoeContract, MotorBoeNorma, MotorBoeCatalogResult } from '@opox/types';
 
 /**
  * Cliente HTTP para el Motor BOE externo.
@@ -31,55 +31,13 @@ export interface MotorBoeConfig {
     timeoutMs?: number;
 }
 
-// ─── DTOs de respuesta ──────────────────────────────────────────────────────
+// ─── DTO interno del job (más rico que MotorJobStatus del contrato) ──────────
 
-export interface MotorBoeNorma {
-    id: string;
-    curso_id: string;
-    identificador_boe: string;
-    titulo: string;
-    url: string;
-    texto_len: number;
-    ultima_revision: string | null;
-    activa: boolean;
-}
-
-export interface MotorBoeFragmento {
-    /** Texto de la redacción derogada */
-    antes: string;
-    /** Texto de la redacción vigente */
-    despues: string;
-    /** Contexto del precepto (ej. "Artículo 14. Derechos en formato electrónico") */
-    contexto: string;
-}
-
-export interface MotorBoePreguntaAfectada {
-    id: string;
-    texto: string;
-    estado: 'marcada' | 'regenerada' | 'descartada';
-    similitud?: number;
-}
-
-export interface MotorBoeCambio {
-    id: string;
-    norma_id: string;
-    norma_titulo: string;
-    identificador_boe: string;
-    detectado: string;
-    resumen: string;
-    fragmentos: MotorBoeFragmento[];
-    estado: string;
-    preguntas_afectadas: MotorBoePreguntaAfectada[];
-    contenido_afectado: unknown[];
-}
-
-export type MotorJobEstado = 'reserved' | 'queued' | 'running' | 'done' | 'error';
-
-export interface MotorJob {
+interface MotorJobFull {
     id: string;
     tipo: string;
     recurso_id: string;
-    estado: MotorJobEstado;
+    estado: string;
     mensaje: string;
     progreso: Record<string, unknown>;
     resultado: Record<string, unknown>;
@@ -119,15 +77,8 @@ export class MotorBoeClient implements MotorBoeContract {
         );
     }
 
-    /**
-     * Registra una norma en el Motor y descarga su snapshot inicial del BOE.
-     * 409 si ya está en seguimiento; 422 si el identificador es inválido.
-     */
-    async followRegulation(
-        cursoId: string,
-        boeIdentifier: string,
-        titulo?: string,
-    ): Promise<MotorBoeNorma> {
+    /** Registra una norma en el Motor. 409 si ya está en seguimiento. */
+    async followRegulation(cursoId: string, boeIdentifier: string, titulo?: string): Promise<MotorBoeNorma> {
         logger.info('[motor-boe] followRegulation', { cursoId, boeIdentifier });
         const { data } = await this.http.post<MotorBoeNorma>('/v1/boe/regulations', {
             curso_id: cursoId,
@@ -137,9 +88,7 @@ export class MotorBoeClient implements MotorBoeContract {
         return data;
     }
 
-    /**
-     * Lista las normas en seguimiento activo del curso.
-     */
+    /** Lista normas en seguimiento activo para el curso. */
     async listRegulations(cursoId: string): Promise<MotorBoeNorma[]> {
         logger.info('[motor-boe] listRegulations', { cursoId });
         const { data } = await this.http.get<MotorBoeNorma[]>('/v1/boe/regulations', {
@@ -148,21 +97,15 @@ export class MotorBoeClient implements MotorBoeContract {
         return data ?? [];
     }
 
-    /**
-     * Deja de seguir una norma del curso.
-     */
-    async stopFollowingRegulation(regulationId: string, cursoId: string): Promise<void> {
-        logger.info('[motor-boe] stopFollowingRegulation', { regulationId, cursoId });
-        await this.http.delete(`/v1/boe/regulations/${regulationId}`, {
+    /** Deja de seguir una norma. motorRegulationId = id del Motor (NormaOut.id). */
+    async stopFollowingRegulation(motorRegulationId: string, cursoId: string): Promise<void> {
+        logger.info('[motor-boe] stopFollowingRegulation', { motorRegulationId, cursoId });
+        await this.http.delete(`/v1/boe/regulations/${motorRegulationId}`, {
             params: { course_id: cursoId },
         });
     }
 
-    /**
-     * Lanza un job de comprobación de cambios (async).
-     * Pasa cursoId para limitar al curso; omitir (o pasar undefined) hace un barrido completo.
-     * Devuelve el job_id para hacer polling con pollJob().
-     */
+    /** Lanza job de detección de cambios. Sin cursoId hace barrido global. Devuelve job_id. */
     async checkForChanges(cursoId?: string): Promise<string> {
         const body = cursoId ? { curso_id: cursoId } : { todos: true };
         logger.info('[motor-boe] checkForChanges', body);
@@ -170,23 +113,16 @@ export class MotorBoeClient implements MotorBoeContract {
         return data.job_id;
     }
 
-    /**
-     * Lista los cambios detectados para un curso, con fragmentos antes/despues.
-     */
-    async getChanges(cursoId: string): Promise<MotorBoeCambio[]> {
+    /** Lista los cambios detectados para un curso (course_id requerido en el Motor). */
+    async getChanges(cursoId: string): Promise<import('@opox/types').MotorCambio[]> {
         logger.info('[motor-boe] getChanges', { cursoId });
-        const { data } = await this.http.get<MotorBoeCambio[]>('/v1/boe/changes', {
+        const { data } = await this.http.get<import('@opox/types').MotorCambio[]>('/v1/boe/changes', {
             params: { course_id: cursoId },
         });
         return data ?? [];
     }
 
-    /**
-     * Lanza un job de regeneración de preguntas afectadas por un cambio (async).
-     * Las preguntas regeneradas solo vuelven al banco si superan la validación completa.
-     * El resultado del job incluye sesion_id del mini-test de validación.
-     * Devuelve el job_id para hacer polling con pollJob().
-     */
+    /** Lanza job de regeneración de preguntas afectadas por un cambio. Devuelve job_id. */
     async regenerateQuestions(changeId: string, cursoId: string): Promise<string> {
         logger.info('[motor-boe] regenerateQuestions', { changeId, cursoId });
         const { data } = await this.http.post<{ job_id: string }>(
@@ -197,22 +133,33 @@ export class MotorBoeClient implements MotorBoeContract {
     }
 
     /**
-     * Busca normas en el catálogo del BOE por título o código.
+     * Busca normas en el catálogo BOE.
+     * El Motor devuelve CatalogoOut ({ sincronizado, total, resultados: [] }).
      */
-    async searchCatalog(query: string, limit = 20): Promise<MotorBoeNorma[]> {
+    async searchCatalog(query: string, limit = 20): Promise<MotorBoeCatalogResult> {
         logger.info('[motor-boe] searchCatalog', { query });
-        const { data } = await this.http.get<MotorBoeNorma[]>('/v1/boe/catalog', {
+        const { data } = await this.http.get<MotorBoeCatalogResult>('/v1/boe/catalog', {
             params: { q: query, limit },
+            timeout: 5_000, // Timeout corto: si el catálogo tarda, cae al fallback de listRegulations
         });
-        return data ?? [];
+        return data ?? { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
     }
 
     /**
-     * Sondea el estado de un job async hasta que termine.
-     * No hace polling por sí solo — el caller decide el intervalo.
+     * Sincroniza el catálogo del BOE oficial en el Motor (async).
+     * `desde`: fecha YYYYMMDD desde la que buscar cambios.
+     * Devuelve job_id para polling.
      */
-    async pollJob(jobId: string): Promise<MotorJob> {
-        const { data } = await this.http.get<MotorJob>(`/v1/jobs/${jobId}`);
-        return data;
+    async syncCatalog(desde?: string): Promise<string> {
+        logger.info('[motor-boe] syncCatalog', { desde });
+        const body = desde ? { desde } : {};
+        const { data } = await this.http.post<{ job_id: string }>('/v1/boe/catalog/sync', body);
+        return data.job_id;
+    }
+
+    /** Sondea el estado de un job. No hace polling interno — el caller decide el intervalo. */
+    async pollJob(jobId: string): Promise<import('@opox/types').MotorJobStatus> {
+        const { data } = await this.http.get<MotorJobFull>(`/v1/jobs/${jobId}`);
+        return { id: data.id, estado: data.estado as import('@opox/types').MotorJobEstado, mensaje: data.mensaje };
     }
 }

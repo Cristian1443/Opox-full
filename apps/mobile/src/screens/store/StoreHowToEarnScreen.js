@@ -7,11 +7,11 @@ import { colors } from '../../theme';
 const ACCENT = '#6C5CE7';
 
 const EARN_METHODS = [
-  { icon: 'school-outline', title: 'Completa tests diarios', points: '+10 O por test' },
-  { icon: 'flame-outline', title: 'Mantén tu racha', points: '+5 O por día de racha' },
-  { icon: 'trophy-outline', title: 'Sube en el ranking', points: '+50 O al top 10 semanal' },
-  { icon: 'people-outline', title: 'Invita a un amigo', points: '+100 O por referido activo' },
-  { icon: 'checkmark-done-outline', title: 'Completa tu plan diario', points: '+15 O por plan cumplido' },
+  { icon: 'checkmark-done-outline', title: 'Completa tu plan diario', points: '+40 O por plan completado' },
+  { icon: 'trophy-outline', title: 'Sube en el ranking', points: '+50 O al top 10 semanal (próximamente)' },
+  { icon: 'people-outline', title: 'Invita a un amigo', points: '+100 O por referido activo (próximamente)' },
+  { icon: 'school-outline', title: 'Completa tests diarios', points: 'Activa tu racha para ganar' },
+  { icon: 'flame-outline', title: 'Mantén tu racha de estudio', points: 'Retos de clan (variable)' },
 ];
 
 export default function StoreHowToEarnScreen({ navigation }) {

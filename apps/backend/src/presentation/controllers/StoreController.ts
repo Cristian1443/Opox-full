@@ -6,6 +6,7 @@ import type {
     GetStoreProductUseCase,
     RedeemProductUseCase,
     ListStoreDiscountsUseCase,
+    RedeemDiscountUseCase,
     GetWalletUseCase,
     GetWalletItemUseCase,
     ListCommunityTestsUseCase,
@@ -26,6 +27,7 @@ export class StoreController {
             getProduct: GetStoreProductUseCase;
             redeemProduct: RedeemProductUseCase;
             listDiscounts: ListStoreDiscountsUseCase;
+            redeemDiscount: RedeemDiscountUseCase;
             getWallet: GetWalletUseCase;
             getWalletItem: GetWalletItemUseCase;
             listCommunityTests: ListCommunityTestsUseCase;
@@ -76,6 +78,17 @@ export class StoreController {
         try {
             const category = req.query['category'] as string | undefined;
             const result = await this.deps.listDiscounts.execute(category);
+            ok(res, 200, result);
+        } catch (e) { next(e); }
+    };
+
+    // POST /store/discounts/:id/redeem
+    redeemDiscount = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const result = await this.deps.redeemDiscount.execute(
+                req.authUser!.id,
+                req.params['id'] as string,
+            );
             ok(res, 200, result);
         } catch (e) { next(e); }
     };

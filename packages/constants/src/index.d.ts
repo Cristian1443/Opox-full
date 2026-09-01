@@ -1,5 +1,7 @@
 declare const API_ROUTES: {
     readonly HEALTH: string;
+    readonly HEALTH_DEVICES: string;
+    readonly HEALTH_DEVICE: string;
 
     readonly AUTH: {
         readonly REGISTER: string;
@@ -60,6 +62,8 @@ declare const API_ROUTES: {
         readonly FEED: string;
         readonly REGULATIONS: string;
         readonly REGULATION: string;
+        readonly CATALOG_SEARCH: string;
+        readonly CATALOG_SYNC: string;
         readonly CHANGE_DETAIL: string;
         readonly CHANGE_COMPARISON: string;
         readonly CHANGE_MINI_TEST: string;
@@ -98,6 +102,7 @@ declare const API_ROUTES: {
         readonly PRODUCT: string;
         readonly REDEEM: string;
         readonly DISCOUNTS: string;
+        readonly DISCOUNT_REDEEM: string;
         readonly WALLET: string;
         readonly WALLET_ITEM: string;
         readonly COMMUNITY_TESTS: string;

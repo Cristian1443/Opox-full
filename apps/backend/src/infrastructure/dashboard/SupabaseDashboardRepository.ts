@@ -50,10 +50,25 @@ function toDomainNotification(row: NotificationRow): Notification {
     });
 }
 
+function todayUtc(): string {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayUtc(): string {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+}
+
 function toDomainGamification(row: GamificationRow): UserGamification {
+    const last = row.last_activity_date;
+    const today = todayUtc();
+    const yesterday = yesterdayUtc();
+    // La racha caduca si la última actividad no fue hoy ni ayer (UTC)
+    const effectiveStreak = (last === today || last === yesterday) ? row.current_streak : 0;
     return UserGamification.create({
         userId: row.user_id,
-        currentStreak: row.current_streak,
+        currentStreak: effectiveStreak,
         longestStreak: row.longest_streak,
         opopointsBalance: row.opopoints_balance,
         lastActivityDate: row.last_activity_date,
@@ -238,6 +253,18 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
         if (ledgerError) {
             // eslint-disable-next-line no-console
             console.error('[dashboard registerActivity] ledger insert failed:', ledgerError.message);
+        }
+
+        // Puente earn → store ledger: getBalance() de la tienda lee user_opopoints_ledger
+        // (solo recibe filas spend). Sin esta fila earn el saldo siempre sería 0.
+        if (input.points > 0) {
+            const { error: earnError } = await this.supabaseAdmin
+                .from('user_opopoints_ledger')
+                .insert({ user_id: input.userId, type: 'earn', amount: input.points, reason: input.reason, ref_id: null });
+            if (earnError) {
+                // eslint-disable-next-line no-console
+                console.error('[dashboard registerActivity] earn ledger insert failed:', earnError.message);
+            }
         }
 
         return toDomainGamification(data as GamificationRow);

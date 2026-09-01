@@ -9,10 +9,38 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import PaymentErrorModal from '../../components/PaymentErrorModal';
 
-const ACCENT = '#6C5CE7';
+// ─── 11.2 · Tienda · Planes ─────────────────────────────────────────────────
+// Fiel al Figma (SuscripcionesScreen.tsx, título confirmado "Planes"). El
+// reference solo captura una comparativa estática de 3 filas con un único
+// CTA "Suscribirme a premium"; la app real ofrece un botón de suscripción
+// por plan (incluye "Anual" con badge de ahorro), prueba social y garantías
+// — todo eso es funcionalidad real de conversión que se conserva, solo se
+// reestiliza con la tipografía/color confirmados.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  cardBorder: 'rgba(65, 41, 80, 0.3)',
+  popularBg: 'rgba(246, 150, 36, 0.15)',
+};
+
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function CheckIcon({ size = 14, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M4 12.5L9.5 18L20 6" stroke={color} strokeWidth={2.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 const PLANS = [
   {
@@ -68,7 +96,7 @@ const PLANS = [
 const StarRow = () => (
   <View style={styles.ratingRow}>
     {[...Array(5)].map((_, i) => (
-      <Ionicons key={i} name="star" size={14} color="#FFD700" />
+      <Ionicons key={i} name="star" size={14} color={colors.accentOrange} />
     ))}
     <Text style={styles.ratingText}>4.9 (12k reseñas)</Text>
   </View>
@@ -78,7 +106,7 @@ const FeatureList = ({ features }) => (
   <View style={styles.featuresList}>
     {features.map((feature, i) => (
       <View key={i} style={styles.featureRow}>
-        <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+        <CheckIcon />
         <Text style={styles.featureText}>{feature}</Text>
       </View>
     ))}
@@ -87,32 +115,32 @@ const FeatureList = ({ features }) => (
 
 const PlanCard = ({ plan, onSubscribe }) => (
   <View style={[styles.planCard, plan.isPopular && styles.planCardPopular]}>
-    {/* Badge "POPULAR" centrado sobre el borde superior */}
-    {plan.isPopular && (
-      <View style={styles.popularBadgeWrapper}>
-        <View style={styles.popularBadge}>
-          <Text style={styles.popularText}>{'POPULAR'}</Text>
-        </View>
-      </View>
-    )}
-
-    {/* Badge de ahorro, esquina superior derecha */}
     {plan.savings && (
       <View style={styles.savingsBadge}>
         <Text style={styles.savingsText}>{plan.savings}</Text>
       </View>
     )}
 
-    <Text style={styles.planName}>{plan.name}</Text>
-    <View style={styles.priceContainer}>
-      <Text style={styles.planPrice}>{plan.price}</Text>
-      <Text style={styles.planPeriod}>{plan.period}</Text>
+    <View style={styles.planHeaderRow}>
+      <View style={styles.planNameRow}>
+        <Text style={styles.planName}>{plan.name}</Text>
+        {plan.isPopular && (
+          <View style={styles.popularBadge}>
+            <Text style={styles.popularText}>Popular</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.priceContainer}>
+        <Text style={styles.planPrice}>{plan.price}</Text>
+        <Text style={styles.planPeriod}>{plan.period}</Text>
+      </View>
     </View>
-    <Text style={styles.planDesc}>{plan.desc}</Text>
 
-    <View style={styles.divider} />
-
-    <FeatureList features={plan.features} />
+    {plan.isPopular ? (
+      <FeatureList features={plan.features} />
+    ) : (
+      <Text style={styles.planDesc}>{plan.desc}</Text>
+    )}
 
     <TouchableOpacity
       style={[
@@ -133,10 +161,9 @@ const PlanCard = ({ plan, onSubscribe }) => (
   </View>
 );
 
-export default function StoreSubscriptionScreen({ navigation, route }) {
+export default function StoreSubscriptionScreen({ navigation }) {
   const [pendingPlan, setPendingPlan] = useState(null);
   const [showPaymentError, setShowPaymentError] = useState(false);
-  const initialPlanKey = route?.params?.planKey;
 
   // TODO(revenuecat): reemplazar bloque de setTimeout por RevenueCat.purchasePackage(package)
   // En error: setShowPaymentError(true). En éxito: navigate StoreSubscriptionSuccess.
@@ -161,24 +188,25 @@ export default function StoreSubscriptionScreen({ navigation, route }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
           accessibilityLabel="Volver"
         >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Elige tu plan</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>Planes</Text>
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Sección de confianza */}
+        {/* Sección de confianza — real, sin equivalente en Figma */}
         <View style={styles.trustSection}>
           <Text style={styles.trustText}>
             Únete a +10.000 opositores que ya estudian mejor
@@ -186,7 +214,6 @@ export default function StoreSubscriptionScreen({ navigation, route }) {
           <StarRow />
         </View>
 
-        {/* Planes */}
         <View style={styles.plansContainer}>
           {PLANS.map((plan) => (
             <PlanCard
@@ -197,14 +224,14 @@ export default function StoreSubscriptionScreen({ navigation, route }) {
           ))}
         </View>
 
-        {/* Garantías */}
+        {/* Garantías — real, sin equivalente en Figma */}
         <View style={styles.infoSection}>
           <View style={styles.infoRow}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={ACCENT} />
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.accentOrange} />
             <Text style={styles.infoText}>Cancelación gratuita en cualquier momento</Text>
           </View>
           <View style={styles.infoRow}>
-            <Ionicons name="refresh-outline" size={20} color={ACCENT} />
+            <Ionicons name="refresh-outline" size={18} color={colors.accentOrange} />
             <Text style={styles.infoText}>Prueba de 7 días gratis disponible</Text>
           </View>
           <TouchableOpacity
@@ -212,7 +239,6 @@ export default function StoreSubscriptionScreen({ navigation, route }) {
             accessibilityLabel="Ver preguntas frecuentes sobre suscripciones"
           >
             <Text style={styles.faqText}>Ver preguntas frecuentes</Text>
-            <Ionicons name="chevron-forward-outline" size={16} color={ACCENT} />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -233,38 +259,44 @@ export default function StoreSubscriptionScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
+
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
   },
+
   scrollContent: {
-    padding: 16,
-    paddingBottom: 48,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  // Sección de confianza
+
+  // ── Confianza ─────────────────────────────────────────────────
   trustSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
   },
   trustText: {
-    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 13,
     color: colors.textSecondary,
     marginBottom: 8,
     textAlign: 'center',
@@ -275,148 +307,133 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ratingText: {
-    fontSize: 13,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '600',
     marginLeft: 4,
   },
-  // Planes
+
+  // ── Tarjetas de plan ──────────────────────────────────────────
   plansContainer: {
-    gap: 20,
+    gap: spacing.md,
   },
   planCard: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 20,
-    position: 'relative',
     borderWidth: 1,
-    borderColor: colors.separator,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: FIGMA.cardBorder,
+    borderRadius: 12,
+    padding: spacing.md,
+    position: 'relative',
   },
   planCardPopular: {
-    borderColor: ACCENT,
-    borderWidth: 2,
+    borderWidth: 1.5,
+    borderColor: colors.accentOrange,
   },
-  // Badge POPULAR: wrapper a ancho completo centrado sobre el borde
-  popularBadgeWrapper: {
-    position: 'absolute',
-    top: -14,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  popularBadge: {
-    backgroundColor: ACCENT,
-    paddingHorizontal: 16,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  popularText: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  // Badge de ahorro
   savingsBadge: {
     position: 'absolute',
-    top: -12,
-    right: 16,
-    backgroundColor: colors.successBg,
+    top: -10,
+    right: 14,
+    backgroundColor: `${colors.ctaGreen}1A`,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   savingsText: {
-    color: colors.success,
-    fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Poppins-Bold',
+    fontSize: 10,
+    color: colors.ctaGreen,
+  },
+  planHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  planNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   planName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 4,
-    marginTop: 8,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 15,
+    color: colors.textDark,
+  },
+  popularBadge: {
+    backgroundColor: FIGMA.popularBg,
+    borderRadius: 10,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  popularText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 9.5,
+    color: colors.accentOrange,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 8,
+    gap: 2,
   },
   planPrice: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: ACCENT,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 15,
+    color: colors.accentOrange,
   },
   planPeriod: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginLeft: 4,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11.5,
+    color: FIGMA.textMuted,
   },
   planDesc: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 16,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.separator,
-    marginVertical: 14,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11.5,
+    color: FIGMA.textMuted,
+    marginTop: 4,
   },
   featuresList: {
-    marginBottom: 20,
+    marginTop: 10,
+    gap: 6,
   },
   featureRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-    gap: 10,
+    alignItems: 'center',
+    gap: 8,
   },
   featureText: {
-    fontSize: 14,
-    color: colors.text,
     flex: 1,
-    lineHeight: 20,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11.5,
+    color: colors.textDark,
   },
-  // Botones de plan
+
+  // ── Botón por plan ────────────────────────────────────────────
   subscribeButton: {
-    paddingVertical: 14,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: ACCENT,
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    elevation: 4,
+    justifyContent: 'center',
+    backgroundColor: colors.accentOrange,
+    marginTop: spacing.md,
   },
   subscribeButtonOutline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: colors.separator,
-    shadowOpacity: 0,
-    elevation: 0,
+    borderColor: FIGMA.cardBorder,
   },
   subscribeButtonSecondary: {
-    backgroundColor: colors.dark,
-    shadowColor: colors.dark,
+    backgroundColor: colors.textDark,
   },
   subscribeButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
     color: colors.white,
-    fontSize: 15,
-    fontWeight: '800',
   },
   subscribeButtonTextOutline: {
-    color: colors.text,
+    color: colors.textDark,
   },
-  // Garantías
+
+  // ── Garantías ─────────────────────────────────────────────────
   infoSection: {
-    marginTop: 28,
+    marginTop: spacing.xl,
     paddingHorizontal: 4,
   },
   infoRow: {
@@ -426,20 +443,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   infoText: {
-    fontSize: 14,
-    color: colors.textSecondary,
     flex: 1,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   faqLink: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 8,
-    gap: 4,
   },
   faqText: {
-    fontSize: 14,
-    color: ACCENT,
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    color: colors.accentOrange,
   },
 });

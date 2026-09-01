@@ -8,15 +8,31 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Rect, Circle, Path } from 'react-native-svg';
 import { colors } from '../theme';
 
-const ACCENT = '#6C5CE7';
 const { width } = Dimensions.get('window');
 
-// ─── Pop-up "Pago rechazado" (mockup 11.5·err) ───────────────────────────────
-// Modal centrado con animación fade+spring. Se monta dentro de
-// StoreSubscriptionScreen cuando RevenueCat devuelve error de cobro.
+// ─── 11.5 · Pago rechazado (suscripción) ───────────────────────────────────
+// Fiel al Figma (TiendaModalesScreen.tsx → PagoRechazadoModal). El mismo
+// diseño se reutiliza también en StoreRealRedeemConfirmScreen para el fallo
+// de canje real; aquí sí aplica literalmente "Cambiar método" porque este
+// modal está atado a un cobro real (RevenueCat), a diferencia de aquel.
+const FIGMA = {
+  cardBorder: 'rgba(65, 41, 80, 0.3)',
+};
+
+function CardBlockedIcon({ size = 56, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect x={2} y={5} width={16} height={11} rx={2} stroke={color} strokeWidth={1.4} fill="none" />
+      <Path d="M2 9H18" stroke={color} strokeWidth={1.4} />
+      <Circle cx={18} cy={16} r={4.5} stroke={color} strokeWidth={1.4} fill="none" />
+      <Circle cx={21} cy={16} r={4.5} stroke={color} strokeWidth={1.4} fill="none" />
+    </Svg>
+  );
+}
+
 // Props:
 //   visible        — controla la visibilidad
 //   onRetry        — relanza el proceso de pago
@@ -56,7 +72,6 @@ export default function PaymentErrorModal({ visible, onClose, onRetry, onChangeM
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      {/* Overlay oscuro tappable */}
       <TouchableOpacity
         style={styles.overlay}
         activeOpacity={1}
@@ -64,47 +79,29 @@ export default function PaymentErrorModal({ visible, onClose, onRetry, onChangeM
         accessibilityLabel="Cerrar"
       />
 
-      {/* Tarjeta centrada */}
       <View style={styles.centeredContainer} pointerEvents="box-none">
         <Animated.View style={[styles.card, { opacity, transform: [{ scale }] }]}>
-
-          {/* Icono de error */}
-          <View style={styles.iconContainer}>
-            <Ionicons name="alert-circle" size={56} color={colors.error} />
-          </View>
+          <CardBlockedIcon />
 
           <Text style={styles.title}>No se ha podido cobrar</Text>
           <Text style={styles.description}>
             Tu método de pago ha sido rechazado. Revisa los datos o prueba con otra tarjeta.
           </Text>
 
-          {/* Botones de acción */}
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={styles.changeButton}
-              onPress={handleChangeMethod}
-              accessibilityLabel="Cambiar método de pago"
-            >
-              <Ionicons name="card-outline" size={18} color={colors.text} />
-              <Text style={styles.changeButtonText}>Cambiar método</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={handleRetry}
-              accessibilityLabel="Reintentar el pago"
-            >
-              <Ionicons name="refresh-outline" size={18} color={colors.white} />
-              <Text style={styles.retryButtonText}>Reintentar</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={handleRetry}
+            accessibilityLabel="Reintentar el pago"
+          >
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.closeLink}
-            onPress={onClose}
-            accessibilityLabel="Cerrar este mensaje"
+            style={styles.changeLink}
+            onPress={handleChangeMethod}
+            accessibilityLabel="Cambiar método de pago"
           >
-            <Text style={styles.closeLinkText}>Cerrar</Text>
+            <Text style={styles.changeLinkText}>Cambiar método</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -115,7 +112,7 @@ export default function PaymentErrorModal({ visible, onClose, onRetry, onChangeM
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   centeredContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -125,88 +122,50 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.white,
-    borderRadius: 24,
-    width: width * 0.88,
-    padding: 28,
+    borderRadius: 10.7,
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
+    width: width * 0.9,
+    maxWidth: 348,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.errorBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
     textAlign: 'center',
-    marginBottom: 10,
+    marginTop: 16,
   },
   description: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontFamily: 'Poppins-Light',
+    fontSize: 13.8,
+    color: colors.textDark,
     textAlign: 'center',
-    lineHeight: 21,
-    marginBottom: 24,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    width: '100%',
-    gap: 10,
-    marginBottom: 12,
-  },
-  changeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.grayLight,
-    paddingVertical: 13,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.separator,
-    gap: 6,
-  },
-  changeButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
+    lineHeight: 19,
+    marginTop: 8,
   },
   retryButton: {
-    flex: 1,
-    flexDirection: 'row',
+    width: '100%',
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.accentOrange,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: ACCENT,
-    paddingVertical: 13,
-    borderRadius: 14,
-    gap: 6,
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    elevation: 4,
+    marginTop: 20,
   },
   retryButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
     color: colors.white,
   },
-  closeLink: {
-    paddingVertical: 10,
+  changeLink: {
+    marginTop: 14,
   },
-  closeLinkText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
+  changeLinkText: {
+    fontFamily: 'Poppins-Light',
+    fontSize: 13.8,
+    color: colors.textDark,
   },
 });

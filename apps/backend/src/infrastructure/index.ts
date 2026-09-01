@@ -13,3 +13,4 @@ export * from './boe';
 export * from './store';
 export * from './config';
 export * from './scheduler';
+export * from './health';

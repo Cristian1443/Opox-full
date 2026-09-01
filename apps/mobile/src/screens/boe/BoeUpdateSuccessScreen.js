@@ -1,71 +1,55 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
     StyleSheet,
     View,
     Text,
     TouchableOpacity,
     StatusBar,
-    Animated,
-    Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
+
+// ─── 10.5 · Actualización al día · éxito tras mini-test ───────────────────────
+// Fiel al Figma (MonitorBoeModalesScreen.tsx → TemarioAlDiaModal, "ACTUALIZACION
+// AL DIA"). El TSX de referencia lo compone como Modal solo como convención de
+// previsualización (mismo patrón que FactoriaModalesScreen de Bloque 9); en la
+// app real esta es una pantalla de navegación de pleno derecho a la que se
+// llega tras terminar el mini-test — se conserva como pantalla completa en
+// vez de encogerla a un popup, ya que es el cierre natural de esa sesión.
+const FIGMA = {
+    subtitleMuted: 'rgba(52, 58, 61, 0.5)',
+};
+
+// Ícono confirmado en Figma: círculo + check verde, sin círculo de fondo
+// adicional detrás (mismo lenguaje visual que NotesDigitizedModal, Bloque 9).
+function SuccessCheckIcon({ size = 64, color = colors.ctaGreen }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 48 48">
+            <Circle cx={24} cy={24} r={22} stroke={color} strokeWidth={3} fill="none" />
+            <Path d="M14 24.5L20.5 31L34 16.5" stroke={color} strokeWidth={3.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
 
 export default function BoeUpdateSuccessScreen({ route, navigation }) {
     // articleRef: título corto del artículo (ej. "art. 14") pasado desde BoeMiniTestScreen
     const { articleRef = 'el artículo' } = route.params ?? {};
 
-    const scale = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        // Entrada: crece hasta 0.8 con ease-out, luego spring a 1 (rebote suave)
-        Animated.sequence([
-            Animated.timing(scale, {
-                toValue: 0.8,
-                duration: 200,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }),
-            Animated.spring(scale, {
-                toValue: 1,
-                tension: 50,
-                friction: 7,
-                useNativeDriver: true,
-            }),
-        ]).start();
-    }, []);
-
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
             <View style={styles.content}>
-                {/* ── Icono animado con anillo decorativo ───────────────────── */}
-                <Animated.View style={[styles.iconWrap, { transform: [{ scale }] }]}>
-                    {/* Anillo exterior decorativo */}
-                    <View style={styles.ring} />
-                    {/* Círculo con sombra verde */}
-                    <View style={styles.iconCircle}>
-                        <Ionicons
-                            name="checkmark-circle-outline"
-                            size={96}
-                            color={colors.success}
-                        />
-                    </View>
-                </Animated.View>
+                <SuccessCheckIcon />
 
-                {/* ── Título ────────────────────────────────────────────────── */}
                 <Text style={styles.title}>¡Temario al día!</Text>
 
-                {/* ── Descripción con referencia al artículo ────────────────── */}
-                <Text style={styles.description}>
-                    {'Has asimilado el cambio del '}
-                    <Text style={styles.highlight}>{articleRef}</Text>
-                    {'. Tus tests ya usan la redacción vigente.'}
+                <Text style={styles.subtitle}>
+                    {`Has asimilado el cambio del ${articleRef}. Tus tests ya usan la redacción vigente.`}
                 </Text>
 
-                {/* ── CTA principal ─────────────────────────────────────────── */}
                 <TouchableOpacity
                     style={styles.primaryBtn}
                     activeOpacity={0.85}
@@ -73,10 +57,20 @@ export default function BoeUpdateSuccessScreen({ route, navigation }) {
                     accessibilityLabel="Volver al feed del Monitor BOE"
                 >
                     <Text style={styles.primaryBtnText}>Volver al feed</Text>
-                    <Ionicons name="arrow-forward" size={20} color={colors.white} />
                 </TouchableOpacity>
 
-                {/* ── Hint secundario ───────────────────────────────────────── */}
+                {/* ── CTA secundario: practicar con preguntas actualizadas ──── */}
+                <TouchableOpacity
+                    style={styles.secondaryBtn}
+                    activeOpacity={0.78}
+                    onPress={() => navigation.navigate('GeneratorConfig', { questionCount: 10 })}
+                    accessibilityLabel="Practicar con preguntas actualizadas"
+                >
+                    <Ionicons name="barbell-outline" size={18} color={colors.ctaGreen} />
+                    <Text style={styles.secondaryBtnText}>Practicar con preguntas actualizadas</Text>
+                </TouchableOpacity>
+
+                {/* ── Hint ──────────────────────────────────────────────────── */}
                 <Text style={styles.hint}>
                     Puedes seguir estudiando o revisar otros cambios.
                 </Text>
@@ -86,9 +80,9 @@ export default function BoeUpdateSuccessScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: {
+    safeArea: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     content: {
         flex: 1,
@@ -96,89 +90,62 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: spacing.lg,
     },
-
-    // ── Icono animado ─────────────────────────────────────────────
-    iconWrap: {
-        position: 'relative',
-        width: 160,
-        height: 160,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: spacing.xl,
-    },
-    ring: {
-        position: 'absolute',
-        width: 160,
-        height: 160,
-        borderRadius: 80,
-        borderWidth: 2,
-        borderColor: `${colors.success}30`, // 30% opacity
-    },
-    iconCircle: {
-        width: 130,
-        height: 130,
-        borderRadius: 65,
-        backgroundColor: colors.card,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 4,
-        borderColor: colors.successBg,
-        shadowColor: colors.success,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.28,
-        shadowRadius: 16,
-        elevation: 8,
-    },
-
-    // ── Textos ────────────────────────────────────────────────────
     title: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: colors.text,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
         textAlign: 'center',
-        lineHeight: 34,
-        marginBottom: spacing.md,
+        marginTop: spacing.md,
     },
-    description: {
-        fontSize: 16,
-        color: colors.textSecondary,
+    subtitle: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 13.8,
+        color: colors.textDark,
         textAlign: 'center',
-        lineHeight: 24,
-        maxWidth: 300,
-        marginBottom: spacing.xl + spacing.md,
+        lineHeight: 19,
+        maxWidth: 320,
+        marginTop: spacing.sm,
     },
-    highlight: {
-        color: colors.success,
-        fontWeight: '700',
-    },
-
-    // ── Botón principal ───────────────────────────────────────────
     primaryBtn: {
-        flexDirection: 'row',
+        width: '100%',
+        maxWidth: 322,
+        height: 61.3,
+        borderRadius: 14.2,
+        backgroundColor: colors.ctaGreen,
         alignItems: 'center',
-        gap: spacing.sm,
-        backgroundColor: colors.success,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.xl,
-        borderRadius: 16,
-        shadowColor: colors.success,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.28,
-        shadowRadius: 8,
-        elevation: 4,
-        marginBottom: spacing.md,
+        justifyContent: 'center',
+        marginTop: spacing.xl,
     },
     primaryBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
         color: colors.white,
-        fontSize: 17,
-        fontWeight: '700',
+    },
+    secondaryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        width: '100%',
+        maxWidth: 322,
+        paddingVertical: 14,
+        borderRadius: 14.2,
+        borderWidth: 1,
+        borderColor: colors.ctaGreen,
+        marginTop: spacing.sm,
+    },
+    secondaryBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.ctaGreen,
     },
 
     // ── Hint ──────────────────────────────────────────────────────
     hint: {
-        fontSize: 13,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.5,
         color: colors.textSecondary,
         textAlign: 'center',
-        opacity: 0.7,
+        marginTop: spacing.lg,
     },
 });

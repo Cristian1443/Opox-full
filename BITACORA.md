@@ -5,6 +5,491 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-30 — Bloque 12 · Revisión y conexión al backend
+
+Rama: `feat/revision-bloque-12-config`. Diagnóstico exhaustivo y corrección de 6 gaps
+críticos/moderados que dejaban las pantallas de configuración desconectadas del backend.
+
+### Gaps cerrados
+
+**GAP-12-04 · Feedback conectado al endpoint real**
+`ConfigFeedbackScreen` llamaba a `setTimeout` en lugar del API. Ahora llama
+`settingsApi.submitFeedback({ type, message })` contra `POST /config/feedback`, que
+inserta en `user_feedback` en Supabase. El feedback del usuario ya persiste en BD.
+
+**GAP-12-01 + GAP-12-06 · Tono de IA sincronizado con el backend**
+`ConfigToneScreen` guardaba solo en `AsyncStorage('opox.ai.tone')`. Ahora:
+- Al abrir: carga AsyncStorage primero (UX instantánea) y luego el backend como fuente
+  de verdad multi-dispositivo.
+- Al cambiar: persiste AsyncStorage síncronamente + `settingsApi.updatePreferences` en
+  background. Los campos `personality`, `detailLevel`, `directHints`, `motivational`
+  se sincronizan con `user_preferences` en Supabase.
+
+**GAP-12-02 + GAP-12-03 (enum) · Accesibilidad conectada + fix mismatch de esquema**
+`ConfigAccessibilityScreen` tenía tres desincronizaciones con el backend:
+- `'claro'/'oscuro'` → backend espera `'light'/'dark'` (CHECK constraint lo rechazaba)
+- `'pequeno'/'medio'/'grande'` → backend usa `fontScale: numeric` (0.85/1.0/1.15)
+- `reduceAnimations` → backend llama `reduceMotion`
+Añadidos mapeos bidireccionales `THEME_TO_API/FROM_API`, `FONT_TO_SCALE/scaleToFont`.
+`highContrast` no existe en el backend → sigue en AsyncStorage únicamente.
+La pantalla ahora carga del backend al entrar y sincroniza los campos soportados.
+
+**GAP-12-03 (stats) · ConfigStatsScreen con datos reales de `GET /config/pro-stats`**
+La pantalla mostraba `MOCK_STATS` estático. Ahora usa `useFocusEffect` +
+`settingsApi.getProStats()`. El gauge de probabilidad y las barras de dominio por ley
+muestran datos reales de `training_attempt_responses`. Las soft-skills se derivan
+heurísticamente de los datos disponibles:
+- Conocimientos → `accuracyPct`
+- Resistencia → `streakDays/30 × 100`
+- Memoria → promedio de accuracy por tema
+- Concentración → temas fuertes / temas intentados
+- Velocidad → 0 (requiere datos de tiempo por pregunta, aún sin implementar)
+
+**GAP-12-05 · SettingsScreen con subtextos reales**
+El menú maestro cargaba subtextos hardcodeados. Ahora usa `useFocusEffect` para cargar:
+- Tono IA: lee de AsyncStorage (instante) y luego del backend para confirmar.
+- Probabilidad: llama `settingsApi.getProStats()` y muestra el porcentaje real.
+- Suscripción y Dispositivos: subtextos genéricos (pendiente RevenueCat / Bloque 3).
+
+**GAP-12-08 · ReportSuccessModal honesto**
+El modal mostraba "Informe listo" con botones "Compartir"/"Guardar" cuando el PDF
+no existía (backend devuelve `downloadUrl: null`). Ahora dice "Solicitud enviada"
+con un único botón "Entendido", y `ConfigExportScreen` ya llama al endpoint real
+`settingsApi.exportProStats(period)`.
+
+### Gaps cerrados (segunda pasada — mismo día — A, B, D)
+
+**A · Tono IA → TutorChat**
+`TutorChatScreen` carga `settingsApi.getPreferences()` en el mount y guarda `personality`
+en un ref. Cada `sendMessage` pasa el tono al backend. `tutorApi.sendMessage` acepta
+`personality` como tercer param opcional. `sendMessageBody` Zod amplía el schema con
+`personality?: enum`. `buildStubAiResponse` varía el texto según cercano/equilibrado/exigente.
+`buildInitialMessages` también varía el saludo inicial por tono.
+
+**B · Velocidad en radar de soft-skills**
+`QuestionActiveScreen` rastrea `questionStartTimeRef = Date.now()`, se resetea en cada
+cambio de pregunta y registra `timeSecs` en el array `answers` al confirmar o agotar tiempo.
+`TrainingResultScreen.buildResponses` incluye `timeSecs` en cada respuesta → persiste en
+`training_attempt_responses.time_secs` (columna ya existente). `getProStats` amplía el
+select con `time_secs`, calcula `avgSecsPerQuestion` (null si no hay datos) y lo devuelve.
+`ConfigStatsScreen.deriveSoftSkills` usa `stats.avgSecsPerQuestion` (fórmula: `max(0, 100 - avg/90*100)`)
+en lugar de 0 fijo. La nota del radar se muestra solo si aún no hay datos de velocidad.
+
+**D · Dispositivos conectados con backend real**
+- SQL: `bloque3_health_devices.sql` — tabla `user_connected_devices` con RLS owner-all.
+- Dominio: entidad `UserDevice`, interfaz `IHealthRepository`, 3 use cases
+  (`GetDevicesUseCase`, `RegisterDeviceUseCase`, `DeleteDeviceUseCase`).
+- Infra: `SupabaseHealthRepository` (get/upsert por `user_id+platform`/delete).
+- Presentación: `HealthController` ampliado (GET/POST/DELETE `/health/devices`),
+  `healthRoutes.ts` actualizado, `server.ts` pasa controller + authMiddleware.
+- Container: `healthRepo` instanciado, use cases y controller cableados.
+- Mobile: `healthApi` en `apps/mobile/src/api/health.js`, exportado del barrel.
+  `ConfigDevicesScreen` reescrito sin mocks — `useFocusEffect` + `healthApi.getDevices()`.
+  `PairingScreen` registra el dispositivo en el backend fire-and-forget al completar permisos.
+- Constantes: `HEALTH_DEVICES` y `HEALTH_DEVICE` añadidas a `API_ROUTES`.
+
+### Gaps cerrados (tercera pasada — mismo día — racha, botón chat, PDF)
+
+**Fix · Racha no se reseteaba al romper la racha**
+`toDomainGamification` en `SupabaseDashboardRepository` devolvía el valor bruto de
+`current_streak` sin comprobar si había expirado. Ahora calcula `effectiveStreak`:
+si `last_activity_date` no es hoy ni ayer (UTC), devuelve 0. `withActivity()` del
+dominio era correcto — el error era solo en lectura. Se añaden helpers `todayUtc()`
+y `yesterdayUtc()` locales.
+
+**Fix · TutorChat sin botón de envío visible**
+`TutorChatScreen` tenía `returnKeyType="send"` en un `TextInput` multiline — en
+Android no muestra tecla de envío. Añadido botón redondo naranja (`arrow-up`,
+Ionicons) a la derecha del input. Se deshabilita (opacity 0.4) cuando el campo
+está vacío o el tutor está escribiendo (`isTyping`).
+
+**GAP-12-07 · PDF real en Export (implementado)**
+- Backend: `pdfkit` instalado. `ExportProStatsUseCase` genera PDF A4 con cabecera
+  morada, resumen de stats (acierto, probabilidad, racha, velocidad) y tabla de
+  desglose por temas con colores verde/naranja/rojo según rendimiento.
+  Sube el buffer a Supabase Storage (`pro-stats-exports`, bucket privado auto-creado)
+  y devuelve una URL firmada con 1 hora de validez. Devuelve 200 (antes 202 stub).
+- `IConfigRepository`: nuevo método `storePdfReport(userId, period, buffer): Promise<string>`.
+- `ConfigController.serializeProStats`: incluía `avgSecsPerQuestion` (error silencioso
+  detectado — la velocidad del radar nunca llegaba al cliente).
+- Mobile: `ConfigExportScreen` abre la URL con `Linking.openURL` (navegador del sistema).
+  `ReportSuccessModal` renovado: título "Informe generado", botón "Abrir PDF" primario
+  + "Cerrar" secundario.
+- TS bonus: `SupabaseNotesRepository.updateStatus` faltaba `pages?: number` en el tipo
+  del patch; `index.d.ts` de `@opox/constants` añade `HEALTH_DEVICES`/`HEALTH_DEVICE`.
+
+### Gaps pendientes
+
+| Gap | Razón |
+|-----|-------|
+| C · ThemeContext global | Requiere refactor de App.js y todas las pantallas (espera diseño aprobado) |
+| GAP-12-09 Chat de soporte | Requiere integración Intercom/Crisp/Zendesk |
+| GAP-12-10 Suscripción real | Requiere RevenueCat SDK |
+
+### Estado final de la rama
+
+- Feedback, tono y accesibilidad sincronizados con backend.
+- Estadísticas pro con datos reales incluyendo velocidad por pregunta.
+- Dispositivos conectados persistidos en Supabase, ConfigDevicesScreen sin mocks.
+- Tono de IA se propaga a TutorChat en tiempo real.
+- Racha caduca correctamente cuando el usuario pierde un día (leída en BD, no solo en escritura).
+- TutorChat con botón de envío visible en Android.
+- Export genera PDF real (pdfkit + Supabase Storage) y devuelve URL firmada al móvil.
+- SQL pendiente de correr en Supabase: `bloque3_health_devices.sql`.
+
+---
+
+## 2026-08-26 — Merge rediseño Figma Bloques 8 y 9 en rama BOE
+
+Rama: `feat/revision-bloque-10-boe`. Integración de `feat/bloque-8-9-rediseno-figma`
+mediante merge con resolución manual de 8 conflictos. Estrategia global: **Figma gana
+en layout y estilos, HEAD gana en lógica de negocio y llamadas API**.
+
+### Lo que trajo el rediseño Figma
+
+**Build fix crítico**: `expo-build-properties` añadido al `package.json` y a los
+plugins de `app.json` con `android.minSdkVersion: 26`. Sin esto `react-native-health-connect`
+no compilaba el APK en EAS (la librería exige API 26+).
+
+**Assets nuevos** (usados en pantallas de Salud): `cel.png`, `celu.png`,
+`celular.png`, `reloj.png`, `watch.png` en `apps/mobile/assets/`.
+
+**`AccentSlider.js`**: thumb rediseñado — antes blanco con borde de color, ahora
+fondo `colors.textDark` con punto interior más pequeño. Afecta a todos los sliders
+de configuración de test (Bloque 6, 9, etc.).
+
+**Aula Virtual — Bloque 8** (6 pantallas + 1 modal reestilizados fiel a Figma):
+- `TutorHomeScreen`, `TutorChatScreen`, `TutorPodcastScreen`, `TutorSummariesScreen`,
+  `TutorFlashcardsScreen`, `TutorFlashcardsLoadingScreen`, `FlashcardsSuccessModal`.
+- Tokens Figma exactos (`Poppins-*`, sizes en puntos, border-radius, paleta morada/verde).
+- `TutorPodcastScreen`: añadido `EpisodePicker` funcional — carga `tutorApi.listEpisodes(oposicion)`
+  y muestra lista antes de entrar al player.
+- `TutorSummariesScreen`: añadido `TopicPicker` funcional — carga `tutorApi.listSummaries(oposicion)`.
+- `TutorFlashcardsScreen`: empty state cuando la IA no genera tarjetas (`paramCards.length === 0`).
+
+**Factoría de Apuntes — Bloque 9** (4 pantallas + 4 modales reestilizados):
+- `NotesHomeScreen`, `NotesUploadScreen`, `NoteDetailScreen`, `NotesTestConfigScreen`.
+- Modales: `NotesDeleteConfirmModal`, `NotesDigitizedModal`, `NotesFormatErrorModal`,
+  `NotesOcrErrorModal`. También `AlertCardModal` (modal genérico compartido).
+- `NotesTestConfigScreen`: nuevo toggle "Solo temas etiquetados" + selector de
+  dificultad (Fácil/Medio/Difícil) integrados; ambos se pasan al API en `startTest`.
+
+**Salud — Bloque 3**:
+- `ConnectDeviceScreen`: iconos SVG inline eliminados, reemplazados por `Ionicons`
+  (más compacto, consistente con el resto de la app).
+
+### Resolución de los 8 conflictos
+
+| Archivo | Decisión |
+|---|---|
+| `package.json` | expo-av (podcast) + expo-build-properties (health connect) |
+| `NoteDetailScreen.js` | DocumentIcon de Figma + fix `createdAt ?? uploadedAt` |
+| `NotesTestConfigScreen.js` | UI Figma + `notesApi.generateTest` async + `adaptGeneratedQuestions`; estados `starting` + `onlyTaggedTopics` combinados; `difficulty` pasado al API |
+| `NotesUploadScreen.js` | Layout Figma + `StatusBar`/`Image`/`Alert` del captureMode; `NOTES_ACCENT = colors.accentOrange` añadido; dead styles `body`/`list` eliminados |
+| `TutorFlashcardsScreen.js` | Figma + empty state re-incorporado; `PURPLE` → `colors.purple`; `handleReviewFailed` eliminado (bug: no tenía setter `setCards`) |
+| `TutorPodcastScreen.js` | `EpisodePicker` conservado (necesario para el flujo); `StatusBar` eliminado; `BLUE_ACCENT` → `colors.accentOrange`; estilos Figma |
+| `TutorSummariesScreen.js` | `TopicPicker` conservado con header inline (fix `ScreenHeader` no importado); `MoreButton` eliminado (no referenciado); `isLoading` inicializado con `topicId` |
+| `pnpm-lock.yaml` | Regenerado con `pnpm install` — conflicto resuelto automáticamente |
+
+---
+
+## 2026-08-27 — Bloque 10 · Monitor BOE — Revisión completa + fixes en dispositivo
+
+Rama: `feat/revision-bloque-10-boe`. Revisión integral del Monitor BOE: gaps de
+backend, integración real con el Motor BOE, corrección de bugs encontrados en
+dispositivo Android y limpieza del `.env`.
+
+### Backend — nuevas capacidades
+
+**Campo `resumen` en `boe_changes`**: el Motor BOE devuelve un resumen textual del
+cambio en `MotorCambio.resumen`. Ahora se persiste en BD y se usa en `buildHint()`
+como primera opción antes de truncar el texto del fragmento. Requiere correr
+`bloque10_boe_patch2.sql` en Supabase.
+
+**`regenerateQuestions` fire-and-forget**: tras sincronizar un cambio con
+`SyncBoeChangesUseCase`, si `mc.preguntas_afectadas.length > 0` se llama
+`motor.regenerateQuestions(mc.id, cursoId)` de forma asíncrona. Los errores
+son no-fatales (solo warn en log).
+
+**`addRegulation` UPSERT idempotente**: cambiado de `INSERT` a `UPSERT` por
+`(user_id, boe_identifier)`. Si el usuario ya sigue la norma el endpoint devuelve
+el registro existente en vez de explotar con constraint violation (500).
+
+**`SearchBoeRegulationsUseCase` con fallback**: el catálogo del Motor
+(`/v1/boe/catalog`) tiene timeout de 5 s (timeout corto configurado por request).
+Si supera ese límite o devuelve vacío, hace fallback automático a
+`motor.listRegulations(MOTOR_BOE_CURSO_ID)` → las normas ya monitorizadas para
+el curso. Filtra localmente por el query del usuario. Así el modal "Añadir norma"
+funciona sin necesidad de ejecutar `POST /boe/catalog/sync` primero.
+
+**Validación del body en `POST /boe/sync`**: añadido `validateBody(syncChangesBody)`
+con Zod → `{ curso_id: string }` requerido.
+
+**`MOTOR_BOE_CURSO_ID` en `.env`**: nueva variable de entorno requerida cuando
+`MOTOR_BOE_BASE_URL` está configurado. Identifica el curso activo en el Motor para
+la oposición (justicia-tramitación: `1357e871b542425b`). Es un ID estable que
+actualiza el equipo IA cuando re-ingesta el temario oficial.
+
+### Mobile — nuevas pantallas y flujos
+
+**`BoeHomeScreen` — modal "Añadir norma"**:
+- Al abrir el modal, carga en paralelo las normas ya seguidas (`listRegulations`)
+  y el catálogo/sugerencias (`searchCatalog('')`).
+- Normas ya seguidas muestran badge gris "Siguiendo" en vez del botón "Seguir".
+- Guard en `handleFollow`: si `followedIds` ya contiene el `boe_identifier`, no
+  relanza la llamada a la API.
+- Al seguir con éxito: actualiza `followedIds` localmente y el contador
+  `watchedCount` sin cerrar el modal.
+
+**`BoeDetailScreen` — botón "Practicar" cross-bloque**:
+- Carga `affectedQuestionsCount` desde el detalle real de la API.
+- Si > 0, muestra un tercer CTA `tertiaryBtn` que navega a `GeneratorConfig`
+  con `{ questionCount: 10 }`.
+- Migrado de `useEffect` a `useFocusEffect` para recargar al volver.
+
+**`BoeUpdateSuccessScreen`**: nuevo CTA secundario "Practicar con preguntas
+actualizadas" → navega a `GeneratorConfig`.
+
+**`DashboardScreen` — alerta de leyes obsoletas con datos reales**:
+- `staleLawsCount` ya no es un mock (era `3`). Carga `boeApi.getFeed()` en
+  paralelo al resto del dashboard y usa `totalUnread` real.
+- Flag de módulo `_boeAlertShownThisSession` (no `useRef`): el pop-up de alerta
+  solo se muestra una vez por sesión de app aunque el componente se remonte.
+
+**`TrainingResultScreen` — hint card BOE**:
+- Tras guardar el intento, consulta `boeApi.getFeed()` fire-and-forget.
+- Si `totalUnread > 0` muestra una tarjeta de aviso antes del bloque "¿Qué
+  quieres hacer ahora?" con CTA "Revisar →" que navega a `BoeHome`.
+
+**`App.js` — Realtime BOE navega a detalle específico**:
+- `BoeRealtimeWatcher` extrae `payload.new?.id` del evento Supabase.
+- Si existe: banner navega a `BoeDetail` con `{ itemId: changeId }`.
+- Si no: navega a `BoeHome` (fallback anterior).
+
+### Limpieza `.env`
+
+- Eliminada indentación de 4 espacios en todas las líneas.
+- `MOTOR_BOE_OPENAI_KEY` vaciado (era copia exacta de `AI_API_KEY`; el código
+  ya tiene fallback automático `MOTOR_BOE_OPENAI_KEY ?? AI_API_KEY`).
+- `PASSWORD_RESET_REDIRECT_URL=opox://reset-password` añadido explícitamente.
+- `MOTOR_BOE_CURSO_ID=1357e871b542425b` añadido (faltaba).
+- `.env.example` actualizado con `MOTOR_BOE_CURSO_ID`.
+
+### Estado tras la sesión
+
+- Monitor BOE completamente funcional en dispositivo Android.
+- Modal "Añadir norma" muestra las 8 normas del Motor sin requerir sync del catálogo.
+- Flujo seguir → ver cambios → revisar detalle → mini-test → practicar: end-to-end.
+- Pendiente de terceros: `generateBoeMiniTest` con prompts reales (equipo IA,
+  `BRIEF_IA_BLOQUE10.md`) y ejecutar los dos patches SQL en Supabase.
+
+---
+
+## 2026-08-27 — Bloque 11 · Tienda OPOX — Conexión al backend y canje real
+
+Rama: `feat/revision-bloque-11-tienda`. MVP completo: eliminación de todos los mocks
+del mobile, corrección del bug de balance=0 y nuevo endpoint de canje de descuentos.
+
+### Bug crítico resuelto: saldo siempre 0
+
+Existían dos sistemas de Opopoints desconectados:
+- `registerActivity()` en `SupabaseDashboardRepository` escribía en `opopoints_ledger`
+  (tabla de auditoría de gamificación) pero **no** en `user_opopoints_ledger`.
+- `getBalance()` en la tienda lee únicamente `user_opopoints_ledger` → siempre devolvía 0.
+
+**Fix**: en `SupabaseDashboardRepository.registerActivity()`, cuando `input.points > 0`,
+insertar fila `type='earn'` en `user_opopoints_ledger` justo después del upsert de
+gamificación. El error es no-fatal (solo log). Sin cambio de interfaz ni de use cases.
+
+### Nuevo endpoint: canje de descuentos
+
+`POST /store/discounts/:id/redeem` — `RedeemDiscountUseCase`:
+- Verifica que el descuento existe y que el saldo es suficiente.
+- Inserta fila `spend` en el ledger.
+- Devuelve `{ walletItemId: '', code: discount.code, newBalance }` (no crea `user_wallet`
+  porque los descuentos son códigos precargados en BD, no artículos de cartera).
+
+Nuevos campos `cost: number; code: string;` en `StoreDiscount` (domain), `StoreDiscountDTO`
+(types) y mapping de `ListStoreDiscountsUseCase`. Ruta registrada en constants,
+handler en controller, inyección en container, método `redeemDiscount` en `store.js`.
+
+**Pendiente SQL** (ejecutar en Supabase SQL Editor):
+```sql
+ALTER TABLE store_discounts
+  ADD COLUMN IF NOT EXISTS cost integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS code  text    NOT NULL DEFAULT '';
+```
+
+### Pantallas mobile conectadas (eliminación de mocks)
+
+Todas las pantallas de la tienda siguen el patrón `useFocusEffect` + `cancelled` guard:
+
+| Pantalla | Antes | Después |
+|---|---|---|
+| `StoreHomeScreen` | `MOCK_PRODUCTS / DISCOUNTS / REAL_REWARDS` | `getBalance + listDiscounts + listProducts` en paralelo |
+| `StoreProductDetailScreen` | `setTimeout` fake + balance hardcoded | `getBalance + getProduct(id)` real |
+| `StoreDiscountsScreen` | `DISCOUNTS_DATA` hardcoded | `listDiscounts()` real |
+| `StoreConfirmRedeemScreen` | `setTimeout` sin API | `redeemDiscount / redeemProduct / obtainCommunityTest` según `redeemType` |
+| `StoreWalletScreen` | `WALLET_DATA` hardcoded | `getWallet()` real |
+| `StoreRealRewardsScreen` | `REWARDS_DATA` hardcoded | `getBalance + listProducts()` real |
+| `StoreRealRedeemConfirmScreen` | `setTimeout` fake | `redeemProduct(reward.id)` real |
+| `StoreMarketplaceScreen` | `MOCK_COMMUNITY_TESTS` | `listCommunityTests()` real; gratis → `obtainCommunityTest` directo |
+
+`StoreConfirmRedeemScreen` centraliza todos los tipos de canje con `redeemType:
+'product' | 'discount' | 'community_test'` recibido desde `route.params`. En éxito
+muestra `RedeemSuccessModal` con `newBalance` real y navega a `StoreWallet`.
+
+`StoreHowToEarnScreen`: textos actualizados para coincidir con `DAILY_GOAL_POINTS = 40`
+(antes mostraba `+15 O` por plan).
+
+### Estado tras la sesión
+
+- Tienda completamente conectada al backend: cero mocks en producción.
+- Bug de saldo 0 corregido: al completar el plan diario (40 O) el balance refleja los puntos.
+- Flujo canje end-to-end: descuento → confirmar → código real → cartera.
+- SQL `ADD COLUMN cost/code` ejecutado en Supabase.
+
+---
+
+## 2026-08-28 — Bloque 11 · Opopoints automáticos por tests + fixes UI tienda
+
+Rama: `feat/revision-bloque-11-tienda`. Motor de earn de Opopoints por rendimiento
+en tests y corrección de dos bugs de UI en la pantalla home de la tienda.
+
+### Motor de earn por tests (sin datos manuales en Supabase)
+
+Los Opopoints ahora se acumulan automáticamente al completar cualquier test, sin
+necesidad de insertar filas manualmente en la base de datos.
+
+**Fórmula de puntos en `SaveAttemptUseCase`**:
+- 1 O por cada respuesta correcta
+- × multiplicador de nota: ≥80% → ×1.5, ≥60% → ×1.2, resto → ×1.0
+- Cap diario de 100 O procedentes de tests (evita farming de tests cortos)
+
+**Cap diario — `getTodayTestEarnings(userId)`** añadido a `IStoreRepository` /
+`SupabaseStoreRepository`: suma filas `type='earn'` con `reason LIKE 'test_%'`
+creadas hoy (UTC). Consultado antes de cada insert para calcular el remanente.
+
+**`CompleteBoeMiniTestUseCase`**: al completar un mini-test BOE (3 preguntas)
+gana hasta 5 O proporcionales a los aciertos (`Math.round(score/total × 5)`).
+Usa `dashboardRepo.registerActivity` → el puente del Bloque 11 escribe en el ledger.
+
+**Flujo completo** (sin nuevas tablas ni rutas):
+```
+Test terminado
+  → SaveAttemptUseCase (Bloques 6/7/9)
+  → dashboardRepo.registerActivity({ reason: 'test_completed', points: N })
+  → insert earn en user_opopoints_ledger  ← puente del Bloque 11
+  → getBalance() devuelve saldo actualizado
+```
+
+Mini-test BOE:
+```
+CompleteBoeMiniTestUseCase (Bloque 10)
+  → dashboardRepo.registerActivity({ reason: 'test_boe_minitest', points: 0-5 })
+  → insert earn en user_opopoints_ledger
+```
+
+### Fixes UI StoreHomeScreen
+
+**Bug escalera en tabs**: `tabIndicator` con `position: 'absolute', bottom: 0` dentro
+de un `ScrollView` horizontal no anclaba correctamente en Android — cada tab calculaba
+su alto de forma diferente. Reemplazado por `borderBottomWidth: 2` directamente en
+el `TouchableOpacity`, con `borderBottomColor: 'transparent'` en inactivo y el color
+de acento en activo.
+
+**Suscripción desaparecía**: el `ScrollView` de planes no tenía espacio asignado
+porque la estructura padre no tenía `flex: 1`. Añadido `<View style={contentArea}>`
+con `flex: 1` envolviendo el área de contenido condicional (FlatList / ScrollView).
+
+**Tab Virtual eliminado**: el tab por defecto era `'virtual'` (sin contenido en BD).
+Eliminado de `TABS`; arranca en `'discounts'` (primer tab con datos reales).
+
+### Estado tras la sesión
+
+- Completar un test de 20 preguntas con 80% acierto → +24 O automáticos.
+- Mini-test BOE 3/3 → +5 O automáticos.
+- Plan diario completado → +40 O (canal previo, sin cambios).
+- Tienda muestra el saldo real al volver a la pantalla (useFocusEffect).
+- Tabs sin escalera, Suscripción visible, default en Descuentos.
+
+---
+
+## 2026-08-25 — Bloque 9 · Factoría de Apuntes — Fixes de upload en dispositivo Android
+
+Rama: `feat/revision-bloque-9-notas`. Sesión de depuración en dispositivo real
+(Android / Expo Go SDK 57). Se identificaron y cerraron 6 bugs que impedían el
+flujo completo upload → análisis → test desde apuntes.
+
+### Fix 1 · Supabase Storage no recibía los archivos subidos
+
+El repositorio pasaba un `Buffer` nativo de Node a la API de Supabase Storage.
+Supabase JS v2 requiere `Uint8Array` para uploads binarios.
+
+- **`SupabaseNotesRepository.uploadFile`**: `Buffer.from(base64, 'base64')` →
+  `new Uint8Array(Buffer.from(base64, 'base64'))`.
+
+### Fix 2 · `expo-file-system` deprecada en SDK 57
+
+`import * as FileSystem from 'expo-file-system'` está deprecated en SDK 57 y
+genera warning de consola. Todo el código de lectura de archivos migrado.
+
+### Fix 3 · `readAsStringAsync` no puede leer URIs `content://` de Android
+
+En SDK 57 la API legada de expo-file-system no soporta el esquema `content://`
+que Android usa para las URIs del Storage Access Framework (SAF). Crash silencioso
+→ el upload no llegaba al backend.
+
+- **`NotesUploadScreen.js`**: eliminado `readAsStringAsync`. Para PDFs se usa
+  `new FSFile(asset.uri).arrayBuffer()` (nueva API de `expo-file-system`) que
+  delega en el ContentResolver nativo y funciona con cualquier URI de Android.
+- Helper `bufferToBase64(buffer)`: convierte `ArrayBuffer` a base64 en chunks de
+  8 192 bytes para no reventar el call stack con documentos grandes.
+- Para fotos de cámara y galería: `ImagePicker.launchCameraAsync` /
+  `launchImageLibraryAsync` con `base64: true` — el picker hace la conversión
+  internamente, evitando FileSystem por completo.
+
+### Fix 4 · Nombre de archivo con ID numérico o UUID en Android
+
+`ImagePicker` en Android devuelve IDs de media store (`1000052094`) como nombre de
+archivo para fotos de galería, y UUIDs para fotos de cámara. Estos aparecían como
+título del apunte en la pantalla de detalle.
+
+- **`NotesUploadScreen.startAnalysis`**: detecta si el nombre base es un número
+  puro o un UUID (regex). Si es así, genera `Apunte DD mon AAAA.ext` con la fecha
+  local del dispositivo. PDFs y fotos con nombre real se dejan intactos.
+
+### Fix 5 · `key` prop warning y test de apuntes no arrancaba
+
+`NotesTestConfigScreen` navegaba al runner con preguntas en formato backend
+(`options: string[], correctIndex: number`), pero `QuestionActiveScreen` espera
+formato runner (`options: [{id, text, correct}]`). Primer síntoma: warning de `key`
+prop undefined; segundo: el test no podía calificar respuestas.
+
+- **`NotesTestConfigScreen.js`**: aplica `adaptGeneratedQuestions(res.data.questions)`
+  antes de navegar (mismo adapter que usa `GeneratorConfigScreen`).
+
+### Fix 6 · Número de páginas siempre "1" para PDFs multipágina
+
+El backend creaba el apunte con `pages = files.length` (1 para un PDF,
+sin importar sus páginas internas). El conteo real se conoce tras el OCR.
+
+- **`INotesRepository.updateStatus` patch**: nuevo campo opcional `pages?: number`.
+- **`SupabaseNotesRepository.updateStatus`**: escribe `pages` en BD si viene en el patch.
+- **`runAnalysisPipeline` (NotesUseCases.ts)**: tras OCR llama
+  `updateStatus({ progress: 33, pages: ocr.pages.length })` — el detalle mostrará
+  el número real en cuanto la IA real esté conectada.
+
+### Estado tras la sesión
+
+- Upload end-to-end funcional en Android (PDF + galería + cámara).
+- Archivos visibles en Supabase Storage con rutas correctas.
+- Test desde apunte arrancan sin errores de key/formato.
+- Etiquetas y conteo de páginas siguen dependiendo de la IA real
+  (`BRIEF_IA_BLOQUE9.md` pendiente de entrega por el equipo IA).
+
+---
+
 ## 2026-08-25 — Diagnóstico Motor de IA + mejoras MotorAiClient
 
 Rama: `feat/revision-bloque-0`. El equipo de IA reportó que el endpoint de generación

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,162 +6,163 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import InsufficientPointsModal from '../../components/InsufficientPointsModal';
+import { storeApi } from '../../api/store';
 
-const ACCENT = '#6C5CE7';
-const ACCENT_LIGHT = '#A29BFE';
-
-// Datos extra que el backend devolverá en el detalle del producto.
-// La home solo pasa nombre/precio/icono; aquí completamos hasta que exista el endpoint.
-const MOCK_EXTRA = {
-  subtitle: '500 preguntas extra elaboradas por examinadores humanos',
-  description: 'Accede a casos prácticos reales. Estos tests están diseñados para simular la dificultad real del examen, con explicaciones detalladas en cada respuesta.',
-  features: [
-    '500 preguntas de alta calidad',
-    'Casos prácticos reales',
-    'Explicaciones detalladas por examinadores',
-    'Actualizaciones mensuales',
-  ],
+// ─── 11.2 · Tienda · detalle de producto ──────────────────────────────────
+// Fiel al Figma (DetalleProductoScreen.tsx). El diseño confirma naranja
+// (#F69624) como color de CTA primario en todo el Bloque 11 — coherente con
+// el que ya usé en StoreHomeScreen (tarjeta de saldo, precios), a diferencia
+// del verde usado en Bloques 9/10.
+//
+// ⚠️ Nota de alcance: tras la conexión real al backend (fusión de
+// feat/revision-bloque-11-tienda), la pestaña "Virtual" de StoreHomeScreen
+// se eliminó por no tener catálogo real detrás, y era la única vía que
+// navegaba a esta pantalla — hoy queda inalcanzable desde la app. Se
+// rediseña igualmente porque el backend (getProduct/redeem) sigue
+// funcionando, por si se reconecta una fuente real de productos.
+const FIGMA = {
+  bodyMuted: 'rgba(52, 58, 61, 0.7)',
+  balanceMuted: 'rgba(65, 41, 80, 0.5)',
 };
+
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function GemIcon({ size = 22, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M5 8L2 3L7 3L12 3L17 3L22 3L19 8L12 21L5 8Z" fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+      <Path d="M2 3L22 3M5 8L19 8M9 3L12 8L15 3" stroke={color} strokeWidth={1.2} fill="none" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 export default function StoreProductDetailScreen({ navigation, route }) {
   const item = route.params?.item ?? {};
   const insets = useSafeAreaInsets();
 
-  const [userBalance] = useState(1840);
-  const [isLoading, setIsLoading] = useState(false);
+  const [userBalance, setUserBalance] = useState(null);
+  const [product, setProduct] = useState(item);
   const [showErrorModal, setShowErrorModal] = useState(false);
 
-  const productCost = item.price ?? 0;
-  const remainingBalance = userBalance - productCost;
-  const canAfford = remainingBalance >= 0;
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    storeApi.getBalance().then(res => {
+      if (cancelled || !res?.data) return;
+      setUserBalance(res.data.balance);
+    });
+    if (item.id) {
+      storeApi.getProduct(item.id).then(res => {
+        if (cancelled || !res?.data) return;
+        setProduct(res.data);
+      });
+    }
+    return () => { cancelled = true; };
+  }, [item.id]));
+
+  const title = product.title ?? item.name ?? '—';
+  const description = product.description ?? product.subtitle ?? '';
+  const productCost = product.cost ?? item.cost ?? item.price ?? 0;
+  const remainingBalance = (userBalance ?? 0) - productCost;
+  const canAfford = userBalance !== null && remainingBalance >= 0;
 
   const handleRedeem = () => {
-    if (isLoading) return;
+    if (userBalance === null) return;
     if (!canAfford) {
       setShowErrorModal(true);
       return;
     }
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      navigation.navigate('StoreConfirmRedeem', {
-        product: item,
-        currentBalance: userBalance,
-        newBalance: remainingBalance,
-      });
-    }, 1200);
+    navigation.navigate('StoreConfirmRedeem', {
+      productId: item.id,
+      redeemType: 'product',
+      product: { name: title, icon: product.icon ?? item.icon, price: productCost },
+      currentBalance: userBalance,
+      newBalance: remainingBalance,
+    });
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles.iconButton}
+          activeOpacity={0.7}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
         >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{item.name ?? 'Detalle del producto'}</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
-        <View style={styles.heroSection}>
-          <View style={styles.iconContainer}>
-            <Ionicons
-              name={item.icon ?? 'cube-outline'}
-              size={64}
-              color={ACCENT}
-            />
-          </View>
-          <Text style={styles.productTitle}>{item.name ?? '—'}</Text>
-          <Text style={styles.productSubtitle}>{MOCK_EXTRA.subtitle}</Text>
-        </View>
+        {/* ── Hero ────────────────────────────────────────────────────── */}
+        <View style={styles.hero}>
+          <Ionicons
+            name={product.icon ?? item.icon ?? 'cube-outline'}
+            size={80}
+            color={colors.accentOrange}
+          />
+          <Text style={styles.productTitle}>{title}</Text>
+          {description ? (
+            <Text style={styles.description}>{description}</Text>
+          ) : null}
 
-        {/* Saldo y coste */}
-        <View style={styles.balanceCard}>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Tu saldo actual</Text>
-            <Text style={styles.rowValue}>{userBalance.toLocaleString()} O</Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Coste del producto</Text>
-            <Text style={[styles.rowValue, { color: ACCENT }]}>{productCost} O</Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={[
-            styles.row,
-            styles.remainingRow,
-            { backgroundColor: canAfford ? colors.successBg : colors.errorBg },
-          ]}>
-            <Text style={[styles.rowLabel, { color: canAfford ? colors.text : colors.error }]}>
-              Te quedarían
-            </Text>
-            <Text style={[
-              styles.rowValue,
-              { fontWeight: '800', color: canAfford ? colors.success : colors.error },
-            ]}>
-              {remainingBalance.toLocaleString()} O
-            </Text>
-          </View>
-
-          {!canAfford && (
-            <Text style={styles.errorText}>
-              Te faltan {Math.abs(remainingBalance)} Opopoints para canjear este producto.
-            </Text>
-          )}
-        </View>
-
-        {/* Descripción y características */}
-        <View style={styles.detailsCard}>
-          <Text style={styles.sectionTitle}>¿Qué incluye?</Text>
-          <Text style={styles.descriptionText}>{MOCK_EXTRA.description}</Text>
-
-          <Text style={styles.featuresTitle}>Características</Text>
-          {MOCK_EXTRA.features.map((feature, i) => (
-            <View key={i} style={styles.featureRow}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={styles.featureText}>{feature}</Text>
+          {product.conditions?.length > 0 && (
+            <View style={styles.conditions}>
+              {product.conditions.map((c, i) => (
+                <View key={i} style={styles.conditionRow}>
+                  <Ionicons name="checkmark-circle" size={16} color={colors.ctaGreen} />
+                  <Text style={styles.conditionText}>{c}</Text>
+                </View>
+              ))}
             </View>
-          ))}
+          )}
+
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{productCost}</Text>
+            <GemIcon />
+          </View>
+          <Text style={[styles.balanceNote, !canAfford && styles.balanceNoteError]}>
+            {userBalance === null
+              ? 'Consultando tu saldo…'
+              : canAfford
+                ? `Tienes ${userBalance.toLocaleString('es-ES')} · te sobran ${remainingBalance.toLocaleString('es-ES')}`
+                : `Tienes ${userBalance.toLocaleString('es-ES')} · te faltan ${Math.abs(remainingBalance).toLocaleString('es-ES')}`}
+          </Text>
         </View>
       </ScrollView>
 
-      {/* Footer fijo */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+      {/* ── CTA fijo al fondo ─────────────────────────────────────────── */}
+      <View style={[styles.footer, { paddingBottom: spacing.sm + insets.bottom }]}>
         <TouchableOpacity
-          style={[styles.redeemButton, !canAfford && styles.redeemButtonDisabled]}
+          style={[styles.ctaButton, !canAfford && styles.ctaButtonDisabled]}
+          activeOpacity={0.85}
           onPress={handleRedeem}
-          disabled={isLoading}
-          accessibilityLabel={`Canjear ${item.name ?? 'producto'} por ${productCost} Opopoints`}
+          disabled={userBalance === null}
+          accessibilityLabel={`Canjear ${title} por ${productCost} Opopoints`}
         >
-          {isLoading ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <>
-              <Text style={styles.redeemButtonText}>Canjear ahora</Text>
-              <Text style={styles.redeemSubtext}>Por {productCost} Opopoints</Text>
-            </>
-          )}
+          <Text style={styles.ctaButtonText}>Canjear ahora</Text>
+          <Text style={styles.ctaButtonSubtext}>Por {productCost} Opopoints</Text>
         </TouchableOpacity>
       </View>
 
@@ -179,189 +180,119 @@ export default function StoreProductDetailScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
+
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
     flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
     textAlign: 'center',
   },
+
+  // ── Hero ──────────────────────────────────────────────────────
   scrollContent: {
-    paddingVertical: 0,
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 120,
   },
-  // Hero
-  heroSection: {
-    alignItems: 'center',
-    paddingVertical: 28,
-    backgroundColor: colors.white,
-    marginBottom: 12,
-  },
-  iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 24,
-    backgroundColor: '#EDE7F6',
+  hero: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    paddingVertical: spacing.xl,
+    gap: 12,
   },
   productTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 19,
+    color: colors.textDark,
     textAlign: 'center',
-    marginBottom: 8,
-    paddingHorizontal: 24,
+    marginTop: spacing.sm,
   },
-  productSubtitle: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    paddingHorizontal: 32,
-    lineHeight: 22,
-  },
-  // Saldo
-  balanceCard: {
-    backgroundColor: colors.white,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 20,
-    borderRadius: 16,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  rowLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  rowValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.separator,
-    marginVertical: 14,
-  },
-  remainingRow: {
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  errorText: {
-    textAlign: 'center',
-    color: colors.error,
+  description: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 13,
-    marginTop: 10,
-    fontWeight: '600',
+    color: FIGMA.bodyMuted,
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: spacing.sm,
   },
-  // Detalles
-  detailsCard: {
-    backgroundColor: colors.white,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 20,
-    borderRadius: 16,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+  conditions: {
+    width: '100%',
+    gap: 8,
+    marginTop: spacing.sm,
   },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 10,
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 18,
-  },
-  featuresTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 12,
-  },
-  featureRow: {
+  conditionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 10,
-    gap: 10,
+    gap: 8,
   },
-  featureText: {
-    fontSize: 14,
-    color: colors.text,
+  conditionText: {
     flex: 1,
-    lineHeight: 20,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 13,
+    color: colors.textDark,
+    lineHeight: 19,
   },
-  // Footer
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+  },
+  price: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 24,
+    color: colors.accentOrange,
+  },
+  balanceNote: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: FIGMA.balanceMuted,
+  },
+  balanceNoteError: {
+    color: colors.statRed,
+  },
+
+  // ── CTA fijo al fondo ─────────────────────────────────────────
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.white,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.separator,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  redeemButton: {
-    backgroundColor: ACCENT,
-    borderRadius: 16,
-    paddingVertical: 16,
+  ctaButton: {
+    height: 61.3,
+    borderRadius: 14.2,
+    backgroundColor: colors.accentOrange,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  redeemButtonDisabled: {
+  ctaButtonDisabled: {
     backgroundColor: colors.grayMid,
-    shadowOpacity: 0,
-    elevation: 0,
   },
-  redeemButtonText: {
+  ctaButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
     color: colors.white,
-    fontSize: 17,
-    fontWeight: '800',
   },
-  redeemSubtext: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    marginTop: 3,
-    fontWeight: '600',
+  ctaButtonSubtext: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
 });

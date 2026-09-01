@@ -55,6 +55,8 @@ const envSchema = z.object({
     MOTOR_BOE_API_KEY: optionalString,
     // Si no se declara, reutiliza AI_API_KEY para las llamadas OpenAI del Motor
     MOTOR_BOE_OPENAI_KEY: optionalString,
+    // ID del curso en el Motor BOE (corresponde a la oposición activa, ej. "justicia-tramitacion")
+    MOTOR_BOE_CURSO_ID: optionalString,
 
     REVENUECAT_WEBHOOK_SECRET: optionalString,
     EXPO_ACCESS_TOKEN: optionalString,

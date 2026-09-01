@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     View,
@@ -6,20 +6,25 @@ import {
     TouchableOpacity,
     StatusBar,
     ScrollView,
-    Animated,
     Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
 
-// ─── Tokens de color — alineados con QuestionActiveScreen (Bloque 7) ─────────
-const QUIZ_ACCENT = colors.purple ?? '#7B4BC4';
-const CORRECT_BG = '#DCFCE7';
-const CORRECT_BORDER = colors.success;
-const INCORRECT_BG = '#FCA5A5';
-const INCORRECT_BORDER = colors.error;
+// ─── 10.4 · Mini-test BOE · pregunta activa con tiempo ────────────────────────
+// Fiel al Figma (PreguntaActivaConTiempoScreen.tsx). El diseño solo captura el
+// estado previo a responder; el flujo real de envío/feedback (correcto,
+// incorrecto, explicación, avance a la siguiente pregunta) no tiene equivalente
+// en Figma y se conserva porque es imprescindible para que el mini-test
+// funcione — solo se reestiliza con la paleta confirmada.
+const FIGMA = {
+    subtitleMuted: 'rgba(52, 58, 61, 0.5)',
+    optionBorder: 'rgba(65, 41, 80, 0.3)',
+    optionSelectedBg: 'rgba(114, 65, 184, 0.08)',
+};
 
 // ─── Mock de preguntas — Paso 2: boeApi.getMiniTest(itemId) ──────────────────
 const MOCK_QUESTIONS_BY_ITEM = {
@@ -77,6 +82,26 @@ const MOCK_QUESTIONS_BY_ITEM = {
     ],
 };
 
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+// Flechas de la píldora de progreso — decorativas: el avance real está
+// gobernado por Confirmar/Siguiente pregunta para no romper el registro de
+// aciertos (score) del flujo de envío, que Figma no modela.
+function ChevronMiniIcon({ direction = 'left', size = 14, color = colors.white }) {
+    const d = direction === 'left' ? 'M9 3L4 8L9 13' : 'M5 3L10 8L5 13';
+    return (
+        <Svg width={size} height={size} viewBox="0 0 14 16">
+            <Path d={d} stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
 export default function BoeMiniTestScreen({ route, navigation }) {
     const { itemId = '1', title } = route.params ?? {};
     const mockQuestions = MOCK_QUESTIONS_BY_ITEM[itemId] ?? MOCK_QUESTIONS_BY_ITEM.default;
@@ -87,7 +112,7 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     useEffect(() => {
         boeApi.getMiniTest(itemId).then(res => {
             if (res?.data?.questions?.length > 0) {
-                const qs = res.data.questions.map((q, i) => ({
+                const qs = res.data.questions.map((q) => ({
                     id: q.id,
                     context: q.context,
                     question: q.question,
@@ -111,7 +136,7 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     const [selectedOption, setSelectedOption] = useState(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [score, setScore] = useState(0);
-    const [finished, setFinished] = useState(false);
+    const scoreRef = useRef(0);
 
     const currentQ = questions[currentIndex];
     const progress = (currentIndex + (isSubmitted ? 1 : 0)) / total;
@@ -136,13 +161,16 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     function handleConfirm() {
         if (!selectedOption) return;
         const correct = currentQ.options.find(o => o.id === selectedOption)?.isCorrect ?? false;
-        if (correct) setScore(s => s + 1);
+        if (correct) {
+            scoreRef.current += 1;
+            setScore(scoreRef.current);
+        }
         setIsSubmitted(true);
     }
 
     function handleNext() {
         if (isLastQuestion) {
-            boeApi.completeMiniTest(itemId, score, total).catch(() => {});
+            boeApi.completeMiniTest(itemId, scoreRef.current, total).catch(() => {});
             navigation.navigate('BoeUpdateSuccess', {
                 articleRef: title ?? currentQ.context,
             });
@@ -169,108 +197,89 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     }
 
     return (
-        <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            {/* ── Header blanco (estilo QuestionActiveScreen) ────────────────── */}
-            <View style={styles.topHeader}>
-                <TouchableOpacity
-                    style={styles.circleBtn}
-                    onPress={handleClose}
-                    accessibilityLabel="Cerrar test"
-                >
-                    <Ionicons name="close" size={20} color={colors.text} />
-                </TouchableOpacity>
-
-                <View style={styles.topHeaderTexts}>
-                    <Text style={styles.topHeaderTitle}>Mini-test BOE</Text>
-                    {title ? (
-                        <Text style={styles.topHeaderSub} numberOfLines={1}>{title}</Text>
-                    ) : null}
+            <View style={styles.screen}>
+                {/* ── Header ──────────────────────────────────────────────────── */}
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        activeOpacity={0.7}
+                        onPress={handleClose}
+                        accessibilityLabel="Cerrar test"
+                    >
+                        <ChevronLeftIcon />
+                    </TouchableOpacity>
+                    <View style={styles.headerTitles}>
+                        <Text style={styles.headerTitle}>Actualización BOE</Text>
+                        <Text style={styles.headerSubtitle} numberOfLines={1}>
+                            {title ?? currentQ.context}
+                        </Text>
+                    </View>
+                    <View style={styles.iconButton} />
                 </View>
 
-                {/* Espaciador para centrar el título */}
-                <View style={styles.circleBtn} />
-            </View>
-
-            {/* ── Barra navy de progreso (estilo QuestionActiveScreen) ───────── */}
-            <View style={styles.progressBar}>
-                <View style={styles.progressRow}>
-                    <Text style={styles.progressLabel}>
-                        Pregunta {currentIndex + 1} de {total}
-                    </Text>
+                {/* ── Píldora de progreso ─────────────────────────────────────── */}
+                <View style={styles.progressPill}>
+                    <ChevronMiniIcon direction="left" />
+                    <View style={styles.progressTrack}>
+                        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                        <Text style={styles.progressText}>
+                            Pregunta {currentIndex + 1} de {total}
+                        </Text>
+                    </View>
+                    <ChevronMiniIcon direction="right" />
                 </View>
-                <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-                </View>
-            </View>
 
-            {/* ── Contenido ─────────────────────────────────────────────────── */}
-            <View style={styles.content}>
+                {/* ── Contenido ─────────────────────────────────────────────────── */}
                 <ScrollView
                     style={styles.scroll}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* Banner de contexto del cambio */}
-                    <View style={styles.contextBanner}>
-                        <Ionicons name="document-text-outline" size={16} color="#007AFF" />
-                        <Text style={styles.contextText}>{currentQ.context}</Text>
-                    </View>
-
-                    {/* Pregunta */}
                     <Text style={styles.questionText}>{currentQ.question}</Text>
 
-                    {/* Opciones */}
                     <View style={styles.optionsList}>
                         {visibleOptions.map(option => {
                             const isSelected = selectedOption === option.id;
-                            let bg = colors.card;
-                            let border = '#E4E8F0';
-                            let borderW = 1.5;
-                            let textColor = colors.text;
+                            let borderColor = FIGMA.optionBorder;
+                            let bg = 'transparent';
+                            let textColor = colors.textDark;
 
                             if (!isSubmitted) {
                                 if (isSelected) {
-                                    border = QUIZ_ACCENT;
-                                    borderW = 2;
+                                    borderColor = colors.purple;
+                                    bg = FIGMA.optionSelectedBg;
+                                    textColor = colors.purple;
                                 }
                             } else if (option.isCorrect) {
-                                bg = CORRECT_BG;
-                                border = CORRECT_BORDER;
-                                borderW = 1.5;
+                                borderColor = colors.ctaGreen;
+                                bg = `${colors.ctaGreen}1A`;
                             } else if (isSelected) {
-                                bg = INCORRECT_BG;
-                                border = INCORRECT_BORDER;
-                                borderW = 1.5;
+                                borderColor = colors.statRed;
+                                bg = `${colors.statRed}1A`;
                             }
 
                             return (
                                 <TouchableOpacity
                                     key={option.id}
-                                    style={[
-                                        styles.optionCard,
-                                        { backgroundColor: bg, borderColor: border, borderWidth: borderW },
-                                    ]}
+                                    style={[styles.optionRow, { borderColor, backgroundColor: bg }]}
                                     onPress={() => handleSelect(option.id)}
                                     disabled={isSubmitted}
-                                    activeOpacity={0.75}
+                                    activeOpacity={0.8}
                                     accessibilityLabel={`Opción ${option.id}: ${option.text}`}
                                     accessibilityState={{ selected: isSelected }}
                                 >
-                                    <Text style={[styles.optionLetter, { color: textColor }]}>
-                                        {option.id}.
-                                    </Text>
-                                    <Text style={[styles.optionText, { color: textColor }]}>
-                                        {option.text}
-                                    </Text>
+                                    <Text style={[styles.optionLabel, { color: textColor }]}>{option.id}.</Text>
+                                    <Text style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
 
-                    {/* Feedback card (como QuestionActiveScreen) */}
+                    {/* Feedback tras enviar respuesta */}
                     {isSubmitted && (
                         <View style={[
                             styles.feedbackCard,
@@ -280,11 +289,11 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                                 <Ionicons
                                     name={isCorrectAnswer ? 'checkmark-circle' : 'close-circle'}
                                     size={22}
-                                    color={isCorrectAnswer ? colors.success : colors.error}
+                                    color={isCorrectAnswer ? colors.ctaGreen : colors.statRed}
                                 />
                                 <Text style={[
                                     styles.feedbackTitle,
-                                    { color: isCorrectAnswer ? colors.success : colors.error },
+                                    { color: isCorrectAnswer ? colors.ctaGreen : colors.statRed },
                                 ]}>
                                     {isCorrectAnswer ? '¡Correcto!' : 'Incorrecto'}
                                 </Text>
@@ -296,8 +305,8 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                     )}
                 </ScrollView>
 
-                {/* Botón de acción fijo al fondo */}
-                <View style={[styles.actionArea, { paddingBottom: spacing.md + 4 + insets.bottom }]}>
+                {/* ── Botón fijo al fondo ───────────────────────────────────────── */}
+                <View style={[styles.actionArea, { paddingBottom: spacing.sm + insets.bottom }]}>
                     {!isSubmitted ? (
                         <TouchableOpacity
                             style={[styles.confirmBtn, !selectedOption && styles.confirmBtnDisabled]}
@@ -309,18 +318,13 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                         </TouchableOpacity>
                     ) : (
                         <TouchableOpacity
-                            style={styles.nextBtn}
+                            style={styles.confirmBtn}
                             onPress={handleNext}
                             accessibilityLabel={isLastQuestion ? 'Finalizar test' : 'Siguiente pregunta'}
                         >
-                            <Text style={styles.nextBtnText}>
+                            <Text style={styles.confirmBtnText}>
                                 {isLastQuestion ? 'Finalizar test' : 'Siguiente pregunta'}
                             </Text>
-                            <Ionicons
-                                name={isLastQuestion ? 'checkmark-circle' : 'arrow-forward'}
-                                size={20}
-                                color={colors.white}
-                            />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -330,153 +334,132 @@ export default function BoeMiniTestScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-    root: {
+    safeArea: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
+    },
+    screen: {
+        flex: 1,
+        backgroundColor: colors.white,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.lg,
     },
 
-    // ── Header blanco ─────────────────────────────────────────────
-    topHeader: {
+    // ── Header ────────────────────────────────────────────────────
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.card,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.separator,
+        marginBottom: spacing.md + 4,
     },
-    circleBtn: {
+    iconButton: {
         width: 36,
         height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.grayLight ?? '#F2F3F5',
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    topHeaderTexts: {
+    headerTitles: {
         flex: 1,
         alignItems: 'center',
-        paddingHorizontal: spacing.sm,
     },
-    topHeaderTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: colors.text,
+    headerTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
     },
-    topHeaderSub: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        marginTop: 1,
+    headerSubtitle: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.6,
+        color: FIGMA.subtitleMuted,
+        marginTop: 2,
     },
 
-    // ── Barra navy de progreso ────────────────────────────────────
-    progressBar: {
-        backgroundColor: colors.dark ?? '#0d1b2a',
-        paddingHorizontal: spacing.md,
-        paddingTop: 10,
-        paddingBottom: 12,
-    },
-    progressRow: {
-        marginBottom: 8,
-    },
-    progressLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: 'rgba(255,255,255,0.75)',
+    // ── Píldora de progreso ────────────────────────────────────────
+    progressPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.textDark,
+        borderRadius: 24,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        marginBottom: spacing.lg,
     },
     progressTrack: {
-        height: 5,
-        backgroundColor: 'rgba(255,255,255,0.18)',
-        borderRadius: 3,
+        flex: 1,
+        height: 24,
+        marginHorizontal: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 24,
         overflow: 'hidden',
     },
     progressFill: {
-        height: '100%',
-        backgroundColor: QUIZ_ACCENT,
-        borderRadius: 3,
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 24,
+        backgroundColor: colors.accentOrange,
+    },
+    progressText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 12.5,
+        color: colors.white,
     },
 
     // ── Contenido ─────────────────────────────────────────────────
-    content: {
-        flex: 1,
-    },
     scroll: {
         flex: 1,
     },
     scrollContent: {
-        padding: spacing.md + 4,
         paddingBottom: spacing.md,
-    },
-
-    // ── Contexto ──────────────────────────────────────────────────
-    contextBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        backgroundColor: '#007AFF12',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 8,
-        marginBottom: spacing.lg,
-    },
-    contextText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#007AFF',
     },
 
     // ── Pregunta ──────────────────────────────────────────────────
     questionText: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 18,
-        fontWeight: '700',
-        color: colors.text,
-        lineHeight: 26,
+        color: colors.textDark,
+        lineHeight: 25,
         marginBottom: spacing.lg,
     },
 
-    // ── Opciones (alineadas con QuestionActiveScreen) ─────────────
+    // ── Opciones ──────────────────────────────────────────────────
     optionsList: {
-        gap: spacing.sm,
-        marginBottom: spacing.md,
+        gap: spacing.sm + 4,
     },
-    optionCard: {
+    optionRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 12,
-        padding: spacing.md,
-        gap: spacing.sm,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-        elevation: 1,
+        alignItems: 'flex-start',
+        gap: 10,
+        borderWidth: 1,
+        borderRadius: 10.7,
+        padding: 14,
     },
-    optionLetter: {
-        fontSize: 15,
-        fontWeight: '800',
-        width: 20,
-        flexShrink: 0,
+    optionLabel: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
     },
     optionText: {
         flex: 1,
-        fontSize: 15,
-        lineHeight: 21,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 14,
+        lineHeight: 19,
     },
 
-    // ── Feedback card (alineado con QuestionActiveScreen) ─────────
+    // ── Feedback card ─────────────────────────────────────────────
     feedbackCard: {
         borderRadius: 14,
         padding: spacing.md,
-        marginTop: spacing.sm,
+        marginTop: spacing.md,
         borderWidth: 1,
     },
     feedbackOk: {
-        backgroundColor: '#F0FFF4',
-        borderColor: `${CORRECT_BORDER}50`,
+        backgroundColor: `${colors.ctaGreen}0F`,
+        borderColor: `${colors.ctaGreen}50`,
     },
     feedbackErr: {
-        backgroundColor: '#FFF5F5',
-        borderColor: `${INCORRECT_BORDER}50`,
+        backgroundColor: `${colors.statRed}0F`,
+        borderColor: `${colors.statRed}50`,
     },
     feedbackHeader: {
         flexDirection: 'row',
@@ -485,62 +468,33 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     feedbackTitle: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
-        fontWeight: '700',
     },
     feedbackBody: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 14,
-        color: colors.text,
+        color: colors.textDark,
         lineHeight: 21,
     },
 
-    // ── Acción fija al fondo ──────────────────────────────────────
+    // ── Botón fijo al fondo ────────────────────────────────────────
     actionArea: {
-        paddingHorizontal: spacing.md + 4,
         paddingTop: spacing.sm,
-        paddingBottom: spacing.md + 4,
-        backgroundColor: colors.background,
-        borderTopWidth: 1,
-        borderTopColor: colors.separator,
     },
     confirmBtn: {
-        backgroundColor: QUIZ_ACCENT,
-        paddingVertical: 16,
-        borderRadius: 12,
+        height: 61.3,
+        borderRadius: 14.2,
+        backgroundColor: colors.ctaGreen,
         alignItems: 'center',
-        shadowColor: QUIZ_ACCENT,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.28,
-        shadowRadius: 8,
-        elevation: 4,
+        justifyContent: 'center',
     },
     confirmBtnDisabled: {
         opacity: 0.4,
-        shadowOpacity: 0,
-        elevation: 0,
     },
     confirmBtnText: {
-        color: colors.white,
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
-        fontWeight: '700',
-    },
-    nextBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.sm,
-        backgroundColor: colors.success,
-        paddingVertical: 16,
-        borderRadius: 12,
-        shadowColor: colors.success,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.28,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    nextBtnText: {
         color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
     },
 });

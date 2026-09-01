@@ -72,6 +72,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
         userId: string;
         role: 'user' | 'assistant';
         content: string;
+        suggestedActions?: Array<{ label: string; icon: string }> | null;
     }): Promise<TutorMessage> {
         const { data, error } = await this.db
             .from('tutor_messages')
@@ -80,6 +81,7 @@ export class SupabaseTutorRepository implements ITutorRepository {
                 user_id: input.userId,
                 role: input.role,
                 content: input.content,
+                suggested_actions: input.suggestedActions ?? null,
             })
             .select()
             .single();

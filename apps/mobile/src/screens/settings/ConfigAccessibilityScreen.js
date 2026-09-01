@@ -1,129 +1,184 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch,
-  useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import AccentSlider from '../../components/AccentSlider';
+import { colors, spacing } from '../../theme';
+import { settingsApi } from '../../api';
+
+// ─── 12.5 · Accesibilidad ───────────────────────────────────────────────────
+// Fiel al Figma (AccesibilidadScreen.tsx). Dos ajustes reales tienen más
+// capacidad que la captura estática de Figma:
+//  - "Modo noche" en Figma es un switch binario, pero el real soporta un
+//    tercer estado "Auto" (sigue el tema del sistema) que no tiene forma de
+//    representarse en un switch de 2 posiciones. Se adapta al selector
+//    segmentado de 3 opciones ya confirmado en esta misma pantalla del
+//    bloque (ConfigToneScreen · "PERSONALIDAD"), en vez de perder "Auto".
+//  - El tamaño de fuente real es un valor discreto de 3 pasos (no continuo);
+//    se mapea sobre AccentSlider (steps=3), igual que en ConfigToneScreen,
+//    conservando el snap a los 3 tamaños reales y añadiendo el texto de
+//    vista previa (real, sin equivalente en Figma).
+// El auto-preview de tema completo de la pantalla (fondo/tarjetas oscuros en
+// vivo) se retira aquí porque Figma confirma un fondo blanco fijo; la
+// preferencia sigue guardándose y sincronizándose con el backend igual
+// (theme/fontScale/reduceMotion vía /config/preferences) para cuando exista
+// un ThemeContext real que la aplique al resto de la app.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  separator: 'rgba(65, 41, 80, 0.12)',
+  segmentBorder: 'rgba(65, 41, 80, 0.2)',
+  sliderTrack: '#F8DFC0',
+};
 
 const A11Y_KEY = 'opox.accessibility';
 
 const DEFAULT = {
-  theme: 'auto',       // 'claro' | 'auto' | 'oscuro'
+  theme: 'auto',       // 'claro' | 'auto' | 'oscuro'  (valores UI internos)
   fontSize: 'medio',   // 'pequeno' | 'medio' | 'grande'
-  highContrast: false,
+  highContrast: false, // solo local — no en backend
   reduceAnimations: false,
 };
 
-// TODO(bloque-12): propagar via ThemeContext para que afecte a todas las pantallas
-// Por ahora el screen hace preview local del tema seleccionado.
+// Mapeos entre valores UI y valores del backend
+const THEME_TO_API   = { claro: 'light', auto: 'auto', oscuro: 'dark' };
+const THEME_FROM_API = { light: 'claro', auto: 'auto', dark: 'oscuro' };
+const FONT_TO_SCALE  = { pequeno: 0.85, medio: 1.0, grande: 1.15 };
+function scaleToFont(scale) {
+  if (scale <= 0.9) return 'pequeno';
+  if (scale <= 1.05) return 'medio';
+  return 'grande';
+}
 
 const THEME_OPTIONS = [
-  { key: 'claro', label: 'Claro', icon: 'sunny-outline' },
-  { key: 'auto', label: 'Auto', icon: 'cloud-outline' },
-  { key: 'oscuro', label: 'Oscuro', icon: 'moon-outline' },
+  { key: 'claro', label: 'Claro' },
+  { key: 'auto', label: 'Auto' },
+  { key: 'oscuro', label: 'Oscuro' },
 ];
 
-const FONT_SIZE_OPTIONS = [
-  { key: 'pequeno', label: 'Pequeño', sizePx: 13 },
-  { key: 'medio', label: 'Medio', sizePx: 16 },
-  { key: 'grande', label: 'Grande', sizePx: 20 },
-];
-
+const FONT_SIZE_OPTIONS = ['pequeno', 'medio', 'grande'];
+const FONT_SIZE_INDEX = { pequeno: 0, medio: 1, grande: 2 };
 const PREVIEW_TEXT_SIZE = { pequeno: 13, medio: 16, grande: 20 };
 
-async function loadA11y() {
+async function loadA11yLocal() {
   try {
     const raw = await AsyncStorage.getItem(A11Y_KEY);
-    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
+    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : null;
   } catch {
-    return DEFAULT;
+    return null;
   }
 }
 
-async function saveA11y(prefs) {
+async function saveA11yLocal(prefs) {
   try {
     await AsyncStorage.setItem(A11Y_KEY, JSON.stringify(prefs));
   } catch { /* fallo silencioso */ }
 }
 
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function MoonIcon({ size = 24, color = colors.accentOrange }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M20 14.5A8.5 8.5 0 1 1 9.5 4A6.8 6.8 0 0 0 20 14.5Z" stroke={color} strokeWidth={1.5} fill="none" strokeLinejoin="round" />
+      <Path d="M18 3L18.6 4.4L20 5L18.6 5.6L18 7L17.4 5.6L16 5L17.4 4.4L18 3Z" fill={color} />
+    </Svg>
+  );
+}
+
 export default function ConfigAccessibilityScreen({ navigation }) {
-  const systemScheme = useColorScheme(); // 'light' | 'dark' | null
   const [prefs, setPrefs] = useState(DEFAULT);
 
   useEffect(() => {
-    loadA11y().then(setPrefs);
+    let cancelled = false;
+    async function load() {
+      // 1. AsyncStorage primero para respuesta instantánea
+      const local = await loadA11yLocal();
+      if (!cancelled && local) setPrefs(local);
+
+      // 2. Backend como source of truth (theme, fontScale, reduceMotion)
+      const res = await settingsApi.getPreferences();
+      if (!cancelled && !res?.error && res?.data) {
+        const { theme, fontScale, reduceMotion } = res.data;
+        const merged = {
+          ...(local ?? DEFAULT),
+          theme:           THEME_FROM_API[theme] ?? (local?.theme ?? DEFAULT.theme),
+          fontSize:        scaleToFont(fontScale ?? 1.0),
+          reduceAnimations: reduceMotion ?? (local?.reduceAnimations ?? false),
+          // highContrast permanece solo local
+        };
+        setPrefs(merged);
+        saveA11yLocal(merged);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   const update = useCallback((patch) => {
     setPrefs((prev) => {
       const next = { ...prev, ...patch };
-      saveA11y(next);
+      saveA11yLocal(next);
+
+      // Sincronizar con backend los campos soportados
+      const apiPatch = {};
+      if (patch.theme !== undefined)            apiPatch.theme       = THEME_TO_API[next.theme] ?? 'auto';
+      if (patch.fontSize !== undefined)         apiPatch.fontScale   = FONT_TO_SCALE[next.fontSize] ?? 1.0;
+      if (patch.reduceAnimations !== undefined) apiPatch.reduceMotion = next.reduceAnimations;
+      // highContrast no existe en backend → no se sincroniza
+
+      if (Object.keys(apiPatch).length > 0) {
+        settingsApi.updatePreferences(apiPatch)
+          .catch(() => { /* error silencioso — ya persistido localmente */ });
+      }
       return next;
     });
   }, []);
 
-  // Resuelve si la vista previa muestra modo oscuro
-  const isDark = prefs.theme === 'oscuro'
-    || (prefs.theme === 'auto' && systemScheme === 'dark');
-
-  const D = isDark ? DARK : LIGHT; // tokens de color del tema activo
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: D.bg }]} edges={['top', 'left', 'right']}>
-      <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={D.header}
-      />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* HEADER */}
-      <View style={[styles.header, { backgroundColor: D.header, borderBottomColor: D.border }]}>
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          style={styles.iconButton}
           activeOpacity={0.7}
+          onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
-          style={styles.headerBack}
         >
-          <Ionicons name="chevron-back" size={24} color={D.text} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: D.text }]}>Accesibilidad</Text>
-        <View style={styles.headerRight} />
+        <Text style={styles.headerTitle}>Accesibilidad</Text>
+        <View style={styles.iconButton} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* APARIENCIA */}
-        <Text style={[styles.sectionTitle, { color: D.textSecondary }]}>APARIENCIA</Text>
-        <View style={[styles.card, { backgroundColor: D.card, borderColor: D.border }]}>
-          <Text style={[styles.cardLabel, { color: D.textSecondary }]}>Modo de la aplicación</Text>
-          <View style={styles.themeRow}>
-            {THEME_OPTIONS.map(({ key, label, icon }) => {
+        {/* ── Modo noche (Claro/Auto/Oscuro) ─────────────────────────── */}
+        <View style={styles.row}>
+          <MoonIcon />
+          <Text style={styles.rowTitle}>Modo noche</Text>
+          <View style={styles.segmentedRow}>
+            {THEME_OPTIONS.map(({ key, label }) => {
               const isSelected = prefs.theme === key;
               return (
                 <TouchableOpacity
                   key={key}
-                  style={[
-                    styles.themeOption,
-                    isSelected
-                      ? { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' }
-                      : { backgroundColor: D.bg, borderColor: D.border },
-                  ]}
+                  style={[styles.segmentButton, isSelected && styles.segmentButtonActive]}
                   onPress={() => update({ theme: key })}
                   activeOpacity={0.7}
                   accessibilityLabel={`Tema ${label}`}
                 >
-                  <Ionicons
-                    name={icon}
-                    size={20}
-                    color={isSelected ? '#3B82F6' : D.textSecondary}
-                  />
-                  <Text style={[
-                    styles.themeLabel,
-                    { color: isSelected ? '#3B82F6' : D.textSecondary },
-                    isSelected && { fontWeight: '700' },
-                  ]}>
+                  <Text style={[styles.segmentText, isSelected && styles.segmentTextActive]}>
                     {label}
                   </Text>
                 </TouchableOpacity>
@@ -132,214 +187,158 @@ export default function ConfigAccessibilityScreen({ navigation }) {
           </View>
         </View>
 
-        {/* TAMAÑO DE FUENTE */}
-        <Text style={[styles.sectionTitle, { color: D.textSecondary }]}>TAMAÑO DE FUENTE</Text>
-        <View style={[styles.card, { backgroundColor: D.card, borderColor: D.border }]}>
-          <Text style={[styles.cardLabel, { color: D.textSecondary }]}>
-            Ajusta el tamaño del texto en toda la app
-          </Text>
-          <View style={styles.fontSizeRow}>
-            {FONT_SIZE_OPTIONS.map(({ key, label, sizePx }) => {
-              const isSelected = prefs.fontSize === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.fontSizeBtn, isSelected && styles.fontSizeBtnSelected]}
-                  onPress={() => update({ fontSize: key })}
-                  activeOpacity={0.7}
-                  accessibilityLabel={`Tamaño de fuente ${label}`}
-                >
-                  <Text style={[
-                    styles.fontSizeLetter,
-                    { fontSize: sizePx },
-                    isSelected && styles.fontSizeLetterSelected,
-                  ]}>
-                    A
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {/* Preview del tamaño seleccionado */}
-          <View style={[styles.previewText, { backgroundColor: D.bg }]}>
-            <Text style={{ fontSize: PREVIEW_TEXT_SIZE[prefs.fontSize], color: D.text }}>
-              Este es un ejemplo de texto con el tamaño seleccionado.
-            </Text>
-          </View>
-        </View>
-
-        {/* ACCESIBILIDAD AVANZADA */}
-        <Text style={[styles.sectionTitle, { color: D.textSecondary }]}>ACCESIBILIDAD AVANZADA</Text>
-        <View style={[styles.card, { backgroundColor: D.card, borderColor: D.border }]}>
-
-          <View style={[styles.switchRow, { borderBottomColor: D.separator }]}>
-            <View style={styles.switchLeft}>
-              <View style={styles.iconBox}>
-                <Ionicons name="contrast-outline" size={18} color="#3B82F6" />
-              </View>
-              <View style={styles.switchTexts}>
-                <Text style={[styles.switchTitle, { color: D.text }]}>Alto contraste</Text>
-                <Text style={[styles.switchSub, { color: D.textSecondary }]}>Mejora la legibilidad</Text>
-              </View>
-            </View>
-            <Switch
-              trackColor={{ false: '#E2E8F0', true: '#93C5FD' }}
-              thumbColor={prefs.highContrast ? '#FFFFFF' : '#F4F4F4'}
-              onValueChange={(v) => update({ highContrast: v })}
-              value={prefs.highContrast}
-              accessibilityLabel={`Alto contraste ${prefs.highContrast ? 'activado' : 'desactivado'}`}
+        {/* ── Tamaño fuente ───────────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>TAMAÑO FUENTE</Text>
+        <View style={styles.sliderRow}>
+          <Text style={styles.sliderEndLabelSmall}>A</Text>
+          <View style={styles.sliderTrackWrap}>
+            <AccentSlider
+              steps={3}
+              valueIdx={FONT_SIZE_INDEX[prefs.fontSize] ?? 1}
+              onChange={(idx) => update({ fontSize: FONT_SIZE_OPTIONS[idx] })}
+              accentColor={colors.accentOrange}
+              trackColor={FIGMA.sliderTrack}
             />
           </View>
+          <Text style={styles.sliderEndLabelLarge}>A</Text>
+        </View>
+        {/* Vista previa — real, sin equivalente en Figma */}
+        <Text style={[styles.previewText, { fontSize: PREVIEW_TEXT_SIZE[prefs.fontSize] }]}>
+          Este es un ejemplo de texto con el tamaño seleccionado.
+        </Text>
 
-          <View style={[styles.switchRow, styles.switchRowLast]}>
-            <View style={styles.switchLeft}>
-              <View style={styles.iconBox}>
-                <Ionicons name="speedometer-outline" size={18} color="#3B82F6" />
-              </View>
-              <View style={styles.switchTexts}>
-                <Text style={[styles.switchTitle, { color: D.text }]}>Reducir animaciones</Text>
-                <Text style={[styles.switchSub, { color: D.textSecondary }]}>Minimiza movimientos</Text>
-              </View>
-            </View>
-            <Switch
-              trackColor={{ false: '#E2E8F0', true: '#93C5FD' }}
-              thumbColor={prefs.reduceAnimations ? '#FFFFFF' : '#F4F4F4'}
-              onValueChange={(v) => update({ reduceAnimations: v })}
-              value={prefs.reduceAnimations}
-              accessibilityLabel={`Reducir animaciones ${prefs.reduceAnimations ? 'activado' : 'desactivado'}`}
-            />
-          </View>
-
+        {/* ── Alto contraste ──────────────────────────────────────────── */}
+        <View style={[styles.row, styles.rowBorder]}>
+          <Ionicons name="contrast-outline" size={24} color={colors.accentOrange} />
+          <Text style={[styles.rowTitle, { flex: 1 }]}>Alto contraste</Text>
+          <Switch
+            value={prefs.highContrast}
+            onValueChange={(v) => update({ highContrast: v })}
+            trackColor={{ false: '#E2E2E6', true: colors.purple }}
+            thumbColor={colors.white}
+            accessibilityLabel={`Alto contraste ${prefs.highContrast ? 'activado' : 'desactivado'}`}
+          />
         </View>
 
+        {/* ── Reducir animaciones ─────────────────────────────────────── */}
+        <View style={[styles.row, styles.rowBorder]}>
+          <Ionicons name="speedometer-outline" size={24} color={colors.accentOrange} />
+          <Text style={[styles.rowTitle, { flex: 1 }]}>Reducir animaciones</Text>
+          <Switch
+            value={prefs.reduceAnimations}
+            onValueChange={(v) => update({ reduceAnimations: v })}
+            trackColor={{ false: '#E2E2E6', true: colors.purple }}
+            thumbColor={colors.white}
+            accessibilityLabel={`Reducir animaciones ${prefs.reduceAnimations ? 'activado' : 'desactivado'}`}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// Tokens de tema — claro y oscuro (preview local del screen)
-const LIGHT = {
-  bg: '#F8FAFC',
-  header: '#FFFFFF',
-  card: '#FFFFFF',
-  border: '#E2E8F0',
-  separator: '#F1F5F9',
-  text: '#1E293B',
-  textSecondary: '#64748B',
-};
-const DARK = {
-  bg: '#111827',
-  header: '#1F2937',
-  card: '#1F2937',
-  border: '#374151',
-  separator: '#374151',
-  text: '#F9FAFB',
-  textSecondary: '#9CA3AF',
-};
-
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
 
-  // Header
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  headerBack: { padding: 8 },
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
     flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
     textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '700',
   },
-  headerRight: { width: 40 },
 
-  // Scroll
-  scroll: { paddingBottom: 40 },
-
-  // Sección
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
+  // ── Contenido ─────────────────────────────────────────────────
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  card: {
-    marginHorizontal: 16,
-    borderRadius: 12,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 16,
+  },
+  rowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: FIGMA.separator,
+  },
+  rowTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+  },
+
+  // ── Modo noche: selector segmentado ───────────────────────────
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  segmentButton: {
     borderWidth: 1,
-    overflow: 'hidden',
-    padding: 14,
-  },
-  cardLabel: { fontSize: 12, marginBottom: 12 },
-
-  // Selector de tema
-  themeRow: { flexDirection: 'row', gap: 8 },
-  themeOption: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    gap: 4,
-  },
-  themeLabel: { fontSize: 13, fontWeight: '500' },
-
-  // Selector de tamaño de fuente
-  fontSizeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 14,
-    marginTop: 4,
-  },
-  fontSizeBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-  },
-  fontSizeBtnSelected: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
-  },
-  fontSizeLetter: { fontWeight: '800', color: '#64748B' },
-  fontSizeLetterSelected: { color: '#FFFFFF' },
-  previewText: {
-    padding: 12,
+    borderColor: FIGMA.segmentBorder,
     borderRadius: 8,
-    marginTop: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  segmentButtonActive: {
+    borderColor: colors.purple,
+  },
+  segmentText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+  },
+  segmentTextActive: {
+    color: colors.purple,
   },
 
-  // Filas con Switch
-  switchRow: {
+  // ── Tamaño fuente ─────────────────────────────────────────────
+  sectionLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 12,
+    color: colors.textDark,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  sliderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    gap: 10,
   },
-  switchRowLast: { borderBottomWidth: 0 },
-  switchLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
-  iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+  sliderEndLabelSmall: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 11,
+    color: FIGMA.textMuted,
   },
-  switchTexts: { flex: 1 },
-  switchTitle: { fontSize: 14, fontWeight: '600' },
-  switchSub: { fontSize: 12, marginTop: 2 },
+  sliderEndLabelLarge: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 20,
+    color: colors.textDark,
+  },
+  sliderTrackWrap: {
+    flex: 1,
+  },
+  previewText: {
+    fontFamily: 'Poppins-Regular',
+    color: colors.textSecondary,
+    marginTop: spacing.sm + 4,
+  },
 });

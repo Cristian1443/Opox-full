@@ -34,6 +34,8 @@ export interface StoreDiscount {
     conditions: string[];
     deepLink: string | null;
     isActive: boolean;
+    cost: number;
+    code: string;
     createdAt: Date;
 }
 

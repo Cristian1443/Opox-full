@@ -100,12 +100,18 @@ import {
     CompleteBoeMiniTestUseCase,
     ListTopicsUseCase,
     SyncBoeChangesUseCase,
+    ListFollowedRegulationsUseCase,
+    FollowRegulationUseCase,
+    UnfollowRegulationUseCase,
+    SearchBoeRegulationsUseCase,
+    SyncBoeCatalogUseCase,
     // Bloque 11 · Tienda
     GetStoreBalanceUseCase,
     ListStoreProductsUseCase,
     GetStoreProductUseCase,
     RedeemProductUseCase,
     ListStoreDiscountsUseCase,
+    RedeemDiscountUseCase,
     GetWalletUseCase,
     GetWalletItemUseCase,
     ListCommunityTestsUseCase,
@@ -118,6 +124,10 @@ import {
     GetProStatsUseCase,
     ExportProStatsUseCase,
     SubmitFeedbackUseCase,
+    // Bloque 3 · Salud — dispositivos
+    GetDevicesUseCase,
+    RegisterDeviceUseCase,
+    DeleteDeviceUseCase,
     // Bloque 13 · Notificaciones
     RegisterPushTokenUseCase,
     SendBoeAlertUseCase,
@@ -139,6 +149,7 @@ import {
     SupabaseStoreRepository,
     SupabaseConfigRepository,
     SupabasePushRepository,
+    SupabaseHealthRepository,
     ExpoPushService,
     ClientApiClient,
     AiApiClient,
@@ -148,6 +159,7 @@ import {
     MotorBoeClient,
 } from './infrastructure';
 import {
+    HealthController,
     AuthController,
     DashboardController,
     PlanningController,
@@ -161,7 +173,7 @@ import {
     PushTokenController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository, IConfigRepository, IPushRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository, IConfigRepository, IPushRepository, IHealthRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -216,6 +228,10 @@ export function buildContainer() {
     const pushRepo: IPushRepository = isSupabaseConfigured
         ? new SupabasePushRepository(getSupabaseAdmin())
         : createStubPushRepository();
+
+    const healthRepo: IHealthRepository = isSupabaseConfigured
+        ? new SupabaseHealthRepository(getSupabaseAdmin())
+        : createStubHealthRepository();
 
     if (!isSupabaseConfigured) {
         logger.warn(
@@ -371,7 +387,7 @@ export function buildContainer() {
         generateQuestions: new GenerateQuestionsUseCase(aiApi),
         analyzePhoto: new AnalyzePhotoUseCase(aiApi),
         generateSurgicalTest: new GenerateSurgicalTestUseCase(aiApi, trainingRepo),
-        saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo),
+        saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo, storeRepo),
         listErrorPatterns: new ListErrorPatternsUseCase(trainingRepo),
         listBookmarks: new ListBookmarksUseCase(trainingRepo),
         saveBookmark: new SaveBookmarkUseCase(trainingRepo),
@@ -418,7 +434,7 @@ export function buildContainer() {
         getBoeMiniTest: new GetBoeMiniTestUseCase(boeRepo, aiApi),
         markBoeRead: new MarkBoeReadUseCase(boeRepo),
         toggleBoeBookmark: new ToggleBoeBookmarkUseCase(boeRepo),
-        completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo),
+        completeBoeMiniTest: new CompleteBoeMiniTestUseCase(boeRepo, dashboardRepo),
         listTopics: new ListTopicsUseCase(boeRepo),
         syncBoeChanges: motorBoe
             ? new SyncBoeChangesUseCase(
@@ -427,6 +443,11 @@ export function buildContainer() {
                 (synced) => sendBoeAlert.execute(synced),
               )
             : undefined,
+        listBoeRegulations: new ListFollowedRegulationsUseCase(boeRepo),
+        followBoeRegulation: new FollowRegulationUseCase(boeRepo, motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        unfollowBoeRegulation: new UnfollowRegulationUseCase(boeRepo, motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        searchBoeCatalog: new SearchBoeRegulationsUseCase(motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        syncBoeCatalog: motorBoe ? new SyncBoeCatalogUseCase(motorBoe) : undefined,
 
         // Bloque 11 · Tienda
         getStoreBalance: new GetStoreBalanceUseCase(storeRepo),
@@ -434,6 +455,7 @@ export function buildContainer() {
         getStoreProduct: new GetStoreProductUseCase(storeRepo),
         redeemProduct: new RedeemProductUseCase(storeRepo),
         listStoreDiscounts: new ListStoreDiscountsUseCase(storeRepo),
+        redeemDiscount: new RedeemDiscountUseCase(storeRepo),
         getWallet: new GetWalletUseCase(storeRepo),
         getWalletItem: new GetWalletItemUseCase(storeRepo),
         listCommunityTests: new ListCommunityTestsUseCase(storeRepo),
@@ -447,6 +469,11 @@ export function buildContainer() {
         getProStats:       new GetProStatsUseCase(configRepo),
         exportProStats:    new ExportProStatsUseCase(configRepo),
         submitFeedback:    new SubmitFeedbackUseCase(configRepo),
+
+        // Bloque 3 · Salud — dispositivos
+        getHealthDevices:    new GetDevicesUseCase(healthRepo),
+        registerHealthDevice: new RegisterDeviceUseCase(healthRepo),
+        deleteHealthDevice:  new DeleteDeviceUseCase(healthRepo),
 
         // Bloque 13 · Notificaciones
         registerPushToken,
@@ -517,6 +544,11 @@ export function buildContainer() {
         toggleBookmark: useCases.toggleBoeBookmark,
         completeMiniTest: useCases.completeBoeMiniTest,
         syncChanges: useCases.syncBoeChanges,
+        listRegulations: useCases.listBoeRegulations,
+        followRegulation: useCases.followBoeRegulation,
+        unfollowRegulation: useCases.unfollowBoeRegulation,
+        searchCatalog: useCases.searchBoeCatalog,
+        syncCatalog: useCases.syncBoeCatalog,
     });
 
     const storeController = new StoreController({
@@ -525,6 +557,7 @@ export function buildContainer() {
         getProduct: useCases.getStoreProduct,
         redeemProduct: useCases.redeemProduct,
         listDiscounts: useCases.listStoreDiscounts,
+        redeemDiscount: useCases.redeemDiscount,
         getWallet: useCases.getWallet,
         getWalletItem: useCases.getWalletItem,
         listCommunityTests: useCases.listCommunityTests,
@@ -550,6 +583,12 @@ export function buildContainer() {
         saveProgress: useCases.saveProgress,
         listSummaries: useCases.listSummaries,
         getSummary: useCases.getSummary,
+    });
+
+    const healthController = new HealthController({
+        getDevices:     useCases.getHealthDevices,
+        registerDevice: useCases.registerHealthDevice,
+        deleteDevice:   useCases.deleteHealthDevice,
     });
 
     const pushTokenController = new PushTokenController({
@@ -595,6 +634,7 @@ export function buildContainer() {
         pushRepo,
         pushService,
         controllers: {
+            health: healthController,
             auth: authController,
             dashboard: dashboardController,
             planning: planningController,
@@ -692,4 +732,11 @@ function createStubPushRepository(): IPushRepository {
         throw new Error('[push] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as IPushRepository, { get: () => notConfigured });
+}
+
+function createStubHealthRepository(): IHealthRepository {
+    const notConfigured = (): never => {
+        throw new Error('[health] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IHealthRepository, { get: () => notConfigured });
 }

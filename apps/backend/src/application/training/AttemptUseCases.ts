@@ -1,4 +1,4 @@
-import type { ITrainingRepository, IDashboardRepository, SaveAttemptInput } from '../../domain';
+import type { ITrainingRepository, IDashboardRepository, IStoreRepository, SaveAttemptInput } from '../../domain';
 import type { TrainingAttempt, TrainingSource, TrainingDifficulty } from '../../domain/entities/TrainingAttempt';
 import type { ErrorPattern } from '../../domain/entities/MockExam';
 
@@ -23,10 +23,13 @@ export interface SaveAttemptInput2 {
     }>;
 }
 
+const DAILY_TEST_CAP = 100;
+
 export class SaveAttemptUseCase {
     constructor(
         private readonly trainingRepo: ITrainingRepository,
         private readonly dashboardRepo: IDashboardRepository,
+        private readonly storeRepo: IStoreRepository,
     ) { }
 
     async execute(input: SaveAttemptInput2): Promise<TrainingAttempt> {
@@ -58,14 +61,22 @@ export class SaveAttemptUseCase {
             responses: input.responses,
         };
 
+        // Opopoints: 1 punto por respuesta correcta × multiplicador de nota,
+        // con cap diario de DAILY_TEST_CAP para evitar farming de tests cortos.
+        const pct = questionCount > 0 ? (correctCount / questionCount) * 100 : 0;
+        const multiplier = pct >= 80 ? 1.5 : pct >= 60 ? 1.2 : 1.0;
+        const rawEarned = Math.round(correctCount * multiplier);
+        const todayEarned = rawEarned > 0
+            ? await this.storeRepo.getTodayTestEarnings(input.userId)
+            : 0;
+        const earnedPoints = Math.min(rawEarned, Math.max(0, DAILY_TEST_CAP - todayEarned));
+
         const [attempt] = await Promise.all([
             this.trainingRepo.saveAttempt(repoInput),
-            // Registrar actividad del día para mantener la racha — sin puntos
-            // extra porque el test no es una tarea ni un reto de clan.
             this.dashboardRepo.registerActivity({
                 userId: input.userId,
-                reason: 'training_attempt',
-                points: 0,
+                reason: 'test_completed',
+                points: earnedPoints,
                 localDate: input.localDate,
             }),
         ]);

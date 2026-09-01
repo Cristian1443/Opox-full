@@ -14,9 +14,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import NudgeModal from '../components/NudgeModal';
 import BoeAlertBanner from '../components/BoeAlertBanner';
 import AlertCardModal from '../components/AlertCardModal';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { dashboardApi, planningApi } from '../api';
+import { dashboardApi, planningApi, boeApi } from '../api';
 import { colors } from '../theme';
+
+// Evita mostrar la alerta BOE más de una vez por sesión de app
+let _boeAlertShownThisSession = false;
 
 // ─── Colores reales de Figma sin token exacto en theme.js ───────────────────
 // Fuente: Figma "OPOX_AI (2)" (fileKey jeiU2Otw0TADm0lwGwHPe7), frame
@@ -458,15 +460,26 @@ const NUDGES = {
     },
 };
 
+// Ícono confirmado en Figma para el pop-up "TEMARIO DESACTUALIZADO" (10.1) —
+// círculo + barra de aviso en naranja, sin círculo de fondo detrás.
+function StaleLawsWarningIcon({ size = 48, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 48 48">
+            <Circle cx={24} cy={24} r={22} stroke={color} strokeWidth={3} fill="none" />
+            <Path d="M24 14V27" stroke={color} strokeWidth={3.2} strokeLinecap="round" />
+            <Circle cx={24} cy={34} r={1.8} fill={color} />
+        </Svg>
+    );
+}
+
 // ─── Pantalla principal (2.1 Dashboard + 2.2 Acceso rápido) ─────────────────
 export default function DashboardScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const [activeNudge, setActiveNudge] = useState(null); // null | 'fatigue' | 'academic' | 'boe'
     const nudge = activeNudge ? NUDGES[activeNudge] : null;
     const [boeBannerVisible, setBoeBannerVisible] = useState(false);
-    // staleLawsCount: en Paso 2 lo devuelve dashboardApi.getSummary() → data.staleLawsCount
     const [staleAlertVisible, setStaleAlertVisible] = useState(false);
-    const [staleLawsCount, setStaleLawsCount] = useState(3); // mock; Paso 2: setStaleLawsCount(data.staleLawsCount)
+    const [staleLawsCount, setStaleLawsCount] = useState(0);
 
     const [summary, setSummary] = useState(null);
     const [planSummary, setPlanSummary] = useState(null);
@@ -486,6 +499,17 @@ export default function DashboardScreen({ navigation }) {
         planningApi.getSummary().then(({ data }) => {
             if (!cancelled && data) setPlanSummary(data);
         });
+        boeApi.getFeed().then(res => {
+            if (cancelled || res?.error || !res?.data) return;
+            const unread = res.data.totalUnread ?? 0;
+            if (unread > 0) {
+                setStaleLawsCount(unread);
+                if (!_boeAlertShownThisSession) {
+                    _boeAlertShownThisSession = true;
+                    setStaleAlertVisible(true);
+                }
+            }
+        }).catch(() => {});
         return () => { cancelled = true; };
     }, []);
 
@@ -804,19 +828,13 @@ export default function DashboardScreen({ navigation }) {
             {/* Pop-up temario desactualizado (10.1·alerta) — en Paso 2 lo dispara dashboardApi.getSummary() → staleLawsCount */}
             <AlertCardModal
                 visible={staleAlertVisible}
-                iconBg="#FDEBE9"
+                iconBg="transparent"
                 iconSize={80}
-                icon={
-                    <MaterialCommunityIcons
-                        name="alert-circle-outline"
-                        size={42}
-                        color="#FF3B30"
-                    />
-                }
+                icon={<StaleLawsWarningIcon />}
                 title={`${staleLawsCount} ${staleLawsCount === 1 ? 'ley' : 'leyes'} de tu temario ${staleLawsCount === 1 ? 'ha cambiado' : 'han cambiado'}`}
                 description="Para no estudiar contenido desfasado, revísalas y pon tu temario al día."
                 primaryLabel="Revisar cambios"
-                primaryColor="#FF3B30"
+                primaryColor={colors.ctaGreen}
                 onPrimaryPress={() => {
                     setStaleAlertVisible(false);
                     navigation.navigate('BoeHome');

@@ -63,7 +63,9 @@ export default function AccentSlider({
                 <View style={[styles.fill, { width: fillW, backgroundColor: accentColor }]} />
             )}
             {trackWidth > 0 && (
-                <View style={[styles.thumb, { left: thumbX, borderColor: accentColor }]} />
+                <View style={[styles.thumbOuter, { left: thumbX }]}>
+                    <View style={styles.thumbInner} />
+                </View>
             )}
         </View>
     );
@@ -82,18 +84,25 @@ const styles = StyleSheet.create({
         borderRadius: TRACK_H / 2,
         top: (THUMB - TRACK_H) / 2,
     },
-    thumb: {
+    thumbOuter: {
         position: 'absolute',
         top: 0,
         width: THUMB,
         height: THUMB,
         borderRadius: THUMB / 2,
-        backgroundColor: colors.white,
-        borderWidth: 3,
+        backgroundColor: colors.textDark,
+        alignItems: 'center',
+        justifyContent: 'center',
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.22,
         shadowRadius: 2,
+    },
+    thumbInner: {
+        width: THUMB * 0.83,
+        height: THUMB * 0.83,
+        borderRadius: (THUMB * 0.83) / 2,
+        backgroundColor: colors.white,
     },
 });

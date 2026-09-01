@@ -38,6 +38,9 @@ ALTER TABLE tutor_messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "owner_all" ON tutor_messages
     FOR ALL USING (auth.uid() = user_id);
 
+-- Migración: chips de acción sugeridos por la IA con cada mensaje
+ALTER TABLE tutor_messages ADD COLUMN IF NOT EXISTS suggested_actions jsonb DEFAULT NULL;
+
 -- ── Mazos de flashcards ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS tutor_flashcard_decks (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),

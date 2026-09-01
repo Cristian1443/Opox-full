@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
     StyleSheet,
@@ -7,10 +7,15 @@ import {
     ScrollView,
     TouchableOpacity,
     StatusBar,
+    TextInput,
+    ActivityIndicator,
+    Modal,
+    FlatList,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
 
@@ -20,116 +25,99 @@ function changeTypeToFeedType(ct) {
     return 'info';
 }
 
-// ─── Tokens de color Bloque 10 · Monitor BOE ──────────────────────────────────
-// Acento rojo alineado con el nudge BOE del Dashboard (NUDGE_VISUALS.boe → #E2483D).
-const BOE_ACCENT = '#E2483D';
-const BOE_ACCENT_BG = '#FDEBE9';
-
-// Configuración visual por tipo de alerta
-const TYPE_CFG = {
-    critical: {
-        borderColor: '#FF3B30',
-        badgeLabel: 'AFECTA A TU TEMA',
-        badgeColor: '#FF3B30',
-        badgeBg: '#FF3B3012',
-        actionLabel: 'REVISAR',
-    },
-    info: {
-        borderColor: '#007AFF',
-        badgeLabel: 'INFORMATIVO',
-        badgeColor: '#007AFF',
-        badgeBg: '#007AFF12',
-        actionLabel: 'VER',
-    },
-    review: {
-        borderColor: '#BFA000',
-        badgeLabel: 'REVISAR',
-        badgeColor: '#BFA000',
-        badgeBg: '#FFCC0015',
-        actionLabel: 'DETALLE',
-    },
+// ─── 10.1 · Monitor BOE · feed "LEYES ACTUALIZADAS" ───────────────────────────
+// Fiel al Figma (archivo OPOX_AI (2), Bloque 10, 905 x 2176px) para header,
+// filtro, tarjeta y estado "Todo en orden". El sistema de búsqueda/seguimiento
+// de normas (modal "Añadir norma") y los estados de carga no tienen
+// equivalente en el reference — son funcionalidad real imprescindible (sin
+// seguir ninguna norma no hay nada que monitorizar) y se conservan,
+// reestilizados con la misma paleta confirmada.
+const FIGMA = {
+    subtitleMuted: 'rgba(52, 58, 61, 0.5)',
+    borderMuted: 'rgba(65, 41, 80, 0.3)',
 };
 
+// Mapeo confirmado por Figma: los 3 ítems mock ("Modificación del art. 14",
+// "Nueva instrucción · Registro electrónico", "Corrección de errores · Ley
+// 40/2015") son los mismos 3 del reference TSX, con categorías
+// urgente(rojo)/afecta(naranja)/informativa(verde) — reemplaza la paleta
+// azul/amarilla que tenía este archivo antes del rediseño.
+const TYPE_CFG = {
+    critical: { color: colors.statRed, label: 'Afecta a tu tema' },
+    info: { color: colors.accentOrange, label: 'Afecta a tu tema' },
+    review: { color: colors.ctaGreen, label: 'Informativa' },
+};
+
+// Solo "Mi temario"/"Guardados": "Toda mi opo" era mock puro (sin backend
+// real detrás) y se retiró al conectar el feed real — ver handleFollow/
+// watchedCount más abajo, que reemplazan por completo el sistema de mocks.
 const TABS = [
     { key: 'myTopics', label: 'Mi temario' },
-    { key: 'allOpo', label: 'Toda mi opo' },
-    { key: 'saved', label: 'Guardadas' },
+    { key: 'saved', label: 'Guardados' },
 ];
 
-// Mock estructurado por tab — se sustituye por boeApi.getFeed() en Paso 2
-const MOCK_FEED = {
-    myTopics: [
-        {
-            section: 'Hoy',
-            items: [
-                {
-                    id: '1',
-                    type: 'critical',
-                    title: 'Modificación del art. 14 · Ley 39/2015',
-                    description: 'Cambia la obligación de relación electrónica para ciertos colectivos.',
-                    read: false,
-                },
-            ],
-        },
-        {
-            section: 'Ayer',
-            items: [
-                {
-                    id: '2',
-                    type: 'info',
-                    title: 'Nueva instrucción · Registro electrónico',
-                    description: 'Afecta a los plazos de presentación telemática.',
-                    read: false,
-                },
-            ],
-        },
-        {
-            section: '12 jun',
-            items: [
-                {
-                    id: '3',
-                    type: 'review',
-                    title: 'Corrección de errores · Ley 40/2015',
-                    description: 'Ajuste menor de redacción, sin impacto en el test.',
-                    read: true,
-                },
-            ],
-        },
-    ],
-    allOpo: [
-        {
-            section: 'Hoy',
-            items: [
-                {
-                    id: '4',
-                    type: 'info',
-                    title: 'RD 203/2021 — Reglamento LPACAP',
-                    description: 'Nuevo reglamento de desarrollo de la Ley 39/2015.',
-                    read: false,
-                },
-            ],
-        },
-    ],
-    saved: [],
-};
+// El feed real llega agrupado por sección (fecha) desde boeApi.getFeed(). El
+// Figma confirmado no muestra encabezados de sección: cada tarjeta lleva su
+// propia marca de tiempo coloreada por categoría. Aplanamos sin perder el
+// dato — el nombre de la sección pasa a ser el timestamp de cada ítem.
+function flattenSections(sections) {
+    return sections.flatMap(s => s.items.map(item => ({ ...item, timestamp: s.section })));
+}
 
-// Todos los ítems aplanados para lookup de guardados — se sustituirá por boeApi en Paso 2
-const ALL_ITEMS_FLAT = [...MOCK_FEED.myTopics, ...MOCK_FEED.allOpo].flatMap(s => s.items);
+// ─── Íconos confirmados en Figma ───────────────────────────────────────────
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function FilterIcon({ size = 20, color = colors.textDark }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+            <Path d="M4 6H20" stroke={color} strokeWidth={2} strokeLinecap="round" />
+            <Path d="M7 12H17" stroke={color} strokeWidth={2} strokeLinecap="round" />
+            <Path d="M10 18H14" stroke={color} strokeWidth={2} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+// Ícono confirmado en Figma para el estado "Todo en orden" (10.1·vacío) —
+// círculo + check verde grande, sin círculo de fondo detrás.
+function SuccessCheckIcon({ size = 96, color = colors.ctaGreen }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 96 96">
+            <Circle cx={48} cy={48} r={44} stroke={color} strokeWidth={4} fill="none" />
+            <Path d="M28 49L42 62L68 33" stroke={color} strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
 
 export default function BoeHomeScreen({ navigation }) {
     const [activeTab, setActiveTab] = useState('myTopics');
     const [readSet, setReadSet] = useState(() => new Set());
     const [bookmarkSet, setBookmarkSet] = useState(() => new Set());
-    const [demoEmpty, setDemoEmpty] = useState(false);
-    const [apiMyTopicsSections, setApiMyTopicsSections] = useState(null);
+    const [myTopicsSections, setMyTopicsSections] = useState([]);
+    const [watchedCount, setWatchedCount] = useState(null); // null = cargando
+    const [totalUnread, setTotalUnread] = useState(0);
+
+    // Sheet de búsqueda y seguimiento de normas ("Añadir norma")
+    const [searchVisible, setSearchVisible] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [followedIds, setFollowedIds] = useState(() => new Set());
+    const searchTimeout = useRef(null);
 
     // Recarga el feed cada vez que la pantalla entra en foco, para reflejar
     // cambios de isRead/isBookmarked producidos en Detalle, Comparativa o Mini-test.
     useFocusEffect(
         useCallback(() => {
             boeApi.getFeed().then(res => {
-                if (res?.data?.sections) {
-                    const sections = res.data.sections.map(s => ({
+                if (!res?.error && res?.data) {
+                    const d = res.data;
+                    const sections = d.sections.map(s => ({
                         section: s.sectionTitle,
                         items: s.data.map(c => ({
                             id: c.id,
@@ -141,16 +129,68 @@ export default function BoeHomeScreen({ navigation }) {
                             read: c.isRead,
                         })),
                     }));
-                    setApiMyTopicsSections(sections);
+                    setMyTopicsSections(sections);
+                    setWatchedCount(d.watchedRegulationsCount ?? 0);
+                    setTotalUnread(d.totalUnread ?? 0);
                     const bmarks = new Set();
-                    res.data.sections.flatMap(s => s.data).forEach(c => {
+                    d.sections.flatMap(s => s.data).forEach(c => {
                         if (c.isBookmarked) bmarks.add(c.id);
                     });
                     setBookmarkSet(bmarks);
+                } else {
+                    setWatchedCount(prev => prev ?? 0);
                 }
-            }).catch(() => {});
+            }).catch(() => { setWatchedCount(prev => prev ?? 0); });
         }, [])
     );
+
+    // Precarga sugerencias y normas ya seguidas cuando el modal abre
+    useEffect(() => {
+        if (!searchVisible) return;
+        boeApi.listRegulations().then(res => {
+            if (!res?.error && res?.data) {
+                setFollowedIds(new Set((res.data ?? []).map(r => r.boeIdentifier)));
+            }
+        }).catch(() => {});
+        setSearchLoading(true);
+        boeApi.searchCatalog('', 20).then(res => {
+            if (!res?.error && res?.data) setSearchResults(res.data.resultados ?? []);
+        }).catch(() => {}).finally(() => setSearchLoading(false));
+    }, [searchVisible]);
+
+    function triggerSearch(q) {
+        setSearchQuery(q);
+        clearTimeout(searchTimeout.current);
+        if (!q.trim()) {
+            // Sin query: volver a mostrar todas las sugerencias cargadas al abrir
+            setSearchLoading(true);
+            boeApi.searchCatalog('', 20).then(res => {
+                if (!res?.error && res?.data) setSearchResults(res.data.resultados ?? []);
+            }).catch(() => {}).finally(() => setSearchLoading(false));
+            return;
+        }
+        searchTimeout.current = setTimeout(() => {
+            setSearchLoading(true);
+            boeApi.searchCatalog(q, 15).then(res => {
+                if (!res?.error && res?.data) {
+                    setSearchResults(res.data.resultados ?? []);
+                }
+            }).catch(() => {}).finally(() => setSearchLoading(false));
+        }, 400);
+    }
+
+    function handleFollow(entry) {
+        const boeId = entry.identificador_boe;
+        if (followedIds.has(boeId)) return; // ya seguida — no relanzar
+        boeApi.followRegulation(boeId, entry.titulo).then(res => {
+            if (!res?.error) {
+                setFollowedIds(prev => new Set([...prev, boeId]));
+                setWatchedCount(c => (c ?? 0) + 1);
+            } else {
+                Alert.alert('Error', res.error?.message ?? 'No se pudo añadir la norma.');
+            }
+        }).catch(() => Alert.alert('Error', 'No se pudo conectar con el servidor.'));
+    }
 
     function toggleBookmark(id) {
         setBookmarkSet(prev => {
@@ -162,18 +202,9 @@ export default function BoeHomeScreen({ navigation }) {
         boeApi.toggleBookmark(id).catch(() => {});
     }
 
-    const myTopicsSections = apiMyTopicsSections ?? MOCK_FEED.myTopics;
-    const allItemsFlat = [
-        ...myTopicsSections,
-        ...MOCK_FEED.allOpo,
-    ].flatMap(s => s.items);
-    const savedItems = allItemsFlat.filter(item => bookmarkSet.has(item.id));
-    const savedSections = savedItems.length > 0 ? [{ section: 'Guardadas', items: savedItems }] : [];
-    const feedSections = demoEmpty ? [] : (
-        activeTab === 'saved' ? savedSections :
-        activeTab === 'myTopics' ? myTopicsSections :
-        (MOCK_FEED[activeTab] ?? [])
-    );
+    const myTopicsItems = flattenSections(myTopicsSections);
+    const savedItems = myTopicsItems.filter(item => bookmarkSet.has(item.id));
+    const feedItems = activeTab === 'saved' ? savedItems : myTopicsItems;
 
     function markRead(id) {
         setReadSet(prev => {
@@ -190,387 +221,379 @@ export default function BoeHomeScreen({ navigation }) {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            {/* ── Header ──────────────────────────────────────────────────────── */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
+            <View style={styles.screen}>
+                {/* ── Header ──────────────────────────────────────────────────── */}
+                <View style={styles.header}>
                     <TouchableOpacity
+                        style={styles.iconButton}
+                        activeOpacity={0.7}
                         onPress={() => navigation.goBack()}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         accessibilityLabel="Volver"
                     >
-                        <Ionicons name="arrow-back" size={24} color={colors.text} />
+                        <ChevronLeftIcon />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Monitor BOE</Text>
-                </View>
-
-                <View style={styles.headerRight}>
-                    <View style={styles.liveBadge}>
-                        <View style={styles.liveDot} />
-                        <Text style={styles.liveText}>LIVE</Text>
+                    <View style={styles.headerTitleRow}>
+                        <Text style={styles.headerTitle}>Monitor BOE</Text>
+                        {totalUnread > 0 && (
+                            <View style={styles.unreadBadge}>
+                                <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
+                            </View>
+                        )}
                     </View>
+                    {/* Añadir norma a monitorizar — única vía persistente para seguir
+                        más normas una vez el temario ya tiene alguna (el CTA del
+                        estado vacío solo aparece antes de la primera). */}
                     <TouchableOpacity
-                        onPress={() => navigation.navigate('Notifications')}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        accessibilityLabel="Notificaciones"
+                        style={styles.iconButton}
+                        activeOpacity={0.7}
+                        onPress={() => setSearchVisible(true)}
+                        accessibilityLabel="Seguir norma"
                     >
-                        <Ionicons name="notifications-outline" size={22} color={colors.text} />
+                        <Ionicons name="add-circle-outline" size={24} color={colors.accentOrange} />
                     </TouchableOpacity>
                 </View>
-            </View>
 
-            {/* ── Demo row (quitar en producción) ─────────────────────────────── */}
-            <View style={styles.demoRow}>
-                <Text style={styles.demoLabel}>DEMO</Text>
-                <TouchableOpacity
-                    style={[styles.demoPill, demoEmpty && styles.demoPillActive]}
-                    onPress={() => setDemoEmpty(e => !e)}
-                >
-                    <Text style={[styles.demoPillText, demoEmpty && styles.demoPillTextActive]}>
-                        {demoEmpty ? '✓ Sin novedades' : 'Sin novedades'}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* ── Tabs ────────────────────────────────────────────────────────── */}
-            <View style={styles.tabsWrapper}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.tabsContent}
-                >
+                {/* ── Filtro ──────────────────────────────────────────────────── */}
+                <View style={styles.filterRow}>
+                    <FilterIcon />
                     {TABS.map(tab => {
                         const isActive = activeTab === tab.key;
                         return (
                             <TouchableOpacity
                                 key={tab.key}
-                                style={[styles.tabPill, isActive && styles.tabPillActive]}
+                                style={[styles.filterTab, isActive && styles.filterTabActive]}
                                 onPress={() => setActiveTab(tab.key)}
                                 accessibilityLabel={tab.label}
                                 accessibilityState={{ selected: isActive }}
                             >
-                                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                                <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
                                     {tab.label}
                                 </Text>
                             </TouchableOpacity>
                         );
                     })}
-                </ScrollView>
-                <View style={styles.tabDivider} />
-            </View>
+                </View>
 
-            {/* ── Feed ────────────────────────────────────────────────────────── */}
-            <ScrollView
-                style={styles.feed}
-                contentContainerStyle={styles.feedContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {feedSections.length === 0 ? (
-                    activeTab === 'saved' ? (
-                        /* ── Empty: tab Guardadas ──────────────────────────────── */
-                        <View style={styles.empty}>
-                            <Ionicons name="bookmark-outline" size={44} color={colors.textSecondary} />
-                            <Text style={styles.emptyTitle}>Nada guardado aún</Text>
-                            <Text style={styles.emptySubtitle}>
-                                Guarda artículos desde el feed para revisarlos después.
-                            </Text>
-                        </View>
-                    ) : (
-                        /* ── Empty: temario al día (10.1·vacío) ────────────────── */
-                        <View style={styles.upToDate}>
-                            {/* Ícono de éxito */}
-                            <View style={styles.upToDateCircle}>
-                                <MaterialCommunityIcons
-                                    name="check-circle"
-                                    size={72}
-                                    color={colors.success}
-                                />
+                {/* ── Feed ────────────────────────────────────────────────────── */}
+                <ScrollView
+                    style={styles.scroll}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {feedItems.length === 0 ? (
+                        activeTab === 'saved' ? (
+                            /* ── Empty: tab Guardados ──────────────────────────── */
+                            <View style={styles.empty}>
+                                <Ionicons name="bookmark-outline" size={44} color={colors.textSecondary} />
+                                <Text style={styles.emptyTitle}>Nada guardado aún</Text>
+                                <Text style={styles.emptySubtitle}>
+                                    Guarda artículos desde el feed para revisarlos después.
+                                </Text>
                             </View>
-
-                            <Text style={styles.upToDateTitle}>¡Temario al día!</Text>
-                            <Text style={styles.upToDateDesc}>
-                                Has asimilado los cambios recientes. Tus tests ya usan la redacción vigente.
-                            </Text>
-
-                            {/* Card secundaria "Todo en orden" */}
-                            <View style={styles.upToDateCard}>
-                                <MaterialCommunityIcons
-                                    name="newspaper-check"
-                                    size={36}
-                                    color={colors.grayMid}
-                                />
-                                <Text style={styles.upToDateCardTitle}>Todo en orden</Text>
-                                <Text style={styles.upToDateCardDesc}>
+                        ) : watchedCount === null ? (
+                            /* ── Cargando ───────────────────────────────────────── */
+                            <ActivityIndicator style={{ marginTop: 60 }} color={colors.accentOrange} />
+                        ) : watchedCount === 0 ? (
+                            /* ── Empty: sin normas seguidas ────────────────────── */
+                            <View style={styles.empty}>
+                                <Ionicons name="telescope-outline" size={48} color={colors.textSecondary} />
+                                <Text style={styles.emptyTitle}>Empieza a monitorizar</Text>
+                                <Text style={styles.emptySubtitle}>
+                                    Añade las normas de tu temario y te avisaremos en cuanto el BOE publique un cambio que te afecte.
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.followCta}
+                                    onPress={() => setSearchVisible(true)}
+                                    accessibilityLabel="Añadir norma"
+                                >
+                                    <Ionicons name="add" size={18} color={colors.white} />
+                                    <Text style={styles.followCtaText}>Añadir norma</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            /* ── Empty: temario al día (10.1·vacío) ────────────── */
+                            <View style={styles.upToDate}>
+                                <SuccessCheckIcon />
+                                <Text style={styles.upToDateTitle}>Todo en orden</Text>
+                                <Text style={styles.upToDateDesc}>
                                     Tu temario está actualizado. Te avisaremos en cuanto el BOE publique
                                     algún cambio que te afecte.
                                 </Text>
                             </View>
-
-                            <TouchableOpacity
-                                style={styles.upToDateBtn}
-                                onPress={() => navigation.goBack()}
-                                accessibilityLabel="Volver al inicio"
-                            >
-                                <Text style={styles.upToDateBtnText}>Volver al inicio</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )
-                ) : (
-                    feedSections.map(section => (
-                        <View key={section.section}>
-                            <Text style={styles.sectionLabel}>{section.section}</Text>
-                            {section.items.map(item => {
-                                const cfg = TYPE_CFG[item.type];
-                                const isRead = readSet.has(item.id) || item.read;
-                                const isBookmarked = bookmarkSet.has(item.id);
-                                return (
-                                    <TouchableOpacity
-                                        key={item.id}
-                                        style={styles.card}
-                                        activeOpacity={0.72}
-                                        onPress={() => handleCardPress(item)}
-                                        accessibilityLabel={item.title}
-                                    >
-                                        {/* Barra de color izquierda */}
-                                        <View style={[styles.cardBar, { backgroundColor: cfg.borderColor }]} />
-
-                                        {/* Cuerpo de la card */}
-                                        <View style={styles.cardBody}>
-                                            {/* Badge + indicadores derecha */}
-                                            <View style={styles.cardTopRow}>
-                                                <View style={[styles.badgePill, { backgroundColor: cfg.badgeBg }]}>
-                                                    <Text style={[styles.badgeText, { color: cfg.badgeColor }]}>
-                                                        {cfg.badgeLabel}
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.cardTopRight}>
-                                                    {!isRead && <View style={styles.unreadDot} />}
-                                                    <TouchableOpacity
-                                                        onPress={() => toggleBookmark(item.id)}
-                                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                                        accessibilityLabel={isBookmarked ? 'Quitar de guardadas' : 'Guardar artículo'}
-                                                    >
-                                                        <Ionicons
-                                                            name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-                                                            size={16}
-                                                            color={isBookmarked ? BOE_ACCENT : colors.textSecondary}
-                                                        />
-                                                    </TouchableOpacity>
-                                                </View>
-                                            </View>
-
-                                            <Text style={styles.cardTitle}>{item.title}</Text>
-                                            <Text style={styles.cardDesc} numberOfLines={2}>
-                                                {item.description}
-                                            </Text>
-
-                                            {/* Footer: chip (View — la card padre ya navega) */}
-                                            <View style={styles.cardFooter}>
-                                                <View style={[styles.actionChip, { backgroundColor: cfg.badgeBg }]}>
-                                                    <Text style={[styles.actionChipText, { color: cfg.badgeColor }]}>
-                                                        {cfg.actionLabel}
-                                                    </Text>
-                                                </View>
-                                            </View>
+                        )
+                    ) : (
+                        feedItems.map(item => {
+                            const cfg = TYPE_CFG[item.type];
+                            const isRead = readSet.has(item.id) || item.read;
+                            const isBookmarked = bookmarkSet.has(item.id);
+                            return (
+                                <TouchableOpacity
+                                    key={item.id}
+                                    style={[styles.card, !isRead && { borderColor: cfg.color, borderWidth: 1.5 }]}
+                                    activeOpacity={0.8}
+                                    onPress={() => handleCardPress(item)}
+                                    accessibilityLabel={item.title}
+                                >
+                                    <View style={styles.cardHeaderRow}>
+                                        <View style={[styles.tag, { backgroundColor: `${cfg.color}1A` }]}>
+                                            <Text style={[styles.tagText, { color: cfg.color }]}>{cfg.label}</Text>
                                         </View>
-                                    </TouchableOpacity>
-                                );
-                            })}
+                                        <View style={styles.cardTopRight}>
+                                            <Text style={[styles.timestamp, { color: cfg.color }]}>
+                                                {item.timestamp}
+                                            </Text>
+                                            <TouchableOpacity
+                                                onPress={() => toggleBookmark(item.id)}
+                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                accessibilityLabel={isBookmarked ? 'Quitar de guardados' : 'Guardar artículo'}
+                                            >
+                                                <Ionicons
+                                                    name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+                                                    size={14}
+                                                    color={isBookmarked ? colors.purple : colors.textSecondary}
+                                                />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                    <Text style={styles.cardTitle}>{item.title}</Text>
+                                    <Text style={styles.cardSubtitle}>{item.description}</Text>
+                                </TouchableOpacity>
+                            );
+                        })
+                    )}
+                </ScrollView>
+            </View>
+
+            {/* ── Modal: buscar y seguir normas ──────────────────────────────── */}
+            <Modal
+                visible={searchVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => {
+                    setSearchVisible(false);
+                    setSearchQuery('');
+                    setSearchResults([]);
+                }}
+            >
+                <SafeAreaView style={styles.modalContainer} edges={['top', 'left', 'right']}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Añadir norma</Text>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setSearchVisible(false);
+                                setSearchQuery('');
+                                setSearchResults([]);
+                            }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            accessibilityLabel="Cerrar"
+                        >
+                            <Ionicons name="close" size={22} color={colors.textDark} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.searchBar}>
+                        <Ionicons name="search" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Buscar por nombre o identificador BOE…"
+                            placeholderTextColor={colors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={triggerSearch}
+                            autoFocus
+                            returnKeyType="search"
+                        />
+                        {searchLoading && <ActivityIndicator size="small" color={colors.accentOrange} />}
+                    </View>
+
+                    {searchResults.length === 0 && !searchLoading ? (
+                        <View style={styles.empty}>
+                            <Ionicons
+                                name={searchQuery.trim() ? 'search-outline' : 'book-outline'}
+                                size={40}
+                                color={colors.textSecondary}
+                            />
+                            <Text style={styles.emptyTitle}>
+                                {searchQuery.trim() ? 'Sin resultados' : 'Sin normas disponibles'}
+                            </Text>
+                            <Text style={styles.emptySubtitle}>
+                                {searchQuery.trim()
+                                    ? 'Prueba con otro término o identificador BOE (ej. BOE-A-2023-...).'
+                                    : 'Verifica que MOTOR_BOE_BASE_URL y MOTOR_BOE_CURSO_ID estén configurados en el backend.'}
+                            </Text>
                         </View>
-                    ))
-                )}
-                <View style={{ height: spacing.xl }} />
-            </ScrollView>
+                    ) : (
+                        <FlatList
+                            data={searchResults}
+                            keyExtractor={item => item.id ?? item.identificador_boe}
+                            contentContainerStyle={{ padding: spacing.md }}
+                            renderItem={({ item }) => (
+                                <View style={styles.searchResultRow}>
+                                    <View style={{ flex: 1, marginRight: spacing.sm }}>
+                                        <Text style={styles.searchResultId}>{item.identificador_boe}</Text>
+                                        <Text style={styles.searchResultTitle} numberOfLines={2}>
+                                            {item.titulo}
+                                        </Text>
+                                    </View>
+                                    {followedIds.has(item.identificador_boe) ? (
+                                        <View style={styles.followedBadge}>
+                                            <Text style={styles.followedBadgeText}>Siguiendo</Text>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={styles.followBtn}
+                                            onPress={() => handleFollow(item)}
+                                            accessibilityLabel={`Seguir ${item.titulo}`}
+                                        >
+                                            <Text style={styles.followBtnText}>Seguir</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
+                            ItemSeparatorComponent={() => (
+                                <View style={{ height: 1, backgroundColor: colors.separator }} />
+                            )}
+                        />
+                    )}
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    safeArea: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
+    },
+    screen: {
+        flex: 1,
+        backgroundColor: colors.white,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.lg,
     },
 
     // ── Header ────────────────────────────────────────────────────
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 12,
-        backgroundColor: colors.card,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.separator,
+        marginBottom: spacing.md,
     },
-    headerLeft: {
+    iconButton: {
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitleRow: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: spacing.sm,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: colors.text,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
     },
-    headerRight: {
-        flexDirection: 'row',
+    unreadBadge: {
+        backgroundColor: colors.statRed,
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
         alignItems: 'center',
-        gap: spacing.sm,
+        justifyContent: 'center',
+        paddingHorizontal: 5,
     },
-    liveBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.successBg,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
-    },
-    liveDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-        backgroundColor: colors.success,
-    },
-    liveText: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: colors.success,
-        letterSpacing: 0.4,
-    },
-
-    // ── Tabs ──────────────────────────────────────────────────────
-    tabsWrapper: {
-        backgroundColor: colors.card,
-    },
-    tabsContent: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        gap: spacing.sm,
-        flexDirection: 'row',
-    },
-    tabPill: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: 7,
-        borderRadius: 20,
-        backgroundColor: colors.grayLight,
-    },
-    tabPillActive: {
-        backgroundColor: BOE_ACCENT,
-    },
-    tabLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: colors.textSecondary,
-    },
-    tabLabelActive: {
+    unreadBadgeText: {
+        fontFamily: 'Poppins-Bold',
+        fontSize: 11,
         color: colors.white,
     },
-    tabDivider: {
-        height: 1,
-        backgroundColor: colors.separator,
+
+    // ── Filtro ────────────────────────────────────────────────────
+    filterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        marginBottom: spacing.md,
+    },
+    filterTab: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 16,
+    },
+    filterTabActive: {
+        backgroundColor: colors.purple,
+    },
+    filterTabText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 10.7,
+        color: FIGMA.subtitleMuted,
+    },
+    filterTabTextActive: {
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.white,
     },
 
     // ── Feed ──────────────────────────────────────────────────────
-    feed: {
+    scroll: {
         flex: 1,
     },
-    feedContent: {
-        padding: spacing.md,
-    },
-    sectionLabel: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: colors.textSecondary,
-        textTransform: 'uppercase',
-        letterSpacing: 0.6,
-        marginTop: spacing.sm,
-        marginBottom: 10,
+    scrollContent: {
+        paddingBottom: spacing.lg,
     },
 
     // ── Card ──────────────────────────────────────────────────────
     card: {
-        flexDirection: 'row',
-        backgroundColor: colors.card,
         borderRadius: 12,
-        marginBottom: 10,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
+        borderWidth: 1,
+        borderColor: 'transparent',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        marginBottom: spacing.sm,
     },
-    cardBar: {
-        width: 5,
-        flexShrink: 0,
-    },
-    cardBody: {
-        flex: 1,
-        padding: spacing.md,
-        paddingLeft: 12,
-    },
-    cardTopRow: {
+    cardHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 6,
     },
-    badgePill: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
+    tag: {
+        borderRadius: 20,
+        paddingVertical: 4,
+        paddingHorizontal: 10,
     },
-    badgeText: {
-        fontSize: 10,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-        letterSpacing: 0.3,
+    tagText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 10.2,
     },
     cardTopRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
     },
-    unreadDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#FF7F50',
+    timestamp: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 10.2,
     },
     cardTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: colors.text,
-        marginBottom: 4,
-        lineHeight: 21,
+        fontFamily: 'Poppins-Bold',
+        fontSize: 17.8,
+        color: colors.textDark,
     },
-    cardDesc: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        lineHeight: 19,
-        marginBottom: 10,
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-    },
-    actionChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: 8,
-    },
-    actionChipText: {
-        fontSize: 11,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 0.3,
+    cardSubtitle: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.6,
+        color: FIGMA.subtitleMuted,
+        marginTop: 2,
     },
 
-    // ── Empty: tab Guardadas ──────────────────────────────────────
+    // ── Empty (Guardados / sin normas / búsqueda sin resultados) ──
     empty: {
         flex: 1,
         alignItems: 'center',
@@ -579,17 +602,33 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.xl,
     },
     emptyTitle: {
+        fontFamily: 'Poppins-Bold',
         fontSize: 16,
-        fontWeight: '700',
-        color: colors.text,
+        color: colors.textDark,
         marginTop: spacing.md,
         marginBottom: spacing.sm,
     },
     emptySubtitle: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 13,
         color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: 19,
+    },
+    followCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: spacing.lg,
+        backgroundColor: colors.purple,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    followCtaText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 15,
+        color: colors.white,
     },
 
     // ── Empty: temario al día (10.1·vacío) ───────────────────────
@@ -600,108 +639,99 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.xl,
     },
-    upToDateCircle: {
-        width: 112,
-        height: 112,
-        borderRadius: 56,
-        backgroundColor: colors.card,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: spacing.lg,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-        elevation: 4,
-    },
     upToDateTitle: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: colors.text,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
         textAlign: 'center',
-        marginBottom: 10,
+        marginTop: spacing.lg,
     },
     upToDateDesc: {
-        fontSize: 15,
-        color: colors.textSecondary,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.6,
+        color: FIGMA.subtitleMuted,
         textAlign: 'center',
-        lineHeight: 23,
-        marginBottom: spacing.xl,
-    },
-    upToDateCard: {
-        alignItems: 'center',
-        backgroundColor: colors.card,
-        borderRadius: 14,
-        paddingVertical: spacing.lg,
-        paddingHorizontal: spacing.xl,
-        marginBottom: spacing.xl,
-        width: '100%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        elevation: 1,
-    },
-    upToDateCardTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: colors.text,
+        lineHeight: 17,
         marginTop: spacing.sm,
-        marginBottom: 6,
-    },
-    upToDateCardDesc: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        lineHeight: 20,
-    },
-    upToDateBtn: {
-        paddingVertical: 12,
-        paddingHorizontal: spacing.lg,
-        borderRadius: 12,
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.separator,
-    },
-    upToDateBtnText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textSecondary,
     },
 
-    // ── Demo row ──────────────────────────────────────────────────
-    demoRow: {
+    // ── Modal de búsqueda / seguimiento de normas ──────────────────
+    modalContainer: {
+        flex: 1,
+        backgroundColor: colors.white,
+    },
+    modalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 6,
-        backgroundColor: '#FFFBE6',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0DC80',
+        borderBottomColor: colors.separator,
     },
-    demoLabel: {
+    modalTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 17,
+        color: colors.textDark,
+    },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        margin: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: FIGMA.borderMuted,
+    },
+    searchInput: {
+        flex: 1,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: colors.textDark,
+        padding: 0,
+    },
+    searchResultRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+    },
+    searchResultId: {
+        fontFamily: 'Poppins-Bold',
         fontSize: 10,
-        fontWeight: '800',
-        color: '#BFA000',
-        letterSpacing: 0.5,
+        color: colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+        marginBottom: 3,
     },
-    demoPill: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+    searchResultTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+        lineHeight: 20,
+    },
+    followBtn: {
+        backgroundColor: `${colors.purple}1A`,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#BFA000',
+        borderColor: colors.purple,
     },
-    demoPillActive: {
-        backgroundColor: '#BFA000',
+    followBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.purple,
     },
-    demoPillText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#BFA000',
+    followedBadge: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: colors.grayLight,
     },
-    demoPillTextActive: {
-        color: colors.white,
+    followedBadgeText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.textSecondary,
     },
 });

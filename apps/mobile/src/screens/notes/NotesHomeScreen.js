@@ -1,38 +1,48 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    StatusBar,
     RefreshControl,
     ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { notesApi } from '../../api';
 
-// Paleta suave por documento — pasteles OPOX (rotan por índice cuando el kind es igual).
-const DOC_PALETTES = {
-    pdf: [
-        { iconColor: '#5AA2E5', bg: '#E8F2FC' },   // azul claro
-        { iconColor: '#5BB59A', bg: '#E6F5EF' },   // verde pastel
-    ],
-    photo: [
-        { iconColor: '#E9825E', bg: '#FCE5D9' },   // naranja pastel
-        { iconColor: '#C48BD1', bg: '#F0E4F5' },   // lila pastel
-    ],
+// Colores confirmados contra Figma (frame HOME FACTORIA, Bloque 9) sin
+// equivalente exacto en theme.js.
+const FIGMA = {
+    cardBorder: 'rgba(65,41,80,0.3)',
+    separator: 'rgba(65,41,80,0.5)',
+    textNote: '#343A3D',
+    textNoteMuted: 'rgba(52,58,61,0.5)',
 };
 
-function paletteFor(note, idx) {
-    const list = DOC_PALETTES[note.kind] ?? DOC_PALETTES.pdf;
-    return list[idx % list.length];
-}
-
-function iconFor(kind) {
-    return kind === 'photo' ? 'camera' : 'document-text';
+// Ícono de documento (ver nota: en Figma este contenedor está nombrado
+// "Modo_de_aislamiento", un nombre genérico heredado — el contenido visual
+// es correcto).
+function DocumentIcon({ width = 32, height = 42, color = colors.accentOrange }) {
+    return (
+        <Svg width={width} height={height} viewBox="0 0 32 42">
+            <Path
+                d="M4 2H20L28 10V38C28 39.1 27.1 40 26 40H4C2.9 40 2 39.1 2 38V4C2 2.9 2.9 2 4 2Z"
+                fill="none"
+                stroke={color}
+                strokeWidth={2.2}
+                strokeLinejoin="round"
+            />
+            <Path d="M20 2V10H28" fill="none" stroke={color} strokeWidth={2.2} strokeLinejoin="round" />
+            <Rect x={8} y={20} width={16} height={2.2} rx={1.1} fill={color} />
+            <Rect x={8} y={26} width={16} height={2.2} rx={1.1} fill={color} />
+            <Rect x={8} y={32} width={10} height={2.2} rx={1.1} fill={color} />
+        </Svg>
+    );
 }
 
 // Fallback mock si el backend aún no está disponible (Supabase sin configurar).
@@ -53,42 +63,31 @@ async function fetchNotes() {
 }
 
 function KpiCard({ totalNotes, totalQuestions }) {
-    // Card navy con icono cuadrado a la izquierda y textos apilados a la derecha.
     return (
         <View style={styles.kpiCard}>
-            <View style={styles.kpiIconBox}>
-                <Ionicons name="document-text-outline" size={22} color={colors.white} />
-            </View>
-            <View style={styles.kpiTexts}>
-                <Text style={styles.kpiPrimary}>{totalNotes} apuntes digitalizados</Text>
-                <Text style={styles.kpiSecondary}>{totalQuestions} preguntas generadas</Text>
-            </View>
+            <DocumentIcon />
+            <Text style={styles.kpiPrimary}>{totalNotes} apuntes digitalizados</Text>
+            <Text style={styles.kpiSecondary}>{totalQuestions} preguntas generadas</Text>
         </View>
     );
 }
 
-function DocItem({ note, idx, onPress }) {
-    const palette = paletteFor(note, idx);
+function DocItem({ note, isLast, onPress }) {
     return (
         <TouchableOpacity
-            style={styles.docItem}
+            style={[styles.docItem, !isLast && styles.docItemSeparator]}
             onPress={onPress}
-            activeOpacity={0.75}
+            activeOpacity={0.7}
             accessibilityLabel={`Abrir ${note.title}`}
             accessibilityRole="button"
         >
-            <View style={[styles.docIcon, { backgroundColor: palette.bg }]}>
-                <Ionicons name={iconFor(note.kind)} size={22} color={palette.iconColor} />
-            </View>
             <View style={styles.docInfo}>
                 <Text style={styles.docTitle} numberOfLines={1}>{note.title}</Text>
                 <Text style={styles.docMeta} numberOfLines={1}>
-                    {note.kind === 'photo' ? 'Foto' : 'PDF'} · {note.pages} {note.pages === 1 ? 'pág' : 'págs'}
-                    {'  ·  '}
-                    {note.questionsCount} preguntas
+                    {note.kind === 'photo' ? 'Foto' : 'PDF'} · {note.pages} {note.pages === 1 ? 'pág' : 'págs'} · {note.questionsCount} preguntas
                 </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.grayText} />
+            <Ionicons name="chevron-forward" size={16} color={colors.textDark} />
         </TouchableOpacity>
     );
 }
@@ -97,21 +96,20 @@ function EmptyState({ onUpload }) {
     return (
         <View style={styles.stateBlock}>
             <View style={styles.stateIconWrap}>
-                <Ionicons name="folder-open-outline" size={44} color={colors.primary} />
+                <Ionicons name="folder-open-outline" size={44} color={colors.accentOrange} />
             </View>
             <Text style={styles.stateTitle}>Aún no tienes apuntes</Text>
             <Text style={styles.stateDesc}>
                 Sube tu primer PDF o foto y la IA te generará preguntas listas para practicar.
             </Text>
             <TouchableOpacity
-                style={styles.orangeCta}
+                style={styles.uploadButton}
                 onPress={onUpload}
                 activeOpacity={0.85}
                 accessibilityLabel="Subir mi primer apunte"
                 accessibilityRole="button"
             >
-                <Ionicons name="add" size={18} color={colors.white} />
-                <Text style={styles.orangeCtaText}>Subir mi primer apunte</Text>
+                <Text style={styles.uploadButtonText}>Subir mi primer apunte</Text>
             </TouchableOpacity>
         </View>
     );
@@ -126,12 +124,11 @@ function ErrorState({ onRetry }) {
             <Text style={styles.stateTitle}>No pudimos cargar tus apuntes</Text>
             <Text style={styles.stateDesc}>Comprueba tu conexión y vuelve a intentarlo.</Text>
             <TouchableOpacity
-                style={[styles.orangeCta, { backgroundColor: colors.dark }]}
+                style={[styles.uploadButton, { backgroundColor: colors.textDark }]}
                 onPress={onRetry}
                 activeOpacity={0.85}
             >
-                <Ionicons name="refresh-outline" size={18} color={colors.white} />
-                <Text style={styles.orangeCtaText}>Reintentar</Text>
+                <Text style={styles.uploadButtonText}>Reintentar</Text>
             </TouchableOpacity>
         </View>
     );
@@ -140,7 +137,7 @@ function ErrorState({ onRetry }) {
 function LoadingState() {
     return (
         <View style={styles.stateBlock}>
-            <ActivityIndicator color={colors.primary} size="large" />
+            <ActivityIndicator color={colors.accentOrange} size="large" />
             <Text style={[styles.stateDesc, { marginTop: spacing.md }]}>Cargando tus apuntes...</Text>
         </View>
     );
@@ -172,7 +169,7 @@ export default function NotesHomeScreen({ navigation, route }) {
         }
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useFocusEffect(useCallback(() => { load(); }, [load]));
 
     useEffect(() => {
         if (!toastMessage) return;
@@ -202,26 +199,23 @@ export default function NotesHomeScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-
-            {/* Header con chevron naranja + título negrita + botón "+" outline naranja */}
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
+                    style={styles.iconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Volver"
                 >
-                    <Text style={styles.backChevron}>‹</Text>
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
-                <Text style={styles.title}>Mis apuntes</Text>
+                <Text style={styles.headerTitle}>Mis apuntes</Text>
                 <TouchableOpacity
                     onPress={goUpload}
-                    style={styles.headerPlusBtn}
+                    style={styles.iconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Subir apuntes"
                 >
-                    <Ionicons name="add" size={26} color={colors.primary} />
+                    <Text style={styles.addGlyph}>+</Text>
                 </TouchableOpacity>
             </View>
 
@@ -236,8 +230,8 @@ export default function NotesHomeScreen({ navigation, route }) {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={colors.primary}
-                        colors={[colors.primary]}
+                        tintColor={colors.accentOrange}
+                        colors={[colors.accentOrange]}
                     />
                 }
             >
@@ -256,20 +250,18 @@ export default function NotesHomeScreen({ navigation, route }) {
 
                         <View style={styles.list}>
                             {notes.map((n, i) => (
-                                <DocItem key={n.id} note={n} idx={i} onPress={() => openNote(n)} />
+                                <DocItem key={n.id} note={n} isLast={i === notes.length - 1} onPress={() => openNote(n)} />
                             ))}
                         </View>
 
-                        {/* CTA grande naranja al final de la lista */}
                         <TouchableOpacity
-                            style={styles.orangeCta}
+                            style={styles.uploadButton}
                             onPress={goUpload}
                             activeOpacity={0.85}
                             accessibilityLabel="Subir nuevos apuntes"
                             accessibilityRole="button"
                         >
-                            <Ionicons name="add" size={20} color={colors.white} />
-                            <Text style={styles.orangeCtaText}>Subir nuevos apuntes</Text>
+                            <Text style={styles.uploadButtonText}>Subir nuevos apuntes</Text>
                         </TouchableOpacity>
                     </>
                 )}
@@ -283,153 +275,120 @@ export default function NotesHomeScreen({ navigation, route }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
 
-    // Header
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: spacing.md,
         paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-        backgroundColor: colors.background,
+        paddingBottom: spacing.md,
     },
-    backBtn: {
-        paddingRight: spacing.xs,
-    },
-    backChevron: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: colors.primary,
-        lineHeight: 32,
-        marginRight: spacing.sm,
-    },
-    title: {
+    iconBtn: { width: 32, alignItems: 'center' },
+    headerTitle: {
         flex: 1,
-        fontSize: 20,
-        fontWeight: '800',
-        color: colors.dark,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
     },
-    headerPlusBtn: {
-        padding: 4,
+    addGlyph: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 30,
+        color: colors.accentOrange,
     },
 
-    // Cuerpo
     scroll: { flex: 1 },
     body: {
         paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.xl,
+        paddingTop: spacing.xs,
+        paddingBottom: spacing.md,
     },
     bodyStateCentered: {
         flexGrow: 1,
         justifyContent: 'center',
     },
 
-    // KPI navy
+    // Tarjeta de estadísticas — outline, sin relleno
     kpiCard: {
-        flexDirection: 'row',
+        borderWidth: 0.32,
+        borderColor: FIGMA.cardBorder,
+        borderRadius: 10.7,
         alignItems: 'center',
-        backgroundColor: colors.dark,
-        borderRadius: 16,
-        padding: spacing.md,
-        marginBottom: spacing.md,
-    },
-    kpiIconBox: {
-        width: 46,
-        height: 46,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.md,
-    },
-    kpiTexts: {
-        flex: 1,
+        paddingVertical: spacing.lg,
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.lg,
     },
     kpiPrimary: {
-        color: colors.white,
-        fontSize: 16,
-        fontWeight: '800',
-        marginBottom: 2,
+        marginTop: 12,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
     },
     kpiSecondary: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 13,
-        fontWeight: '500',
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 8.9,
+        color: colors.textDark,
     },
 
     // Lista
     listHeader: {
-        fontSize: 11,
-        fontWeight: '700',
+        fontFamily: 'Poppins-Medium',
+        fontSize: 10.7,
+        color: FIGMA.textNoteMuted,
         letterSpacing: 0.5,
-        color: colors.grayText,
-        marginTop: spacing.sm,
         marginBottom: spacing.sm,
-        textTransform: 'uppercase',
     },
     list: {
-        gap: spacing.sm + 2,
         marginBottom: spacing.lg,
     },
 
-    // Doc item
+    // Fila de documento — plana, sin ícono ni tarjeta
     docItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.card,
-        borderRadius: 14,
-        paddingVertical: spacing.sm + 4,
-        paddingHorizontal: spacing.sm + 4,
+        justifyContent: 'space-between',
+        paddingVertical: 14,
     },
-    docIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: spacing.sm + 4,
+    docItemSeparator: {
+        borderBottomWidth: 0.44,
+        borderBottomColor: FIGMA.separator,
     },
     docInfo: {
         flex: 1,
         marginRight: spacing.xs,
     },
     docTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: colors.dark,
-        marginBottom: 3,
+        fontFamily: 'Poppins-Bold',
+        fontSize: 17.8,
+        color: colors.textDark,
     },
     docMeta: {
-        fontSize: 12,
-        color: colors.grayText,
+        marginTop: 2,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.6,
+        color: FIGMA.textNoteMuted,
     },
 
-    // CTA naranja grande (usado como footer y en empty state)
-    orangeCta: {
-        flexDirection: 'row',
+    uploadButton: {
+        height: 61,
+        borderRadius: 14.2,
+        backgroundColor: colors.ctaGreen,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: spacing.sm,
-        backgroundColor: colors.primary,
-        borderRadius: 14,
-        paddingVertical: 15,
         marginTop: spacing.xs,
-        shadowColor: colors.primary,
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 3,
+        alignSelf: 'stretch',
     },
-    orangeCtaText: {
+    uploadButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
         color: colors.white,
-        fontWeight: '800',
-        fontSize: 15,
     },
 
-    // States (loading / empty / error)
+    // Estados (loading / empty / error) — sin dato de Figma, restyleados
+    // mínimamente a los tokens del sistema.
     stateBlock: {
         alignItems: 'center',
         paddingVertical: spacing.xl,
@@ -440,20 +399,21 @@ const styles = StyleSheet.create({
         width: 84,
         height: 84,
         borderRadius: 42,
-        backgroundColor: '#FDE7D8',
+        backgroundColor: 'rgba(246,150,36,0.15)',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: spacing.sm,
     },
     stateTitle: {
+        fontFamily: 'Poppins-SemiBold',
         fontSize: 17,
-        fontWeight: '800',
-        color: colors.dark,
+        color: colors.textDark,
         textAlign: 'center',
     },
     stateDesc: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 13,
-        color: colors.grayText,
+        color: FIGMA.textNote,
         textAlign: 'center',
         lineHeight: 19,
         marginBottom: spacing.md,
@@ -467,7 +427,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: colors.dark,
+        backgroundColor: colors.textDark,
         paddingHorizontal: 18,
         paddingVertical: 12,
         borderRadius: 24,
@@ -478,8 +438,8 @@ const styles = StyleSheet.create({
         elevation: 6,
     },
     toastText: {
+        fontFamily: 'Poppins-SemiBold',
         color: colors.white,
         fontSize: 13,
-        fontWeight: '600',
     },
 });

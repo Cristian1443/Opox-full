@@ -21,6 +21,7 @@ export function createStoreRouter(
 
     // Catálogo de descuentos virtuales
     r.get(S.DISCOUNTS, authMiddleware, controller.listDiscounts);
+    r.post(S.DISCOUNT_REDEEM, authMiddleware, controller.redeemDiscount);
 
     // Cartera del usuario
     r.get(S.WALLET, authMiddleware, controller.getWallet);

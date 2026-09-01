@@ -9,3 +9,4 @@ export * from './IBoeRepository';
 export * from './IStoreRepository';
 export * from './IConfigRepository';
 export * from './IPushRepository';
+export * from './IHealthRepository';

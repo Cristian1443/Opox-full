@@ -1,86 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   StatusBar,
   FlatList,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import Svg, { Path } from 'react-native-svg';
+import { colors, spacing } from '../../theme';
 import InsufficientPointsModal from '../../components/InsufficientPointsModal';
+import { storeApi } from '../../api/store';
 
-const ACCENT = '#6C5CE7';
-const ACCENT_LIGHT = '#A29BFE';
-const PHASE2_COLOR = '#7B1FA2';
-
-const REWARDS_DATA = [
-  {
-    id: '1',
-    partner: 'Uber Eats',
-    title: '1 mes gratis',
-    subtitle: 'Suscripción Uber One durante 30 días',
-    cost: 1500,
-    stock: 12,
-    maxStock: 20,
-    icon: 'restaurant-outline',
-    color: '#000000',
-    tag: 'Comida equilibrada',
-    isAvailable: true,
-    category: 'Food',
-  },
-  {
-    id: '2',
-    partner: 'Decathlon',
-    title: '-20% en tienda',
-    subtitle: 'Ideal para tu prueba física',
-    cost: 1200,
-    stock: 8,
-    maxStock: 10,
-    icon: 'fitness-outline',
-    color: '#0082C3',
-    tag: 'Prueba física',
-    isAvailable: true,
-    category: 'Sport',
-  },
-  {
-    id: '3',
-    partner: 'Spotify',
-    title: '3 meses Premium',
-    subtitle: 'Música sin anuncios para estudiar',
-    cost: 2000,
-    stock: 0,
-    maxStock: 0,
-    icon: 'musical-notes-outline',
-    color: '#1DB954',
-    tag: 'Podcasts',
-    isAvailable: false,
-    category: 'Music',
-  },
-  {
-    id: '4',
-    partner: 'Amazon',
-    title: '15€ en libros',
-    subtitle: 'Material de estudio',
-    cost: 1800,
-    stock: 5,
-    maxStock: 10,
-    icon: 'book-outline',
-    color: '#FF9900',
-    tag: 'Libros',
-    isAvailable: true,
-    category: 'Books',
-  },
-];
-
-const partnerAbbr = (name) => {
-  const w = name.trim().split(/\s+/);
-  return w.length >= 2 ? (w[0][0] + w[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+// ─── 11.2 · Tienda · Recompensas reales ────────────────────────────────────
+// Fiel al Figma (RecompensasRealesScreen.tsx). El reference sustituye marcas
+// reales (Uber Eats, Decathlon, Spotify) por partners ficticios solo para no
+// reproducirlas en el diseño entregado — el backend real (storeApi.listProducts)
+// ya sirve icon/color genéricos por recompensa, así que aquí se usan
+// directamente sin necesidad de sustituir nada. Los filtros por categoría y
+// los 3 niveles de urgencia de stock (Figma solo confirma 2: disponible/
+// agotado) son funcionalidad real que se conserva.
+const FIGMA = {
+  textMuted: 'rgba(65, 41, 80, 0.5)',
+  separator: 'rgba(65, 41, 80, 0.12)',
 };
+
+function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function GemIcon({ size = 32, color = colors.white }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M5 8L2 3L7 3L12 3L17 3L22 3L19 8L12 21L5 8Z"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+      />
+      <Path d="M2 3L22 3M5 8L19 8M9 3L12 8L15 3" stroke={color} strokeWidth={1.2} fill="none" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 const CATEGORIES = [
   { key: 'all', label: 'Todos' },
@@ -90,88 +59,62 @@ const CATEGORIES = [
   { key: 'Books', label: 'Libros' },
 ];
 
-const StockBadge = ({ stock, isAvailable }) => {
+function StockBadge({ stock, isAvailable }) {
   if (!isAvailable) {
     return (
-      <View style={[styles.stockChip, { backgroundColor: colors.errorBg }]}>
-        <Text style={[styles.stockChipText, { color: colors.error }]}>Agotado</Text>
+      <View style={[styles.statusBadge, { backgroundColor: `${colors.statRed}1A` }]}>
+        <Text style={[styles.statusBadgeText, { color: colors.statRed }]}>Agotado</Text>
       </View>
     );
   }
   if (stock <= 3) {
     return (
-      <View style={[styles.stockChip, { backgroundColor: colors.errorBg }]}>
-        <Text style={[styles.stockChipText, { color: colors.error }]}>¡Últimas {stock}!</Text>
+      <View style={[styles.statusBadge, { backgroundColor: `${colors.statRed}1A` }]}>
+        <Text style={[styles.statusBadgeText, { color: colors.statRed }]}>¡Últimas {stock}!</Text>
       </View>
     );
   }
   if (stock <= 6) {
     return (
-      <View style={[styles.stockChip, { backgroundColor: '#FFF3E0' }]}>
-        <Text style={[styles.stockChipText, { color: '#FF9F43' }]}>{stock} disp.</Text>
+      <View style={[styles.statusBadge, { backgroundColor: `${colors.accentOrange}1A` }]}>
+        <Text style={[styles.statusBadgeText, { color: colors.accentOrange }]}>{stock} disp.</Text>
       </View>
     );
   }
   return (
-    <View style={[styles.stockChip, { backgroundColor: colors.successBg }]}>
-      <Text style={[styles.stockChipText, { color: colors.success }]}>{stock} disp.</Text>
+    <View style={[styles.statusBadge, { backgroundColor: `${colors.ctaGreen}1A` }]}>
+      <Text style={[styles.statusBadgeText, { color: colors.ctaGreen }]}>{stock} disp.</Text>
     </View>
   );
-};
-
-const RewardCard = ({ item, onPress }) => (
-  <TouchableOpacity
-    style={[styles.card, !item.isAvailable && styles.cardUnavailable]}
-    onPress={() => onPress(item)}
-    disabled={!item.isAvailable}
-    activeOpacity={0.9}
-    accessibilityLabel={`${item.partner} ${item.title}, ${item.cost} Opopoints`}
-  >
-    <View style={styles.cardHeader}>
-      <View style={[styles.partnerAvatar, { backgroundColor: item.color }]}>
-        <Text style={styles.partnerAvatarText}>{partnerAbbr(item.partner)}</Text>
-      </View>
-      <StockBadge stock={item.stock} isAvailable={item.isAvailable} />
-    </View>
-
-    <Text style={styles.partnerName}>{item.partner}</Text>
-    <Text style={styles.rewardTitle}>{item.title}</Text>
-    <Text style={styles.rewardSubtitle}>{item.subtitle}</Text>
-
-    <View style={styles.cardFooter}>
-      <View style={styles.costContainer}>
-        <Ionicons name="cash-outline" size={18} color={PHASE2_COLOR} />
-        <Text style={styles.costText}>{item.cost} O</Text>
-      </View>
-
-      {item.isAvailable ? (
-        <View style={styles.redeemButton}>
-          <Text style={styles.redeemButtonText}>Canjear</Text>
-        </View>
-      ) : (
-        <View style={styles.soldOutBadge}>
-          <Ionicons name="close-circle" size={16} color={colors.white} />
-          <Text style={styles.soldOutText}>Agotado</Text>
-        </View>
-      )}
-    </View>
-
-  </TouchableOpacity>
-);
+}
 
 export default function StoreRealRewardsScreen({ navigation }) {
-  const { top: topInset } = useSafeAreaInsets();
-  const [userBalance] = useState(1840);
+  const [userBalance, setUserBalance] = useState(null);
+  const [rewardsData, setRewardsData] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all');
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
   const [selectedReward, setSelectedReward] = useState(null);
 
-  const filteredRewards = REWARDS_DATA.filter(
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    storeApi.getBalance().then(res => {
+      if (cancelled || !res?.data) return;
+      setUserBalance(res.data.balance);
+    });
+    storeApi.listProducts().then(res => {
+      if (cancelled || !res?.data) return;
+      setRewardsData(res.data);
+    });
+    return () => { cancelled = true; };
+  }, []));
+
+  const filteredRewards = rewardsData.filter(
     (r) => activeCategory === 'all' || r.category === activeCategory,
   );
 
   const handleRedeem = (reward) => {
-    if (userBalance < reward.cost) {
+    const bal = userBalance ?? 0;
+    if (userBalance === null || bal < reward.cost) {
       setSelectedReward(reward);
       setShowInsufficientModal(true);
       return;
@@ -180,42 +123,43 @@ export default function StoreRealRewardsScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* Header con gradiente que cubre la zona del status bar */}
-      <LinearGradient
-        colors={[PHASE2_COLOR, ACCENT]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.headerGradient, { paddingTop: topInset + 12 }]}
-      >
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <View style={styles.header}>
         <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
           accessibilityLabel="Volver"
         >
-          <Ionicons name="chevron-back" size={24} color={colors.white} />
+          <ChevronLeftIcon />
         </TouchableOpacity>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Recompensas Reales</Text>
-          <Text style={styles.headerSubtitle}>
-            Canjea tus puntos por premios del mundo real
-          </Text>
-        </View>
-
-        <View style={{ width: 40 }} />
-      </LinearGradient>
-
-      {/* Saldo flotante sobre el gradiente */}
-      <View style={styles.balanceBanner}>
-        <Text style={styles.balanceLabel}>Tus Opopoints:</Text>
-        <Text style={styles.balanceAmount}>{userBalance.toLocaleString()} O</Text>
+        <Text style={styles.headerTitle}>Recompensas reales</Text>
+        <View style={styles.iconButton} />
       </View>
 
-      {/* Filtros */}
-      <View style={styles.filtersContainer}>
+      {/* ── Tarjeta de saldo (reutilizada de Home - Tienda) ────────────── */}
+      <View style={styles.balanceCard}>
+        <GemIcon />
+        <View style={styles.balanceTextWrap}>
+          <Text style={styles.balanceAmount}>
+            {userBalance !== null ? userBalance.toLocaleString('es-ES') : '—'}
+          </Text>
+          <Text style={styles.balanceLabel}>OPOPOINTS DISPONIBLES</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.earnButton}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('StoreHowToEarn')}
+        >
+          <Text style={styles.earnButtonText}>Cómo ganar +</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Filtros por categoría — real, sin equivalente en Figma */}
+      <View style={styles.filtersRow}>
         {CATEGORIES.map((cat) => {
           const isActive = activeCategory === cat.key;
           return (
@@ -235,16 +179,33 @@ export default function StoreRealRewardsScreen({ navigation }) {
         })}
       </View>
 
-      {/* Lista de recompensas */}
       <FlatList
         data={filteredRewards}
-        renderItem={({ item }) => <RewardCard item={item} onPress={handleRedeem} />}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        renderItem={({ item, index }) => (
+          <TouchableOpacity
+            style={[styles.row, index === 0 && styles.rowFirst, !item.isAvailable && styles.rowUnavailable]}
+            activeOpacity={0.7}
+            disabled={!item.isAvailable}
+            onPress={() => handleRedeem(item)}
+            accessibilityLabel={`${item.partner} ${item.title}, ${item.cost} Opopoints`}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: item.color }]}>
+              <Ionicons name={item.icon ?? 'gift-outline'} size={22} color={colors.white} />
+            </View>
+            <View style={styles.rowTextWrap}>
+              <Text style={styles.rowTitle}>{item.partner} · {item.title}</Text>
+              <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
+              <Text style={styles.rowPrice}>{item.cost.toLocaleString('es-ES')} Opopoints</Text>
+            </View>
+            <StockBadge stock={item.stock} isAvailable={item.isAvailable} />
+          </TouchableOpacity>
+        )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="gift-outline" size={48} color={colors.textSecondary} />
+            <Ionicons name="gift-outline" size={44} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No hay recompensas en esta categoría.</Text>
           </View>
         }
@@ -254,7 +215,7 @@ export default function StoreRealRewardsScreen({ navigation }) {
         visible={showInsufficientModal}
         onClose={() => setShowInsufficientModal(false)}
         cost={selectedReward?.cost ?? 0}
-        currentBalance={userBalance}
+        currentBalance={userBalance ?? 0}
         navigation={navigation}
       />
     </SafeAreaView>
@@ -264,229 +225,162 @@ export default function StoreRealRewardsScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
-  // Header gradient
-  headerGradient: {
-    paddingBottom: 28,
-    paddingHorizontal: 16,
+
+  // ── Header ────────────────────────────────────────────────────
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  backButton: {
-    padding: 4,
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  phase2BadgeContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  phase2BadgeText: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.white,
-    marginBottom: 4,
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 21.3,
+    color: colors.textDark,
+    textAlign: 'center',
   },
-  headerSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.82)',
-    lineHeight: 18,
-  },
-  // Balance banner
-  balanceBanner: {
+
+  // ── Tarjeta de saldo ──────────────────────────────────────────
+  balanceCard: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    paddingVertical: 12,
-    marginTop: -14,
-    marginHorizontal: 16,
-    borderRadius: 14,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    gap: 6,
+    backgroundColor: colors.accentOrange,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
-  balanceLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '600',
+  balanceTextWrap: {
+    flex: 1,
+    marginLeft: 12,
   },
   balanceAmount: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: ACCENT,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 20,
+    color: colors.white,
   },
-  // Filters
-  filtersContainer: {
+  balanceLabel: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10,
+    color: colors.white,
+    marginTop: 2,
+  },
+  earnButton: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  earnButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 11,
+    color: colors.white,
+  },
+
+  // ── Filtros ───────────────────────────────────────────────────
+  filtersRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 10,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
     gap: 8,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.separator,
   },
   filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.separator,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: colors.grayLight,
   },
   filterChipActive: {
-    backgroundColor: ACCENT_LIGHT,
-    borderColor: ACCENT_LIGHT,
+    backgroundColor: colors.purple,
   },
   filterText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12,
     color: colors.textSecondary,
   },
   filterTextActive: {
+    fontFamily: 'Poppins-SemiBold',
     color: colors.white,
   },
-  // List
+
+  // ── Lista ─────────────────────────────────────────────────────
   listContent: {
-    padding: 16,
+    paddingHorizontal: spacing.lg,
     paddingBottom: 40,
   },
-  // Cards
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: ACCENT_LIGHT,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardUnavailable: {
-    opacity: 0.55,
-    borderColor: colors.separator,
-  },
-  cardHeader: {
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: FIGMA.separator,
   },
-  partnerAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+  rowFirst: {
+    borderTopWidth: 0,
+  },
+  rowUnavailable: {
+    opacity: 0.5,
+  },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  partnerAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  rowTextWrap: {
+    flex: 1,
   },
-  stockChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  stockChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  partnerName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  rewardTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: PHASE2_COLOR,
-    marginBottom: 4,
-  },
-  rewardSubtitle: {
+  rowTitle: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 14,
+    color: colors.textDark,
+  },
+  rowSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
     color: colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 16,
+    marginTop: 2,
   },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.separator,
+  rowPrice: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10,
+    color: colors.accentOrange,
+    marginTop: 3,
   },
-  costContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  statusBadge: {
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
   },
-  costText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: PHASE2_COLOR,
+  statusBadgeText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 10.5,
   },
-  redeemButton: {
-    backgroundColor: ACCENT,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  redeemButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  soldOutBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.error,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 4,
-  },
-  soldOutText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  // Empty
+
+  // ── Vacío ─────────────────────────────────────────────────────
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
   },
   emptyText: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 14,
     color: colors.textSecondary,
-    marginTop: 12,
+    marginTop: spacing.md,
   },
 });

@@ -53,11 +53,12 @@ export interface ProStats {
     topicsStrong: number;   // accuracy >= 80 %
     topicsWeak: number;     // accuracy < 50 %
     topicBreakdown: ProStatsTopicBreakdown[];
+    avgSecsPerQuestion: number | null; // null = sin datos de tiempo todavía
     computedAt: string; // ISO
 }
 
 export interface ProStatsExportResult {
     period: string; // 'week' | 'month' | 'all'
-    downloadUrl: string | null; // stub null hasta implementar PDF real
+    downloadUrl: string;
     message: string;
 }

@@ -5,7 +5,6 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    StatusBar,
     Alert,
     Image,
     Modal,
@@ -13,20 +12,60 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import NotesDeleteConfirmModal from '../../components/NotesDeleteConfirmModal';
 import NotesTagsEditorModal from '../../components/NotesTagsEditorModal';
 import { notesApi } from '../../api';
 
+// Colores confirmados contra Figma (frame SUBIR APUNTES · detalle, Bloque
+// 9) sin equivalente exacto en theme.js.
+const FIGMA = {
+    cardBorder: 'rgba(65,41,80,0.3)',
+};
+
 const WARNING_COLOR = '#F59E0B';
 
-// Paleta rotativa para chips de etiquetas — 4 tonos suaves OPOX.
-const TAG_PALETTES = [
-    { text: '#2563EB', bg: '#E8F2FC' },  // azul
-    { text: '#7B4BC4', bg: '#EEE5F7' },  // morado
-    { text: '#1F9D6B', bg: '#DEF2E7' },  // verde
-    { text: '#E9825E', bg: '#FCE5D9' },  // naranja
-];
+// Paleta rotativa para chips de etiquetas. Figma confirma colores fijos
+// solo para las 2 etiquetas de su ejemplo (verde/morado) — como las
+// etiquetas son texto libre editable por el usuario (NotesTagsEditorModal),
+// no hay un color "correcto" por significado; se mantiene una paleta
+// rotativa pero con los tonos confirmados + 2 acentos ya usados en el
+// resto de la app para cuando haya más de 2 etiquetas.
+const TAG_PALETTE = [colors.ctaGreen, colors.selectionBorder, colors.accentOrange, colors.purple];
+
+function DocumentIcon({ width = 32, height = 42, color = colors.accentOrange }) {
+    return (
+        <Svg width={width} height={height} viewBox="0 0 32 42">
+            <Path
+                d="M4 2H20L28 10V38C28 39.1 27.1 40 26 40H4C2.9 40 2 39.1 2 38V4C2 2.9 2.9 2 4 2Z"
+                fill="none"
+                stroke={color}
+                strokeWidth={2.2}
+                strokeLinejoin="round"
+            />
+            <Path d="M20 2V10H28" fill="none" stroke={color} strokeWidth={2.2} strokeLinejoin="round" />
+            <Rect x={8} y={20} width={16} height={2.2} rx={1.1} fill={color} />
+            <Rect x={8} y={26} width={16} height={2.2} rx={1.1} fill={color} />
+            <Rect x={8} y={32} width={10} height={2.2} rx={1.1} fill={color} />
+        </Svg>
+    );
+}
+
+function PageThumbnailIcon({ size = 24, color = colors.textDark }) {
+    return (
+        <Svg width={size} height={size * 1.2} viewBox="0 0 24 29">
+            <Path
+                d="M3 2H16L21 7V26C21 26.6 20.6 27 20 27H3C2.4 27 2 26.6 2 26V3C2 2.4 2.4 2 3 2Z"
+                fill="none"
+                stroke={color}
+                strokeWidth={1.4}
+                strokeLinejoin="round"
+            />
+            <Path d="M16 2V7H21" fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+        </Svg>
+    );
+}
 
 // Mock local — cuando exista backend: GET /notes/:noteId devuelve NoteDetail.
 const MOCK_NOTE_DETAIL = {
@@ -46,26 +85,21 @@ const MOCK_NOTE_DETAIL = {
 };
 
 function MetaCard({ note }) {
-    // Card con icono azul + nombre.pdf + subtítulo con páginas y fecha.
     return (
         <View style={styles.metaCard}>
-            <View style={styles.metaIcon}>
-                <Ionicons name="document-text" size={22} color="#5AA2E5" />
-            </View>
-            <View style={styles.metaTexts}>
-                <Text style={styles.metaTitle} numberOfLines={1}>{note.fileName}</Text>
-                <Text style={styles.metaSubtitle}>
-                    {note.pages} {note.pages === 1 ? 'página' : 'páginas'} · subido el {formatDate(note.uploadedAt)}
-                </Text>
-            </View>
+            <DocumentIcon />
+            <Text style={styles.metaTitle} numberOfLines={1}>{note.fileName}</Text>
+            <Text style={styles.metaSubtitle}>
+                {note.pages} {note.pages === 1 ? 'página' : 'páginas'} · subido el {formatDate(note.createdAt ?? note.uploadedAt)}
+            </Text>
         </View>
     );
 }
 
-function TagChip({ label, palette }) {
+function TagChip({ label, color }) {
     return (
-        <View style={[styles.tag, { backgroundColor: palette.bg }]}>
-            <Text style={[styles.tagText, { color: palette.text }]}>{label}</Text>
+        <View style={[styles.tag, { borderColor: color, backgroundColor: `${color}26` }]}>
+            <Text style={[styles.tagText, { color }]}>{label}</Text>
         </View>
     );
 }
@@ -83,9 +117,7 @@ function PageThumbnail({ page, needsReview, onPress }) {
             {page.thumbnailUrl ? (
                 <Image source={{ uri: page.thumbnailUrl }} style={styles.pageImage} />
             ) : (
-                <View style={styles.pagePlaceholder}>
-                    <Ionicons name="document-outline" size={28} color="#C5CDD8" />
-                </View>
+                <PageThumbnailIcon />
             )}
             {isProblematic ? (
                 <View style={styles.pageBadge}>
@@ -97,7 +129,9 @@ function PageThumbnail({ page, needsReview, onPress }) {
 }
 
 function KebabMenu({ visible, anchorTop, onClose, onEditTags, onDelete }) {
-    // Menú contextual anclado abajo del icono kebab del header.
+    // Menú contextual anclado abajo del icono kebab del header. No está en
+    // el frame de Figma, pero es la única forma real de editar etiquetas o
+    // eliminar el apunte — sin esto quedarían sin ningún punto de acceso.
     return (
         <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
             <Pressable style={styles.menuOverlay} onPress={onClose}>
@@ -107,7 +141,7 @@ function KebabMenu({ visible, anchorTop, onClose, onEditTags, onDelete }) {
                         onPress={onEditTags}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="pricetag-outline" size={18} color={colors.dark} />
+                        <Ionicons name="pricetag-outline" size={18} color={colors.textDark} />
                         <Text style={styles.menuItemText}>Editar etiquetas</Text>
                     </TouchableOpacity>
                     <View style={styles.menuSeparator} />
@@ -199,27 +233,24 @@ export default function NoteDetailScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-
-            {/* Header: chevron naranja + título + kebab (⋮) */}
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
+                    style={styles.iconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Volver"
                 >
-                    <Text style={styles.backChevron}>‹</Text>
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle} numberOfLines={1}>{note.title}</Text>
                 <TouchableOpacity
                     onPress={() => setMenuVisible(true)}
-                    style={styles.kebabBtn}
+                    style={styles.iconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Más opciones"
                     disabled={deleting}
                 >
-                    <Ionicons name="ellipsis-vertical" size={22} color={colors.dark} />
+                    <Ionicons name="ellipsis-vertical" size={22} color={colors.textDark} />
                 </TouchableOpacity>
             </View>
 
@@ -239,11 +270,7 @@ export default function NoteDetailScreen({ navigation, route }) {
                             </Text>
                         ) : (
                             note.tags.map((t, i) => (
-                                <TagChip
-                                    key={t}
-                                    label={t}
-                                    palette={TAG_PALETTES[i % TAG_PALETTES.length]}
-                                />
+                                <TagChip key={t} label={t} color={TAG_PALETTE[i % TAG_PALETTE.length]} />
                             ))
                         )}
                     </View>
@@ -251,7 +278,7 @@ export default function NoteDetailScreen({ navigation, route }) {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>PÁGINAS DIGITALIZADAS</Text>
-                    <View style={styles.pagesGrid}>
+                    <View style={styles.pagesRow}>
                         {note.pageThumbnails.map((p) => (
                             <PageThumbnail
                                 key={p.pageNumber}
@@ -323,35 +350,24 @@ function formatDate(iso) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.white },
 
-    // Header
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: spacing.md,
         paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
+        paddingBottom: spacing.md,
     },
-    backBtn: { paddingRight: spacing.xs },
-    backChevron: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: colors.primary,
-        lineHeight: 32,
-        marginRight: spacing.sm,
-    },
+    iconBtn: { width: 32, alignItems: 'center' },
     headerTitle: {
         flex: 1,
-        fontSize: 20,
-        fontWeight: '800',
-        color: colors.dark,
-    },
-    kebabBtn: {
-        padding: 4,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
     },
 
-    // Scroll
     scroll: { flex: 1 },
     content: {
         paddingHorizontal: spacing.md,
@@ -359,86 +375,78 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.md,
     },
 
-    // Meta card
+    // Ficha de documento — outline, sin relleno
     metaCard: {
-        flexDirection: 'row',
+        borderWidth: 0.32,
+        borderColor: FIGMA.cardBorder,
+        borderRadius: 10.7,
         alignItems: 'center',
-        backgroundColor: colors.card,
-        borderRadius: 14,
-        padding: spacing.sm + 4,
+        paddingVertical: spacing.lg,
+        paddingHorizontal: spacing.lg,
         marginBottom: spacing.lg,
     },
-    metaIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: '#E8F2FC',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.sm + 4,
-    },
-    metaTexts: { flex: 1 },
     metaTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: colors.dark,
-        marginBottom: 3,
+        marginTop: 12,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+        textAlign: 'center',
     },
     metaSubtitle: {
-        fontSize: 12,
-        color: colors.grayText,
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 8.9,
+        color: colors.textDark,
     },
 
-    // Section
     section: {
         marginBottom: spacing.lg,
     },
     sectionTitle: {
-        fontSize: 11,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-        color: colors.grayText,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
         marginBottom: spacing.sm + 4,
-        textTransform: 'uppercase',
     },
 
-    // Tags
+    // Tags — outline con fondo tenue
     tagsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: spacing.sm,
     },
     tag: {
-        paddingHorizontal: 12,
-        paddingVertical: 5,
+        borderWidth: 0.9,
         borderRadius: 20,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
     },
     tagText: {
-        fontSize: 12,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 12.2,
     },
     tagsEmpty: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 13,
-        color: colors.grayText,
+        color: colors.textDark,
         fontStyle: 'italic',
     },
 
-    // Pages grid — 3 columnas grandes con borde blanco y placeholder centrado
-    pagesGrid: {
+    // Miniaturas de página — fila de cajas outline pequeñas
+    pagesRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: spacing.sm + 4,
+        gap: 12,
     },
     pageItem: {
-        width: '31%',
-        aspectRatio: 3 / 4,
-        borderRadius: 12,
-        backgroundColor: colors.card,
-        overflow: 'hidden',
+        width: 60,
+        height: 72,
+        borderRadius: 3.6,
+        borderWidth: 0.32,
+        borderColor: FIGMA.cardBorder,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#EEF1F5',
+        overflow: 'hidden',
     },
     pageItemProblem: {
         borderWidth: 2,
@@ -448,59 +456,47 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
-    pagePlaceholder: {
-        flex: 1,
-        alignSelf: 'stretch',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     pageBadge: {
         position: 'absolute',
-        top: 6,
-        right: 6,
+        top: 4,
+        right: 4,
         backgroundColor: WARNING_COLOR,
-        width: 18,
-        height: 18,
-        borderRadius: 9,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
 
-    // CTA
     actionSection: {
         padding: spacing.md,
         paddingBottom: spacing.md,
-        backgroundColor: colors.background,
+        backgroundColor: colors.white,
     },
     btnPrimary: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.primary,
-        borderRadius: 14,
-        paddingVertical: 16,
-        shadowColor: colors.primary,
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 3,
+        height: 61.3,
+        backgroundColor: colors.ctaGreen,
+        borderRadius: 14.2,
     },
     btnPrimaryText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
         color: colors.white,
-        fontSize: 15,
-        fontWeight: '800',
     },
     btnPrimaryDisabled: {
-        backgroundColor: colors.grayMid,
-        shadowOpacity: 0,
+        backgroundColor: colors.gray,
     },
     noQuestionsHint: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 12,
-        color: colors.grayText,
+        color: colors.textDark,
         textAlign: 'center',
         marginBottom: spacing.sm,
     },
 
-    // Kebab menu
+    // Menú kebab — sin dato de Figma, restyleado mínimamente
     menuOverlay: {
         flex: 1,
         backgroundColor: 'transparent',
@@ -508,7 +504,7 @@ const styles = StyleSheet.create({
     menuCard: {
         position: 'absolute',
         right: spacing.md,
-        backgroundColor: colors.card,
+        backgroundColor: colors.white,
         borderRadius: 12,
         paddingVertical: 4,
         minWidth: 200,
@@ -526,12 +522,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
     },
     menuItemText: {
+        fontFamily: 'Poppins-Medium',
         fontSize: 14,
-        color: colors.dark,
-        fontWeight: '600',
+        color: colors.textDark,
     },
     menuSeparator: {
         height: StyleSheet.hairlineWidth,
-        backgroundColor: colors.separator,
+        backgroundColor: FIGMA.cardBorder,
     },
 });

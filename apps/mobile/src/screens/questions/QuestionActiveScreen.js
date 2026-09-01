@@ -86,6 +86,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const [isHintLoading, setIsHintLoading] = useState(false);
 
   const timerRef = useRef(null);
+  const questionStartTimeRef = useRef(Date.now());
   const feedbackAnim = useRef(new Animated.Value(0)).current;
   const timerPulseAnim = useRef(new Animated.Value(1)).current;
   const pulseRef = useRef(null);
@@ -96,6 +97,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
   useEffect(() => {
     setTimeLeft(secondsPerQuestion);
+    questionStartTimeRef.current = Date.now();
   }, [currentIndex, secondsPerQuestion]);
 
   useEffect(() => {
@@ -160,9 +162,9 @@ export default function QuestionActiveScreen({ navigation, route }) {
   }, [feedbackAnim]);
 
   const handleTimeout = useCallback(() => {
-    setAnswers(prev => [...prev, { questionId: question?.id, selected: null, isCorrect: false }]);
+    setAnswers(prev => [...prev, { questionId: question?.id, selected: null, isCorrect: false, timeSecs: secondsPerQuestion }]);
     setShowTimeUpModal(true);
-  }, [question]);
+  }, [question, secondsPerQuestion]);
 
   const handleSelectOption = (id) => {
     if (isSubmitted) return;
@@ -173,11 +175,12 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const handleConfirm = () => {
     if (!selectedOption) return;
     clearInterval(timerRef.current);
+    const timeSecs = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
     const selected = question.options.find(o => o.id === selectedOption);
     const isCorrect = selected?.correct ?? false;
     if (!isCorrect) Vibration.vibrate(80);
     setIsSubmitted(true);
-    setAnswers(prev => [...prev, { questionId: question.id, selected: selectedOption, isCorrect }]);
+    setAnswers(prev => [...prev, { questionId: question.id, selected: selectedOption, isCorrect, timeSecs }]);
     animateFeedback();
   };
 
