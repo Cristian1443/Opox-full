@@ -50,21 +50,24 @@ function toDomainNotification(row: NotificationRow): Notification {
     });
 }
 
-function todayUtc(): string {
-    return new Date().toISOString().slice(0, 10);
+// La racha usa Europe/Madrid como zona horaria de referencia global (app
+// dirigida a opositores en España). Así todos los usuarios ven el mismo
+// corte de día, sin importar dónde estén ni el reloj de su dispositivo.
+function todayMadrid(): string {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid' }).format(new Date());
 }
 
-function yesterdayUtc(): string {
-    const d = new Date();
+function previousDayIso(isoDate: string): string {
+    const d = new Date(`${isoDate}T00:00:00.000Z`);
     d.setUTCDate(d.getUTCDate() - 1);
     return d.toISOString().slice(0, 10);
 }
 
 function toDomainGamification(row: GamificationRow): UserGamification {
     const last = row.last_activity_date;
-    const today = todayUtc();
-    const yesterday = yesterdayUtc();
-    // La racha caduca si la última actividad no fue hoy ni ayer (UTC)
+    const today = todayMadrid();
+    const yesterday = previousDayIso(today);
+    // La racha caduca si la última actividad no fue hoy ni ayer (Madrid).
     const effectiveStreak = (last === today || last === yesterday) ? row.current_streak : 0;
     return UserGamification.create({
         userId: row.user_id,
@@ -224,11 +227,25 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
         points: number;
         localDate?: string;
     }): Promise<UserGamification> {
-        const current = await this.getGamification(input.userId);
-        // `localDate` viene del dispositivo — evita el desfase de racha en
-        // usuarios de UTC−N (una actividad a las 21:00 hora Colombia se
-        // registraba en UTC del día siguiente y "quemaba" la racha).
-        const today = input.localDate ?? new Date().toISOString().slice(0, 10);
+        // Racha global anclada a Europe/Madrid: no dependemos de la TZ del
+        // dispositivo (ignoramos `input.localDate`). Además leemos la fila
+        // cruda — no `getGamification`, que devolvería `effectiveStreak`
+        // caducado y romperia el +1 al escribir.
+        const { data: rawRow, error: readError } = await this.supabaseAdmin
+            .from('user_gamification')
+            .upsert({ user_id: input.userId }, { onConflict: 'user_id' })
+            .select('*')
+            .single();
+        if (readError || !rawRow) throw new Error(`registerActivity read: ${readError?.message}`);
+        const current = UserGamification.create({
+            userId: rawRow.user_id,
+            currentStreak: rawRow.current_streak,
+            longestStreak: rawRow.longest_streak,
+            opopointsBalance: rawRow.opopoints_balance,
+            lastActivityDate: rawRow.last_activity_date,
+            updatedAt: new Date(rawRow.updated_at),
+        });
+        const today = todayMadrid();
         const next = current.withActivity(today, input.points);
 
         const { data, error } = await this.supabaseAdmin
