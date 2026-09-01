@@ -12,5 +12,5 @@ export const pushApi = {
      * @param {string} deviceId - identificador único del dispositivo
      */
     registerToken: (token, platform, deviceId) =>
-        api.post(P.REGISTER_TOKEN, { token, platform, deviceId }),
+        api.post(P.REGISTER_TOKEN, { token, platform, deviceId }, { auth: true }),
 };
