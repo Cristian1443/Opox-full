@@ -65,7 +65,10 @@
             "android.permission.health.READ_STEPS"
           ]
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-splash-screen",
+      "expo-status-bar"
     ],
     "ios": {
       "supportsTablet": true,

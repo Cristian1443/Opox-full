@@ -14,9 +14,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Polygon } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 
-// Lazy require para evitar crash en Expo Go (mismo patrón que expo-notifications en App.js).
-let ExpoAudio = null;
-try { ExpoAudio = require('expo-av').Audio; } catch { /* Expo Go o módulo no disponible */ }
+// expo-av fue removido: su .so nativo es incompatible con el JSI de React Native
+// 0.86.x (UnsatisfiedLinkError en cada arranque de la app). Hasta migrar a
+// expo-audio, esta pantalla funciona en modo timer puro (ExpoAudio siempre null).
+const ExpoAudio = null;
 
 // Mapa de sesiones → archivo de audio local.
 // Para activar audio en una sesión: añadir el .mp3 en apps/mobile/assets/audio/
