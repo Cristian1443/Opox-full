@@ -15,5 +15,6 @@ export interface ProStats {
     topicsStrong: number;
     topicsWeak: number;
     topicBreakdown: (ProStatsTopicRow & { accuracyPct: number })[];
+    avgSecsPerQuestion: number | null; // null = sin datos de tiempo todavía
     computedAt: Date;
 }

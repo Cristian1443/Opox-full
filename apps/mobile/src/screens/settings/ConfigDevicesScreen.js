@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
+  Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing } from '../../theme';
+import { healthApi } from '../../api';
 
 // ─── 12.4 · Dispositivos ────────────────────────────────────────────────────
 // Fiel al Figma (DispositivosScreen.tsx). El TSX de referencia genericiza
@@ -13,7 +16,9 @@ import { colors, spacing } from '../../theme';
 // diseño entregado — eso aplica a ESE documento de diseño, no a la app real:
 // aquí sí son nombres reales de hardware que el usuario necesita reconocer
 // para saber si su dispositivo es compatible, así que se mantienen tal como
-// ya estaban en el código real.
+// ya estaban en el código real. La lista viene de GET /health/devices — solo
+// incluye dispositivos ya conectados (desconectar quita la fila; conectar
+// navega a ConnectDevice), así que no existe un estado "tarjeta desconectada".
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   textDisabled: 'rgba(65, 41, 80, 0.3)',
@@ -21,23 +26,15 @@ const FIGMA = {
   banner: 'rgba(159, 110, 228, 0.75)',
 };
 
-// TODO: cargar desde user_connected_devices — endpoint GET /health/devices (Bloque 3 backend pendiente)
-const MOCK_DEVICES = [
-  {
-    id: '1',
-    name: 'Apple Watch',
-    icon: 'watch-outline',
-    isConnected: true,
-    lastSync: '2 min',
-  },
-  {
-    id: '2',
-    name: 'Garmin',
-    icon: 'pulse-outline',
-    isConnected: false,
-    lastSync: null,
-  },
-];
+// Formatea una fecha ISO a "X min", "X h" o "X d" para mostrar como lastSync
+function formatRelative(isoString) {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 60) return `${Math.max(1, diffMin)} min`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `${diffH} h`;
+  return `${Math.round(diffH / 24)} d`;
+}
 
 function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
   return (
@@ -47,73 +44,61 @@ function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
   );
 }
 
-function EmptyDeviceIcon({ size = 28 }) {
+function DeviceCard({ device, onDisconnect }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Circle cx={12} cy={12} r={9} stroke={FIGMA.textDisabled} strokeWidth={1.4} fill="none" />
-    </Svg>
-  );
-}
-
-function DeviceCard({ device, onConnect, onDisconnect }) {
-  return (
-    <View style={[styles.deviceCard, device.isConnected && styles.deviceCardConnected]}>
-      {device.isConnected
-        ? <Ionicons name={device.icon} size={26} color={colors.accentOrange} />
-        : <EmptyDeviceIcon />
-      }
+    <View style={[styles.deviceCard, styles.deviceCardConnected]}>
+      <Ionicons name={device.icon || 'watch-outline'} size={26} color={colors.accentOrange} />
       <View style={styles.deviceTextWrap}>
-        <Text style={styles.deviceName}>{device.name}</Text>
-        {device.isConnected ? (
-          <Text style={styles.deviceStatus}>Sincronizado hace {device.lastSync}</Text>
-        ) : (
-          <Text style={styles.deviceStatusMuted}>No conectado</Text>
-        )}
+        <Text style={styles.deviceName}>{device.deviceName}</Text>
+        <Text style={styles.deviceStatus}>Sincronizado hace {formatRelative(device.connectedAt)}</Text>
       </View>
-      {device.isConnected ? (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => onDisconnect(device.id)}
-          accessibilityLabel={`Quitar ${device.name}`}
-        >
-          <Text style={styles.actionLink}>Quitar</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => onConnect(device.id)}
-          accessibilityLabel={`Conectar ${device.name}`}
-        >
-          <Text style={styles.actionLink}>Conectar</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => onDisconnect(device)}
+        accessibilityLabel={`Quitar ${device.deviceName}`}
+      >
+        <Text style={styles.actionLink}>Quitar</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 export default function ConfigDevicesScreen({ navigation }) {
-  const [devices, setDevices] = useState(MOCK_DEVICES);
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Conectar → reutiliza el flujo de pairing del Bloque 3 (ya implementado)
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const res = await healthApi.getDevices();
+      if (!cancelled) {
+        setDevices(!res?.error && Array.isArray(res?.data) ? res.data : []);
+        setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []));
+
   const handleConnect = () => {
     navigation.navigate('ConnectDevice');
   };
 
-  const handleDisconnect = (id) => {
-    const device = devices.find((d) => d.id === id);
+  const handleDisconnect = (device) => {
     Alert.alert(
       'Quitar dispositivo',
-      `¿Seguro que quieres desconectar ${device?.name}? Dejarás de recibir datos de fatiga.`,
+      `¿Seguro que quieres desconectar ${device.deviceName}? Dejarás de recibir datos de fatiga.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Quitar',
           style: 'destructive',
-          onPress: () => {
-            // TODO: llamar a endpoint DELETE /health/devices/:id (Bloque 3 backend)
-            setDevices((prev) =>
-              prev.map((d) => d.id === id ? { ...d, isConnected: false, lastSync: null } : d),
-            );
+          onPress: async () => {
+            const res = await healthApi.deleteDevice(device.id);
+            if (!res?.error) {
+              setDevices((prev) => prev.filter((d) => d.id !== device.id));
+            }
           },
         },
       ],
@@ -142,13 +127,16 @@ export default function ConfigDevicesScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {devices.length > 0 ? (
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="small" color={colors.accentOrange} />
+          </View>
+        ) : devices.length > 0 ? (
           <View style={styles.deviceList}>
             {devices.map((device) => (
               <DeviceCard
                 key={device.id}
                 device={device}
-                onConnect={handleConnect}
                 onDisconnect={handleDisconnect}
               />
             ))}
@@ -157,7 +145,28 @@ export default function ConfigDevicesScreen({ navigation }) {
           <View style={styles.emptyState}>
             <Ionicons name="watch-outline" size={44} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No tienes dispositivos conectados.</Text>
+            <TouchableOpacity
+              style={styles.connectBtnLarge}
+              onPress={handleConnect}
+              activeOpacity={0.85}
+              accessibilityLabel="Conectar dispositivo"
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.connectBtnText}>Conectar dispositivo</Text>
+            </TouchableOpacity>
           </View>
+        )}
+
+        {devices.length > 0 && (
+          <TouchableOpacity
+            style={styles.addMore}
+            onPress={handleConnect}
+            activeOpacity={0.7}
+            accessibilityLabel="Añadir otro dispositivo"
+          >
+            <Ionicons name="add-circle-outline" size={18} color={colors.accentOrange} />
+            <Text style={styles.addMoreText}>Añadir dispositivo</Text>
+          </TouchableOpacity>
         )}
 
         <View style={styles.banner}>
@@ -212,6 +221,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
+  loadingBox: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
   deviceList: {
     gap: 14,
   },
@@ -241,12 +254,6 @@ const styles = StyleSheet.create({
     color: FIGMA.textMuted,
     marginTop: 2,
   },
-  deviceStatusMuted: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 10.5,
-    color: FIGMA.textDisabled,
-    marginTop: 2,
-  },
   actionLink: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 12,
@@ -264,6 +271,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  connectBtnLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.purple,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  connectBtnText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.white,
+  },
+
+  // ── Añadir otro dispositivo ────────────────────────────────────
+  addMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    paddingVertical: 8,
+  },
+  addMoreText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    color: colors.accentOrange,
   },
 
   // ── Banner de privacidad ──────────────────────────────────────

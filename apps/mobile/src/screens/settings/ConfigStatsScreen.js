@@ -1,45 +1,27 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Circle, Polygon, Line, G } from 'react-native-svg';
+import { useFocusEffect } from '@react-navigation/native';
+import Svg, { Path, Circle, Polygon, Line } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
+import { settingsApi } from '../../api';
 
 // ─── 12.6 · Estadísticas Pro ────────────────────────────────────────────────
 // Fiel al Figma (EstadisticasProScreen.tsx) para el anillo de probabilidad y
 // el radar de soft-skills — ambos son mejoras reales de precisión: el radar
-// de Figma dibuja el polígono real por eje (el código real solo aproximaba un
-// círculo al promedio, con un comentario propio admitiéndolo). "DOMINIO POR
-// LEY" NO se reproduce como gráfico de líneas: el propio TSX de referencia
-// documenta que 2 líneas no pueden representar sin ambigüedad 3 leyes, y el
-// real ya resuelve el mismo dato (dominio por ley) sin esa ambigüedad con
-// una barra de progreso exacta por ley — se conserva esa solución más precisa,
-// solo reestilizada.
+// de Figma dibuja el polígono real por eje. "DOMINIO POR LEY" NO se reproduce
+// como gráfico de líneas: el propio TSX de referencia documenta que 2 líneas
+// no pueden representar sin ambigüedad 3 leyes, así que se conserva la barra
+// de progreso exacta por ley, solo reestilizada. Datos reales desde
+// GET /config/pro-stats (training_attempt_responses + streak).
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   ringTrack: '#E7E7EA',
   radarGuide: 'rgba(65, 41, 80, 0.15)',
   radarSpoke: 'rgba(65, 41, 80, 0.1)',
-};
-
-// TODO: cargar desde GET /config/pro-stats (training_attempt_responses + training_error_patterns)
-const MOCK_STATS = {
-  probability: 78,
-  trend: '+6%',
-  trendLabel: 'este mes · vas por buen camino',
-  softSkills: {
-    memoria: 78,
-    conocimiento: 85,
-    velocidad: 82,
-    resistencia: 65,
-    concentracion: 70,
-  },
-  laws: [
-    { name: 'Constitución', percent: 95 },
-    { name: 'Ley 39/2015', percent: 88 },
-    { name: 'Ley 40/2015', percent: 72 },
-  ],
 };
 
 // Orden de ejes confirmado en Figma
@@ -50,6 +32,37 @@ const RADAR_AXES = [
   { key: 'resistencia', label: 'Resistencia' },
   { key: 'concentracion', label: 'Concent.' },
 ];
+
+// Deriva heurísticas de soft-skills (0-100 por eje) a partir de las stats
+// reales del backend — sin equivalente directo en Figma, que solo maqueta
+// valores de ejemplo.
+function deriveSoftSkills(stats) {
+  const {
+    accuracyPct = 0,
+    studyStreakDays = 0,
+    topicsStrong = 0,
+    topicBreakdown = [],
+    avgSecsPerQuestion = null,
+  } = stats;
+
+  const memoria = topicBreakdown.length > 0
+    ? Math.round(topicBreakdown.reduce((acc, t) => acc + t.accuracyPct, 0) / topicBreakdown.length)
+    : accuracyPct;
+
+  const resistencia = Math.min(Math.round(studyStreakDays * 100 / 30), 100);
+
+  const conocimiento = accuracyPct;
+
+  const concentracion = topicBreakdown.length > 0
+    ? Math.round((topicsStrong / topicBreakdown.length) * 100)
+    : 0;
+
+  const velocidad = avgSecsPerQuestion != null
+    ? Math.max(0, Math.min(100, Math.round(100 - (avgSecsPerQuestion / 90) * 100)))
+    : 0;
+
+  return { memoria, conocimiento, velocidad, resistencia, concentracion };
+}
 
 function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
   return (
@@ -163,11 +176,28 @@ function LawBar({ name, percent, isLast }) {
 }
 
 export default function ConfigStatsScreen({ navigation }) {
-  const stats = MOCK_STATS;
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleExport = () => {
-    navigation.navigate('ConfigExport');
-  };
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const res = await settingsApi.getProStats();
+      if (!cancelled) {
+        if (!res?.error && res?.data) {
+          setStats(res.data);
+        }
+        setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []));
+
+  const handleExport = () => navigation.navigate('ConfigExport');
+
+  const softSkills = stats ? deriveSoftSkills(stats) : null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -194,34 +224,69 @@ export default function ConfigStatsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* ── Probabilidad de aprobado ─────────────────────────────────── */}
-        <Text style={styles.sectionLabel}>PROBABILIDAD DE APROBADO</Text>
-        <View style={styles.ringWrap}>
-          <ProgressRing percentage={stats.probability} />
-          <View style={styles.ringCenterLabel}>
-            <Text style={styles.ringPercentage}>{stats.probability}%</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.ctaGreen} />
+          <Text style={styles.loadingText}>Calculando estadísticas…</Text>
+        </View>
+      ) : !stats ? (
+        <View style={styles.loadingContainer}>
+          <Ionicons name="bar-chart-outline" size={48} color={FIGMA.ringTrack} />
+          <Text style={styles.loadingText}>Completa algunos tests para ver tus estadísticas.</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {/* ── Probabilidad de aprobado ─────────────────────────────────── */}
+          <Text style={styles.sectionLabel}>PROBABILIDAD DE APROBADO</Text>
+          <View style={styles.ringWrap}>
+            <ProgressRing percentage={stats.passedProbabilityPct} />
+            <View style={styles.ringCenterLabel}>
+              <Text style={styles.ringPercentage}>{stats.passedProbabilityPct}%</Text>
+            </View>
           </View>
-        </View>
-        <Text style={styles.monthDelta}>{stats.trend} {stats.trendLabel}</Text>
+          <Text style={styles.monthDelta}>
+            {stats.accuracyPct}% de acierto · racha de {stats.studyStreakDays} días
+          </Text>
 
-        {/* ── Soft skills ───────────────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, styles.sectionSpacing]}>SOFT SKILLS</Text>
-        <SoftSkillsRadar skills={stats.softSkills} />
+          {/* ── Soft skills ───────────────────────────────────────────────── */}
+          <Text style={[styles.sectionLabel, styles.sectionSpacing]}>SOFT SKILLS</Text>
+          <SoftSkillsRadar skills={softSkills} />
+          {stats.avgSecsPerQuestion == null && (
+            <Text style={styles.radarNote}>
+              Completa tests para ver tu velocidad media por pregunta.
+            </Text>
+          )}
 
-        {/* ── Dominio por ley (ver nota arriba) ───────────────────────────── */}
-        <Text style={[styles.sectionLabel, styles.sectionSpacing]}>DOMINIO POR LEY</Text>
-        <View style={styles.lawList}>
-          {stats.laws.map((law, idx) => (
-            <LawBar
-              key={law.name}
-              name={law.name}
-              percent={law.percent}
-              isLast={idx === stats.laws.length - 1}
-            />
-          ))}
-        </View>
-      </ScrollView>
+          {/* ── Dominio por ley (datos reales del backend) ─────────────────── */}
+          {stats.topicBreakdown.length > 0 && (
+            <>
+              <Text style={[styles.sectionLabel, styles.sectionSpacing]}>DOMINIO POR LEY</Text>
+              <View style={styles.lawList}>
+                {stats.topicBreakdown.map((t, idx) => (
+                  <LawBar
+                    key={t.topicId}
+                    name={t.topic || t.topicId}
+                    percent={t.accuracyPct}
+                    isLast={idx === stats.topicBreakdown.length - 1}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* ── Resumen — temas fuertes / débiles ───────────────────────────── */}
+          <View style={[styles.summaryRow, styles.sectionSpacing]}>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: colors.ctaGreen }]}>{stats.topicsStrong}</Text>
+              <Text style={styles.summaryLabel}>Temas dominados</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: colors.statRed }]}>{stats.topicsWeak}</Text>
+              <Text style={styles.summaryLabel}>Temas a reforzar</Text>
+            </View>
+          </View>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -250,6 +315,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     fontSize: 21.3,
     color: colors.textDark,
+    textAlign: 'center',
+  },
+
+  // ── Loading / vacío ───────────────────────────────────────────
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: spacing.xl,
+  },
+  loadingText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 13,
+    color: FIGMA.textMuted,
     textAlign: 'center',
   },
 
@@ -313,6 +393,13 @@ const styles = StyleSheet.create({
     color: FIGMA.textMuted,
     textAlign: 'center',
   },
+  radarNote: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
 
   // ── Dominio por ley ───────────────────────────────────────────
   lawList: {
@@ -351,6 +438,29 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 4,
-    backgroundColor: colors.ctaGreen,
+  },
+
+  // ── Resumen ───────────────────────────────────────────────────
+  summaryRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    backgroundColor: 'rgba(65, 41, 80, 0.05)',
+  },
+  summaryValue: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+  },
+  summaryLabel: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
   },
 });

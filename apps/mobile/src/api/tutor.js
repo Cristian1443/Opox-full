@@ -14,8 +14,12 @@ export const tutorApi = {
     createConversation: (title = 'Nueva conversación', topic = null) =>
         api.post(T.CONVERSATIONS, { title, topic }, { auth: true }),
 
-    sendMessage: (conversationId, content) =>
-        api.post(T.MESSAGES.replace(':id', conversationId), { content }, { auth: true }),
+    sendMessage: (conversationId, content, personality = null) =>
+        api.post(
+            T.MESSAGES.replace(':id', conversationId),
+            personality ? { content, personality } : { content },
+            { auth: true },
+        ),
 
     deleteConversation: (id) =>
         api.delete(T.CONVERSATION.replace(':id', id), { auth: true }),

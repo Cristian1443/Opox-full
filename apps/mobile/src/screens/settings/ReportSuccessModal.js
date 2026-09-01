@@ -5,16 +5,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Linking,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../../theme';
 
 // ─── 12.11 · Informe generado ───────────────────────────────────────────────
 // Fiel al Figma (ConfiguracionModalesScreen.tsx → InformeGeneradoModal). Se
-// mantiene el contrato de props ya cableado en ConfigExportScreen ({visible,
-// periodLabel, onShare, onSave, onClose}) — periodLabel es funcionalidad real
-// (Figma solo confirma un único ejemplo estático "del trimestre") y se
-// conserva dinámico, adaptando la frase confirmada por Figma a cada periodo.
+// mantiene el contrato real cableado en ConfigExportScreen ({visible,
+// periodLabel, downloadUrl, onClose}) — downloadUrl viene de
+// POST /config/pro-stats/export y se abre con Linking.openURL.
 const FIGMA = {
   overlay: 'rgba(0, 0, 0, 0.55)',
 };
@@ -28,7 +28,7 @@ function CheckIcon({ size = 40, color = colors.ctaGreen }) {
   );
 }
 
-export default function ReportSuccessModal({ visible, periodLabel, onShare, onSave, onClose }) {
+export default function ReportSuccessModal({ visible, periodLabel, downloadUrl, onClose }) {
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -55,24 +55,27 @@ export default function ReportSuccessModal({ visible, periodLabel, onShare, onSa
             <Text style={styles.title}>Informe listo</Text>
             <Text style={styles.subtitle}>
               Tu PDF de rendimiento{periodLabel ? ` de ${periodLabel.toLowerCase()}` : ''} se ha generado.
+              Ábrelo en el navegador para verlo o descargarlo.
             </Text>
 
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={onShare}
-              activeOpacity={0.85}
-              accessibilityLabel="Compartir informe PDF"
-            >
-              <Text style={styles.primaryButtonText}>Compartir</Text>
-            </TouchableOpacity>
+            {downloadUrl ? (
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => { Linking.openURL(downloadUrl); onClose(); }}
+                activeOpacity={0.85}
+                accessibilityLabel="Abrir PDF"
+              >
+                <Text style={styles.primaryButtonText}>Abrir PDF</Text>
+              </TouchableOpacity>
+            ) : null}
 
             <TouchableOpacity
               style={styles.secondaryLinkMuted}
-              onPress={onSave}
+              onPress={onClose}
               activeOpacity={0.7}
-              accessibilityLabel="Guardar informe en el móvil"
+              accessibilityLabel="Cerrar"
             >
-              <Text style={styles.secondaryLinkMutedText}>Guardar en el móvil</Text>
+              <Text style={styles.secondaryLinkMutedText}>Cerrar</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </Animated.View>

@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
 import AccentSlider from '../../components/AccentSlider';
 import { colors, spacing } from '../../theme';
+import { settingsApi } from '../../api';
 
 // ─── 12.5 · Accesibilidad ───────────────────────────────────────────────────
 // Fiel al Figma (AccesibilidadScreen.tsx). Dos ajustes reales tienen más
@@ -22,9 +23,10 @@ import { colors, spacing } from '../../theme';
 //    conservando el snap a los 3 tamaños reales y añadiendo el texto de
 //    vista previa (real, sin equivalente en Figma).
 // El auto-preview de tema completo de la pantalla (fondo/tarjetas oscuros en
-// vivo) era un stub temporal marcado "TODO: propagar vía ThemeContext" — se
-// retira aquí porque Figma confirma un fondo blanco fijo; la preferencia
-// sigue guardándose igual en AsyncStorage para cuando exista el Context real.
+// vivo) se retira aquí porque Figma confirma un fondo blanco fijo; la
+// preferencia sigue guardándose y sincronizándose con el backend igual
+// (theme/fontScale/reduceMotion vía /config/preferences) para cuando exista
+// un ThemeContext real que la aplique al resto de la app.
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   separator: 'rgba(65, 41, 80, 0.12)',
@@ -35,13 +37,21 @@ const FIGMA = {
 const A11Y_KEY = 'opox.accessibility';
 
 const DEFAULT = {
-  theme: 'auto',       // 'claro' | 'auto' | 'oscuro'
+  theme: 'auto',       // 'claro' | 'auto' | 'oscuro'  (valores UI internos)
   fontSize: 'medio',   // 'pequeno' | 'medio' | 'grande'
-  highContrast: false,
+  highContrast: false, // solo local — no en backend
   reduceAnimations: false,
 };
 
-// TODO(bloque-12): propagar via ThemeContext para que afecte a todas las pantallas
+// Mapeos entre valores UI y valores del backend
+const THEME_TO_API   = { claro: 'light', auto: 'auto', oscuro: 'dark' };
+const THEME_FROM_API = { light: 'claro', auto: 'auto', dark: 'oscuro' };
+const FONT_TO_SCALE  = { pequeno: 0.85, medio: 1.0, grande: 1.15 };
+function scaleToFont(scale) {
+  if (scale <= 0.9) return 'pequeno';
+  if (scale <= 1.05) return 'medio';
+  return 'grande';
+}
 
 const THEME_OPTIONS = [
   { key: 'claro', label: 'Claro' },
@@ -53,16 +63,16 @@ const FONT_SIZE_OPTIONS = ['pequeno', 'medio', 'grande'];
 const FONT_SIZE_INDEX = { pequeno: 0, medio: 1, grande: 2 };
 const PREVIEW_TEXT_SIZE = { pequeno: 13, medio: 16, grande: 20 };
 
-async function loadA11y() {
+async function loadA11yLocal() {
   try {
     const raw = await AsyncStorage.getItem(A11Y_KEY);
-    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
+    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : null;
   } catch {
-    return DEFAULT;
+    return null;
   }
 }
 
-async function saveA11y(prefs) {
+async function saveA11yLocal(prefs) {
   try {
     await AsyncStorage.setItem(A11Y_KEY, JSON.stringify(prefs));
   } catch { /* fallo silencioso */ }
@@ -89,13 +99,47 @@ export default function ConfigAccessibilityScreen({ navigation }) {
   const [prefs, setPrefs] = useState(DEFAULT);
 
   useEffect(() => {
-    loadA11y().then(setPrefs);
+    let cancelled = false;
+    async function load() {
+      // 1. AsyncStorage primero para respuesta instantánea
+      const local = await loadA11yLocal();
+      if (!cancelled && local) setPrefs(local);
+
+      // 2. Backend como source of truth (theme, fontScale, reduceMotion)
+      const res = await settingsApi.getPreferences();
+      if (!cancelled && !res?.error && res?.data) {
+        const { theme, fontScale, reduceMotion } = res.data;
+        const merged = {
+          ...(local ?? DEFAULT),
+          theme:           THEME_FROM_API[theme] ?? (local?.theme ?? DEFAULT.theme),
+          fontSize:        scaleToFont(fontScale ?? 1.0),
+          reduceAnimations: reduceMotion ?? (local?.reduceAnimations ?? false),
+          // highContrast permanece solo local
+        };
+        setPrefs(merged);
+        saveA11yLocal(merged);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   const update = useCallback((patch) => {
     setPrefs((prev) => {
       const next = { ...prev, ...patch };
-      saveA11y(next);
+      saveA11yLocal(next);
+
+      // Sincronizar con backend los campos soportados
+      const apiPatch = {};
+      if (patch.theme !== undefined)            apiPatch.theme       = THEME_TO_API[next.theme] ?? 'auto';
+      if (patch.fontSize !== undefined)         apiPatch.fontScale   = FONT_TO_SCALE[next.fontSize] ?? 1.0;
+      if (patch.reduceAnimations !== undefined) apiPatch.reduceMotion = next.reduceAnimations;
+      // highContrast no existe en backend → no se sincroniza
+
+      if (Object.keys(apiPatch).length > 0) {
+        settingsApi.updatePreferences(apiPatch)
+          .catch(() => { /* error silencioso — ya persistido localmente */ });
+      }
       return next;
     });
   }, []);

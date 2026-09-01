@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
-  Switch, Alert, ActivityIndicator, Share,
+  Switch, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import ReportSuccessModal from './ReportSuccessModal';
+import { settingsApi } from '../../api';
 
 // ─── 12.7 · Exportar informe ────────────────────────────────────────────────
 // Fiel al Figma (ExportarInformeScreen.tsx). El flujo real de generación
@@ -64,28 +65,9 @@ export default function ConfigExportScreen({ navigation }) {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState(null);
 
   const periodLabel = PERIOD_OPTIONS.find((p) => p.key === period)?.label || period;
-
-  const handleModalShare = async () => {
-    setShowModal(false);
-    try {
-      // TODO: reemplazar message/url por el PDF real cuando exista el endpoint
-      await Share.share({
-        title: 'Mi informe OPOX',
-        message: 'Adjunto mi informe de rendimiento generado con OPOX.',
-        // url: pdfUrl,
-      });
-    } catch {
-      // el usuario canceló el share — no es un error
-    }
-  };
-
-  const handleModalSave = () => {
-    setShowModal(false);
-    // TODO: expo-file-system → guardar PDF en Downloads cuando exista el endpoint
-    Alert.alert('Próximamente', 'La descarga directa estará disponible en la siguiente versión.');
-  };
 
   const toggleInclude = (key) => {
     setIncludes((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -100,8 +82,13 @@ export default function ConfigExportScreen({ navigation }) {
 
     setIsGenerating(true);
     try {
-      // TODO: reemplazar por llamada real → POST /config/pro-stats/export
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const periodMap = { mes: 'month', trimestre: 'all', todo: 'all' };
+      const res = await settingsApi.exportProStats(periodMap[period] ?? 'month');
+      if (res?.error || !res?.data?.downloadUrl) {
+        Alert.alert('Error', 'No se pudo generar el informe. Inténtalo de nuevo.');
+        return;
+      }
+      setDownloadUrl(res.data.downloadUrl);
       setShowModal(true);
     } finally {
       setIsGenerating(false);
@@ -189,9 +176,8 @@ export default function ConfigExportScreen({ navigation }) {
       <ReportSuccessModal
         visible={showModal}
         periodLabel={periodLabel}
-        onShare={handleModalShare}
-        onSave={handleModalSave}
-        onClose={() => setShowModal(false)}
+        downloadUrl={downloadUrl}
+        onClose={() => { setShowModal(false); setDownloadUrl(null); }}
       />
     </SafeAreaView>
   );

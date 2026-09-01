@@ -32,7 +32,7 @@ export function createServer(): Express {
     app.use(express.json({ limit: '25mb' }));
 
     // Rutas
-    app.use(createHealthRouter());
+    app.use(createHealthRouter(container.controllers.health, container.middleware.auth));
     app.use(createAuthRouter(container.controllers.auth, container.middleware.auth));
     app.use(createDashboardRouter(container.controllers.dashboard, container.middleware.auth));
     app.use(createPlanningRouter(container.controllers.planning, container.middleware.auth));

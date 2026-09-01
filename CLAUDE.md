@@ -456,16 +456,41 @@ las crea con defaults (`equilibrado`, `detailLevel:1`, `theme:auto`, `fontScale:
 Valida `personality` ∈ `{cercano,equilibrado,exigente}`, `theme` ∈ `{auto,light,dark}`,
 `detailLevel` ∈ `{0,1,2}`.
 
+**Mapeo mobile → backend para accesibilidad** (revisión 2026-08-30):
+- Mobile `'claro'/'oscuro'` → API `'light'/'dark'` (CHECK constraint lo exige).
+- Mobile `'pequeno'/'medio'/'grande'` → API `fontScale: 0.85/1.0/1.15`.
+- Mobile `reduceAnimations` → API `reduceMotion`.
+- `highContrast` no tiene columna en backend → solo persiste en `AsyncStorage('opox.accessibility')`.
+Los mapeos están en `ConfigAccessibilityScreen.js` (`THEME_TO_API`, `FONT_TO_SCALE`, etc.).
+
 **`GET /config/pro-stats`**: calcula en tiempo real desde `training_attempt_responses`
 (agregación por `topic_id`) + streak desde `user_gamification`. Devuelve
 `accuracyPct`, `passedProbabilityPct` (heurística: accuracy×0.85 + streak×0.5),
-`topicsStrong` (≥80%), `topicsWeak` (<50%), `topicBreakdown[]` con accuracy por tema.
+`topicsStrong` (≥80%), `topicsWeak` (<50%), `topicBreakdown[]` con accuracy por tema,
+`avgSecsPerQuestion` (null si no hay datos de tiempo). `serializeProStats` expone todos los
+campos incluyendo `avgSecsPerQuestion` — asegurarse de no omitirlo al añadir campos nuevos.
 
-**`POST /config/pro-stats/export`**: stub — devuelve 202 con `downloadUrl:null` y mensaje
-de notificación pendiente. `TODO(bloque-12)`: implementar PDF con pdfkit/puppeteer.
+**`POST /config/pro-stats/export`** (revisión 2026-08-30 — PDF real):
+- `pdfkit` instalado en backend. `ExportProStatsUseCase` genera buffer PDF A4 (cabecera
+  morada, resumen de stats, tabla de temas coloreada por rendimiento).
+- `IConfigRepository.storePdfReport(userId, period, buffer)` sube a Supabase Storage
+  (`pro-stats-exports`, bucket privado auto-creado) y devuelve URL firmada (1 h).
+- El endpoint devuelve 200 con `{ downloadUrl: string }` (no 202 stub).
+- Mobile: `ConfigExportScreen` abre la URL con `Linking.openURL`. `ReportSuccessModal`
+  muestra botón "Abrir PDF" primario + "Cerrar" secundario.
 
 **`POST /config/feedback`**: inserta en `user_feedback`. Tipo: `suggestion|bug|other`.
 Mensaje: 1–500 caracteres (validado con Zod y con CHECK en BD).
+
+**Racha — corrección de lectura** (revisión 2026-08-30):
+`toDomainGamification` en `SupabaseDashboardRepository` devolvía `current_streak` bruto
+sin comprobar si había expirado. Ahora calcula `effectiveStreak`: si `last_activity_date`
+no es hoy ni ayer (UTC), devuelve 0. `withActivity()` (escritura) siempre fue correcto.
+
+**TutorChat — botón de envío** (revisión 2026-08-30):
+`TutorChatScreen` añade un botón redondo naranja (`arrow-up`) a la derecha del input.
+`returnKeyType="send"` en multiline no funciona en Android — el botón es la acción fiable.
+Se deshabilita cuando `inputText.trim()` está vacío o `isTyping === true`.
 
 **Nota sobre naming**: el cliente mobile se llama `settingsApi` (en `settings.js`)
 porque `config.js` ya está tomado por la utilidad de URL base del cliente HTTP.
@@ -618,7 +643,7 @@ pnpm lint                       # lint completo
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
 | 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-28: motor earn automático por tests (1 O/acierto × multiplicador, cap 100 O/día), mini-test BOE hasta 5 O, `getTodayTestEarnings` en repo. Revisión 2026-08-27: puente earn→ledger, `POST /store/discounts/:id/redeem`, 8 pantallas sin mocks, canje por `redeemType`, fixes tabs UI. |
-| 12 | Configuración | Frontend + backend completo (11 pantallas + 2 modales, 5 endpoints, 10 requests / 31 assertions verde) |
+| 12 | Configuración | Frontend + backend completo. Revisión 2026-08-30 (3 pasadas): feedback real, tono IA multi-dispositivo, accesibilidad mapeada, stats reales con velocidad, subtextos API, PDF real (pdfkit+Supabase Storage URL firmada), racha caduca correctamente en lectura, botón envío TutorChat. Gaps pendientes: ThemeContext global, chat soporte (Intercom), RevenueCat (suscripción). |
 | 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

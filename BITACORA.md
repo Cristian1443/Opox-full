@@ -5,6 +5,140 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-08-30 — Bloque 12 · Revisión y conexión al backend
+
+Rama: `feat/revision-bloque-12-config`. Diagnóstico exhaustivo y corrección de 6 gaps
+críticos/moderados que dejaban las pantallas de configuración desconectadas del backend.
+
+### Gaps cerrados
+
+**GAP-12-04 · Feedback conectado al endpoint real**
+`ConfigFeedbackScreen` llamaba a `setTimeout` en lugar del API. Ahora llama
+`settingsApi.submitFeedback({ type, message })` contra `POST /config/feedback`, que
+inserta en `user_feedback` en Supabase. El feedback del usuario ya persiste en BD.
+
+**GAP-12-01 + GAP-12-06 · Tono de IA sincronizado con el backend**
+`ConfigToneScreen` guardaba solo en `AsyncStorage('opox.ai.tone')`. Ahora:
+- Al abrir: carga AsyncStorage primero (UX instantánea) y luego el backend como fuente
+  de verdad multi-dispositivo.
+- Al cambiar: persiste AsyncStorage síncronamente + `settingsApi.updatePreferences` en
+  background. Los campos `personality`, `detailLevel`, `directHints`, `motivational`
+  se sincronizan con `user_preferences` en Supabase.
+
+**GAP-12-02 + GAP-12-03 (enum) · Accesibilidad conectada + fix mismatch de esquema**
+`ConfigAccessibilityScreen` tenía tres desincronizaciones con el backend:
+- `'claro'/'oscuro'` → backend espera `'light'/'dark'` (CHECK constraint lo rechazaba)
+- `'pequeno'/'medio'/'grande'` → backend usa `fontScale: numeric` (0.85/1.0/1.15)
+- `reduceAnimations` → backend llama `reduceMotion`
+Añadidos mapeos bidireccionales `THEME_TO_API/FROM_API`, `FONT_TO_SCALE/scaleToFont`.
+`highContrast` no existe en el backend → sigue en AsyncStorage únicamente.
+La pantalla ahora carga del backend al entrar y sincroniza los campos soportados.
+
+**GAP-12-03 (stats) · ConfigStatsScreen con datos reales de `GET /config/pro-stats`**
+La pantalla mostraba `MOCK_STATS` estático. Ahora usa `useFocusEffect` +
+`settingsApi.getProStats()`. El gauge de probabilidad y las barras de dominio por ley
+muestran datos reales de `training_attempt_responses`. Las soft-skills se derivan
+heurísticamente de los datos disponibles:
+- Conocimientos → `accuracyPct`
+- Resistencia → `streakDays/30 × 100`
+- Memoria → promedio de accuracy por tema
+- Concentración → temas fuertes / temas intentados
+- Velocidad → 0 (requiere datos de tiempo por pregunta, aún sin implementar)
+
+**GAP-12-05 · SettingsScreen con subtextos reales**
+El menú maestro cargaba subtextos hardcodeados. Ahora usa `useFocusEffect` para cargar:
+- Tono IA: lee de AsyncStorage (instante) y luego del backend para confirmar.
+- Probabilidad: llama `settingsApi.getProStats()` y muestra el porcentaje real.
+- Suscripción y Dispositivos: subtextos genéricos (pendiente RevenueCat / Bloque 3).
+
+**GAP-12-08 · ReportSuccessModal honesto**
+El modal mostraba "Informe listo" con botones "Compartir"/"Guardar" cuando el PDF
+no existía (backend devuelve `downloadUrl: null`). Ahora dice "Solicitud enviada"
+con un único botón "Entendido", y `ConfigExportScreen` ya llama al endpoint real
+`settingsApi.exportProStats(period)`.
+
+### Gaps cerrados (segunda pasada — mismo día — A, B, D)
+
+**A · Tono IA → TutorChat**
+`TutorChatScreen` carga `settingsApi.getPreferences()` en el mount y guarda `personality`
+en un ref. Cada `sendMessage` pasa el tono al backend. `tutorApi.sendMessage` acepta
+`personality` como tercer param opcional. `sendMessageBody` Zod amplía el schema con
+`personality?: enum`. `buildStubAiResponse` varía el texto según cercano/equilibrado/exigente.
+`buildInitialMessages` también varía el saludo inicial por tono.
+
+**B · Velocidad en radar de soft-skills**
+`QuestionActiveScreen` rastrea `questionStartTimeRef = Date.now()`, se resetea en cada
+cambio de pregunta y registra `timeSecs` en el array `answers` al confirmar o agotar tiempo.
+`TrainingResultScreen.buildResponses` incluye `timeSecs` en cada respuesta → persiste en
+`training_attempt_responses.time_secs` (columna ya existente). `getProStats` amplía el
+select con `time_secs`, calcula `avgSecsPerQuestion` (null si no hay datos) y lo devuelve.
+`ConfigStatsScreen.deriveSoftSkills` usa `stats.avgSecsPerQuestion` (fórmula: `max(0, 100 - avg/90*100)`)
+en lugar de 0 fijo. La nota del radar se muestra solo si aún no hay datos de velocidad.
+
+**D · Dispositivos conectados con backend real**
+- SQL: `bloque3_health_devices.sql` — tabla `user_connected_devices` con RLS owner-all.
+- Dominio: entidad `UserDevice`, interfaz `IHealthRepository`, 3 use cases
+  (`GetDevicesUseCase`, `RegisterDeviceUseCase`, `DeleteDeviceUseCase`).
+- Infra: `SupabaseHealthRepository` (get/upsert por `user_id+platform`/delete).
+- Presentación: `HealthController` ampliado (GET/POST/DELETE `/health/devices`),
+  `healthRoutes.ts` actualizado, `server.ts` pasa controller + authMiddleware.
+- Container: `healthRepo` instanciado, use cases y controller cableados.
+- Mobile: `healthApi` en `apps/mobile/src/api/health.js`, exportado del barrel.
+  `ConfigDevicesScreen` reescrito sin mocks — `useFocusEffect` + `healthApi.getDevices()`.
+  `PairingScreen` registra el dispositivo en el backend fire-and-forget al completar permisos.
+- Constantes: `HEALTH_DEVICES` y `HEALTH_DEVICE` añadidas a `API_ROUTES`.
+
+### Gaps cerrados (tercera pasada — mismo día — racha, botón chat, PDF)
+
+**Fix · Racha no se reseteaba al romper la racha**
+`toDomainGamification` en `SupabaseDashboardRepository` devolvía el valor bruto de
+`current_streak` sin comprobar si había expirado. Ahora calcula `effectiveStreak`:
+si `last_activity_date` no es hoy ni ayer (UTC), devuelve 0. `withActivity()` del
+dominio era correcto — el error era solo en lectura. Se añaden helpers `todayUtc()`
+y `yesterdayUtc()` locales.
+
+**Fix · TutorChat sin botón de envío visible**
+`TutorChatScreen` tenía `returnKeyType="send"` en un `TextInput` multiline — en
+Android no muestra tecla de envío. Añadido botón redondo naranja (`arrow-up`,
+Ionicons) a la derecha del input. Se deshabilita (opacity 0.4) cuando el campo
+está vacío o el tutor está escribiendo (`isTyping`).
+
+**GAP-12-07 · PDF real en Export (implementado)**
+- Backend: `pdfkit` instalado. `ExportProStatsUseCase` genera PDF A4 con cabecera
+  morada, resumen de stats (acierto, probabilidad, racha, velocidad) y tabla de
+  desglose por temas con colores verde/naranja/rojo según rendimiento.
+  Sube el buffer a Supabase Storage (`pro-stats-exports`, bucket privado auto-creado)
+  y devuelve una URL firmada con 1 hora de validez. Devuelve 200 (antes 202 stub).
+- `IConfigRepository`: nuevo método `storePdfReport(userId, period, buffer): Promise<string>`.
+- `ConfigController.serializeProStats`: incluía `avgSecsPerQuestion` (error silencioso
+  detectado — la velocidad del radar nunca llegaba al cliente).
+- Mobile: `ConfigExportScreen` abre la URL con `Linking.openURL` (navegador del sistema).
+  `ReportSuccessModal` renovado: título "Informe generado", botón "Abrir PDF" primario
+  + "Cerrar" secundario.
+- TS bonus: `SupabaseNotesRepository.updateStatus` faltaba `pages?: number` en el tipo
+  del patch; `index.d.ts` de `@opox/constants` añade `HEALTH_DEVICES`/`HEALTH_DEVICE`.
+
+### Gaps pendientes
+
+| Gap | Razón |
+|-----|-------|
+| C · ThemeContext global | Requiere refactor de App.js y todas las pantallas (espera diseño aprobado) |
+| GAP-12-09 Chat de soporte | Requiere integración Intercom/Crisp/Zendesk |
+| GAP-12-10 Suscripción real | Requiere RevenueCat SDK |
+
+### Estado final de la rama
+
+- Feedback, tono y accesibilidad sincronizados con backend.
+- Estadísticas pro con datos reales incluyendo velocidad por pregunta.
+- Dispositivos conectados persistidos en Supabase, ConfigDevicesScreen sin mocks.
+- Tono de IA se propaga a TutorChat en tiempo real.
+- Racha caduca correctamente cuando el usuario pierde un día (leída en BD, no solo en escritura).
+- TutorChat con botón de envío visible en Android.
+- Export genera PDF real (pdfkit + Supabase Storage) y devuelve URL firmada al móvil.
+- SQL pendiente de correr en Supabase: `bloque3_health_devices.sql`.
+
+---
+
 ## 2026-08-26 — Merge rediseño Figma Bloques 8 y 9 en rama BOE
 
 Rama: `feat/revision-bloque-10-boe`. Integración de `feat/bloque-8-9-rediseno-figma`

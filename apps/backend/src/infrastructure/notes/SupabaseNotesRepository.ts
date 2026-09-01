@@ -125,6 +125,7 @@ export class SupabaseNotesRepository implements INotesRepository {
             errorMessage?: string | null;
             questionsCount?: number;
             storagePath?: string | null;
+            pages?: number;
         },
     ): Promise<void> {
         const dbPatch: Record<string, unknown> = {};

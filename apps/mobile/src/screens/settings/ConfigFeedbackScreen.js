@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import FeedbackSuccessModal from './FeedbackSuccessModal';
+import { settingsApi } from '../../api';
 
 // ─── 12.9 · Tu opinión ──────────────────────────────────────────────────────
 // Fiel al Figma (FeedbackScreen.tsx). La validación de mensaje vacío, el
@@ -59,8 +60,11 @@ export default function ConfigFeedbackScreen({ navigation }) {
 
     setIsSubmitting(true);
     try {
-      // TODO: POST /config/feedback — body: { type: selectedType, message }
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const res = await settingsApi.submitFeedback({ type: selectedType, message: message.trim() });
+      if (res?.error) {
+        Alert.alert('Error', 'No se pudo enviar el feedback. Inténtalo de nuevo.');
+        return;
+      }
       setMessage('');
       setSelectedType('suggestion');
       setShowModal(true);

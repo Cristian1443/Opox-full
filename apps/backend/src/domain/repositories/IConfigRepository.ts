@@ -9,4 +9,5 @@ export interface IConfigRepository {
         message: string;
     }): Promise<void>;
     getProStats(userId: string): Promise<ProStats>;
+    storePdfReport(userId: string, period: string, pdfBuffer: Buffer): Promise<string>;
 }

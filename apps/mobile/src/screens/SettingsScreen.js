@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
-import { authApi, storeApi } from '../api';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authApi, storeApi, settingsApi } from '../api';
 import { colors, spacing } from '../theme';
 
 // ─── 12.1 · Ajustes · hub principal ────────────────────────────────────────
@@ -13,8 +15,13 @@ import { colors, spacing } from '../theme';
 // cuenta) — son funcionalidad real imprescindible (sin logout no hay forma
 // de salir de la cuenta) y se conservan, añadidas al final de la lista plana
 // que sí confirma Figma. El saldo de Opopoints en el header es un dato real
-// (mismo sistema de Bloque 11 · Tienda) que el archivo real no mostraba
-// todavía — se conecta aquí con storeApi.getBalance().
+// (mismo sistema de Bloque 11 · Tienda) que se conecta con storeApi.getBalance().
+// El tono de la IA y la probabilidad de aprobado también son datos reales
+// (GET /config/preferences y GET /config/pro-stats) en vez de los valores
+// fijos que mostraba el diseño.
+const TONE_KEY = 'opox.ai.tone';
+const PERSONALITY_LABELS = { cercano: 'Cercano', equilibrado: 'Equilibrado', exigente: 'Exigente' };
+
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   separator: 'rgba(65, 41, 80, 0.12)',
@@ -132,11 +139,46 @@ function FeedbackIcon({ size = 24, color = colors.accentOrange }) {
 export default function SettingsScreen({ navigation }) {
   const [user, setUser] = useState(null);
   const [opopoints, setOpopoints] = useState(null);
+  const [toneLabel, setToneLabel] = useState('Equilibrado');
+  const [probLabel, setProbLabel] = useState(null); // null = sin datos aún
 
-  useEffect(() => {
-    authApi.me().then(({ data }) => { if (data) setUser(data); });
-    storeApi.getBalance().then((res) => { if (res?.data) setOpopoints(res.data.balance); });
-  }, []);
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+
+    async function load() {
+      // Perfil de usuario
+      const { data } = await authApi.me();
+      if (!cancelled && data) setUser(data);
+
+      // Saldo de Opopoints (Bloque 11 · Tienda)
+      storeApi.getBalance().then((res) => {
+        if (!cancelled && res?.data) setOpopoints(res.data.balance);
+      });
+
+      // Tono: AsyncStorage primero (rápido), luego backend como fuente de verdad
+      try {
+        const raw = await AsyncStorage.getItem(TONE_KEY);
+        if (!cancelled && raw) {
+          const parsed = JSON.parse(raw);
+          setToneLabel(PERSONALITY_LABELS[parsed.personality] ?? 'Equilibrado');
+        }
+      } catch { /* fallo silencioso */ }
+
+      const prefsRes = await settingsApi.getPreferences();
+      if (!cancelled && !prefsRes?.error && prefsRes?.data?.personality) {
+        setToneLabel(PERSONALITY_LABELS[prefsRes.data.personality] ?? 'Equilibrado');
+      }
+
+      // Probabilidad de aprobado desde pro-stats
+      const statsRes = await settingsApi.getProStats();
+      if (!cancelled && !statsRes?.error && statsRes?.data) {
+        setProbLabel(`${statsRes.data.passedProbabilityPct}% Prob. Aprobado`);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, []));
 
   const oposicionLine = [user?.oposicion, user?.especialidad].filter(Boolean).join(' · ')
     || 'Configura tu oposición';
@@ -172,16 +214,14 @@ export default function SettingsScreen({ navigation }) {
       id: 'tono-ia',
       icon: SparkleIcon,
       label: 'Tono de la IA',
-      // TODO: leer preferencia desde perfil Supabase o AsyncStorage
-      subtitle: 'Equilibrado',
+      subtitle: toneLabel,
       onPress: () => navigation.navigate('ConfigTone'),
     },
     {
       id: 'estadisticas',
       icon: ChartIcon,
       label: 'Estadísticas Pro',
-      // TODO: calcular desde training_attempt_responses — endpoint GET /config/pro-stats
-      subtitle: '78% Prob. Aprobado',
+      subtitle: probLabel ?? 'Calculando…',
       onPress: () => navigation.navigate('ConfigStats'),
     },
     {

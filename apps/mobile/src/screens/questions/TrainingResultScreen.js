@@ -32,6 +32,7 @@ function buildResponses(questions, answers) {
         optionsSnapshot: (q.options ?? []).map((o) => o.text),
         correctIndex: (q.options ?? []).findIndex((o) => o.correct),
         userAnswerIndex: answer.selected != null ? OPTION_ID_TO_INDEX[answer.selected] : null,
+        timeSecs: answer.timeSecs ?? undefined,
       };
     })
     .filter((r) => r.optionsSnapshot.length === 4 && r.correctIndex >= 0);

@@ -44,6 +44,7 @@ function serializeProStats(s: ProStats): ProStatsDTO {
         topicsStrong:         s.topicsStrong,
         topicsWeak:           s.topicsWeak,
         topicBreakdown:       s.topicBreakdown,
+        avgSecsPerQuestion:   s.avgSecsPerQuestion,
         computedAt:           s.computedAt.toISOString(),
     };
 }
@@ -90,7 +91,7 @@ export class ConfigController {
             const { period = 'month' } = req.body as { period?: 'week' | 'month' | 'all' };
             const result = await this.deps.exportProStats.execute(req.authUser!.id, period);
             const dto: ProStatsExportResult = result;
-            ok(res, 202, dto);
+            ok(res, 200, dto);
         } catch (e) { next(e); }
     };
 
