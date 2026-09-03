@@ -129,15 +129,17 @@ export class NotesController {
     generateTest = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const userId = req.authUser!.id;
-            const { questionCount, topics } = req.body as {
+            const { questionCount, topics, difficulty } = req.body as {
                 questionCount: number;
                 topics: string[];
+                difficulty?: 'easy' | 'medium' | 'hard';
             };
             const result = await this.deps.generateTest.execute({
                 id: (req.params.id as string),
                 userId,
                 questionCount,
                 topics,
+                difficulty,
             });
             ok(res, 200, result);
         } catch (e) { next(e); }

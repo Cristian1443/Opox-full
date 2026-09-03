@@ -213,6 +213,7 @@ export class GenerateTestFromNoteUseCase {
         userId: string;
         questionCount: number;
         topics: string[];
+        difficulty?: 'easy' | 'medium' | 'hard';
     }): Promise<{
         questions: Array<{
             id: string;
@@ -230,6 +231,7 @@ export class GenerateTestFromNoteUseCase {
         const raw = await this.repo.listQuestions(params.id, params.userId, {
             tags: params.topics,
             limit: params.questionCount,
+            difficulty: params.difficulty,
         });
         return {
             questions: raw.map(q => ({

@@ -86,7 +86,7 @@ export default function NotesTestConfigScreen({ navigation, route }) {
         if (!canStart || starting) return;
         setStarting(true);
         const topics = onlyTaggedTopics ? note.tags : [];
-        const difficulty = ['low', 'medium', 'high'][dificultadIdx];
+        const difficulty = ['easy', 'medium', 'hard'][dificultadIdx];
         try {
             const res = await notesApi.generateTest(note.id, { questionCount, topics, difficulty, timed });
             const questions = adaptGeneratedQuestions(res?.data?.questions ?? []);

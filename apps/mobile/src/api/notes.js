@@ -29,10 +29,10 @@ export const notesApi = {
     remove: (id) => api.delete(N.DETAIL.replace(':id', id), { auth: true }),
 
     // ── Generar test (9.5 → runner) ───────────────────────────────────────────
-    generateTest: (id, { questionCount, topics, timed = false }) =>
+    generateTest: (id, { questionCount, topics, timed = false, difficulty }) =>
         api.post(
             N.GENERATE_TEST.replace(':id', id),
-            { questionCount, topics, timed },
+            { questionCount, topics, timed, ...(difficulty && { difficulty }) },
             { auth: true },
         ),
 };

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import DestacadoBanner from '../../components/DestacadoBanner';
 import AvatarPlaceholder from '../../components/AvatarPlaceholder';
-import { motivationApi, trainingApi } from '../../api';
+import { motivationApi, boeApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
 // Icono de chevron para el botón de volver (mismo patrón que MotivationHomeScreen.js / ClanDetailScreen.js).
@@ -75,7 +75,7 @@ export default function RankingsScreen({ navigation }) {
 
     // Carga la lista de temas una sola vez al montar (para el tab "Tema")
     useEffect(() => {
-        trainingApi.listTopics().then(({ data }) => {
+        boeApi.listTopics('justicia-tramitacion').then(({ data }) => {
             if (data && data.length > 0) setSelectedTopicId(data[0].topicId);
             setTopics(data ?? []);
         });

@@ -85,7 +85,7 @@ export interface INotesRepository {
     listQuestions(
         noteId: string,
         userId: string,
-        filter?: { tags?: string[]; limit?: number },
+        filter?: { tags?: string[]; limit?: number; difficulty?: 'easy' | 'medium' | 'hard' },
     ): Promise<NoteQuestion[]>;
 
     // ── Borrado ─────────────────────────────────────────────────────────────

@@ -24,4 +24,5 @@ export const generateTestBody = z.object({
     questionCount: z.number().int().min(1).max(50),
     topics: z.array(z.string().min(1).max(30)).max(20),
     timed: z.boolean().optional(),
+    difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
 });

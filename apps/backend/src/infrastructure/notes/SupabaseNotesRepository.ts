@@ -242,7 +242,7 @@ export class SupabaseNotesRepository implements INotesRepository {
     async listQuestions(
         noteId: string,
         userId: string,
-        filter?: { tags?: string[]; limit?: number },
+        filter?: { tags?: string[]; limit?: number; difficulty?: 'easy' | 'medium' | 'hard' },
     ): Promise<NoteQuestion[]> {
         let q = this.db
             .from('note_questions')
@@ -250,6 +250,7 @@ export class SupabaseNotesRepository implements INotesRepository {
             .eq('note_id', noteId)
             .eq('user_id', userId);
         if (filter?.tags?.length) q = q.in('tag', filter.tags);
+        if (filter?.difficulty) q = q.eq('difficulty', filter.difficulty);
         if (filter?.limit) q = q.limit(filter.limit);
         const { data, error } = await q;
         if (error) { logger.error('[notes-repo] listQuestions', { error }); return []; }

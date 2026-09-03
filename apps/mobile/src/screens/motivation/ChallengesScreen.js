@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { RetoRecibidoModal } from '../../components/MotivationModals';
-import { motivationApi, trainingApi } from '../../api';
+import { motivationApi, boeApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
 function IconChevronLeft({ size = 11, color = colors.textDark }) {
@@ -118,7 +118,7 @@ export default function ChallengesScreen({ navigation, route }) {
         setForm({ title: '', questionCount: 20, rewardPoints: 50 });
         setWizardVisible(true);
         setTopicsLoading(true);
-        const { data } = await trainingApi.listTopics();
+        const { data } = await boeApi.listTopics('justicia-tramitacion');
         setTopics(data ?? []);
         setTopicsLoading(false);
     };
