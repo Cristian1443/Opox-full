@@ -114,11 +114,24 @@ endpoints nuevos — reutiliza `PATCH /planning/plan` para inicializar la intens
 **Test de nivel (`LevelTestInProgressScreen.js`)**:
 - 20 preguntas únicas distribuidas en 4 temas: 8 Constitución, 8 Ley 39/2015, 2 Ley 40/2015, 2 Org. del Estado.
 - `calcLevelAndIntensity(percent)`: `≥75% → Avanzado/high`, `≥50% → Intermedio/medium`, else `Básico/low`.
-- `calcStrengthsAndWeaknesses(answers)`: hit rate por tema, ≥50% → fortaleza, <50% → a reforzar.
+- `calcStrengthsAndWeaknesses(answers, qs)`: hit rate por tema, ≥50% → fortaleza, <50% → a reforzar.
+  Acepta `qs` (array de preguntas activo) para funcionar con preguntas dinámicas del Motor.
 - Cronómetro real con `startTimeRef = useRef(Date.now())`.
 - Navegación hacia atrás permitida dentro del test (array `answers` guarda la elección por pregunta).
 - Último botón dice "Ver resultado" en vez de "Confirmar respuesta".
 - Al finalizar: guarda en `LEVEL_TEST_RESULT_KEY`, borra `PENDING_LEVEL_TEST_KEY`, navega con `replace('LevelTestResult', { ...params reales })`.
+- **Motor IA (2026-09-02)**: al montar, intenta `trainingApi.getLevelTestQuestions(oposicion)` vía
+  `GET /training/level-test` (ruta pública, sin auth). Si el Motor responde con ≥10 preguntas, las
+  usa en lugar de `QUESTIONS` local. Banner de carga mientras se realiza el fetch inicial.
+  Si falla (error o vacío), continúa con las preguntas estáticas sin interrupción.
+
+**`GET /training/level-test` — ruta pública**:
+- Sin `authMiddleware` — corre antes del login en onboarding.
+- `TrainingController.getLevelTest` llama `MotorOnboardingClient.getLevelTestQuestions(oposicion, 20)`
+  con timeout de **5 s**. Si el Motor no responde, devuelve `STATIC_LEVEL_TEST` (20 preguntas estáticas).
+- Formato Motor: `{ preguntas: [{ id, tema, tema_label, enunciado, opciones: [{id, texto}], correcta }] }`
+  → adaptado a `{ id, topic, topicLabel, question, options: [{id, text}], correct }`.
+- `API_ROUTES.TRAINING.LEVEL_TEST = '/training/level-test'` en `packages/constants`.
 
 **`SesionIniciadaScreen.js`** — tres operaciones en `Promise.all` tras login:
 1. `applyPendingOposicion()` — aplica oposición guardada vía `authApi.updateProfile`.
@@ -211,15 +224,31 @@ Rutas bajo `/motivation/`. Cubre racha, rankings, clanes, retos de clan y Muro d
 ### Tutor IA (Bloque 8) — endpoints propios
 
 El Aula Virtual tiene su propio conjunto de rutas bajo `/tutor/`. La entidad central
-es `TutorConversation`; el chat envía mensajes a OpenAI real (`gpt-4o-mini`). Las
-flashcards usan stubs por `topicId` con marcador `TODO(ia-bloque8)`. El podcast y
-los resúmenes leen de tablas Supabase pobladas con seed.
+es `TutorConversation`; el chat envía mensajes al Motor IA real cuando `isMotorConfigured`,
+con fallback a OpenAI directo (`gpt-4o-mini`). Las flashcards y resúmenes también
+usan el Motor cuando está disponible, con stubs como fallback.
 
 Tipos en `packages/types/src/tutor.ts`. Cliente mobile en `apps/mobile/src/api/tutor.js`.
 Colección de tests completa en `Bloque8_Tutor_Tests.postman_collection.json`.
 
 Patrón de respuesta del API client mobile: devuelve `{ data, error }` — **nunca**
 `{ success, data }`. Usar `!res?.error && res?.data` para comprobar éxito.
+
+**Integración Motor IA (2026-09-02)**:
+- `ITutorAiClient` — interfaz de dominio en `domain/repositories/` con métodos `chat()`,
+  `generateFlashcards()`, `getSummary()`. Evita que los use cases importen infraestructura.
+- `MotorTutorClient` — implementa `ITutorAiClient` contra endpoints `/v1/classroom/*` del
+  Motor (timeout 15 s, auth `X-API-Key`). Instanciado en `container.ts` si `isMotorConfigured`.
+- `SendMessageUseCase` — pasa historial (últimos 10 mensajes) y `toneProfile` al Motor.
+  Fallback al stub de personalidad si Motor falla.
+- `GenerateDeckUseCase` — 10 tarjetas vía Motor; fallback al stub por `topicId`.
+- `GetSummaryUseCase` — resumen temporal (no persistido en Supabase) vía Motor;
+  fallback a `SummaryNotFoundError`.
+- `TutorChatScreen` — lee `tonePrefs` de `AsyncStorage('opox.ai.tone')` y los envía al
+  backend como `{ content, tonePrefs }`. El controller convierte a `ToneProfile` con
+  `buildToneProfile()` antes de pasarlos al Motor.
+- `tutorApi.sendMessage(conversationId, content, tonePrefs)` — tercer param es el objeto
+  OPOX completo (`personality`, `detailLevel`, `hintStyle`, `reinforcementLevel`).
 
 **Rediseño Figma (2026-08-26)**: 6 pantallas + 1 modal completamente reestilizados
 con tokens exactos de Figma (`Poppins-*`, border-radius, paleta morada/verde):
@@ -588,8 +617,18 @@ Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, devic
 
 ### Motor de IA del cliente (ACTIVO — INC-04 aún pendiente)
 
-Microservicio RAG del equipo IA en `https://ingesta-demo.onrender.com`.
-**Estado actual (2026-08-25): activo en `.env`** (`MOTOR_API_BASE_URL` configurado).
+Microservicio RAG del equipo IA. URL configurada en `.env` (`MOTOR_API_BASE_URL`).
+Auth: `X-API-Key: MOTOR_API_KEY`. `isMotorConfigured = Boolean(MOTOR_API_BASE_URL && MOTOR_API_KEY)`.
+
+**Endpoints en uso (2026-09-02)**:
+- `/v1/classroom/chat` — chat del Tutor IA con historial y tono (Bloque 8).
+- `/v1/classroom/flashcards` — generación de mazos de flashcards (Bloque 8).
+- `/v1/classroom/resumen` — resúmenes de tema (Bloque 8).
+- `/v1/onboarding/preguntas` — preguntas del test de nivel (Bloque 0, timeout 5 s).
+- `/v1/fatigue/analyze` — análisis de fatiga (Bloque 3).
+- (Bloques 6/7): generación de preguntas de entrenamiento — activo con fallback a OpenAI por INC-04.
+
+**Estado Bloque 6/7 — INC-04 aún pendiente (2026-08-25)**: activo en `.env`.
 Con el Motor activo, `CompositeAiClient` lo intenta primero y cae a OpenAI directo
 cuando el Motor falla por INC-04. El usuario no ve error pero espera ~67s en lugar de ~10s.
 
@@ -644,14 +683,14 @@ pnpm lint                       # lint completo
 
 | Bloque | Nombre | Estado |
 |---|---|---|
-| 1 | Acceso (Auth/Onboarding) | Frontend cerrado + Bloque 0 revisado: onboarding no repetido, test real de 20 preguntas, inicialización de intensidad del plan |
+| 1 | Acceso (Auth/Onboarding) | Frontend cerrado + Bloque 0 revisado: onboarding no repetido, test real de 20 preguntas, inicialización de intensidad del plan. Revisión 2026-09-02: test de nivel intenta Motor IA (`GET /training/level-test` ruta pública, 5 s timeout), fallback a preguntas estáticas |
 | 2 | Dashboard | Frontend + backend completo |
 | 3 | Salud | Frontend cerrado |
 | 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |
 | 5 | Motivación | Frontend + backend completo |
 | 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **desactivado por INC-04** (generaba con LLM y no exponía `correcta_idx` → primera opción siempre "correcta"). Fallback a OpenAI directo activo. Blindaje `CompositeAiClient` para reactivar sin riesgo cuando el equipo IA cierre INC-04 |
 | 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
-| 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 6 pantallas + modal reestilizados. EpisodePicker y TopicPicker funcionales. Chat OpenAI real, Flashcards stub IA, Podcast, Resúmenes |
+| 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 6 pantallas + modal reestilizados. EpisodePicker y TopicPicker funcionales. Revisión 2026-09-02: Motor IA wired para chat (historial+tono), flashcards y resúmenes; stubs como fallback. `ITutorAiClient` en dominio. `tonePrefs` desde AsyncStorage en TutorChatScreen |
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
 | 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-28: motor earn automático por tests (1 O/acierto × multiplicador, cap 100 O/día), mini-test BOE hasta 5 O, `getTodayTestEarnings` en repo. Revisión 2026-08-27: puente earn→ledger, `POST /store/discounts/:id/redeem`, 8 pantallas sin mocks, canje por `redeemType`, fixes tabs UI. |

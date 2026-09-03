@@ -5,6 +5,76 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-02 — Motor IA · Integración en Bloques 0, 8, 12 y Salud
+
+Rama: `fix/revision-bloques-bugfixes`. Cuatro integraciones del Motor IA en
+microservicios distintos. Commit principal: `feat(motor): integrar Motor IA en
+Aula Virtual y test de nivel (bloques 8 y 0)` (18 archivos, +471 / -57).
+
+### Integración A — Motor de Fatiga (Bloque 3 · Salud)
+
+`FatigueEngineScreen` llama `healthApi.analyzeFatigue(metrics)` → `POST /health/fatigue`
+→ `MotorFatigueClient` → Motor IA `/v1/fatigue/analyze`.
+Si el Motor responde, usa sus señales y nivel; si falla (timeout/offline),
+cae al cálculo local (`buildSignals`) sin que el usuario vea error.
+Motor activo solo cuando `MOTOR_API_BASE_URL` está configurado (`isMotorConfigured`).
+
+### Integración B — Tono IA alineado con Motor (Bloque 12 · Config)
+
+- Campos `personality`/`detailLevel`/`hintStyle`/`reinforcementLevel` renombrados y
+  normalizados para coincidir con los valores que acepta el Motor:
+  `cercano|formal|directo|motivador`, `0|1|2`, `socraticas|directas`, `alto|normal|ninguno`.
+- `buildToneProfile(prefs: UserPreferences): ToneProfile` en `ConfigUseCases.ts` convierte
+  al formato interno del Motor (`personalidad`, `nivel_detalle`, `estilo_pistas`, `refuerzo`).
+- `TutorChatScreen` ya no llama `settingsApi.getPreferences()` — lee directamente de
+  `AsyncStorage('opox.ai.tone')` que `ConfigToneScreen` mantiene actualizado. Envía
+  `tonePrefs` (OPOX format) al backend; el controller llama `buildToneProfile` antes de
+  pasarlo al Motor.
+- Migración Supabase requerida: bloque `-- Migración Motor IA (2026-09-02)` al final de
+  `bloque12_config.sql` (normaliza valores legacy `equilibrado→cercano`, `exigente→formal`).
+
+### Integración C — Aula Virtual con Motor (Bloque 8 · Tutor IA)
+
+**Arquitectura**: nueva interfaz de dominio `ITutorAiClient` (en `domain/repositories/`)
+para que los use cases no importen infraestructura directamente. `MotorTutorClient`
+la implementa con tres endpoints del Motor:
+
+- `chat()` → `POST /v1/classroom/chat` — historial de los últimos 10 mensajes incluido;
+  tono Motor recibido del controller vía `toneProfile`. Fallback al stub de personalidad
+  si el Motor falla.
+- `generateFlashcards()` → `POST /v1/classroom/flashcards` — 10 tarjetas por mazo.
+  Fallback al stub por `topicId` (`TODO(ia-bloque8)` reemplazado en producción).
+- `getSummary()` → `POST /v1/classroom/resumen` — resumen temporal no persistido en Supabase
+  (evita complejidad de `createSummary` en el repositorio). Fallback a `SummaryNotFoundError`.
+
+`SendMessageUseCase`, `GenerateDeckUseCase` y `GetSummaryUseCase` aceptan `ITutorAiClient`
+opcional en su constructor; `container.ts` pasa `motorTutor` (timeout 15 s) cuando el
+Motor está activo.
+
+### Integración D — Test de nivel con Motor (Bloque 0 · Onboarding)
+
+- Nueva ruta pública `GET /training/level-test` (sin `authMiddleware`) — el test corre
+  durante el onboarding antes del login.
+- `MotorOnboardingClient.getLevelTestQuestions(oposicion, count=20)` llama
+  `GET /v1/onboarding/preguntas` con timeout de **5 s**. Si el Motor no responde, cae
+  automáticamente a `STATIC_LEVEL_TEST` (las 20 preguntas estáticas hardcodeadas).
+- Mobile `LevelTestInProgressScreen` intenta obtener preguntas del Motor al montar
+  (via `trainingApi.getLevelTestQuestions`). Usa el resultado si viene con ≥10 preguntas;
+  si no (error o vacío), usa `QUESTIONS` local. Banner de carga visible durante el fetch.
+- `API_ROUTES.TRAINING.LEVEL_TEST = '/training/level-test'` añadida a `packages/constants`.
+
+### Estado final de la rama
+
+- Motor de Fatiga: activo cuando `MOTOR_API_BASE_URL` configurado, fallback local.
+- Tono IA: campos alineados con Motor + `buildToneProfile` wired en `TutorController`.
+- Chat Tutor: Motor real con historial + tono; stub de personalidad como fallback.
+- Flashcards: Motor real; stub por topicId como fallback.
+- Resúmenes: Motor real (temporal, no persistido); `SummaryNotFoundError` como fallback.
+- Test de nivel: Motor real con 5 s timeout; array estático como fallback.
+- Pruebas E2E pendientes para mañana.
+
+---
+
 ## 2026-08-30 — Bloque 12 · Revisión y conexión al backend
 
 Rama: `feat/revision-bloque-12-config`. Diagnóstico exhaustivo y corrección de 6 gaps
