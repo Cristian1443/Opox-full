@@ -14,6 +14,19 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Polygon } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 
+function MoonIcon({ size = 100, color = '#FFFFFF' }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 192 192" fill="none">
+            <Path
+                d="M133.733 140.445C114.483 138.696 96.3152 130.774 81.9396 117.859C68.7366 106.357 59.2309 91.2102 54.618 74.3227C47.7233 49.3846 50.9408 25.6226 63.572 3C33.1249 13.8978 -1.60622 50.5424 3.50508 102.422C5.97052 126.629 17.5096 149.008 35.8041 165.061C54.0987 181.114 77.7932 189.652 102.127 188.961C128.603 188.263 151.108 178.063 169.585 159.079C177.547 150.901 189.001 132.708 189.001 128.426C172.325 138.203 152.965 142.412 133.733 140.445Z"
+                stroke={color}
+                strokeWidth={6}
+                strokeLinejoin="round"
+            />
+        </Svg>
+    );
+}
+
 // expo-av fue removido: su .so nativo es incompatible con el JSI de React Native
 // 0.86.x (UnsatisfiedLinkError en cada arranque de la app). Hasta migrar a
 // expo-audio, esta pantalla funciona en modo timer puro (ExpoAudio siempre null).
@@ -32,7 +45,7 @@ const AUDIO_FILES = {
 const { width } = Dimensions.get('window');
 
 const FIGMA = {
-    moonCircleBg: 'rgba(36,189,144,0.25)',
+    moonCircleBg: '#4B5768',
     subtitleGray: '#C4C4C4',
     progressTrack: '#F1F1F1',
     timeLabel: '#919097',
@@ -243,7 +256,7 @@ export default function MeditationPlayerScreen({ navigation, route }) {
 
             <View style={styles.content}>
                 <View style={styles.moonCircle}>
-                    <Ionicons name="moon-outline" size={56} color="#FFFFFF" />
+                    <MoonIcon size={100} />
                 </View>
 
                 <Text style={styles.title}>{session.title}</Text>
@@ -404,8 +417,8 @@ const styles = StyleSheet.create({
     },
     timeText: {
         fontFamily: 'Poppins-Regular',
-        fontSize: 5.3,
-        letterSpacing: 1,
+        fontSize: 11,
+        letterSpacing: 0.5,
         color: FIGMA.timeLabel,
     },
     controls: {

@@ -81,13 +81,13 @@ export default function PlanningAgendaScreen({ navigation }) {
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.iconBtn}
+                    style={styles.backBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                     <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Agenda</Text>
-                <View style={styles.iconBtn} />
+                <View style={styles.headerSpacer} />
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -164,6 +164,15 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
     },
     iconBtn: { width: 32, padding: 4 },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerSpacer: { width: 44 },
     headerTitle: {
         flex: 1,
         fontFamily: 'Poppins-SemiBold',
@@ -173,19 +182,19 @@ const styles = StyleSheet.create({
     },
     scroll: { flex: 1 },
     body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 24 },
-    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, marginBottom: 8 },
-    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16 },
+    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: colors.textDark, marginBottom: 8 },
+    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 26 },
     rowTopBorder: { borderTopWidth: 0.44, borderTopColor: FIGMA.separator },
     listBottomBorder: { borderTopWidth: 0.44, borderTopColor: FIGMA.separator },
-    dateBadge: { width: 48, height: 53, borderRadius: 10, borderWidth: 0.32, borderColor: FIGMA.badgeBorder, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-    dateBadgeDay: { fontFamily: 'Poppins-Bold', fontSize: 23.4 },
-    dateBadgeMonth: { fontFamily: 'Poppins-Regular', fontSize: 12.2 },
+    dateBadge: { width: 52, height: 58, borderRadius: 10, borderWidth: 0.32, borderColor: FIGMA.badgeBorder, alignItems: 'center', justifyContent: 'center', marginRight: 18 },
+    dateBadgeDay: { fontFamily: 'Poppins-Bold', fontSize: 25 },
+    dateBadgeMonth: { fontFamily: 'Poppins-Regular', fontSize: 13 },
     rowTextWrap: { flex: 1 },
-    rowTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
-    rowSubtitle: { marginTop: 2, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote },
-    addIcon: { width: 48, textAlign: 'center', fontFamily: 'Poppins-Light', fontSize: 30.5, color: FIGMA.faded, marginRight: 14 },
-    addTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: FIGMA.faded },
-    addSubtitle: { marginTop: 2, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.faded },
+    rowTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: colors.textDark },
+    rowSubtitle: { marginTop: 3, fontFamily: 'Poppins-Regular', fontSize: 12, color: FIGMA.textNote },
+    addIcon: { width: 52, textAlign: 'center', fontFamily: 'Poppins-Light', fontSize: 32, color: FIGMA.faded, marginRight: 18 },
+    addTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: FIGMA.faded },
+    addSubtitle: { marginTop: 3, fontFamily: 'Poppins-Regular', fontSize: 12, color: FIGMA.faded },
     overlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
     modalCard: { backgroundColor: colors.white, borderRadius: 16, padding: 18, width: '100%' },
     modalTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: colors.textDark, marginBottom: 12 },

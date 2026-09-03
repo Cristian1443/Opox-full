@@ -405,7 +405,14 @@ export default function LevelTestInProgressScreen({ navigation }) {
             <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.backButton}
-                    onPress={() => navigation.goBack()}
+                    onPress={() => {
+                        // Si el test se reanudó tras cerrar la app (Splash hace un
+                        // `replace`), no hay pantalla anterior en el historial —
+                        // el progreso ya quedó guardado, así que "volver" sale al
+                        // inicio del onboarding en vez de no hacer nada.
+                        if (navigation.canGoBack()) navigation.goBack();
+                        else navigation.replace('OnboardingSlider');
+                    }}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Volver"
                 >

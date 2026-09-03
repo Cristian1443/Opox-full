@@ -159,6 +159,14 @@ export default function LoginScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={s.container}>
+            {/* Fondo texturizado de pantalla completa (907×1920 en Figma, mismo
+                origen que "Entrada") — el patrón de cebra se concentra arriba y
+                se desvanece a un gris plano hacia abajo, por eso cubre toda la
+                pantalla en vez de recortarse solo en el header. */}
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <Image source={HERO_BG} style={s.heroBg} resizeMode="cover" />
+            </View>
+
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={s.flex}
@@ -170,7 +178,6 @@ export default function LoginScreen({ navigation, route }) {
                 >
                     {/* Header / LOGO (Figma node 2293:573) */}
                     <View style={s.hero}>
-                        <Image source={HERO_BG} style={s.heroBg} resizeMode="cover" />
                         <View style={s.logoBlock}>
                             <OpoxLogo width={196} />
                             <Text style={s.tagline}>Tu APP de Oposiciones Inteligente</Text>
@@ -356,7 +363,6 @@ const s = StyleSheet.create({
     },
     hero: {
         height: 210,
-        overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center',
     },

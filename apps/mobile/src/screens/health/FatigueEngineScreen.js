@@ -8,7 +8,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 
@@ -17,8 +17,8 @@ import HealthScreenHeader from '../../components/HealthScreenHeader';
 const FIGMA = {
     textNote: '#343A3D',
     separator: 'rgba(65,41,80,0.5)',
-    featuredBgHigh: 'rgba(255,38,56,0.5)',
-    featuredBgLow: 'rgba(36,189,144,0.5)',
+    featuredBgHigh: '#FF2638',
+    featuredBgLow: '#5FD9A4',
     unknownBadge: '#A7ADB8',
 };
 
@@ -62,9 +62,8 @@ function buildSignals(metrics) {
         },
         {
             id: 4,
-            label: 'Saturación de oxígeno',
-            note: 'Rendimiento aeróbico',
-            value: spo2 != null ? `${spo2}%` : 'Sin datos',
+            label: 'Energía corporal',
+            value: spo2 == null ? 'Sin datos' : spo2 >= 95 ? 'OK' : 'Baja',
             status: spo2 == null ? 'unknown' : spo2 >= 95 ? 'ok' : 'alert',
             severity: spo2 == null ? 'unknown' : spo2 >= 95 ? 'ok' : 'warning',
         },
@@ -78,16 +77,15 @@ function buildSignals(metrics) {
     ];
 }
 
-function XMarkIcon({ size = 14, color = colors.white }) {
+function DotIcon({ size = 18, color = colors.white }) {
     return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path d="M6 6L18 18" stroke={color} strokeWidth={3} strokeLinecap="round" />
-            <Path d="M18 6L6 18" stroke={color} strokeWidth={3} strokeLinecap="round" />
+            <Circle cx={12} cy={12} r={7} fill={color} />
         </Svg>
     );
 }
 
-function CheckMarkIcon({ size = 14, color = colors.white }) {
+function CheckMarkIcon({ size = 18, color = colors.white }) {
     return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
             <Path d="M4 13l5 5L20 6" stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -101,7 +99,7 @@ function SignalRow({ signal, isFirst }) {
     return (
         <View style={[styles.signalRow, !isFirst && styles.signalRowSeparator]}>
             <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-                {signal.status === 'alert' ? <XMarkIcon /> : signal.status === 'ok' ? <CheckMarkIcon /> : null}
+                {signal.status === 'alert' ? <DotIcon /> : signal.status === 'ok' ? <CheckMarkIcon /> : null}
             </View>
             <View style={styles.signalTextWrap}>
                 <Text style={styles.signalLabel}>{signal.label}</Text>
@@ -202,19 +200,19 @@ const styles = StyleSheet.create({
     signalRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 14,
+        paddingVertical: 24,
     },
     signalRowSeparator: {
         borderTopWidth: 0.5,
         borderTopColor: FIGMA.separator,
     },
     badge: {
-        width: 29,
-        height: 29,
-        borderRadius: 3,
+        width: 40,
+        height: 40,
+        borderRadius: 11,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: 14,
     },
     signalTextWrap: {
         flex: 1,
@@ -227,12 +225,12 @@ const styles = StyleSheet.create({
     signalNote: {
         marginTop: 2,
         fontFamily: 'Poppins-Regular',
-        fontSize: 9,
+        fontSize: 11.5,
         color: FIGMA.textNote,
     },
     signalValue: {
         fontFamily: 'Poppins-Bold',
-        fontSize: 10.5,
+        fontSize: 15,
     },
     ctaButton: {
         height: 61,

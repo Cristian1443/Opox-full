@@ -37,7 +37,7 @@ export default function NudgeModal({
                 <View style={styles.sheet}>
                     <View style={styles.grip} />
 
-                    <View style={styles.iconWrap}>
+                    <View style={styles.iconRow}>
                         {icon}
                     </View>
 
@@ -88,22 +88,28 @@ const styles = StyleSheet.create({
         backgroundColor: FIGMA.handle,
         marginBottom: 20,
     },
-    iconWrap: {
-        marginBottom: 16,
+    iconRow: {
+        width: '100%',
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: -8,
+        marginBottom: 8,
     },
     title: {
+        width: '100%',
         fontFamily: 'Poppins-SemiBold',
         fontSize: 22,
         color: colors.textDark,
-        textAlign: 'center',
+        textAlign: 'left',
     },
     description: {
+        width: '100%',
         marginTop: 12,
         fontFamily: 'Poppins-Light',
         fontSize: 16,
         lineHeight: 22,
         color: colors.textDark,
-        textAlign: 'center',
+        textAlign: 'left',
     },
     btnPrimary: {
         width: '100%',

@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     },
     btnAllow: {
         backgroundColor: colors.ctaGreen,
-        borderRadius: 999,
+        borderRadius: 12,
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.xl,
         alignItems: 'center',

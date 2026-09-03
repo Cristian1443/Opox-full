@@ -1,18 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { RetoRecibidoModal } from '../../components/MotivationModals';
 import { motivationApi, trainingApi } from '../../api';
 import { colors, spacing } from '../../theme';
-
-function IconChevronLeft({ size = 11, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <Path d="M15 18l-6-6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
 
 function hoursLeft(expiresAt) {
     if (!expiresAt) return null;
@@ -158,13 +150,13 @@ export default function ChallengesScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
 
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <IconChevronLeft />
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Retos</Text>
+                <View style={styles.headerSpacer} />
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -286,53 +278,41 @@ export default function ChallengesScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.grayLight },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: colors.textDark, marginRight: 'auto' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.sm,
         paddingHorizontal: spacing.md,
-        paddingTop: 6,
+        paddingTop: spacing.sm,
         paddingBottom: spacing.sm,
     },
-    // Figma (NAV 2336:963 "Ellipse 352"): botón de volver = 24x24dp exacto.
     backBtn: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F2',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    // Figma (2336:965 "Retos"): fontSize 21dp exacto.
-    headerTitle: { fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3 },
+    headerTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3, textAlign: 'center' },
+    headerSpacer: { width: 44 },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: 24 },
-    // Figma (2336:991 "RETOS ACTIVOS"): fontSize 16dp exacto.
-    groupTitle: { fontSize: 16, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, marginBottom: 8, marginTop: 8, textTransform: 'uppercase' },
+    groupTitle: { fontSize: 18, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, marginBottom: 12, marginTop: 8, textTransform: 'uppercase' },
     empty: { textAlign: 'center', color: colors.textMuted, fontSize: 12.5, marginBottom: 10 },
-    card: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 14, padding: spacing.md, marginBottom: 9 },
-    // Figma (2337:1025/1003 "Maratón semanal"): fontSize 16dp exacto.
-    cardTitle: { fontSize: 16, fontWeight: '700', color: colors.textDark, textAlign: 'center' },
-    // Figma (2337:1024/1002 subtítulos): fontSize 7dp exacto.
-    cardSubtitle: { fontSize: 7, fontWeight: '600', color: colors.accentOrange, textAlign: 'center', marginTop: 2 },
-    // Figma (Vector 2337:1021/999): barra de progreso de 11.6dp de alto exacto.
-    progressTrack: { height: 12, backgroundColor: '#EEF1F7', borderRadius: 6, marginTop: spacing.sm, overflow: 'hidden' },
+    card: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 14, padding: spacing.lg, marginBottom: 16 },
+    cardTitle: { fontSize: 19, fontWeight: '700', color: colors.textDark, textAlign: 'center' },
+    cardSubtitle: { fontSize: 13, fontWeight: '600', color: colors.accentOrange, textAlign: 'center', marginTop: 3 },
+    progressTrack: { height: 14, backgroundColor: '#EEF1F7', borderRadius: 7, marginTop: spacing.md, overflow: 'hidden' },
     progressFill: { height: '100%', backgroundColor: colors.ctaGreen },
-    cardFootRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
-    // Figma (2337:1001 "12 de 28 del clan ya lo hicieron"): fontSize 9dp exacto.
-    progressCaption: { fontSize: 9, fontWeight: '400', color: colors.textDark, flex: 1 },
-    // Figma (2337:1000 "6h restantes"): fontSize 9dp exacto.
-    timeBadge: { fontSize: 9, fontWeight: '700', color: colors.accentOrange },
-    // Figma (2337:1022 "Iniciar"): fontSize 9dp exacto.
-    startLink: { fontSize: 9, fontWeight: '700', color: colors.ctaGreen },
+    cardFootRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
+    progressCaption: { fontSize: 13, fontWeight: '400', color: colors.textDark, flex: 1 },
+    timeBadge: { fontSize: 13, fontWeight: '700', color: colors.accentOrange },
+    startLink: { fontSize: 13, fontWeight: '700', color: colors.ctaGreen },
     startLinkDone: { color: colors.textMuted },
-    createCard: { backgroundColor: colors.ctaGreen, borderRadius: 14, paddingVertical: spacing.md, paddingHorizontal: spacing.md, alignItems: 'center', marginTop: spacing.sm },
-    // Figma (2337:1029 "+ Crear reto para tu clan"): fontSize 16dp exacto.
-    createTitle: { fontSize: 16, fontWeight: '700', color: colors.white },
-    // Figma (2337:1030 "Elige tema, nº de preguntas y duración"): fontSize 7dp exacto.
-    createCaption: { fontSize: 7, fontWeight: '500', color: colors.white, marginTop: 2 },
+    createCard: { backgroundColor: colors.ctaGreen, borderRadius: 30, paddingVertical: 20, paddingHorizontal: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+    createTitle: { fontSize: 19, fontWeight: '700', color: colors.white },
+    createCaption: { fontSize: 13, fontWeight: '500', color: colors.white, marginTop: 3 },
     overlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
     modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 18, width: '100%', maxHeight: '80%' },
     wizardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
