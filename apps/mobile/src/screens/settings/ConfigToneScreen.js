@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,13 +9,7 @@ import AccentSlider from '../../components/AccentSlider';
 import { colors, spacing } from '../../theme';
 import { settingsApi } from '../../api';
 
-// ─── 12.4 · Tono de la IA ───────────────────────────────────────────────────
-// Fiel al Figma (TonoDeLaIAScreen.tsx). El slider de nivel de detalle
-// reutiliza AccentSlider (componente compartido de Bloque 9) — su pulgar
-// blanco con borde oscuro ya coincide exactamente con lo que confirma Figma
-// aquí. La persistencia real en AsyncStorage/backend y el texto de vista
-// previa dinámico por personalidad (Figma solo muestra el ejemplo "cercano")
-// se conservan.
+// ─── 12.4 · Tono de la IA — alineado con Motor /tone ───────────────────────
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   segmentBorder: 'rgba(65, 41, 80, 0.2)',
@@ -25,24 +19,40 @@ const FIGMA = {
 const TONE_KEY = 'opox.ai.tone';
 
 const DEFAULT_TONE = {
-  personality: 'equilibrado',
-  detailLevel: 1,      // 0=Conciso · 1=Medio · 2=Extenso
-  directHints: false,
-  motivational: true,
+  personality: 'cercano',
+  detailLevel: 1,       // 0=Breve · 1=Medio · 2=Profundo
+  hintStyle: 'directas',
+  reinforcementLevel: 'normal',
 };
 
+// 4 opciones del Motor: Cercano / Formal / Directo / Motivador
 const PERSONALITY_OPTIONS = [
-  { key: 'cercano',     label: 'Cercano' },
-  { key: 'equilibrado', label: 'Equilibrado' },
-  { key: 'exigente',   label: 'Exigente' },
+  { key: 'cercano',   label: 'Cercano' },
+  { key: 'formal',    label: 'Formal' },
+  { key: 'directo',   label: 'Directo' },
+  { key: 'motivador', label: 'Motivador' },
 ];
 
-const DETAIL_LABELS = ['Conciso', 'Medio', 'Extenso'];
+const DETAIL_LABELS = ['Breve', 'Medio', 'Profundo'];
+
+// Estilo de pistas: 2 opciones del Motor
+const HINT_OPTIONS = [
+  { key: 'socraticas', label: 'Socráticas' },
+  { key: 'directas',   label: 'Directas' },
+];
+
+// Refuerzo: 3 opciones del Motor
+const REINFORCE_OPTIONS = [
+  { key: 'alto',    label: 'Alto' },
+  { key: 'normal',  label: 'Normal' },
+  { key: 'ninguno', label: 'Ninguno' },
+];
 
 const PREVIEW_TEXTS = {
-  cercano:     '"¡Buena esa, Juan! El art. 14 lo tienes dominado. Vamos con el siguiente."',
-  equilibrado: '"Has acertado el artículo 14. Sigue así con el siguiente."',
-  exigente:   '"Artículo 14 correcto. No bajes el ritmo. Siguiente."',
+  cercano:   '"¡Buena esa, Juan! El art. 14 lo tienes dominado. Vamos con el siguiente."',
+  formal:    '"Correcto. Artículo 14. Continúe con la siguiente cuestión."',
+  directo:   '"Correcto. Siguiente."',
+  motivador: '"¡Perfecto! Vas a reventar ese examen. Siguiente pregunta."',
 };
 
 async function loadToneLocal() {
@@ -68,25 +78,46 @@ function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
   );
 }
 
+function SegmentControl({ options, value, onChange }) {
+  return (
+    <View style={styles.segmentedRow}>
+      {options.map(({ key, label }) => {
+        const isSelected = value === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            style={[styles.segmentButton, isSelected && styles.segmentButtonActive]}
+            onPress={() => onChange(key)}
+            activeOpacity={0.7}
+            accessibilityLabel={label}
+          >
+            <Text style={[styles.segmentText, isSelected && styles.segmentTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function ConfigToneScreen({ navigation }) {
   const [tone, setTone] = useState(DEFAULT_TONE);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      // 1. Cargar inmediatamente desde AsyncStorage para respuesta instantánea
       const local = await loadToneLocal();
       if (!cancelled && local) setTone(local);
 
-      // 2. Preferir datos del backend (source of truth multi-dispositivo)
       const res = await settingsApi.getPreferences();
       if (!cancelled && !res?.error && res?.data) {
-        const { personality, detailLevel, directHints, motivational } = res.data;
+        const { personality, detailLevel, hintStyle, reinforcementLevel } = res.data;
         const fromBackend = {
-          personality:  personality  ?? DEFAULT_TONE.personality,
-          detailLevel:  detailLevel  ?? DEFAULT_TONE.detailLevel,
-          directHints:  directHints  ?? DEFAULT_TONE.directHints,
-          motivational: motivational ?? DEFAULT_TONE.motivational,
+          personality:        personality        ?? DEFAULT_TONE.personality,
+          detailLevel:        detailLevel        ?? DEFAULT_TONE.detailLevel,
+          hintStyle:          hintStyle          ?? DEFAULT_TONE.hintStyle,
+          reinforcementLevel: reinforcementLevel ?? DEFAULT_TONE.reinforcementLevel,
         };
         setTone(fromBackend);
         saveToneLocal(fromBackend);
@@ -99,15 +130,13 @@ export default function ConfigToneScreen({ navigation }) {
   const update = useCallback((patch) => {
     setTone((prev) => {
       const next = { ...prev, ...patch };
-      // Persistir localmente de forma síncrona para UX instantánea
       saveToneLocal(next);
-      // Sincronizar con backend en background
       settingsApi.updatePreferences({
-        personality:  next.personality,
-        detailLevel:  next.detailLevel,
-        directHints:  next.directHints,
-        motivational: next.motivational,
-      }).catch(() => { /* error silencioso — ya está en AsyncStorage */ });
+        personality:        next.personality,
+        detailLevel:        next.detailLevel,
+        hintStyle:          next.hintStyle,
+        reinforcementLevel: next.reinforcementLevel,
+      }).catch(() => {});
       return next;
     });
   }, []);
@@ -116,7 +145,6 @@ export default function ConfigToneScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.iconButton}
@@ -134,29 +162,17 @@ export default function ConfigToneScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* ── Personalidad ────────────────────────────────────────────── */}
-        <Text style={styles.sectionLabel}>PERSONALIDAD</Text>
-        <View style={styles.segmentedRow}>
-          {PERSONALITY_OPTIONS.map(({ key, label }) => {
-            const isSelected = tone.personality === key;
-            return (
-              <TouchableOpacity
-                key={key}
-                style={[styles.segmentButton, isSelected && styles.segmentButtonActive]}
-                onPress={() => update({ personality: key })}
-                activeOpacity={0.7}
-                accessibilityLabel={`Personalidad ${label}`}
-              >
-                <Text style={[styles.segmentText, isSelected && styles.segmentTextActive]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
 
-        {/* ── Nivel de detalle ────────────────────────────────────────── */}
-        <Text style={styles.detailLabel}>Nivel de detalle</Text>
+        {/* ── Personalidad ─────────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>PERSONALIDAD</Text>
+        <SegmentControl
+          options={PERSONALITY_OPTIONS}
+          value={tone.personality}
+          onChange={(key) => update({ personality: key })}
+        />
+
+        {/* ── Nivel de detalle ────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>NIVEL DE DETALLE</Text>
         <AccentSlider
           steps={3}
           valueIdx={tone.detailLevel ?? 1}
@@ -172,38 +188,27 @@ export default function ConfigToneScreen({ navigation }) {
           ))}
         </View>
 
-        {/* ── Toggles ─────────────────────────────────────────────────── */}
-        <View style={styles.toggleRow}>
-          <View style={styles.rowTextWrap}>
-            <Text style={styles.rowTitle}>Pistas más directas</Text>
-            <Text style={styles.rowSubtitle}>Acércate más a la respuesta</Text>
-          </View>
-          <Switch
-            value={tone.directHints}
-            onValueChange={(v) => update({ directHints: v })}
-            trackColor={{ false: '#E2E2E6', true: colors.purple }}
-            thumbColor={colors.white}
-            accessibilityLabel={`Pistas directas ${tone.directHints ? 'activadas' : 'desactivadas'}`}
-          />
-        </View>
+        {/* ── Estilo de pistas ─────────────────────────────────────── */}
+        <Text style={[styles.sectionLabel, styles.sectionSpacing]}>ESTILO DE PISTAS</Text>
+        <SegmentControl
+          options={HINT_OPTIONS}
+          value={tone.hintStyle}
+          onChange={(key) => update({ hintStyle: key })}
+        />
 
-        <View style={styles.toggleRow}>
-          <View style={styles.rowTextWrap}>
-            <Text style={styles.rowTitle}>Motivación en los avisos</Text>
-            <Text style={styles.rowSubtitle}>Mensajes de ánimo</Text>
-          </View>
-          <Switch
-            value={tone.motivational}
-            onValueChange={(v) => update({ motivational: v })}
-            trackColor={{ false: '#E2E2E6', true: colors.purple }}
-            thumbColor={colors.white}
-            accessibilityLabel={`Mensajes motivacionales ${tone.motivational ? 'activados' : 'desactivados'}`}
-          />
-        </View>
+        {/* ── Refuerzo ─────────────────────────────────────────────── */}
+        <Text style={[styles.sectionLabel, styles.sectionSpacing]}>REFUERZO</Text>
+        <SegmentControl
+          options={REINFORCE_OPTIONS}
+          value={tone.reinforcementLevel}
+          onChange={(key) => update({ reinforcementLevel: key })}
+        />
 
-        {/* ── Vista previa ────────────────────────────────────────────── */}
+        {/* ── Vista previa ─────────────────────────────────────────── */}
         <View style={styles.previewBubble}>
-          <Text style={styles.previewText}>{PREVIEW_TEXTS[tone.personality]}</Text>
+          <Text style={styles.previewText}>
+            {PREVIEW_TEXTS[tone.personality] ?? PREVIEW_TEXTS.cercano}
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -216,7 +221,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,7 +250,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── Contenido ─────────────────────────────────────────────────
   scroll: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -258,10 +261,13 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     marginBottom: 10,
   },
+  sectionSpacing: {
+    marginTop: 20,
+  },
 
-  // ── Personalidad ──────────────────────────────────────────────
   segmentedRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: spacing.lg,
   },
@@ -284,13 +290,6 @@ const styles = StyleSheet.create({
     color: colors.purple,
   },
 
-  // ── Nivel de detalle ──────────────────────────────────────────
-  detailLabel: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: colors.textDark,
-    marginBottom: 14,
-  },
   sliderLabelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -303,33 +302,11 @@ const styles = StyleSheet.create({
     color: FIGMA.textMuted,
   },
 
-  // ── Toggles ───────────────────────────────────────────────────
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  rowTextWrap: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: colors.textDark,
-  },
-  rowSubtitle: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 10.5,
-    color: FIGMA.textMuted,
-    marginTop: 2,
-  },
-
-  // ── Vista previa ──────────────────────────────────────────────
   previewBubble: {
     backgroundColor: colors.purple,
     borderRadius: 14,
     padding: spacing.md,
-    marginTop: spacing.sm + 4,
+    marginTop: spacing.md,
   },
   previewText: {
     fontFamily: 'Poppins-Regular',

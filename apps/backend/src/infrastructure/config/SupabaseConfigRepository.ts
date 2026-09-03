@@ -7,14 +7,16 @@ import type {
     AppTheme,
     TonePersonality,
     DetailLevel,
+    HintStyle,
+    ReinforcementLevel,
 } from '../../domain/entities';
 import { logger } from '@opox/utils';
 
 const DEFAULT_PREFS = {
-    personality: 'equilibrado' as TonePersonality,
+    personality: 'cercano' as TonePersonality,
     detail_level: 1 as DetailLevel,
-    direct_hints: false,
-    motivational: true,
+    hint_style: 'directas' as HintStyle,
+    reinforcement_level: 'normal' as ReinforcementLevel,
     theme: 'auto' as AppTheme,
     font_scale: 1.0,
     reduce_motion: false,
@@ -37,13 +39,13 @@ export class SupabaseConfigRepository implements IConfigRepository {
 
     async upsertPreferences(userId: string, input: UpdatePreferencesInput): Promise<UserPreferences> {
         const patch: Record<string, unknown> = { user_id: userId, updated_at: new Date().toISOString() };
-        if (input.personality !== undefined)  patch.personality   = input.personality;
-        if (input.detailLevel !== undefined)  patch.detail_level  = input.detailLevel;
-        if (input.directHints !== undefined)  patch.direct_hints  = input.directHints;
-        if (input.motivational !== undefined) patch.motivational  = input.motivational;
-        if (input.theme !== undefined)        patch.theme         = input.theme;
-        if (input.fontScale !== undefined)    patch.font_scale    = input.fontScale;
-        if (input.reduceMotion !== undefined) patch.reduce_motion = input.reduceMotion;
+        if (input.personality !== undefined)         patch.personality          = input.personality;
+        if (input.detailLevel !== undefined)         patch.detail_level         = input.detailLevel;
+        if (input.hintStyle !== undefined)           patch.hint_style           = input.hintStyle;
+        if (input.reinforcementLevel !== undefined)  patch.reinforcement_level  = input.reinforcementLevel;
+        if (input.theme !== undefined)               patch.theme                = input.theme;
+        if (input.fontScale !== undefined)           patch.font_scale           = input.fontScale;
+        if (input.reduceMotion !== undefined)        patch.reduce_motion        = input.reduceMotion;
 
         const { data, error } = await this.db
             .from('user_preferences')
@@ -52,13 +54,12 @@ export class SupabaseConfigRepository implements IConfigRepository {
             .single();
         if (error || !data) {
             logger.error('[config-repo] upsertPreferences', { error });
-            // Si la upsert falla (row bloqueada, etc.) retornamos un objeto con defaults
             return {
                 userId,
                 personality: (patch.personality ?? DEFAULT_PREFS.personality) as TonePersonality,
                 detailLevel: (patch.detail_level ?? DEFAULT_PREFS.detail_level) as DetailLevel,
-                directHints: (patch.direct_hints ?? DEFAULT_PREFS.direct_hints) as boolean,
-                motivational: (patch.motivational ?? DEFAULT_PREFS.motivational) as boolean,
+                hintStyle: (patch.hint_style ?? DEFAULT_PREFS.hint_style) as HintStyle,
+                reinforcementLevel: (patch.reinforcement_level ?? DEFAULT_PREFS.reinforcement_level) as ReinforcementLevel,
                 theme: (patch.theme ?? DEFAULT_PREFS.theme) as AppTheme,
                 fontScale: (patch.font_scale ?? DEFAULT_PREFS.font_scale) as number,
                 reduceMotion: (patch.reduce_motion ?? DEFAULT_PREFS.reduce_motion) as boolean,
@@ -183,15 +184,31 @@ export class SupabaseConfigRepository implements IConfigRepository {
 // ── Mappers ───────────────────────────────────────────────────────────────────
 
 function mapPrefs(row: Record<string, unknown>): UserPreferences {
+    // Normalización de personalidad legacy: 'equilibrado'→'cercano', 'exigente'→'formal'
+    const rawPersonality = (row.personality ?? DEFAULT_PREFS.personality) as string;
+    const personality = (rawPersonality === 'equilibrado' ? 'cercano'
+        : rawPersonality === 'exigente' ? 'formal'
+        : rawPersonality) as TonePersonality;
+
+    // Retrocompatibilidad: si hint_style no existe en BD, leer direct_hints (boolean)
+    const hintStyle: HintStyle = row.hint_style
+        ? (row.hint_style as HintStyle)
+        : (row.direct_hints ? 'directas' : 'socraticas');
+
+    // Retrocompatibilidad: si reinforcement_level no existe, leer motivational (boolean)
+    const reinforcementLevel: ReinforcementLevel = row.reinforcement_level
+        ? (row.reinforcement_level as ReinforcementLevel)
+        : (row.motivational ? 'alto' : 'normal');
+
     return {
-        userId:       row.user_id as string,
-        personality:  (row.personality  ?? DEFAULT_PREFS.personality)  as TonePersonality,
-        detailLevel:  (row.detail_level ?? DEFAULT_PREFS.detail_level)  as DetailLevel,
-        directHints:  (row.direct_hints ?? DEFAULT_PREFS.direct_hints)  as boolean,
-        motivational: (row.motivational ?? DEFAULT_PREFS.motivational)  as boolean,
-        theme:        (row.theme        ?? DEFAULT_PREFS.theme)         as AppTheme,
-        fontScale:    (row.font_scale   ?? DEFAULT_PREFS.font_scale)    as number,
-        reduceMotion: (row.reduce_motion ?? DEFAULT_PREFS.reduce_motion) as boolean,
-        updatedAt:    new Date(row.updated_at as string),
+        userId:             row.user_id as string,
+        personality,
+        detailLevel:        (row.detail_level ?? DEFAULT_PREFS.detail_level) as DetailLevel,
+        hintStyle,
+        reinforcementLevel,
+        theme:              (row.theme       ?? DEFAULT_PREFS.theme)        as AppTheme,
+        fontScale:          (row.font_scale  ?? DEFAULT_PREFS.font_scale)   as number,
+        reduceMotion:       (row.reduce_motion ?? DEFAULT_PREFS.reduce_motion) as boolean,
+        updatedAt:          new Date(row.updated_at as string),
     };
 }

@@ -1,5 +1,5 @@
 // Bloque 3 · Salud — Pantalla 3.4b · Motor de fatiga
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import { healthApi } from '../../api';
 
 // Colores confirmados contra Figma (frame MOTOR DE FATIGA, Bloque 3) sin
 // equivalente exacto en theme.js.
@@ -112,15 +113,45 @@ function SignalRow({ signal, isFirst }) {
     );
 }
 
+// Convierte las señales del Motor al shape que espera SignalRow.
+function mapMotorSignals(motorSenales) {
+    return motorSenales.map((s, i) => ({
+        id: i + 1,
+        label: s.label,
+        note: s.nota,
+        value: s.valor,
+        status: s.estado === 'alerta' ? 'alert' : s.estado === 'desconocido' ? 'unknown' : 'ok',
+        severity: s.severidad,
+    }));
+}
+
 export default function FatigueEngineScreen({ navigation, route }) {
-    // HomeHealthScreen pasa las métricas reales como parámetro de navegación.
     const metrics = route?.params?.metrics ?? null;
-    const SIGNALS = buildSignals(metrics);
+    const [motorResult, setMotorResult] = useState(null);
+
+    useEffect(() => {
+        if (!metrics) return;
+        let cancelled = false;
+        healthApi.analyzeFatigue(metrics).then((res) => {
+            if (!cancelled && !res?.error && res?.data) setMotorResult(res.data);
+        }).catch(() => { /* fallback silencioso al cálculo local */ });
+        return () => { cancelled = true; };
+    }, []);
+
+    // Motor disponible → usa sus datos; sin Motor → cálculo local.
+    const SIGNALS = motorResult
+        ? mapMotorSignals(motorResult.senales ?? [])
+        : buildSignals(metrics);
+
+    const motorFatigueLevel = motorResult
+        ? ({ alto: 'high', medio: 'medium', bajo: 'low' }[motorResult.nivel] ?? 'low')
+        : null;
 
     const criticalCount = SIGNALS.filter((s) => s.severity === 'critical').length;
     const warningCount = SIGNALS.filter((s) => s.severity === 'warning').length;
     const activeSignalsCount = SIGNALS.filter((s) => s.status === 'alert').length;
-    const fatigueLevel = criticalCount >= 2 ? 'high' : criticalCount === 1 || warningCount >= 2 ? 'medium' : 'low';
+    const fatigueLevel = motorFatigueLevel
+        ?? (criticalCount >= 2 ? 'high' : criticalCount === 1 || warningCount >= 2 ? 'medium' : 'low');
     const isHigh = fatigueLevel !== 'low';
 
     return (
@@ -147,6 +178,15 @@ export default function FatigueEngineScreen({ navigation, route }) {
                         <SignalRow key={signal.id} signal={signal} isFirst={index === 0} />
                     ))}
                 </View>
+
+                {motorResult?.recomendaciones?.length > 0 && (
+                    <View style={styles.recommendationsWrap}>
+                        <Text style={styles.sectionHeader}>RECOMENDACIONES</Text>
+                        {motorResult.recomendaciones.map((rec, i) => (
+                            <Text key={i} style={styles.recommendationItem}>{'· '}{rec}</Text>
+                        ))}
+                    </View>
+                )}
 
                 {/* CTA */}
                 <TouchableOpacity
@@ -245,5 +285,15 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
         color: colors.white,
+    },
+    recommendationsWrap: {
+        marginBottom: 24,
+    },
+    recommendationItem: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.5,
+        color: FIGMA.textNote,
+        marginTop: 6,
+        lineHeight: 18,
     },
 });

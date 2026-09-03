@@ -70,3 +70,33 @@ create policy "user_feedback: owner insert" on public.user_feedback
 drop policy if exists "user_feedback: owner select" on public.user_feedback;
 create policy "user_feedback: owner select" on public.user_feedback
     for select using (auth.uid() = user_id);
+
+
+-- ─── Migración Motor IA (2026-09-02) — nuevos campos de tono ─────────────────
+-- Ejecutar una vez contra la BD existente (idempotente gracias a IF NOT EXISTS).
+-- Añade hint_style y reinforcement_level. Actualiza el CHECK de personality para
+-- aceptar las cuatro personalidades del Motor (Cercano/Formal/Directo/Motivador).
+
+alter table public.user_preferences
+    add column if not exists hint_style          text not null default 'directas',
+    add column if not exists reinforcement_level text not null default 'normal';
+
+-- Actualizar el CHECK de personalidad para aceptar las nuevas opciones del Motor.
+-- Supabase no permite ALTER CONSTRAINT directamente — hay que dropear y recrear.
+alter table public.user_preferences drop constraint if exists user_preferences_personality_check;
+alter table public.user_preferences
+    add constraint user_preferences_personality_check
+    check (personality in ('cercano', 'equilibrado', 'exigente', 'formal', 'directo', 'motivador'));
+
+-- Normalizar los valores legacy en las filas existentes
+update public.user_preferences set personality = 'cercano' where personality = 'equilibrado';
+update public.user_preferences set personality = 'formal'  where personality = 'exigente';
+
+-- Retrocompatibilidad: poblar hint_style/reinforcement_level desde columnas legacy
+update public.user_preferences
+    set hint_style = case when direct_hints then 'directas' else 'socraticas' end
+    where hint_style = 'directas' and direct_hints = false;
+
+update public.user_preferences
+    set reinforcement_level = case when motivational then 'alto' else 'normal' end
+    where reinforcement_level = 'normal';

@@ -88,9 +88,7 @@ Actualizar este fichero al cerrar cada ítem.
 ## Bloque 12 · Configuración
 
 ### GAP-12-01 — Exportación PDF de estadísticas
-**Estado**: Stub 202 (`downloadUrl: null`)  
-**Marcador**: `TODO(bloque-12)` en el use case de export  
-**Solución**: Implementar generación PDF con pdfkit o puppeteer en `POST /config/pro-stats/export`. Enviar push cuando esté listo (`SendNoteReadyUseCase` como referencia de patrón).
+**Estado**: ~~Cerrado~~ — implementado en revisión 2026-08-30 con pdfkit + Supabase Storage. URL firmada (1 h). Este gap es obsoleto.
 
 ---
 
@@ -104,3 +102,40 @@ Actualizar este fichero al cerrar cada ítem.
 ### GAP-MOTOR-02 — Re-ingesta del temario oficial
 **Estado**: Pendiente  
 **Contexto**: El curso activo (`1357e871b542425b`) contiene datos migrados del Cloud Run viejo. Pendiente re-ingestar el temario oficial y actualizar `MOTOR_DEFAULT_CURSO_ID` en `.env`.
+
+---
+
+## Bloque 0 · Acceso / Onboarding
+
+### GAP-00-01 — Test de nivel estático vs Motor IA
+**Estado**: Divergencia documentada — decisión pendiente  
+**Contexto**: `FLUJO_NAVEGACION.md` y `LevelTestInProgressScreen.js` implementan un test de 20 preguntas **estáticas** hardcoded (8 Constitución, 8 Ley 39/2015, 2 Ley 40/2015, 2 Org. Estado). El Motor IA en `https://ia.opox.jaeverba.com/onboarding` ya ofrece generación dinámica con distribución configurable (40% easy/40% medium/20% hard) y cantidad de preguntas seleccionable.  
+**Decisión requerida**: ¿Integrar Motor para el test de nivel (más adaptativo, requiere Motor activo en onboarding) o mantener estático (sin dependencia de red en el flujo crítico de primera apertura)?  
+**Si se integra**: añadir `GenerateLevelTestParams` al `AiApiContract`, nuevo endpoint `POST /auth/level-test/generate`, y sustituir las preguntas hardcoded en `LevelTestInProgressScreen.js`.
+
+---
+
+## Bloque 3 · Salud (integración Motor pendiente)
+
+### GAP-03-01 — Motor de fatiga con umbral personalizado
+**Estado**: Funcional con valores hardcoded — Motor disponible  
+**Contexto**: `FatigueEngineScreen.js` compara contra `HRV_BASE=50, HR_BASE=61` hardcoded. El Motor en `/fatigue` acepta HRV + FC reposo + horas de sueño y devuelve semáforo + histórico 7 días + recomendaciones de descanso calculados contra la **línea base personal** del usuario (no un valor fijo).  
+**Solución**: Ver Plan de implementación Bloque 3 en este documento.
+
+---
+
+## Bloque 8 · Aula Virtual (integración Motor pendiente)
+
+### GAP-08-01 — Tutor Chat, Flashcards, Podcast, Resúmenes con Motor
+**Estado**: Chat via OpenAI directo, Flashcards stub IA  
+**Contexto**: El Motor en `/classroom` ofrece tutor RAG sobre el temario oficial, resúmenes con 3 niveles de profundidad (cacheados), podcast con selector de duración, y flashcards con cantidad configurable. La integración con el Motor elevaría la calidad del tutor al usar el corpus indexado en lugar de un LLM genérico.  
+**Solución**: Ver Plan de implementación Bloque 8 en este documento.
+
+---
+
+## Bloque 12 · Configuración (integración Motor pendiente)
+
+### GAP-12-02 — Perfil de tono IA no propagado a las respuestas del Motor
+**Estado**: `PATCH /config/preferences` guarda `personality` en BD — Motor no lo recibe  
+**Contexto**: El Motor en `/tone` expone personalidad (Cercano/Formal/Directo/Motivador), modo de discurso, estilo de pista y nivel de referencia. Actualmente `TutorChatScreen` llama al backend que llama a OpenAI directo sin aplicar el perfil guardado. Cuando se integre el Motor para el Aula Virtual, hay que propagar el perfil de tono en cada request.  
+**Solución**: Ver Plan de implementación Bloque 12 en este documento.

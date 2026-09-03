@@ -21,15 +21,15 @@ function ok<T>(res: Response, status: number, data: T): void {
 
 function serializePrefs(p: UserPreferences): UserPrefsDTO {
     return {
-        userId:       p.userId,
-        personality:  p.personality,
-        detailLevel:  p.detailLevel,
-        directHints:  p.directHints,
-        motivational: p.motivational,
-        theme:        p.theme,
-        fontScale:    p.fontScale,
-        reduceMotion: p.reduceMotion,
-        updatedAt:    p.updatedAt.toISOString(),
+        userId:             p.userId,
+        personality:        p.personality,
+        detailLevel:        p.detailLevel,
+        hintStyle:          p.hintStyle,
+        reinforcementLevel: p.reinforcementLevel,
+        theme:              p.theme,
+        fontScale:          p.fontScale,
+        reduceMotion:       p.reduceMotion,
+        updatedAt:          p.updatedAt.toISOString(),
     };
 }
 

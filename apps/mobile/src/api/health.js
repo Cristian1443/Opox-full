@@ -10,4 +10,12 @@ export const healthApi = {
 
     deleteDevice: (deviceId) =>
         api.delete(API_ROUTES.HEALTH_DEVICE.replace(':deviceId', deviceId), { auth: true }),
+
+    // Análisis de fatiga via Motor IA (Bloque 3). Acepta métricas de HealthKit/Health Connect.
+    analyzeFatigue: ({ hrv, restingHeartRate, sleepHours } = {}) =>
+        api.post(API_ROUTES.HEALTH_FATIGUE, {
+            hrv: hrv ?? null,
+            fc_reposo: restingHeartRate ?? null,
+            sueno_horas: sleepHours ?? null,
+        }, { auth: true }),
 };

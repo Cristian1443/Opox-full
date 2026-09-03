@@ -1,13 +1,13 @@
 import PDFDocument from 'pdfkit';
 import type { IConfigRepository } from '../../domain/repositories';
-import type { UserPreferences, UpdatePreferencesInput, ProStats } from '../../domain/entities';
+import type { UserPreferences, UpdatePreferencesInput, ProStats, ToneProfile } from '../../domain/entities';
 import { FeedbackInvalidError } from '../../domain/errors';
 
 const DEFAULT_PREFERENCES: Omit<UpdatePreferencesInput, never> = {
-    personality: 'equilibrado',
+    personality: 'cercano',
     detailLevel: 1,
-    directHints: false,
-    motivational: true,
+    hintStyle: 'directas',
+    reinforcementLevel: 'normal',
     theme: 'auto',
     fontScale: 1.0,
     reduceMotion: false,
@@ -30,6 +30,30 @@ export class UpdatePreferencesUseCase {
     async execute(userId: string, input: UpdatePreferencesInput): Promise<UserPreferences> {
         return this.repo.upsertPreferences(userId, input);
     }
+}
+
+/** Convierte las preferencias OPOX al formato que el Motor IA espera en cada request. */
+export function buildToneProfile(prefs: UserPreferences): ToneProfile {
+    const PERSONALITY_MAP: Record<string, ToneProfile['personalidad']> = {
+        cercano:     'Cercano',
+        equilibrado: 'Cercano',
+        formal:      'Formal',
+        exigente:    'Formal',
+        directo:     'Directo',
+        motivador:   'Motivador',
+    };
+    const DETAIL_MAP: ToneProfile['nivel_detalle'][] = ['Breve', 'Medio', 'Profundo'];
+    const REFUERZO_MAP: Record<string, ToneProfile['refuerzo']> = {
+        alto:   'Alto',
+        normal: 'Normal',
+        ninguno: 'Ninguno',
+    };
+    return {
+        personalidad:   PERSONALITY_MAP[prefs.personality] ?? 'Cercano',
+        nivel_detalle:  DETAIL_MAP[prefs.detailLevel] ?? 'Medio',
+        estilo_pistas:  prefs.hintStyle === 'socraticas' ? 'Socraticas' : 'Directas',
+        refuerzo:       REFUERZO_MAP[prefs.reinforcementLevel] ?? 'Normal',
+    };
 }
 
 // ── 12.7 Estadísticas Pro ────────────────────────────────────────────────────

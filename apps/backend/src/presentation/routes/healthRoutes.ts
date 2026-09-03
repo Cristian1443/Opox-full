@@ -17,6 +17,7 @@ export function createHealthRouter(
         router.get(API_ROUTES.HEALTH_DEVICES, authMiddleware, controller.listDevices);
         router.post(API_ROUTES.HEALTH_DEVICES, authMiddleware, controller.addDevice);
         router.delete(API_ROUTES.HEALTH_DEVICE, authMiddleware, controller.removeDevice);
+        router.post(API_ROUTES.HEALTH_FATIGUE, authMiddleware, controller.analyzeFatigue);
     }
 
     return router;

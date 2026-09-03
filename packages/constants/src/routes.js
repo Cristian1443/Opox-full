@@ -7,6 +7,7 @@ export const API_ROUTES = {
     HEALTH: '/health',
     HEALTH_DEVICES: '/health/devices',
     HEALTH_DEVICE: '/health/devices/:deviceId',
+    HEALTH_FATIGUE: '/health/fatigue',
 
     AUTH: {
         REGISTER: '/auth/register',

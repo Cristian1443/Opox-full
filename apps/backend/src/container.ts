@@ -157,6 +157,7 @@ import {
     MotorAiClient,
     CompositeAiClient,
     MotorBoeClient,
+    MotorFatigueClient,
 } from './infrastructure';
 import {
     HealthController,
@@ -313,6 +314,10 @@ export function buildContainer() {
             'Rellena MOTOR_BOE_BASE_URL en .env para activar la sincronización automática de cambios.',
         );
     }
+
+    const motorFatigue = isMotorConfigured
+        ? new MotorFatigueClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 10_000)
+        : undefined;
 
     // ─── Use cases (application) ──────────────────
     const getWeek = new GetWeekUseCase(planningRepo);
@@ -589,6 +594,7 @@ export function buildContainer() {
         getDevices:     useCases.getHealthDevices,
         registerDevice: useCases.registerHealthDevice,
         deleteDevice:   useCases.deleteHealthDevice,
+        motorFatigue,
     });
 
     const pushTokenController = new PushTokenController({

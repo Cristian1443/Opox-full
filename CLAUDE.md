@@ -453,8 +453,17 @@ Colección de tests en `Bloque12_Config_Tests.postman_collection.json` (10 reque
 las crea con defaults (`equilibrado`, `detailLevel:1`, `theme:auto`, `fontScale:1.0`).
 
 **`PATCH /config/preferences`**: upsert parcial — solo enviar los campos a cambiar.
-Valida `personality` ∈ `{cercano,equilibrado,exigente}`, `theme` ∈ `{auto,light,dark}`,
-`detailLevel` ∈ `{0,1,2}`.
+Valida `personality` ∈ `{cercano,formal,directo,motivador,equilibrado,exigente}`, `theme` ∈ `{auto,light,dark}`,
+`detailLevel` ∈ `{0,1,2}`, `hintStyle` ∈ `{socraticas,directas}`, `reinforcementLevel` ∈ `{alto,normal,ninguno}`.
+
+**Tono IA — campos alineados con Motor (revisión 2026-09-02)**:
+- `personality`: `'cercano'|'formal'|'directo'|'motivador'` (Motor: Cercano/Formal/Directo/Motivador).
+  Legacy `'equilibrado'→'cercano'`, `'exigente'→'formal'` normalizados en mapper Supabase y en SQL.
+- `detailLevel`: `0|1|2` (Motor: Breve/Medio/Profundo). Labels del slider actualizados en `ConfigToneScreen`.
+- `hintStyle`: `'socraticas'|'directas'` (Motor: Socráticas/Directas). Reemplaza `directHints: boolean`.
+- `reinforcementLevel`: `'alto'|'normal'|'ninguno'` (Motor: Alto/Normal/Ninguno). Reemplaza `motivational: boolean`.
+- `buildToneProfile(prefs: UserPreferences): ToneProfile` en `ConfigUseCases.ts` — transforma al formato del Motor.
+- **Migración Supabase requerida antes de desplegar**: ejecutar el bloque `-- Migración Motor IA (2026-09-02)` al final de `bloque12_config.sql`.
 
 **Mapeo mobile → backend para accesibilidad** (revisión 2026-08-30):
 - Mobile `'claro'/'oscuro'` → API `'light'/'dark'` (CHECK constraint lo exige).
@@ -529,8 +538,11 @@ automáticamente. Estados: `loading → complete / denied / unavailable`.
 Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.
 
 **Motor de fatiga** (`FatigueEngineScreen.js`): recibe `metrics` vía `route.params`.
+Al montar, llama `healthApi.analyzeFatigue(metrics)` → `POST /health/fatigue` → `MotorFatigueClient` → Motor IA `/v1/fatigue/analyze`.
+Si el Motor responde, usa sus señales y nivel; si falla (timeout/offline), cae al cálculo local:
 `buildSignals(metrics)` → status `ok/warning/critical/unknown` por señal.
-Nivel: `high` (≥2 críticas), `medium` (1 crítica o ≥2 warning), `low` (resto).
+Nivel local: `high` (≥2 críticas), `medium` (1 crítica o ≥2 warning), `low` (resto).
+Motor activo solo cuando `MOTOR_API_BASE_URL` está configurado (`isMotorConfigured`).
 
 **Permisos de notificaciones** (`PermissionsScreen.js`):
 - "¡A por más!" → `Notifications.requestPermissionsAsync()` real (lazy require).
