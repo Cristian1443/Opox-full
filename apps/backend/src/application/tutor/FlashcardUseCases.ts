@@ -1,9 +1,10 @@
+import { logger } from '@opox/utils';
 import type { ITutorRepository } from '../../domain';
 import { DeckNotFoundError } from '../../domain';
+import type { ITutorAiClient } from '../../domain/repositories/ITutorAiClient';
 import type { TutorFlashcardDeck, TutorFlashcard } from '../../domain/entities';
 
-// ─── Tarjetas stub por tema ───────────────────────────────────────────────────
-// TODO(ia-bloque8): reemplazar con TutorAiContract.generateFlashcards()
+// ─── Tarjetas stub por tema (fallback sin Motor) ──────────────────────────────
 const STUB_CARDS_BY_TOPIC: Record<string, Array<{ question: string; answer: string }>> = {
     constitucion: [
         { question: '¿Cuántos artículos tiene la Constitución Española de 1978?', answer: '169 artículos, distribuidos en un Título Preliminar y diez Títulos.' },
@@ -53,9 +54,12 @@ export class GetDeckWithCardsUseCase {
     }
 }
 
-// ─── Generar mazo (stub sin IA) ───────────────────────────────────────────────
+// ─── Generar mazo con Motor IA (stub como fallback) ───────────────────────────
 export class GenerateDeckUseCase {
-    constructor(private readonly tutorRepo: ITutorRepository) {}
+    constructor(
+        private readonly tutorRepo: ITutorRepository,
+        private readonly tutorAi?: ITutorAiClient,
+    ) {}
 
     async execute(params: {
         userId: string;
@@ -63,8 +67,25 @@ export class GenerateDeckUseCase {
         topicTitle: string;
         oposicion: string;
     }): Promise<{ deck: TutorFlashcardDeck; cards: TutorFlashcard[] }> {
-        // TODO(ia-bloque8): reemplazar getStubCards por TutorAiContract.generateFlashcards()
-        const cards = getStubCards(params.topicId);
+        let cards: Array<{ question: string; answer: string }>;
+
+        if (this.tutorAi) {
+            try {
+                cards = await this.tutorAi.generateFlashcards({
+                    topicId: params.topicId,
+                    topicTitle: params.topicTitle,
+                    oposicion: params.oposicion,
+                    count: 10,
+                });
+                if (!cards.length) throw new Error('Motor devolvió 0 tarjetas');
+            } catch (err) {
+                logger.warn('[GenerateDeck] Motor falló, usando stub', { err: String(err) });
+                cards = getStubCards(params.topicId);
+            }
+        } else {
+            cards = getStubCards(params.topicId);
+        }
+
         return this.tutorRepo.createDeck({ ...params, cards });
     }
 }

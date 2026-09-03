@@ -13,12 +13,15 @@ import {
     reportQuestionSchema,
 } from '../validators';
 
-/** Todas las rutas del Bloque 6 requieren sesión. */
+/** La mayoría de rutas del Bloque 6 requieren sesión. LEVEL_TEST es pública (onboarding). */
 export function createTrainingRouter(
     controller: TrainingController,
     authMiddleware: RequestHandler,
 ): Router {
     const r = Router();
+
+    // Ruta pública — sin auth — para el test de nivel en el onboarding
+    r.get(API_ROUTES.TRAINING.LEVEL_TEST, controller.getLevelTest);
 
     r.get(
         API_ROUTES.TRAINING.MOCKS,

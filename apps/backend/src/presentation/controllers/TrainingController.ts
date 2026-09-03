@@ -38,6 +38,32 @@ import type { TrainingAttempt } from '../../domain/entities/TrainingAttempt';
 import type { TrainingBookmark } from '../../domain/entities/TrainingBookmark';
 import type { ErrorPattern } from '../../domain/entities/MockExam';
 import { MockExamNotFoundError } from '../../domain';
+import type { MotorOnboardingClient, LevelTestQuestion } from '../../infrastructure/clients/MotorOnboardingClient';
+
+// ─── Preguntas de nivel estáticas (fallback sin Motor) ────────────────────────
+// Solo las primeras 20 — misma distribución que LevelTestInProgressScreen.js
+const STATIC_LEVEL_TEST: LevelTestQuestion[] = [
+    { id: 1, topic: 'ley-39',       topicLabel: 'Ley 39/2015',      question: 'Según la Ley 39/2015, el plazo general para resolver un procedimiento administrativo es de:', options: [{ id:'A', text:'Un mes' }, { id:'B', text:'Tres meses' }, { id:'C', text:'Seis meses' }, { id:'D', text:'Un año' }], correct: 'C' },
+    { id: 2, topic: 'constitucion', topicLabel: 'Constitución',      question: '¿Cuántos artículos tiene la Constitución Española de 1978?', options: [{ id:'A', text:'159' }, { id:'B', text:'169' }, { id:'C', text:'179' }, { id:'D', text:'189' }], correct: 'B' },
+    { id: 3, topic: 'org-estado',   topicLabel: 'Org. del Estado',   question: '¿Cuál es el órgano colegiado supremo de la Administración General del Estado?', options: [{ id:'A', text:'El Congreso de los Diputados' }, { id:'B', text:'El Senado' }, { id:'C', text:'El Consejo de Ministros' }, { id:'D', text:'El Tribunal Supremo' }], correct: 'C' },
+    { id: 4, topic: 'constitucion', topicLabel: 'Constitución',      question: '¿En qué fecha fue ratificada la Constitución Española en referéndum?', options: [{ id:'A', text:'31 de octubre de 1978' }, { id:'B', text:'6 de diciembre de 1978' }, { id:'C', text:'27 de diciembre de 1978' }, { id:'D', text:'29 de diciembre de 1978' }], correct: 'B' },
+    { id: 5, topic: 'ley-40',       topicLabel: 'Ley 40/2015',       question: 'Según la Ley 40/2015, las relaciones entre Administraciones Públicas se rigen por el principio de:', options: [{ id:'A', text:'Jerarquía' }, { id:'B', text:'Lealtad institucional' }, { id:'C', text:'Subordinación' }, { id:'D', text:'Unidad de mando' }], correct: 'B' },
+    { id: 6, topic: 'ley-39',       topicLabel: 'Ley 39/2015',       question: 'El recurso de alzada debe interponerse en el plazo máximo de:', options: [{ id:'A', text:'1 mes si el acto es expreso' }, { id:'B', text:'2 meses si el acto es expreso' }, { id:'C', text:'3 meses siempre' }, { id:'D', text:'6 meses siempre' }], correct: 'A' },
+    { id: 7, topic: 'ley-39',       topicLabel: 'Ley 39/2015',       question: 'El silencio administrativo en procedimientos iniciados a solicitud del interesado se considera, con carácter general:', options: [{ id:'A', text:'Negativo' }, { id:'B', text:'Positivo' }, { id:'C', text:'Nulo de pleno derecho' }, { id:'D', text:'Anulable' }], correct: 'B' },
+    { id: 8, topic: 'constitucion', topicLabel: 'Constitución',      question: '¿Cuántos magistrados componen el Tribunal Constitucional?', options: [{ id:'A', text:'9' }, { id:'B', text:'10' }, { id:'C', text:'12' }, { id:'D', text:'15' }], correct: 'C' },
+    { id: 9, topic: 'constitucion', topicLabel: 'Constitución',      question: 'Según el artículo 1 de la Constitución, la forma política del Estado español es:', options: [{ id:'A', text:'República parlamentaria' }, { id:'B', text:'Monarquía constitucional' }, { id:'C', text:'Monarquía parlamentaria' }, { id:'D', text:'Estado federado' }], correct: 'C' },
+    { id: 10, topic: 'ley-39',      topicLabel: 'Ley 39/2015',       question: 'La Ley 39/2015 del Procedimiento Administrativo Común entró en vigor el:', options: [{ id:'A', text:'1 de enero de 2016' }, { id:'B', text:'2 de octubre de 2016' }, { id:'C', text:'1 de enero de 2017' }, { id:'D', text:'2 de octubre de 2017' }], correct: 'B' },
+    { id: 11, topic: 'ley-39',      topicLabel: 'Ley 39/2015',       question: '¿Cuántos días hábiles tiene el interesado para subsanar defectos en su solicitud según la Ley 39/2015?', options: [{ id:'A', text:'5 días hábiles' }, { id:'B', text:'10 días hábiles' }, { id:'C', text:'15 días hábiles' }, { id:'D', text:'20 días hábiles' }], correct: 'B' },
+    { id: 12, topic: 'constitucion', topicLabel: 'Constitución',     question: 'El Defensor del Pueblo es elegido por:', options: [{ id:'A', text:'El Gobierno' }, { id:'B', text:'El Rey' }, { id:'C', text:'Las Cortes Generales' }, { id:'D', text:'El Tribunal Constitucional' }], correct: 'C' },
+    { id: 13, topic: 'ley-39',      topicLabel: 'Ley 39/2015',       question: 'En el cómputo de plazos en días hábiles, se excluyen:', options: [{ id:'A', text:'Solo los festivos nacionales' }, { id:'B', text:'Los sábados, domingos y festivos' }, { id:'C', text:'Solo los domingos' }, { id:'D', text:'Los festivos autonómicos únicamente' }], correct: 'B' },
+    { id: 14, topic: 'org-estado',  topicLabel: 'Org. del Estado',   question: 'La Administración General del Estado se organiza territorialmente principalmente en:', options: [{ id:'A', text:'Comunidades Autónomas' }, { id:'B', text:'Delegaciones y Subdelegaciones del Gobierno' }, { id:'C', text:'Municipios' }, { id:'D', text:'Diputaciones Provinciales' }], correct: 'B' },
+    { id: 15, topic: 'constitucion', topicLabel: 'Constitución',     question: '¿Qué artículo de la Constitución Española reconoce el principio de igualdad ante la ley?', options: [{ id:'A', text:'Artículo 12' }, { id:'B', text:'Artículo 14' }, { id:'C', text:'Artículo 16' }, { id:'D', text:'Artículo 18' }], correct: 'B' },
+    { id: 16, topic: 'ley-39',      topicLabel: 'Ley 39/2015',       question: 'El recurso de reposición es un recurso:', options: [{ id:'A', text:'Ordinario ante el superior jerárquico' }, { id:'B', text:'Extraordinario ante el mismo órgano' }, { id:'C', text:'Potestativo previo al contencioso-administrativo' }, { id:'D', text:'Obligatorio en todo caso' }], correct: 'C' },
+    { id: 17, topic: 'ley-40',      topicLabel: 'Ley 40/2015',       question: 'La Ley 40/2015 de Régimen Jurídico del Sector Público entró en vigor el:', options: [{ id:'A', text:'1 de enero de 2016' }, { id:'B', text:'2 de octubre de 2016' }, { id:'C', text:'1 de enero de 2017' }, { id:'D', text:'1 de octubre de 2017' }], correct: 'B' },
+    { id: 18, topic: 'constitucion', topicLabel: 'Constitución',     question: 'Según la Constitución, el Congreso de los Diputados se compone de:', options: [{ id:'A', text:'Un mínimo de 300 y un máximo de 400 diputados' }, { id:'B', text:'Un mínimo de 250 y un máximo de 350 diputados' }, { id:'C', text:'Un número fijo de 350 diputados' }, { id:'D', text:'Un mínimo de 350 y un máximo de 450 diputados' }], correct: 'A' },
+    { id: 19, topic: 'constitucion', topicLabel: 'Constitución',     question: '¿Cuántos títulos numerados (del I al X) contiene la Constitución Española?', options: [{ id:'A', text:'8' }, { id:'B', text:'9' }, { id:'C', text:'10' }, { id:'D', text:'11' }], correct: 'C' },
+    { id: 20, topic: 'ley-39',      topicLabel: 'Ley 39/2015',       question: 'Los actos administrativos de las Administraciones Públicas sujetos al Derecho Administrativo se presumirán:', options: [{ id:'A', text:'Definitivos y ejecutorios' }, { id:'B', text:'Válidos y producirán efectos desde la fecha en que se dicten' }, { id:'C', text:'Firmes desde su notificación' }, { id:'D', text:'Ejecutivos salvo suspensión judicial' }], correct: 'B' },
+];
 
 export class TrainingController {
     constructor(
@@ -55,6 +81,7 @@ export class TrainingController {
             generateHint: GenerateHintUseCase;
             reportQuestion: ReportQuestionUseCase;
             listTopics: ListTopicsUseCase;
+            motorOnboarding?: MotorOnboardingClient;
         },
     ) { }
 
@@ -268,6 +295,25 @@ export class TrainingController {
             const oposicion = (req.query['oposicion'] as string) ?? '';
             const topics = await this.deps.listTopics.execute(oposicion);
             this.ok(res, 200, topics);
+        } catch (err) { next(err); }
+    };
+
+    // GET /training/level-test?oposicion= — PÚBLICO (sin auth, onboarding)
+    getLevelTest = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const oposicion = (req.query['oposicion'] as string) ?? 'justicia-tramitacion';
+
+            if (this.deps.motorOnboarding) {
+                try {
+                    const questions = await this.deps.motorOnboarding.getLevelTestQuestions(oposicion, 20);
+                    this.ok<LevelTestQuestion[]>(res, 200, questions);
+                    return;
+                } catch {
+                    // Motor falló — usar estático sin propagar el error al cliente
+                }
+            }
+
+            this.ok<LevelTestQuestion[]>(res, 200, STATIC_LEVEL_TEST);
         } catch (err) { next(err); }
     };
 }

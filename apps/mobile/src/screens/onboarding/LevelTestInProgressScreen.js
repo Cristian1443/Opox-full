@@ -5,11 +5,13 @@ import {
     TouchableOpacity,
     StyleSheet,
     StatusBar,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing } from '../../theme';
+import { trainingApi } from '../../api';
 
 // Persiste la pregunta actual para reanudar si el usuario cierra la app a medias.
 export const PENDING_LEVEL_TEST_KEY = 'opox.pendingLevelTestIndex';
@@ -282,8 +284,6 @@ const QUESTIONS = [
     },
 ];
 
-const TOTAL = QUESTIONS.length; // 20
-
 // Calcula nivel e intensidad a partir del porcentaje de aciertos
 function calcLevelAndIntensity(percent) {
     if (percent >= 75) return { level: 'Avanzado', intensity: 'high' };
@@ -292,9 +292,9 @@ function calcLevelAndIntensity(percent) {
 }
 
 // Calcula fortalezas y debilidades por área temática
-function calcStrengthsAndWeaknesses(answers) {
+function calcStrengthsAndWeaknesses(answers, qs = QUESTIONS) {
     const byTopic = {};
-    QUESTIONS.forEach((q, i) => {
+    qs.forEach((q, i) => {
         if (!byTopic[q.topic]) byTopic[q.topic] = { label: q.topicLabel, correct: 0, total: 0 };
         byTopic[q.topic].total += 1;
         if (answers[i] === q.correct) byTopic[q.topic].correct += 1;
@@ -316,18 +316,38 @@ function calcStrengthsAndWeaknesses(answers) {
 }
 
 export default function LevelTestInProgressScreen({ navigation }) {
+    const [questions, setQuestions] = useState(QUESTIONS);
+    const [loadingQuestions, setLoadingQuestions] = useState(true);
     const [qIndex, setQIndex] = useState(0);
     const [selected, setSelected] = useState(null);
     const [answers, setAnswers] = useState([]); // respuesta elegida por pregunta
     const hasRestoredRef = useRef(false);
     const startTimeRef = useRef(Date.now());
 
+    // Cargar preguntas del Motor IA con timeout de 5 s (fallback a estáticas)
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const oposicion = await AsyncStorage.getItem('opox.pendingOposicion') ?? 'justicia-tramitacion';
+                const res = await trainingApi.getLevelTestQuestions(oposicion);
+                if (!cancelled && !res?.error && Array.isArray(res?.data) && res.data.length >= 10) {
+                    setQuestions(res.data);
+                }
+            } catch { /* sin Motor: usar preguntas estáticas */ }
+            if (!cancelled) setLoadingQuestions(false);
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    const total = questions.length;
+
     // Reanuda desde la pregunta donde se quedó si el usuario cerró la app a medias
     useEffect(() => {
         (async () => {
             const saved = await AsyncStorage.getItem(PENDING_LEVEL_TEST_KEY);
             const savedIndex = saved != null ? parseInt(saved, 10) : NaN;
-            if (Number.isInteger(savedIndex) && savedIndex > 0 && savedIndex < TOTAL) {
+            if (Number.isInteger(savedIndex) && savedIndex > 0 && savedIndex < QUESTIONS.length) {
                 setQIndex(savedIndex);
             }
             hasRestoredRef.current = true;
@@ -340,12 +360,12 @@ export default function LevelTestInProgressScreen({ navigation }) {
         AsyncStorage.setItem(PENDING_LEVEL_TEST_KEY, String(qIndex));
     }, [qIndex]);
 
-    const question = QUESTIONS[qIndex];
+    const question = questions[qIndex];
     const isFirst = qIndex === 0;
-    const isLast = qIndex >= TOTAL - 1;
+    const isLast = qIndex >= total - 1;
 
     const goToQuestion = (nextIndex) => {
-        if (nextIndex < 0 || nextIndex > TOTAL - 1) return;
+        if (nextIndex < 0 || nextIndex > total - 1) return;
         setQIndex(nextIndex);
         setSelected(answers[nextIndex] ?? null);
     };
@@ -364,13 +384,13 @@ export default function LevelTestInProgressScreen({ navigation }) {
         }
 
         // Última pregunta — calcular resultado
-        const correctCount = QUESTIONS.reduce(
+        const correctCount = questions.reduce(
             (acc, q, i) => acc + (newAnswers[i] === q.correct ? 1 : 0),
             0,
         );
-        const percent = Math.round((correctCount / TOTAL) * 100);
+        const percent = Math.round((correctCount / total) * 100);
         const { level, intensity } = calcLevelAndIntensity(percent);
-        const { strengths, weaknesses } = calcStrengthsAndWeaknesses(newAnswers);
+        const { strengths, weaknesses } = calcStrengthsAndWeaknesses(newAnswers, questions);
 
         const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
         const mins = Math.floor(elapsed / 60);
@@ -387,10 +407,10 @@ export default function LevelTestInProgressScreen({ navigation }) {
         navigation.replace('LevelTestResult', {
             percent,
             correct: correctCount,
-            total: TOTAL,
+            total,
             level,
             aciertos: correctCount,
-            fallos: TOTAL - correctCount,
+            fallos: total - correctCount,
             tiempo,
             strengths,
             weaknesses,
@@ -418,9 +438,16 @@ export default function LevelTestInProgressScreen({ navigation }) {
             {/* Cuerpo principal */}
             <View style={styles.body}>
 
+                {loadingQuestions ? (
+                    <View style={styles.loadingWrap}>
+                        <ActivityIndicator size="small" color={colors.purple} />
+                        <Text style={styles.loadingText}>Preparando preguntas…</Text>
+                    </View>
+                ) : null}
+
                 {/* Barra de progreso visual */}
                 <View style={styles.progressBarTrack}>
-                    <View style={[styles.progressBarFill, { width: `${((qIndex + 1) / TOTAL) * 100}%` }]} />
+                    <View style={[styles.progressBarFill, { width: `${((qIndex + 1) / total) * 100}%` }]} />
                 </View>
 
                 {/* Indicador de pregunta con navegación anterior/siguiente */}
@@ -438,7 +465,7 @@ export default function LevelTestInProgressScreen({ navigation }) {
                         />
                     </TouchableOpacity>
                     <Text style={styles.progressLabel}>
-                        Pregunta {qIndex + 1} de {TOTAL}
+                        Pregunta {qIndex + 1} de {total}
                     </Text>
                     <TouchableOpacity
                         onPress={() => goToQuestion(qIndex + 1)}
@@ -530,6 +557,11 @@ const styles = StyleSheet.create({
         paddingTop: spacing.sm,
         paddingBottom: 80,
     },
+    loadingWrap: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        marginBottom: spacing.sm,
+    },
+    loadingText: { fontSize: 11, color: colors.textDark, opacity: 0.5 },
 
     progressBarTrack: {
         height: 4, borderRadius: 2,

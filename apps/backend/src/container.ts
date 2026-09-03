@@ -158,6 +158,8 @@ import {
     CompositeAiClient,
     MotorBoeClient,
     MotorFatigueClient,
+    MotorTutorClient,
+    MotorOnboardingClient,
 } from './infrastructure';
 import {
     HealthController,
@@ -319,6 +321,15 @@ export function buildContainer() {
         ? new MotorFatigueClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 10_000)
         : undefined;
 
+    const motorTutor = isMotorConfigured
+        ? new MotorTutorClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 15_000)
+        : undefined;
+
+    // Timeout corto (5 s) — el onboarding cae a preguntas estáticas si el Motor tarda
+    const motorOnboarding = isMotorConfigured
+        ? new MotorOnboardingClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 5_000)
+        : undefined;
+
     // ─── Use cases (application) ──────────────────
     const getWeek = new GetWeekUseCase(planningRepo);
     const getMacro = new GetMacroUseCase(planningRepo);
@@ -405,11 +416,11 @@ export function buildContainer() {
         listConversations: new ListConversationsUseCase(tutorRepo),
         getConversation: new GetConversationUseCase(tutorRepo),
         createConversation: new CreateConversationUseCase(tutorRepo),
-        sendMessage: new SendMessageUseCase(tutorRepo),
+        sendMessage: new SendMessageUseCase(tutorRepo, motorTutor),
         deleteConversation: new DeleteConversationUseCase(tutorRepo),
         listDecks: new ListDecksUseCase(tutorRepo),
         getDeckWithCards: new GetDeckWithCardsUseCase(tutorRepo),
-        generateDeck: new GenerateDeckUseCase(tutorRepo),
+        generateDeck: new GenerateDeckUseCase(tutorRepo, motorTutor),
         deleteDeck: new DeleteDeckUseCase(tutorRepo),
         submitReview: new SubmitReviewUseCase(tutorRepo),
         listEpisodes: new ListEpisodesUseCase(tutorRepo),
@@ -417,7 +428,7 @@ export function buildContainer() {
         getProgress: new GetProgressUseCase(tutorRepo),
         saveProgress: new SaveProgressUseCase(tutorRepo),
         listSummaries: new ListSummariesUseCase(tutorRepo),
-        getSummary: new GetSummaryUseCase(tutorRepo),
+        getSummary: new GetSummaryUseCase(tutorRepo, motorTutor),
 
         // Bloque 9 · Factoría de Apuntes
         listNotes: new ListNotesUseCase(notesRepo),
@@ -528,6 +539,7 @@ export function buildContainer() {
         generateHint: useCases.generateHint,
         reportQuestion: useCases.reportQuestion,
         listTopics: useCases.listTopics,
+        motorOnboarding,
     });
 
     const notesController = new NotesController({

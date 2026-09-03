@@ -14,10 +14,11 @@ export const tutorApi = {
     createConversation: (title = 'Nueva conversación', topic = null) =>
         api.post(T.CONVERSATIONS, { title, topic }, { auth: true }),
 
-    sendMessage: (conversationId, content, personality = null) =>
+    // tonePrefs = { personality, detailLevel, hintStyle, reinforcementLevel } de AsyncStorage
+    sendMessage: (conversationId, content, tonePrefs = null) =>
         api.post(
             T.MESSAGES.replace(':id', conversationId),
-            personality ? { content, personality } : { content },
+            tonePrefs ? { content, tonePrefs } : { content },
             { auth: true },
         ),
 

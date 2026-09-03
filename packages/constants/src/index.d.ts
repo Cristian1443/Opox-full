@@ -57,6 +57,7 @@ declare const API_ROUTES: {
         readonly HINT: string;
         readonly QUESTION_REPORT: string;
         readonly TOPICS: string;
+        readonly LEVEL_TEST: string;
     };
 
     readonly BOE: {

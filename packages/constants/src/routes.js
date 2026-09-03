@@ -69,6 +69,7 @@ export const API_ROUTES = {
         HINT:               '/training/hint',
         QUESTION_REPORT:    '/training/questions/:id/report',
         TOPICS:             '/training/topics',
+        LEVEL_TEST:         '/training/level-test',
     },
 
     BOE: {

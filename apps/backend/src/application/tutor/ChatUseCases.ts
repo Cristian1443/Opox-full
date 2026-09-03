@@ -1,21 +1,23 @@
+import { logger } from '@opox/utils';
 import type { ITutorRepository } from '../../domain';
 import { ConversationNotFoundError } from '../../domain';
+import type { ITutorAiClient } from '../../domain/repositories/ITutorAiClient';
 import type { TutorConversation, TutorMessage } from '../../domain/entities';
+import type { ToneProfile } from '../../domain/entities';
 
-// ─── Stub de respuesta IA ─────────────────────────────────────────────────────
-// TODO(ia-bloque8): reemplazar con TutorAiContract.generateChatResponse()
+// ─── Stub de respuesta IA (fallback sin Motor) ────────────────────────────────
 const DEFAULT_SUGGESTED_ACTIONS: Array<{ label: string; icon: string }> = [
     { label: 'Crear flashcards', icon: 'layers-outline' },
     { label: 'Ponme un ejemplo', icon: 'bulb-outline' },
     { label: 'Lanzar test', icon: 'flash-outline' },
 ];
 
-function buildStubAiResponse(_userContent: string, personality: string = 'equilibrado'): { content: string; suggestedActions: Array<{ label: string; icon: string }> } {
+function buildStubAiResponse(personality: string = 'equilibrado'): { content: string; suggestedActions: Array<{ label: string; icon: string }> } {
     let content: string;
-    if (personality === 'cercano') {
+    if (personality === 'cercano' || personality === 'motivador') {
         content = '¡Claro que sí! Voy a explicarte este tema de forma sencilla. En la versión con IA activa, recibirás una respuesta personalizada con referencias a los artículos y normativa relevante. ¡Cualquier duda, me dices!';
-    } else if (personality === 'exigente') {
-        content = 'Análisis en curso. En la versión con IA activa, recibirás una respuesta rigurosa con referencias normativas exactas. Asegúrate de revisar los artículos relacionados antes de continuar.';
+    } else if (personality === 'directo') {
+        content = 'Entendido. En la versión con IA activa, recibirás aquí la explicación directa con referencias normativas.';
     } else {
         content = 'Entendido. Voy a preparar la explicación de este tema según tu temario. En la versión con IA activa, recibirás aquí una respuesta personalizada con referencias a los artículos y normativa relevante.';
     }
@@ -52,15 +54,19 @@ export class CreateConversationUseCase {
     }
 }
 
-// ─── Enviar mensaje (persiste + genera respuesta stub) ────────────────────────
+// ─── Enviar mensaje (persiste + genera respuesta IA) ──────────────────────────
 export class SendMessageUseCase {
-    constructor(private readonly tutorRepo: ITutorRepository) {}
+    constructor(
+        private readonly tutorRepo: ITutorRepository,
+        private readonly tutorAi?: ITutorAiClient,
+    ) {}
 
     async execute(params: {
         conversationId: string;
         userId: string;
         content: string;
         personality?: string;
+        toneProfile?: ToneProfile;
     }): Promise<{ userMessage: TutorMessage; aiMessage: TutorMessage }> {
         const conversation = await this.tutorRepo.getConversation(params.conversationId, params.userId);
         if (!conversation) throw new ConversationNotFoundError();
@@ -72,14 +78,43 @@ export class SendMessageUseCase {
             content: params.content,
         });
 
-        // TODO(ia-bloque8): sustituir buildStubAiResponse por TutorAiContract.generateChatResponse()
-        const { content: aiContent, suggestedActions } = buildStubAiResponse(params.content, params.personality);
+        let aiContent: string;
+        let suggestedActions: Array<{ label: string; icon: string }> | undefined;
+
+        if (this.tutorAi) {
+            try {
+                // Obtener historial reciente para dar contexto al Motor
+                const allMessages = await this.tutorRepo.listMessages(params.conversationId, params.userId);
+                const history = allMessages
+                    .slice(-11, -1) // últimos 10 mensajes antes del actual
+                    .map((m) => ({ role: m.isAI ? 'assistant' as const : 'user' as const, content: m.content }));
+
+                const result = await this.tutorAi.chat({
+                    message: params.content,
+                    toneProfile: params.toneProfile,
+                    history,
+                    topic: conversation.topic,
+                });
+                aiContent = result.content;
+                suggestedActions = result.suggestedActions ?? DEFAULT_SUGGESTED_ACTIONS;
+            } catch (err) {
+                logger.warn('[SendMessage] Motor falló, usando stub', { err: String(err) });
+                const stub = buildStubAiResponse(params.personality);
+                aiContent = stub.content;
+                suggestedActions = stub.suggestedActions;
+            }
+        } else {
+            const stub = buildStubAiResponse(params.personality);
+            aiContent = stub.content;
+            suggestedActions = stub.suggestedActions;
+        }
+
         const aiMessage = await this.tutorRepo.addMessage({
             conversationId: params.conversationId,
             userId: params.userId,
             role: 'assistant',
             content: aiContent,
-            suggestedActions,
+            suggestedActions: suggestedActions ?? null,
         });
 
         return { userMessage, aiMessage };

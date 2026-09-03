@@ -9,6 +9,7 @@ import type {
     TutorSummary as TutorSummaryDTO,
     ApiSuccessResponse,
 } from '@opox/types';
+import { buildToneProfile } from '../../application/config/ConfigUseCases';
 import type {
     ListConversationsUseCase,
     GetConversationUseCase,
@@ -92,12 +93,39 @@ export class TutorController {
 
     sendMessage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const { content, personality } = req.body as { content: string; personality?: string };
+            const { content, personality, tonePrefs } = req.body as {
+                content: string;
+                personality?: string;
+                // Preferencias OPOX enviadas por el mobile (formato AsyncStorage)
+                tonePrefs?: {
+                    personality?: string;
+                    detailLevel?: number;
+                    hintStyle?: string;
+                    reinforcementLevel?: string;
+                };
+            };
+
+            // Convertir preferencias OPOX al formato que espera el Motor IA
+            const toneProfile = tonePrefs
+                ? buildToneProfile({
+                    personality: (tonePrefs.personality ?? 'cercano') as import('../../domain/entities').TonePersonality,
+                    detailLevel: (tonePrefs.detailLevel ?? 1) as import('../../domain/entities').DetailLevel,
+                    hintStyle: (tonePrefs.hintStyle ?? 'directas') as import('../../domain/entities').HintStyle,
+                    reinforcementLevel: (tonePrefs.reinforcementLevel ?? 'normal') as import('../../domain/entities').ReinforcementLevel,
+                    theme: 'auto',
+                    fontScale: 1.0,
+                    reduceMotion: false,
+                    userId: req.authUser!.id,
+                    updatedAt: new Date(),
+                })
+                : undefined;
+
             const { userMessage, aiMessage } = await this.deps.sendMessage.execute({
                 conversationId: (req.params.id as string),
                 userId: req.authUser!.id,
                 content,
                 personality,
+                toneProfile,
             });
             ok(res, 201, { userMessage: this.serializeMessage(userMessage), aiMessage: this.serializeMessage(aiMessage) });
         } catch (err) { next(err); }

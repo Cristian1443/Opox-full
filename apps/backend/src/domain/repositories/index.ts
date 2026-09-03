@@ -4,6 +4,7 @@ export * from './IPlanningRepository';
 export * from './IMotivationRepository';
 export * from './ITrainingRepository';
 export * from './ITutorRepository';
+export * from './ITutorAiClient';
 export * from './INotesRepository';
 export * from './IBoeRepository';
 export * from './IStoreRepository';

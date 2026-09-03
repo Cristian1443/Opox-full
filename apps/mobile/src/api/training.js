@@ -49,4 +49,11 @@ export const trainingApi = {
         ),
 
     listTopics: () => api.get(API_ROUTES.TRAINING.TOPICS, { auth: true }),
+
+    // Ruta pública — no requiere sesión — para el test de nivel en onboarding
+    getLevelTestQuestions: (oposicion = 'justicia-tramitacion') =>
+        api.get(
+            `${API_ROUTES.TRAINING.LEVEL_TEST}?oposicion=${encodeURIComponent(oposicion)}`,
+            { auth: false },
+        ),
 };

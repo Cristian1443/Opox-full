@@ -12,8 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing } from '../../theme';
-import { tutorApi, settingsApi } from '../../api';
+import { tutorApi } from '../../api';
+
+const TONE_KEY = 'opox.ai.tone';
+const DEFAULT_TONE = { personality: 'cercano', detailLevel: 1, hintStyle: 'directas', reinforcementLevel: 'normal' };
 
 // Colores confirmados contra Figma (frame CHAT TUTOR IA, Bloque 8) sin
 // equivalente exacto en theme.js.
@@ -131,22 +135,18 @@ function TypingIndicator() {
 export default function TutorChatScreen({ navigation, route }) {
     const technique = route?.params?.technique ?? null;
 
-    const [messages, setMessages] = useState(() => buildInitialMessages(technique));
+    const [messages, setMessages] = useState(() => buildInitialMessages(technique, DEFAULT_TONE.personality));
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const scrollRef = useRef(null);
     const conversationIdRef = useRef(null);
-    const personalityRef = useRef('equilibrado');
+    const tonePrefsRef = useRef(DEFAULT_TONE);
 
     // Crea la conversación y carga el tono de IA al montar la pantalla
     useEffect(() => {
-        settingsApi.getPreferences()
-            .then((res) => {
-                if (!res?.error && res?.data?.personality) {
-                    personalityRef.current = res.data.personality;
-                }
-            })
+        AsyncStorage.getItem(TONE_KEY)
+            .then((raw) => { if (raw) tonePrefsRef.current = { ...DEFAULT_TONE, ...JSON.parse(raw) }; })
             .catch(() => {});
 
         tutorApi.createConversation('Nueva conversación', technique)
@@ -175,7 +175,7 @@ export default function TutorChatScreen({ navigation, route }) {
         try {
             const cid = conversationIdRef.current;
             if (!cid) throw new Error('no-conv');
-            const res = await tutorApi.sendMessage(cid, userText, personalityRef.current);
+            const res = await tutorApi.sendMessage(cid, userText, tonePrefsRef.current);
             if (res?.error || !res?.data) throw new Error('api-err');
             const ai = res.data.aiMessage;
             addMessage({
@@ -268,7 +268,7 @@ export default function TutorChatScreen({ navigation, route }) {
                             {
                                 text: 'Nueva conversación',
                                 onPress: async () => {
-                                    setMessages(buildInitialMessages(technique, personalityRef.current));
+                                    setMessages(buildInitialMessages(technique, tonePrefsRef.current.personality));
                                     setInputText('');
                                     try {
                                         const res = await tutorApi.createConversation('Nueva conversación', technique);
