@@ -4,11 +4,24 @@ import {
     StatusBar, ScrollView, PanResponder, Animated, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import ConfirmExitModal from '../../components/ConfirmExitModal';
 import { colors } from '../../theme';
 import { api, trainingApi, boeApi } from '../../api';
 import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
+
+// Icono exacto exportado de Figma para el engranaje. El botón de volver usa
+// el mismo patrón (círculo morado @10% + Feather chevron-left) que
+// TrainingHomeScreen.js, la referencia por defecto para toda la app.
+function IconGear({ size = 22, color = colors.textDark }) {
+    return (
+        <Svg width={size} height={size} viewBox="740 0 52 55" fill="none">
+            <Path d="M789.75 31.0005V23.9205L783.54 23.4005C783.118 21.1364 782.288 18.9678 781.09 17.0005L785.24 12.0005L780.3 7.00055L775.55 11.0705C773.663 9.7728 771.555 8.83066 769.33 8.29055L768.8 1.81055H761.8L761.28 8.09055C759.053 8.5372 756.925 9.38425 755 10.5905L750.1 6.39055L745.16 11.3905L749.16 16.2005C747.871 18.1175 746.939 20.2519 746.41 22.5005L740 23.0005V30.0705L746.21 30.5905C746.63 32.86 747.457 35.0349 748.65 37.0105L744.51 42.0105L749.44 47.0105L754.2 42.9405C756.082 44.2404 758.187 45.1827 760.41 45.7205L761 52.2005H768L768.52 45.9205C770.764 45.4889 772.91 44.6483 774.85 43.4405L779.75 47.6405L784.69 42.6405L780.69 37.8305C781.979 35.9136 782.911 33.7792 783.44 31.5305L789.75 31.0005Z" stroke={color} strokeWidth={3.38} />
+            <Path d="M772.62 27.0004C772.6 28.5288 772.129 30.0172 771.266 31.2785C770.402 32.5397 769.185 33.5175 767.767 34.0888C766.349 34.66 764.794 34.7993 763.298 34.4891C761.801 34.1789 760.429 33.433 759.356 32.3452C758.282 31.2575 757.553 29.8765 757.262 28.3759C756.971 26.8754 757.131 25.3223 757.72 23.912C758.309 22.5016 759.303 21.2971 760.575 20.4499C761.847 19.6026 763.341 19.1505 764.87 19.1504C765.894 19.1569 766.907 19.3652 767.851 19.7632C768.795 20.1613 769.651 20.7413 770.371 21.4703C771.09 22.1992 771.659 23.0628 772.045 24.0116C772.431 24.9605 772.627 25.9761 772.62 27.0004Z" stroke={color} strokeWidth={3.38} />
+        </Svg>
+    );
+}
 
 // ─── Constantes de configuración ─────────────────────────────────────────────
 
@@ -143,7 +156,7 @@ function FatigueToggle({ value, onValueChange }) {
                     width: TRACK_W,
                     height: TRACK_H2,
                     borderRadius: TRACK_H2 / 2,
-                    backgroundColor: value ? COLORS.orangeBg15 : COLORS.toggleOff,
+                    backgroundColor: COLORS.toggleOff,
                 },
             ]}
         >
@@ -155,7 +168,7 @@ function FatigueToggle({ value, onValueChange }) {
                         height: KNOB,
                         borderRadius: KNOB / 2,
                         transform: [{ translateX }],
-                        backgroundColor: value ? COLORS.orange : COLORS.purple,
+                        backgroundColor: value ? COLORS.purple : COLORS.purpleBorder50,
                     },
                 ]}
             />
@@ -351,12 +364,12 @@ export default function GeneratorConfigScreen({ navigation, route }) {
 
                 {/* Header */}
                 <View style={styles.headerRow}>
-                    <TouchableOpacity onPress={handleBack} hitSlop={12}>
-                        <Ionicons name="chevron-back" size={22} color={COLORS.purple} />
+                    <TouchableOpacity style={styles.backButton} onPress={handleBack} hitSlop={12}>
+                        <Feather name="chevron-left" size={22} color={COLORS.purple} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Zona de entrenamiento</Text>
-                    <TouchableOpacity hitSlop={12} onPress={() => navigation.navigate('Settings')}>
-                        <Ionicons name="settings-outline" size={20} color={COLORS.purple} />
+                    <Text style={styles.headerTitle} numberOfLines={1}>Zona de entrenamiento</Text>
+                    <TouchableOpacity style={styles.settingsButton} hitSlop={12} onPress={() => navigation.navigate('Settings')}>
+                        <IconGear size={20} color={COLORS.purple} />
                     </TouchableOpacity>
                 </View>
                 <Text style={styles.headerSubtitle}>Generador infinito</Text>
@@ -394,8 +407,8 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                 {/* Control de fatiga */}
                 <View style={[styles.section, styles.rowBetween]}>
                     <View style={{ flex: 1, paddingRight: 16 }}>
-                        <Text style={styles.sectionTitle}>Control de fatiga</Text>
-                        <Text style={styles.sectionDesc}>Monitoreo continuo de tus constantes vitales</Text>
+                        <Text style={[styles.sectionTitle, { textAlign: 'left' }]}>Control de fatiga</Text>
+                        <Text style={[styles.sectionDesc, { textAlign: 'left' }]}>Monitoreo continuo de tus constantes vitales</Text>
                     </View>
                     <FatigueToggle value={fatigueMode} onValueChange={setFatigueMode} />
                 </View>
@@ -559,16 +572,31 @@ const styles = StyleSheet.create({
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+    },
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    settingsButton: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
+        flex: 1,
         fontFamily: FONTS.semiBold,
-        fontSize: 17,
+        fontSize: 20,
         color: COLORS.purple,
+        marginLeft: 12,
     },
     headerSubtitle: {
         fontFamily: FONTS.light,
-        fontSize: 17,
+        fontSize: 20,
         color: COLORS.purple,
         textAlign: 'center',
         marginTop: 2,
@@ -585,16 +613,16 @@ const styles = StyleSheet.create({
 
     sectionTitle: {
         fontFamily: FONTS.semiBold,
-        fontSize: 16,
+        fontSize: 19,
         color: COLORS.purple,
         marginBottom: 4,
         textAlign: 'center',
     },
     sectionDesc: {
         fontFamily: FONTS.regular,
-        fontSize: 12,
+        fontSize: 13,
         color: COLORS.grayText,
-        lineHeight: 16,
+        lineHeight: 17,
         textAlign: 'center',
     },
 
@@ -671,12 +699,20 @@ const styles = StyleSheet.create({
     },
 
     /* Temario */
-    temarioCard: { marginTop: 4 },
+    temarioCard: {
+        marginTop: 4,
+        backgroundColor: '#F5F5F5',
+        borderWidth: 1,
+        borderColor: COLORS.purpleBorder30,
+        borderRadius: 14,
+        overflow: 'hidden',
+    },
     temarioHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 6,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
     },
     temarioLabel: {
         fontFamily: FONTS.medium,
@@ -690,8 +726,8 @@ const styles = StyleSheet.create({
         marginTop: 1,
     },
     temarioList: {
-        marginTop: 10,
-        backgroundColor: COLORS.white,
+        paddingHorizontal: 8,
+        paddingBottom: 8,
     },
     topicItem: {
         paddingVertical: 11,

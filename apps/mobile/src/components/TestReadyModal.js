@@ -1,7 +1,19 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import AlertCardModal from './AlertCardModal';
+import { colors } from '../theme';
+
+// Check verde exacto (mismo trazo que ConnectionSuccessModal) — el original
+// usaba un checkmark gris de Ionicons, pero Figma muestra un check verde
+// grueso sin chip de fondo.
+function IconCheckGreen({ width = 60, height = 40, color = colors.ctaGreen }) {
+    return (
+        <Svg width={width} height={height} viewBox="0 0 107 70">
+            <Path d="M8 34L40 62L99 8" stroke={color} strokeWidth={14} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
 
 // ─── Estado "Test generado" (6.5 · ok) ───────────────────────────────────────
 // Modal de éxito centrado que celebra que la IA ha terminado de generar el
@@ -22,7 +34,8 @@ export default function TestReadyModal({
     return (
         <AlertCardModal
             visible={visible}
-            icon={<Ionicons name="checkmark" size={40} color="#B9B9B9" />}
+            iconBg="transparent"
+            icon={<IconCheckGreen />}
             title={title}
             description={
                 <Text style={{ fontFamily: 'Poppins-Light', fontSize: 14, lineHeight: 19, color: '#412950', textAlign: 'center', marginBottom: 20 }}>

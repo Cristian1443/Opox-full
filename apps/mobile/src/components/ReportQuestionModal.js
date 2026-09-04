@@ -6,11 +6,15 @@ import {
   StyleSheet,
   Modal,
   Animated,
+  ScrollView,
+  PanResponder,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
 import { trainingApi } from '../api';
+
+const SHEET_OFFSET = 520;
 
 // Motivos simplificados según el mockup REPORTAR
 const MOTIVOS = [
@@ -21,34 +25,36 @@ const MOTIVOS = [
 ];
 
 /**
- * Modal de reporte de errores en preguntas (mockup REPORTAR).
- * Card blanca con título, 4 opciones con borde y CTA morado.
+ * Bottom sheet de reporte de errores en preguntas (mockup REPORTAR).
+ * Mismo patrón que HintBottomSheet/LawReferenceBottomSheet: card blanca
+ * anclada abajo, handle de arrastre, 4 opciones con borde y CTA morado.
  * La opción seleccionada se marca con borde morado.
  */
 export default function ReportQuestionModal({ visible, questionId, onClose, onSendReport }) {
   const [selectedId, setSelectedId] = useState(null);
   const [isSending, setIsSending] = useState(false);
 
-  const scaleAnim = useRef(new Animated.Value(0.88)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(SHEET_OFFSET)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) {
       setSelectedId(null);
       setIsSending(false);
-      scaleAnim.setValue(0.88);
-      opacityAnim.setValue(0);
+      translateY.setValue(SHEET_OFFSET);
+      backdropOpacity.setValue(0);
 
       Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 120,
-          friction: 9,
+        Animated.spring(translateY, {
+          toValue: 0,
+          tension: 68,
+          friction: 11,
           useNativeDriver: true,
         }),
-        Animated.timing(opacityAnim, {
+        Animated.timing(backdropOpacity, {
           toValue: 1,
-          duration: 190,
+          duration: 210,
           useNativeDriver: true,
         }),
       ]).start();
@@ -57,20 +63,45 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
 
   const handleClose = () => {
     Animated.parallel([
-      Animated.timing(scaleAnim, {
-        toValue: 0.88,
-        duration: 150,
+      Animated.timing(translateY, {
+        toValue: SHEET_OFFSET,
+        duration: 250,
         useNativeDriver: true,
       }),
-      Animated.timing(opacityAnim, {
+      Animated.timing(backdropOpacity, {
         toValue: 0,
-        duration: 150,
+        duration: 200,
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
       if (finished) onClose?.();
     });
   };
+
+  const handleCloseRef = useRef(handleClose);
+  handleCloseRef.current = handleClose;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dy, dx }) =>
+        dy > 8 && Math.abs(dy) > Math.abs(dx),
+      onPanResponderMove: (_, { dy }) => {
+        if (dy > 0) translateY.setValue(dy);
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 80 || vy > 0.8) {
+          handleCloseRef.current();
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            tension: 68,
+            friction: 11,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const handleSend = async () => {
     if (!selectedId || isSending) return;
@@ -95,7 +126,7 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
       onRequestClose={handleClose}
     >
       <View style={styles.root}>
-        <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]}>
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity
             style={{ flex: 1 }}
             activeOpacity={1}
@@ -103,22 +134,26 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
           />
         </Animated.View>
 
-        <View style={styles.center} pointerEvents="box-none">
-          <Animated.View style={[
-            styles.modal,
-            { transform: [{ scale: scaleAnim }], opacity: opacityAnim },
-          ]}>
-            <TouchableOpacity
-              onPress={handleClose}
-              style={styles.closeBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityLabel="Cerrar sin reportar"
-            >
-              <Ionicons name="close" size={22} color={colors.gray} />
-            </TouchableOpacity>
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              transform: [{ translateY }],
+              paddingBottom: insets.bottom + spacing.md,
+            },
+          ]}
+        >
+          <View {...panResponder.panHandlers} style={styles.handleContainer}>
+            <View style={styles.handle} />
+          </View>
 
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
             <Text style={styles.title}>Reportar esta pregunta</Text>
-            <Text style={styles.subtitle}>¿Qué le pasó?</Text>
+            <Text style={styles.subtitle}>¿Qué le pasa?</Text>
 
             <View style={styles.optionsList}>
               {MOTIVOS.map(motivo => {
@@ -138,23 +173,23 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
                 );
               })}
             </View>
+          </ScrollView>
 
-            <TouchableOpacity
-              style={[
-                styles.sendBtn,
-                (!selectedId || isSending) && styles.sendBtnDisabled,
-              ]}
-              onPress={handleSend}
-              disabled={!selectedId || isSending}
-              activeOpacity={0.82}
-            >
-              {isSending
-                ? <ActivityIndicator size="small" color={colors.white} />
-                : <Text style={styles.sendBtnText}>Enviar reporte</Text>
-              }
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
+          <TouchableOpacity
+            style={[
+              styles.sendBtn,
+              (!selectedId || isSending) && styles.sendBtnDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={!selectedId || isSending}
+            activeOpacity={0.82}
+          >
+            {isSending
+              ? <ActivityIndicator size="small" color={colors.white} />
+              : <Text style={styles.sendBtnText}>Enviar reporte</Text>
+            }
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -162,82 +197,86 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15,27,51,0.55)',
   },
-  center: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  modal: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    elevation: 16,
-  },
-  closeBtn: {
+
+  sheet: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    maxHeight: '88%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+
+  handleContainer: {
+    alignSelf: 'stretch',
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
+    paddingVertical: 10,
+  },
+  handle: {
+    width: 38,
+    height: 4,
+    backgroundColor: colors.separator,
+    borderRadius: 2,
+  },
+
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
 
   title: {
-    fontSize: 17,
+    fontSize: 22,
     fontFamily: 'Poppins-SemiBold',
     color: colors.textDark,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     marginBottom: spacing.md,
   },
 
   optionsList: {
-    gap: 8,
-    marginBottom: spacing.md,
+    gap: 10,
   },
   option: {
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#E4E8F0',
     backgroundColor: colors.card,
   },
   optionSelected: {
-    borderColor: colors.selectionBorder,
-    borderWidth: 2,
+    borderColor: colors.purple,
+    borderWidth: 2.5,
   },
   optionText: {
-    fontSize: 13.5,
+    fontSize: 14.5,
     fontFamily: 'Poppins-Regular',
     color: colors.textDark,
-    lineHeight: 18,
+    lineHeight: 20,
   },
 
   sendBtn: {
+    marginHorizontal: spacing.lg,
     marginTop: spacing.sm,
     backgroundColor: colors.purple,
-    paddingVertical: 14,
+    paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
   },
