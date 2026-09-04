@@ -573,6 +573,13 @@ Si el Motor responde, usa sus señales y nivel; si falla (timeout/offline), cae 
 Nivel local: `high` (≥2 críticas), `medium` (1 crítica o ≥2 warning), `low` (resto).
 Motor activo solo cuando `MOTOR_API_BASE_URL` está configurado (`isMotorConfigured`).
 
+**Fallback local en backend (revisión 2026-09-03)**: `HealthController.analyzeFatigue`
+envuelve la llamada al Motor en try/catch. Si el Motor no está configurado o falla
+por cualquier motivo (404, timeout, offline), el controller cae a
+`buildFatigueLocally(input)` — heurística en el mismo controller con la misma forma
+que `MotorFatigueResult`. Antes propagaba `AxiosError 404` como 500 crudo al mobile;
+ahora siempre devuelve 200 con nivel válido.
+
 **Permisos de notificaciones** (`PermissionsScreen.js`):
 - "¡A por más!" → `Notifications.requestPermissionsAsync()` real (lazy require).
 - Si denegado: `DeniedState` con texto correcto + "Ir a Ajustes" (`Linking.openSettings()`).
@@ -664,6 +671,39 @@ Ver `packages/ai/MOTOR_INTEGRATION.md` para el detalle histórico.
 
 **Smoke test E2E:** `scripts/smoke_bloques_0_6_7.js` — 30/30 PASS (bloques 0, 6 y 7).
 **Diagnóstico Motor:** `scripts/diagnostico_motor.js` — verifica correcta_idx en job result.
+**E2E FLUJO_NAVEGACION** (2026-09-03): `scripts/e2e_flujo_navegacion.js` — 60/60 PASS
+recorriendo el flujo completo contra backend local. `scripts/e2e_motor_coleccion.js`
+ejecuta la colección Postman "Motor de IA — colección completa" contra
+`MOTOR_API_BASE_URL`. Ejecutar con `SKIP_REGISTER=1 node scripts/e2e_flujo_navegacion.js`
+si Supabase tiene "Confirm email" ON.
+
+### ⚠ AVISO CRÍTICO (2026-09-03) — endpoints Motor desalineados
+
+E2E contra `ia.opox.jaeverba.com/openapi.json` (46 paths reales) reveló que los
+clientes del backend llaman rutas que **no existen** en el Motor real. Todos caen a
+fallback silencioso (OpenAI directo o stub), así que la app "funciona" pero la IA
+prometida el 2026-09-02 nunca se ejecuta contra el Motor.
+
+Además, el Motor de producción está **vacío**: `GET /v1/courses` devuelve `[]`. El
+`MOTOR_DEFAULT_CURSO_ID=1357e871b542425b` existe en `ingesta-demo.onrender.com` pero
+no en `ia.opox.jaeverba.com` — todos los endpoints por curso responden 404.
+
+**Rutas a corregir en los clientes del backend:**
+
+| Cliente / línea | Backend llama (roto) | Endpoint real del Motor |
+|---|---|---|
+| `MotorTutorClient.ts:54` | `POST /v1/classroom/chat` | `POST /v1/classroom/tutor` |
+| `MotorTutorClient.ts:89` | `POST /v1/classroom/resumen` | `POST /v1/classroom/summary` |
+| `MotorTutorClient.ts:70` | `POST /v1/classroom/flashcards` | `POST /v1/classroom/flashcards/generate` |
+| `MotorFatigueClient.ts:54` | `POST /v1/fatigue/analyze` | `POST /v1/fatigue/biometrics` + `GET /v1/fatigue/status/{user_id}` |
+| `MotorOnboardingClient.ts:40` | `GET /v1/onboarding/preguntas` | `POST /v1/onboarding/placement-test` (async, requiere polling de job) |
+| `MotorAiClient` (hint) | `POST /v1/hint` | `POST /v1/modes/hint` |
+| Config tono | `PUT /v1/users/:id/tone` | `PUT /v1/tone/{user_id}` |
+
+**Prerrequisito para probar IA real end-to-end:** subir un curso al Motor de prod
+con `POST /v1/courses` (multipart form-data con PDF, `titulo`) y actualizar
+`MOTOR_DEFAULT_CURSO_ID` en `.env` con el `curso_id` devuelto. Después el generator,
+placement-test, aula y RAG search deberían responder con contenido real.
 
 ---
 
@@ -685,7 +725,7 @@ pnpm lint                       # lint completo
 |---|---|---|
 | 1 | Acceso (Auth/Onboarding) | Frontend cerrado + Bloque 0 revisado: onboarding no repetido, test real de 20 preguntas, inicialización de intensidad del plan. Revisión 2026-09-02: test de nivel intenta Motor IA (`GET /training/level-test` ruta pública, 5 s timeout), fallback a preguntas estáticas |
 | 2 | Dashboard | Frontend + backend completo |
-| 3 | Salud | Frontend cerrado |
+| 3 | Salud | Frontend cerrado. Revisión 2026-09-03: `HealthController.analyzeFatigue` con try/catch + `buildFatigueLocally` — el endpoint devuelve 200 aunque el Motor de fatiga esté caído o el endpoint desalineado. |
 | 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |
 | 5 | Motivación | Frontend + backend completo |
 | 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **desactivado por INC-04** (generaba con LLM y no exponía `correcta_idx` → primera opción siempre "correcta"). Fallback a OpenAI directo activo. Blindaje `CompositeAiClient` para reactivar sin riesgo cuando el equipo IA cierre INC-04 |

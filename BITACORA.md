@@ -5,6 +5,94 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-03 — E2E completo + fix Bloque 3 fatiga + hallazgos Motor
+
+Rama: `fix/revision-bloques-bugfixes`. Sesión de validación end-to-end contra
+backend local y contra el Motor IA de producción. Se cerraron dos scripts
+reutilizables, un bug de fallback y se documentaron los desalineos con el Motor.
+
+### Scripts E2E añadidos (`scripts/`)
+
+- **`e2e_flujo_navegacion.js`** — recorre el FLUJO_NAVEGACION completo contra
+  `http://localhost:3000`: Bloque 0 (test de nivel público) → Bloque 1 (login,
+  perfil, terms, updatePlan) → Bloques 2/4/5 → Bloques 6/7 (generator, surgical,
+  hint, photo-test, attempts) → Bloque 8 (tutor, flashcards, resúmenes, podcast) →
+  Bloque 9 (list) → Bloque 10 (feed, regulations, catalog) → Bloque 11 (balance,
+  products, discounts, wallet, marketplace) → Bloque 12 (preferences, pro-stats,
+  feedback). 60 asserts totales. Flag `SKIP_REGISTER=1` para saltar el register
+  cuando no se quiere depender de OTP (Supabase con "Confirm email" ON).
+- **`e2e_motor_coleccion.js`** — ejecuta la colección Postman "Motor de IA —
+  colección completa" contra `MOTOR_API_BASE_URL` del .env. Cubre salud,
+  onboarding placement-test, cursos + RAG, generador de tests, banco de exámenes,
+  hint, tono, fatiga, aula y BOE. Excluye la carpeta RGPD por seguridad. Lee las
+  claves del `.env` automáticamente. Reutilizable con `MOTOR_BASE=<url> node ...`.
+
+### Fix · Bloque 3 fatiga sin filtrar 500 al mobile
+
+`HealthController.analyzeFatigue` propagaba `AxiosError 404` como 500 crudo al
+cliente cuando el Motor devolvía `Not Found`. La BITÁCORA del 2026-09-02
+prometía fallback local (`buildSignals`) pero no estaba implementado en el
+controller.
+
+- Añadido `buildFatigueLocally(input)` en el mismo archivo, con la misma
+  forma que `MotorFatigueResult` (`nivel/semaforo/senales/recomendaciones`).
+  Heurística: HRV vs base 50, FC reposo vs base 61, horas de sueño ≥7.
+  Nivel `alto` (≥2 críticas), `medio` (1 crítica o ≥2 warning), `bajo` (resto).
+- `analyzeFatigue` ahora envuelve la llamada al Motor en try/catch. Si el
+  Motor no está configurado o falla por cualquier motivo, cae al cálculo
+  local y devuelve 200. El usuario nunca ve error.
+- Verificado con E2E: `POST /health/fatigue` pasa de `500` a `200 (0.5s)` con
+  `nivel: 'medio'` bien formado.
+
+### Hallazgos críticos del Motor de producción (`ia.opox.jaeverba.com`)
+
+Contra el Motor real, la mayoría de las "integraciones IA" del 2026-09-02
+están rotas por dos razones:
+
+**1. Motor de producción sin cursos.** `GET /v1/courses` devuelve `[]`. El
+`MOTOR_DEFAULT_CURSO_ID=1357e871b542425b` existe en `ingesta-demo.onrender.com`
+pero no en producción. Todos los endpoints por curso responden `404
+curso_no_encontrado`. Efecto: el generator cae a OpenAI directo (sin RAG real),
+el test de nivel cae al array estático, la aula cae a stubs.
+
+**2. Endpoints Motor con nombres desalineados.** El OpenAPI real del Motor
+(`https://ia.opox.jaeverba.com/openapi.json`, 46 paths) expone rutas distintas
+a las que llaman los clientes del backend:
+
+| Backend llama | Endpoint real |
+|---|---|
+| `POST /v1/classroom/chat` (`MotorTutorClient:54`) | `POST /v1/classroom/tutor` |
+| `POST /v1/classroom/resumen` (`MotorTutorClient:89`) | `POST /v1/classroom/summary` |
+| `POST /v1/classroom/flashcards` (`MotorTutorClient:70`) | `POST /v1/classroom/flashcards/generate` |
+| `POST /v1/fatigue/analyze` (`MotorFatigueClient:54`) | `POST /v1/fatigue/biometrics` + `GET /v1/fatigue/status/{user_id}` |
+| `GET /v1/onboarding/preguntas` (`MotorOnboardingClient:40`) | `POST /v1/onboarding/placement-test` (async job) |
+| `POST /v1/hint` | `POST /v1/modes/hint` |
+| `PUT /v1/users/:id/tone` | `PUT /v1/tone/{user_id}` |
+
+Efecto: cada integración IA del 2026-09-02 (chat, resúmenes, flashcards, fatiga,
+onboarding) hace 404 silencioso y cae al fallback. No hay error visible pero
+tampoco IA real. Pendiente actualizar los 4 clientes del Motor a las rutas del
+OpenAPI actual.
+
+### Resultado numérico del E2E
+
+- Backend OPOX (tras fixes): **60/60 PASS · 0 FAIL · 2 SKIP** (register requiere
+  OTP con Supabase "Confirm email" ON; notes upload requiere multipart PDF).
+- Motor `ingesta-demo.onrender.com` (default de la colección): 18/26 PASS
+  (endpoints legacy no existen: hint, tone PUT, fatigue analyze, classroom/*).
+- Motor `ia.opox.jaeverba.com` (prod .env): 4/18 PASS (además de lo anterior,
+  vacío de cursos).
+
+### Estado tras la sesión
+
+- Bloque 3 fatiga ya no cae con 500 al usuario — fallback local activo.
+- Scripts E2E versionados y re-ejecutables cuando cierren los gaps del Motor.
+- INC-04 sigue confirmado: preguntas del Motor sin `correcta_idx` en job result.
+- Pendiente: subir un curso al Motor de prod y actualizar los 4 clientes del
+  backend a los nombres reales del OpenAPI del Motor.
+
+---
+
 ## 2026-09-02 — Motor IA · Integración en Bloques 0, 8, 12 y Salud
 
 Rama: `fix/revision-bloques-bugfixes`. Cuatro integraciones del Motor IA en
