@@ -153,9 +153,10 @@ async function bloque6Cursos() {
         });
         if (r.status === 200) {
             P('POST /v1/courses/:id/search (RAG) → 200');
-            const arr = r.json?.chunks ?? r.json?.resultados ?? r.json;
-            if (Array.isArray(arr) && arr.length > 0) P(`  ${arr.length} chunks devueltos`);
-            else G('RAG search sin resultados', `body=${JSON.stringify(r.json).slice(0, 200)}`);
+            // Motor devuelve {query, pasajes: [...]} o {chunks: [...]}
+            const arr = r.json?.pasajes ?? r.json?.chunks ?? r.json?.resultados ?? (Array.isArray(r.json) ? r.json : []);
+            if (Array.isArray(arr) && arr.length > 0) P(`  ${arr.length} pasajes RAG devueltos`);
+            else G('RAG search sin pasajes', `keys=${Object.keys(r.json||{}).join(',')}`);
         } else F('POST /v1/courses/:id/search', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 200)}`);
     }
 }
@@ -207,11 +208,12 @@ async function bloque6Generador() {
 async function bloque66() {
     section('Bloque 6.6 · Banco de exámenes oficiales');
     if (!CURSO_ID) return S('banco', 'sin curso_id');
-    const r = await req('GET', `/v1/courses/${CURSO_ID}/exams`);
+    // Ruta real: /v1/bank/exams?course_id=
+    const r = await req('GET', `/v1/bank/exams?course_id=${CURSO_ID}`);
     if (r.status === 200) {
         const arr = Array.isArray(r.json) ? r.json : (r.json?.examenes ?? []);
-        P(`GET /v1/courses/:id/exams → 200 (${arr.length} exámenes)`);
-    } else F('GET exams', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 200)}`);
+        P(`GET /v1/bank/exams → 200 (${arr.length} exámenes)`);
+    } else F('GET /v1/bank/exams', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 200)}`);
 }
 
 // Bloque 7 · Dominio, pistas, etc.
@@ -226,19 +228,33 @@ async function bloque7() {
         else F('GET mastery', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 200)}`);
     }
 
-    // Pista IA — brief exacto
-    console.log('  ⏳ POST /v1/hint (OpenAI)…');
+    // Pista IA — ruta real: /v1/modes/hint (requiere pregunta_id real del banco)
+    console.log('  ⏳ POST /v1/modes/hint — obteniendo pregunta real del banco…');
     const t0 = Date.now();
-    const r = await req('POST', '/v1/hint', {
-        pregunta: {
-            enunciado: '¿Cuántos artículos tiene la Constitución Española de 1978?',
-            opciones: ['100', '150', '169', '200'],
-        },
-        user_id: USER_ID,
-    });
-    const el = ((Date.now() - t0) / 1000).toFixed(1);
-    if (r.status === 200) P(`POST /v1/hint → 200 (${el}s)`);
-    else F(`POST /v1/hint (${el}s)`, `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
+    let hintPregId = null;
+    {
+        // Obtener una pregunta real del banco para usarla en el hint
+        const bankR = await req('GET', `/v1/courses/${CURSO_ID}/questions?limit=1`);
+        if (bankR.status === 200 && Array.isArray(bankR.json) && bankR.json[0]) {
+            hintPregId = bankR.json[0].id;
+        }
+    }
+    if (!hintPregId) {
+        S('POST /v1/modes/hint', 'no se pudo obtener pregunta_id real del banco');
+    } else {
+        const r = await req('POST', '/v1/modes/hint', {
+            user_id: USER_ID,
+            pregunta_id: hintPregId,
+            questionText: '¿Cuántos artículos tiene la Constitución Española de 1978?',
+            options: ['100', '150', '169', '200'],
+            topicId: 'constitucion',
+            topic: 'Constitución Española',
+            oposicion: 'justicia-tramitacion',
+        });
+        const el = ((Date.now() - t0) / 1000).toFixed(1);
+        if (r.status === 200) P(`POST /v1/modes/hint → 200 (${el}s)`);
+        else F(`POST /v1/modes/hint (${el}s)`, `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
+    }
 }
 
 // Bloque 8 · Aula, tono, fatiga
@@ -246,63 +262,63 @@ async function bloque8() {
     section('Bloque 8 · Aula Virtual, tono y fatiga');
     if (!CURSO_ID) return S('bloque8', 'sin curso_id');
 
-    // Perfil tono
+    // Perfil tono — ruta real: /v1/tone/{user_id}
     {
-        const r = await req('GET', `/v1/users/${USER_ID}/tone`);
-        if (r.status === 200 || r.status === 404) P(`GET tone → ${r.status}`);
-        else F('GET tone', `status=${r.status}`);
+        const r = await req('GET', `/v1/tone/${USER_ID}`);
+        if (r.status === 200 || r.status === 404) P(`GET /v1/tone/:id → ${r.status}`);
+        else F('GET /v1/tone/:id', `status=${r.status}`);
     }
-    // Ajustar tono
+    // Ajustar tono — nivel_detalle: 'breve'|'medio'|'profundo', motivacion: 'alta'|'media'|'baja'
     {
-        const r = await req('PUT', `/v1/users/${USER_ID}/tone`, {
-            personalidad: 'cercano', nivel_detalle: 1, estilo_pistas: 'directas', refuerzo: 'normal',
+        const r = await req('PUT', `/v1/tone/${USER_ID}`, {
+            personalidad: 'cercano', nivel_detalle: 'medio', pistas_directas: true, motivacion: 'media',
         });
-        if (r.status === 200) P('PUT /v1/users/:id/tone → 200');
-        else F('PUT tone', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
+        if (r.status === 200) P('PUT /v1/tone/:id → 200');
+        else F('PUT /v1/tone/:id', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
     }
-    // Fatiga
+    // Fatiga — ruta real: /v1/fatigue/biometrics
     {
-        const r = await req('POST', '/v1/fatigue/analyze', {
-            user_id: USER_ID,
-            biometria: { hr: 72, hrv: 48, spo2: 97, sueno_horas: 7 },
+        const r = await req('POST', '/v1/fatigue/biometrics', {
+            user_id: USER_ID, hrv_ms: 48, fc_reposo: 62, horas_sueno: 7, ts: new Date().toISOString().split('T')[0],
         });
-        if (r.status === 200) P('POST /v1/fatigue/analyze → 200');
-        else F('POST /v1/fatigue/analyze', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
+        if (r.status === 200) P('POST /v1/fatigue/biometrics → 200');
+        else F('POST /v1/fatigue/biometrics', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
     }
-    // Chat aula
+    // Chat aula — ruta real: /v1/classroom/tutor
     {
-        console.log('  ⏳ POST /v1/classroom/chat…');
+        console.log('  ⏳ POST /v1/classroom/tutor…');
         const t0 = Date.now();
-        const r = await req('POST', '/v1/classroom/chat', {
+        const r = await req('POST', '/v1/classroom/tutor', {
             user_id: USER_ID,
             curso_id: CURSO_ID,
             mensaje: 'Explícame el artículo 24 de la Constitución',
         });
         const el = ((Date.now() - t0) / 1000).toFixed(1);
-        if (r.status === 200) P(`POST /v1/classroom/chat → 200 (${el}s)`);
-        else F(`POST /v1/classroom/chat (${el}s)`, `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
+        if (r.status === 200) P(`POST /v1/classroom/tutor → 200 (${el}s)`);
+        else F(`POST /v1/classroom/tutor (${el}s)`, `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
     }
-    // Resumen tema
+    // Resumen tema — ruta real: /v1/classroom/summary
     {
-        console.log('  ⏳ POST /v1/classroom/resumen…');
+        console.log('  ⏳ POST /v1/classroom/summary…');
         const t0 = Date.now();
-        const r = await req('POST', '/v1/classroom/resumen', {
-            user_id: USER_ID, curso_id: CURSO_ID, tema_id: 'constitucion',
+        // Usar un tema_id real del curso
+        const r = await req('POST', '/v1/classroom/summary', {
+            curso_id: CURSO_ID, tema_id: '3b6f62d89ac74a78', nivel: 'medio',
         });
         const el = ((Date.now() - t0) / 1000).toFixed(1);
-        if (r.status === 200) P(`POST /v1/classroom/resumen → 200 (${el}s)`);
-        else F(`POST /v1/classroom/resumen (${el}s)`, `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
+        if (r.status === 200) P(`POST /v1/classroom/summary → 200 (${el}s)`);
+        else F(`POST /v1/classroom/summary (${el}s)`, `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
     }
-    // Flashcards
+    // Flashcards — ruta real: /v1/classroom/flashcards/generate
     {
-        console.log('  ⏳ POST /v1/classroom/flashcards…');
+        console.log('  ⏳ POST /v1/classroom/flashcards/generate…');
         const t0 = Date.now();
-        const r = await req('POST', '/v1/classroom/flashcards', {
-            user_id: USER_ID, curso_id: CURSO_ID, tema_id: 'constitucion', n: 5,
+        const r = await req('POST', '/v1/classroom/flashcards/generate', {
+            curso_id: CURSO_ID, tema_id: '3b6f62d89ac74a78', n: 5,
         });
         const el = ((Date.now() - t0) / 1000).toFixed(1);
-        if (r.status === 200) P(`POST /v1/classroom/flashcards → 200 (${el}s)`);
-        else F(`POST /v1/classroom/flashcards (${el}s)`, `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
+        if (r.status === 200) P(`POST /v1/classroom/flashcards/generate → 200 (${el}s)`);
+        else F(`POST /v1/classroom/flashcards/generate (${el}s)`, `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
     }
 }
 
@@ -317,9 +333,9 @@ async function bloque10() {
         else F('GET /v1/boe/catalog', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
     }
     {
-        const r = await req('GET', `/v1/boe/regulations?user_id=${USER_ID}`);
+        const r = await req('GET', `/v1/boe/regulations?course_id=${CURSO_ID}`);
         if (r.status === 200) P(`GET /v1/boe/regulations → 200`);
-        else F('GET regulations', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
+        else F('GET /v1/boe/regulations', `status=${r.status} body=${JSON.stringify(r.json).slice(0, 300)}`);
     }
 }
 

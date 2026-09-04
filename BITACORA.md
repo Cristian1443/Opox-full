@@ -5,6 +5,90 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-04 — Alineación completa clientes Motor IA + E2E usuario nuevo
+
+Rama: `fix/revision-bloques-bugfixes`. Sesión de alineación de los 4 clientes del
+Motor contra el OpenAPI real (`ia.opox.ai`), E2E completo con usuario nuevo
+verificado y scripts Motor actualizados a rutas reales.
+
+### Nuevo usuario E2E verificado
+
+- Email: `tester.contrax.2026@gmail.com` · Contraseña: `Contrax#2026!`
+- Registro → OTP 323071 → verificado → Supabase user ID `23a702d2-69e1-4d64-b37e-72fccd622d17`
+
+### Alineación de clientes Motor (3 archivos + container)
+
+El OpenAPI real de `ia.opox.ai` (46 paths) expone rutas distintas a las que
+llamaban los clientes del backend. Se actualizaron las 4 rutas rotas:
+
+| Cliente | Roto (antes) | Correcto (ahora) |
+|---|---|---|
+| `MotorTutorClient` — chat | `POST /v1/classroom/chat` | `POST /v1/classroom/tutor` |
+| `MotorTutorClient` — summary | `POST /v1/classroom/resumen` | `POST /v1/classroom/summary` |
+| `MotorTutorClient` — flashcards | `POST /v1/classroom/flashcards` | `POST /v1/classroom/flashcards/generate` |
+| `MotorFatigueClient` | `POST /v1/fatigue/analyze` | `POST /v1/fatigue/biometrics` |
+| `MotorOnboardingClient` | `GET /v1/onboarding/preguntas` | `GET /v1/courses/{id}/questions` (banco) |
+
+**`MotorOnboardingClient` rediseñado**: usa el banco de preguntas
+(`/v1/courses/{cursoId}/questions`) en lugar del job de placement-test, porque
+el banco expone `correcta_idx` mientras el job de placement-test no lo tiene
+(INC-04). Las 20 preguntas del test de nivel ahora llegan del Motor real con
+respuesta correcta incluida.
+
+**`MotorTutorClient`**: añadido `cursoId` al constructor (propagado desde
+`container.ts`). Mapeo de respuestas actualizado:
+- `acciones_sugeridas` → `acciones` (nombre real del campo)
+- Flashcards: array directo `{front, back}` en lugar de `{tarjetas: [{pregunta, respuesta}]}`
+- Summary: `{resumen: {titulo, ideas_clave, desarrollo}}` mapeado a secciones
+- `nivel_detalle` (int 0/1/2) → `'esquema'|'medio'|'profundo'` en summary
+
+**`MotorFatigueClient`**: mapeo de campos `hrv→hrv_ms`, `sueno_horas→horas_sueno`;
+respuesta `{nivel: 'verde'}` (color) mapeada a `{nivel: 'bajo', semaforo: 'verde'}`.
+
+**`container.ts`**: pasa `MOTOR_DEFAULT_CURSO_ID` a `MotorTutorClient` y
+`MotorOnboardingClient`.
+
+### `e2e_motor_coleccion.js` actualizado
+
+Script Motor actualizado con todas las rutas reales del OpenAPI actual:
+- `/v1/courses/:id/exams` → `/v1/bank/exams?course_id=`
+- `/v1/hint` → `/v1/modes/hint` (con `pregunta_id` real del banco)
+- `/v1/users/:id/tone` → `/v1/tone/:id`
+- `/v1/fatigue/analyze` → `/v1/fatigue/biometrics`
+- `/v1/classroom/chat` → `/v1/classroom/tutor`
+- `/v1/classroom/resumen` → `/v1/classroom/summary`
+- `/v1/classroom/flashcards` → `/v1/classroom/flashcards/generate`
+- RAG search: mapeo `pasajes` (no `chunks`/`resultados`)
+- Tono: `nivel_detalle` como string `'breve'|'medio'|'profundo'`
+
+### Resultado numérico E2E final
+
+- **E2E OPOX backend** (usuario `tester.contrax.2026@gmail.com`):
+  **60/60 PASS · 0 FAIL · 2 SKIP** (register ya hecho + upload multipart PDF)
+  - Motor RAG activo: `articleRef` presente → preguntas con evidencia verbatim
+  - `generate` en 5.6 s (antes ~67 s por INC-04 fallthrough a OpenAI completo)
+  - Motor fatiga: 0.9 s (antes: 500 crudo)
+  - Motor chat tutor: 1.9 s (antes: 404 silencioso)
+  - Motor flashcards: 0.7 s (antes: 404 silencioso)
+  - Nivel test Motor: 0.7 s (banco real, antes: siempre estáticas)
+  - 0 GAPS detectados
+
+- **E2E Motor directo** (`ia.opox.ai`): **27/27 PASS · 0 FAIL**
+  - 2 GAPS pendientes del equipo IA: INC-04 (`correcta_idx` ausente en job results
+    del placement-test y del generador)
+
+### Estado tras la sesión
+
+- Todos los clientes del Motor alineados con el OpenAPI real.
+- INC-04 sigue activo en el Motor: el generador (`/v1/tests/generate`) y el
+  placement-test no exponen `correcta_idx` en el job result. El banco de preguntas
+  SÍ tiene `correcta_idx` y se usa como workaround para onboarding y para
+  `MotorAiClient`.
+- Pendiente para el equipo IA: exponer `correcta_idx` en el job result del
+  generador (Opción A de INC-04) y del placement-test.
+
+---
+
 ## 2026-09-03 — E2E completo + fix Bloque 3 fatiga + hallazgos Motor
 
 Rama: `fix/revision-bloques-bugfixes`. Sesión de validación end-to-end contra

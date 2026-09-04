@@ -1,15 +1,19 @@
 import type { ITutorAiClient, TutorAiChatParams, TutorAiChatResult } from '../../domain/repositories/ITutorAiClient';
 
-/** Cliente HTTP para el Motor IA — Aula Virtual (/classroom). */
+/** Cliente HTTP para el Motor IA — Aula Virtual.
+ *  Rutas reales (2026-09-04): /v1/classroom/tutor, /v1/classroom/summary, /v1/classroom/flashcards/generate
+ */
 export class MotorTutorClient implements ITutorAiClient {
     private readonly baseUrl: string;
     private readonly apiKey: string;
     private readonly timeoutMs: number;
+    private readonly cursoId: string;
 
-    constructor(baseUrl: string, apiKey: string, timeoutMs = 15_000) {
+    constructor(baseUrl: string, apiKey: string, timeoutMs = 15_000, cursoId = '') {
         this.baseUrl = baseUrl.replace(/\/$/, '');
         this.apiKey = apiKey;
         this.timeoutMs = timeoutMs;
+        this.cursoId = cursoId;
     }
 
     private async post<T>(path: string, body: unknown): Promise<T> {
@@ -27,7 +31,7 @@ export class MotorTutorClient implements ITutorAiClient {
             });
             if (!res.ok) {
                 const text = await res.text().catch(() => '');
-                throw new Error(`Motor tutor ${path} → ${res.status}: ${text}`);
+                throw new Error(`Motor tutor ${path} → ${res.status}: ${text.slice(0, 200)}`);
             }
             return res.json() as Promise<T>;
         } finally {
@@ -36,26 +40,28 @@ export class MotorTutorClient implements ITutorAiClient {
     }
 
     async chat(params: TutorAiChatParams): Promise<TutorAiChatResult> {
-        const body = {
+        const body: Record<string, unknown> = {
+            user_id: 'opox-backend',
+            curso_id: this.cursoId,
             mensaje: params.message,
-            ...(params.toneProfile && { tono: params.toneProfile }),
-            ...(params.history?.length && {
-                historial: params.history.map((m) => ({
-                    rol: m.role === 'user' ? 'usuario' : 'asistente',
-                    contenido: m.content,
-                })),
-            }),
-            ...(params.topic && { tema: params.topic }),
         };
+        if (params.toneProfile) body.tono = params.toneProfile;
+        if (params.history?.length) {
+            body.historial = params.history.map((m) => ({
+                rol: m.role === 'user' ? 'usuario' : 'asistente',
+                contenido: m.content,
+            }));
+        }
+        if (params.topic) body.tema = params.topic;
 
         const data = await this.post<{
             respuesta?: string;
-            acciones_sugeridas?: Array<{ label: string; icon: string }>;
-        }>('/v1/classroom/chat', body);
+            acciones?: Array<{ label: string; icon: string }>;
+        }>('/v1/classroom/tutor', body);
 
         return {
             content: data.respuesta ?? '',
-            suggestedActions: data.acciones_sugeridas,
+            suggestedActions: data.acciones,
         };
     }
 
@@ -65,35 +71,55 @@ export class MotorTutorClient implements ITutorAiClient {
         oposicion: string;
         count?: number;
     }): Promise<Array<{ question: string; answer: string }>> {
-        const data = await this.post<{
-            tarjetas?: Array<{ pregunta: string; respuesta: string }>;
-        }>('/v1/classroom/flashcards', {
-            tema_id: params.topicId,
-            titulo: params.topicTitle,
-            oposicion: params.oposicion,
-            cantidad: params.count ?? 10,
-        });
+        // Motor returns a direct array of {id, tema_id, front, back}
+        const data = await this.post<Array<{ front?: string; back?: string }>>(
+            '/v1/classroom/flashcards/generate',
+            {
+                curso_id: this.cursoId,
+                tema_id: params.topicId,
+                n: params.count ?? 10,
+            },
+        );
 
-        return (data.tarjetas ?? []).map((t) => ({
-            question: t.pregunta,
-            answer: t.respuesta,
+        if (!Array.isArray(data)) return [];
+        return data.map((t) => ({
+            question: t.front ?? '',
+            answer: t.back ?? '',
         }));
     }
 
     async getSummary(params: {
         topicId: string;
         oposicion: string;
+        detailLevel?: number;
     }): Promise<Array<{ title: string; content: string }>> {
+        // Map detailLevel (0|1|2) → Motor nivel ('esquema'|'medio'|'profundo')
+        const nivelMap: Record<number, string> = { 0: 'esquema', 1: 'medio', 2: 'profundo' };
+        const nivel = nivelMap[params.detailLevel ?? 1] ?? 'medio';
+
         const data = await this.post<{
-            secciones?: Array<{ titulo: string; contenido: string }>;
-        }>('/v1/classroom/resumen', {
+            tema_id?: string;
+            nivel?: string;
+            resumen?: {
+                titulo?: string;
+                ideas_clave?: string[];
+                desarrollo?: string;
+            };
+        }>('/v1/classroom/summary', {
+            curso_id: this.cursoId,
             tema_id: params.topicId,
-            oposicion: params.oposicion,
+            nivel,
         });
 
-        return (data.secciones ?? []).map((s) => ({
-            title: s.titulo,
-            content: s.contenido,
-        }));
+        const r = data.resumen;
+        if (!r) return [];
+        const sections: Array<{ title: string; content: string }> = [];
+        if (r.titulo) {
+            sections.push({ title: r.titulo, content: (r.ideas_clave ?? []).join('\n') });
+        }
+        if (r.desarrollo) {
+            sections.push({ title: 'Desarrollo', content: r.desarrollo });
+        }
+        return sections;
     }
 }

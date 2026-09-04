@@ -322,12 +322,12 @@ export function buildContainer() {
         : undefined;
 
     const motorTutor = isMotorConfigured
-        ? new MotorTutorClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 15_000)
+        ? new MotorTutorClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 15_000, env.MOTOR_DEFAULT_CURSO_ID ?? '')
         : undefined;
 
     // Timeout corto (5 s) — el onboarding cae a preguntas estáticas si el Motor tarda
     const motorOnboarding = isMotorConfigured
-        ? new MotorOnboardingClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 5_000)
+        ? new MotorOnboardingClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 5_000, env.MOTOR_DEFAULT_CURSO_ID ?? '')
         : undefined;
 
     // ─── Use cases (application) ──────────────────
