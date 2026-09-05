@@ -25,3 +25,11 @@ export class BoeInvalidIdentifierError extends DomainError {
         super('Identificador BOE inválido. Usa el formato BOE-A-AAAA-NNNNN.');
     }
 }
+
+export class BoeMiniTestNotAvailableError extends DomainError {
+    readonly code = 'boe/mini-test-not-available';
+    readonly httpStatus = 409;
+    constructor() {
+        super('Las preguntas de este cambio aún no están listas. Vuelve en unos minutos.');
+    }
+}

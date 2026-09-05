@@ -5,6 +5,7 @@ import type {
     GetBoeChangeDetailUseCase,
     GetBoeComparisonUseCase,
     GetBoeMiniTestUseCase,
+    AnswerBoeMiniTestUseCase,
     MarkBoeReadUseCase,
     ToggleBoeBookmarkUseCase,
     CompleteBoeMiniTestUseCase,
@@ -15,6 +16,7 @@ import type {
     SearchBoeRegulationsUseCase,
     SyncBoeCatalogUseCase,
 } from '../../application';
+import type { BoeMiniTestAnswerInput } from '@opox/types';
 
 function ok<T>(res: Response, status: number, data: T): void {
     res.status(status).json({ ok: true, data } satisfies ApiSuccessResponse<T>);
@@ -27,6 +29,7 @@ export class BoeController {
             getDetail: GetBoeChangeDetailUseCase;
             getComparison: GetBoeComparisonUseCase;
             getMiniTest: GetBoeMiniTestUseCase;
+            answerMiniTest: AnswerBoeMiniTestUseCase;
             markRead: MarkBoeReadUseCase;
             toggleBookmark: ToggleBoeBookmarkUseCase;
             completeMiniTest: CompleteBoeMiniTestUseCase;
@@ -88,6 +91,17 @@ export class BoeController {
         try {
             const changeId = req.params['id'] as string;
             const result = await this.deps.toggleBookmark.execute(changeId, req.authUser!.id);
+            ok(res, 200, result);
+        } catch (e) { next(e); }
+    };
+
+    // POST /boe/changes/:id/mini-test/answer
+    answerMiniTest = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { sesionId, preguntaId, elegidaIdx, tiempoMs } = req.body as BoeMiniTestAnswerInput;
+            const result = await this.deps.answerMiniTest.execute(
+                sesionId, req.authUser!.id, preguntaId, elegidaIdx, tiempoMs,
+            );
             ok(res, 200, result);
         } catch (e) { next(e); }
     };

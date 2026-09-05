@@ -7,6 +7,7 @@ import {
     StatusBar,
     ScrollView,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,72 +15,19 @@ import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
 
-// ─── 10.4 · Mini-test BOE · pregunta activa con tiempo ────────────────────────
-// Fiel al Figma (PreguntaActivaConTiempoScreen.tsx). El diseño solo captura el
-// estado previo a responder; el flujo real de envío/feedback (correcto,
-// incorrecto, explicación, avance a la siguiente pregunta) no tiene equivalente
-// en Figma y se conserva porque es imprescindible para que el mini-test
-// funcione — solo se reestiliza con la paleta confirmada.
+// ─── 10.4 · Mini-test BOE ─────────────────────────────────────────────────────
+// Flujo con Motor activo:
+//   1. GET /boe/changes/:id/mini-test → SesionOut (preguntas sin respuesta correcta)
+//   2. POST /boe/changes/:id/mini-test/answer por pregunta → correcta + explicación + evidencia
+//   3. POST /boe/changes/:id/mini-test/complete al finalizar → Opopoints
+// Flujo sin Motor (stub / fallback):
+//   sesionId === null → correctIndex viene en la pregunta → resolución local
 const FIGMA = {
     subtitleMuted: 'rgba(52, 58, 61, 0.5)',
     optionBorder: 'rgba(65, 41, 80, 0.3)',
     optionSelectedBg: 'rgba(114, 65, 184, 0.08)',
-};
-
-// ─── Mock de preguntas — Paso 2: boeApi.getMiniTest(itemId) ──────────────────
-const MOCK_QUESTIONS_BY_ITEM = {
-    '1': [
-        {
-            id: 'q1',
-            context: 'Art. 14 modificado',
-            question: 'Tras la modificación, ¿quién está ahora obligado a relacionarse electrónicamente con la Administración?',
-            options: [
-                { id: 'A', text: 'Solo las personas jurídicas.', isCorrect: false },
-                { id: 'B', text: 'También los empleados públicos en el ejercicio de sus funciones.', isCorrect: true },
-                { id: 'C', text: 'Únicamente las grandes empresas.', isCorrect: false },
-            ],
-            explanation: 'La nueva redacción amplía la obligación a los empleados públicos en el ejercicio de sus funciones.',
-            explanationWrong: 'Incorrecto. La respuesta correcta es la B. La modificación añade expresamente a los empleados públicos.',
-        },
-        {
-            id: 'q2',
-            context: 'Art. 14 modificado',
-            question: '¿Qué colectivo profesional se añade expresamente en la nueva redacción?',
-            options: [
-                { id: 'A', text: 'Los autónomos sin colegiación.', isCorrect: false },
-                { id: 'B', text: 'Quienes ejerzan actividad profesional colegiada.', isCorrect: true },
-                { id: 'C', text: 'Los trabajadores por cuenta ajena.', isCorrect: false },
-            ],
-            explanation: 'La nueva redacción añade expresamente a quienes ejerzan cualquier actividad profesional colegiada.',
-            explanationWrong: 'Incorrecto. La respuesta correcta es la B. Los profesionales con colegiación obligatoria son el colectivo añadido.',
-        },
-        {
-            id: 'q3',
-            context: 'Art. 14 modificado',
-            question: '¿Qué ocurre con la obligación electrónica de las personas físicas no profesionales?',
-            options: [
-                { id: 'A', text: 'Pasan a ser obligatorias para todas.', isCorrect: false },
-                { id: 'B', text: 'Se mantiene voluntaria, salvo los supuestos del art. 14.2.', isCorrect: true },
-                { id: 'C', text: 'Queda derogada por el nuevo reglamento.', isCorrect: false },
-            ],
-            explanation: 'Las personas físicas no profesionales siguen con la relación electrónica voluntaria, salvo excepciones del art. 14.2.',
-            explanationWrong: 'Incorrecto. La respuesta correcta es la B. La obligación no se extiende a todas las personas físicas.',
-        },
-    ],
-    default: [
-        {
-            id: 'q1',
-            context: 'Cambio legislativo',
-            question: '¿Cuál es el efecto principal del cambio publicado en el BOE?',
-            options: [
-                { id: 'A', text: 'Deroga la norma anterior en su totalidad.', isCorrect: false },
-                { id: 'B', text: 'Modifica parcialmente la redacción vigente.', isCorrect: true },
-                { id: 'C', text: 'Aplaza la entrada en vigor de la ley base.', isCorrect: false },
-            ],
-            explanation: 'La publicación en el BOE modifica parcialmente la redacción anterior, manteniéndose el resto del articulado vigente.',
-            explanationWrong: 'Incorrecto. La respuesta correcta es la B. Solo se modifica parcialmente la redacción.',
-        },
-    ],
+    evidenciaBg: 'rgba(65, 41, 80, 0.06)',
+    evidenciaBorder: 'rgba(65, 41, 80, 0.2)',
 };
 
 function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
@@ -90,9 +38,6 @@ function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
     );
 }
 
-// Flechas de la píldora de progreso — decorativas: el avance real está
-// gobernado por Confirmar/Siguiente pregunta para no romper el registro de
-// aciertos (score) del flujo de envío, que Figma no modela.
 function ChevronMiniIcon({ direction = 'left', size = 14, color = colors.white }) {
     const d = direction === 'left' ? 'M9 3L4 8L9 13' : 'M5 3L10 8L5 13';
     return (
@@ -102,87 +47,116 @@ function ChevronMiniIcon({ direction = 'left', size = 14, color = colors.white }
     );
 }
 
+// ─── Estados de la pantalla ───────────────────────────────────────────────────
+const STATE = {
+    LOADING: 'loading',
+    NOT_AVAILABLE: 'not_available',
+    ERROR: 'error',
+    ACTIVE: 'active',
+};
+
 export default function BoeMiniTestScreen({ route, navigation }) {
-    const { itemId = '1', title } = route.params ?? {};
-    const mockQuestions = MOCK_QUESTIONS_BY_ITEM[itemId] ?? MOCK_QUESTIONS_BY_ITEM.default;
+    const { itemId, title } = route.params ?? {};
     const insets = useSafeAreaInsets();
 
-    const [apiQuestions, setApiQuestions] = useState(null);
-
-    useEffect(() => {
-        boeApi.getMiniTest(itemId).then(res => {
-            if (res?.data?.questions?.length > 0) {
-                const qs = res.data.questions.map((q) => ({
-                    id: q.id,
-                    context: q.context,
-                    question: q.question,
-                    options: q.options.map((text, idx) => ({
-                        id: String.fromCharCode(65 + idx), // 'A', 'B', 'C'
-                        text,
-                        isCorrect: idx === q.correctIndex,
-                    })),
-                    explanation: q.explanation,
-                    explanationWrong: `Incorrecto. La respuesta correcta es la ${String.fromCharCode(65 + q.correctIndex)}. ${q.explanation}`,
-                }));
-                setApiQuestions(qs);
-            }
-        }).catch(() => {});
-    }, [itemId]);
-
-    const questions = apiQuestions ?? mockQuestions;
-    const total = questions.length;
+    const [screenState, setScreenState] = useState(STATE.LOADING);
+    const [questions, setQuestions] = useState([]);
+    const sesionIdRef = useRef(null); // null = stub, string = Motor
+    const isStubRef = useRef(false);
 
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [selectedOption, setSelectedOption] = useState(null);
-    const [isSubmitted, setIsSubmitted] = useState(false);
-    const [score, setScore] = useState(0);
+    const [selectedOptionIdx, setSelectedOptionIdx] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [feedback, setFeedback] = useState(null); // { correcta, correctaIdx, explicacion, justificaciones, evidencia }
     const scoreRef = useRef(0);
+    const startTimeRef = useRef(Date.now());
+
+    // ── Cargar sesión al montar ───────────────────────────────────────────────
+    useEffect(() => {
+        boeApi.getMiniTest(itemId).then((res) => {
+            if (res?.error) {
+                if (res.error.code === 'boe/mini-test-not-available') {
+                    setScreenState(STATE.NOT_AVAILABLE);
+                } else {
+                    setScreenState(STATE.ERROR);
+                }
+                return;
+            }
+            const { sesionId, questions: qs } = res?.data ?? {};
+            if (!qs?.length) {
+                setScreenState(STATE.ERROR);
+                return;
+            }
+            sesionIdRef.current = sesionId ?? null;
+            isStubRef.current = sesionId === null;
+            setQuestions(qs);
+            startTimeRef.current = Date.now();
+            setScreenState(STATE.ACTIVE);
+        }).catch(() => setScreenState(STATE.ERROR));
+    }, [itemId]);
 
     const currentQ = questions[currentIndex];
-    const progress = (currentIndex + (isSubmitted ? 1 : 0)) / total;
+    const total = questions.length;
+    const progress = total > 0 ? (currentIndex + (feedback ? 1 : 0)) / total : 0;
     const isLastQuestion = currentIndex === total - 1;
 
-    // Solo mostrar: correcta + elegida incorrecta (igual que QuestionActiveScreen)
-    const visibleOptions = currentQ.options.filter(opt => {
-        if (!isSubmitted) return true;
-        if (opt.isCorrect) return true;
-        if (opt.id === selectedOption) return true;
-        return false;
-    });
+    // ── Confirmar respuesta ───────────────────────────────────────────────────
+    async function handleConfirm() {
+        if (selectedOptionIdx === null || isSubmitting) return;
+        setIsSubmitting(true);
 
-    const isCorrectAnswer =
-        isSubmitted && currentQ.options.find(o => o.id === selectedOption)?.isCorrect === true;
+        const tiempoMs = Date.now() - startTimeRef.current;
+        startTimeRef.current = Date.now();
 
-    function handleSelect(id) {
-        if (isSubmitted) return;
-        setSelectedOption(id);
-    }
+        if (isStubRef.current) {
+            // Fallback local: correctIndex viene en la pregunta del stub
+            const correctaIdx = currentQ.correctIndex ?? 0;
+            const correcta = selectedOptionIdx === correctaIdx;
+            if (correcta) scoreRef.current += 1;
+            setFeedback({
+                correcta,
+                correctaIdx,
+                explicacion: currentQ.explanation ?? '',
+                justificaciones: [],
+                evidencia: null,
+            });
+        } else {
+            const res = await boeApi.answerMiniTest(itemId, {
+                sesionId: sesionIdRef.current,
+                preguntaId: currentQ.id,
+                elegidaIdx: selectedOptionIdx,
+                tiempoMs,
+            }).catch(() => null);
 
-    function handleConfirm() {
-        if (!selectedOption) return;
-        const correct = currentQ.options.find(o => o.id === selectedOption)?.isCorrect ?? false;
-        if (correct) {
-            scoreRef.current += 1;
-            setScore(scoreRef.current);
+            if (!res?.data) {
+                Alert.alert('Error', 'No se pudo registrar tu respuesta. Inténtalo de nuevo.');
+                setIsSubmitting(false);
+                return;
+            }
+            const { correcta, correctaIdx, explicacion, justificaciones, evidencia } = res.data;
+            if (correcta) scoreRef.current += 1;
+            setFeedback({ correcta, correctaIdx, explicacion, justificaciones, evidencia });
         }
-        setIsSubmitted(true);
+
+        setIsSubmitting(false);
     }
 
+    // ── Avanzar a la siguiente pregunta o finalizar ───────────────────────────
     function handleNext() {
         if (isLastQuestion) {
             boeApi.completeMiniTest(itemId, scoreRef.current, total).catch(() => {});
             navigation.navigate('BoeUpdateSuccess', {
-                articleRef: title ?? currentQ.context,
+                articleRef: title ?? currentQ?.context ?? 'Actualización BOE',
             });
         } else {
-            setCurrentIndex(i => i + 1);
-            setSelectedOption(null);
-            setIsSubmitted(false);
+            setCurrentIndex((i) => i + 1);
+            setSelectedOptionIdx(null);
+            setFeedback(null);
         }
     }
 
     function handleClose() {
-        if (currentIndex === 0 && !isSubmitted) {
+        if (currentIndex === 0 && !feedback) {
             navigation.goBack();
             return;
         }
@@ -192,23 +166,78 @@ export default function BoeMiniTestScreen({ route, navigation }) {
             [
                 { text: 'Cancelar', style: 'cancel' },
                 { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() },
-            ]
+            ],
         );
     }
+
+    // ─── Estado: cargando ─────────────────────────────────────────────────────
+    if (screenState === STATE.LOADING) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+                <View style={styles.centeredState}>
+                    <ActivityIndicator size="large" color={colors.purple} />
+                    <Text style={styles.stateText}>Preparando mini-test…</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ─── Estado: preguntas aún no disponibles (409) ───────────────────────────
+    if (screenState === STATE.NOT_AVAILABLE) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+                <View style={styles.centeredState}>
+                    <Ionicons name="time-outline" size={52} color={colors.purple} style={{ marginBottom: 20 }} />
+                    <Text style={styles.stateTitle}>Preguntas en preparación</Text>
+                    <Text style={styles.stateBody}>
+                        El Motor IA está regenerando las preguntas afectadas por este cambio. Vuelve en unos minutos.
+                    </Text>
+                    <TouchableOpacity style={styles.stateBtn} onPress={() => navigation.goBack()}>
+                        <Text style={styles.stateBtnText}>Volver</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ─── Estado: error genérico ───────────────────────────────────────────────
+    if (screenState === STATE.ERROR) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+                <View style={styles.centeredState}>
+                    <Ionicons name="alert-circle-outline" size={52} color={colors.statRed} style={{ marginBottom: 20 }} />
+                    <Text style={styles.stateTitle}>No se pudo cargar</Text>
+                    <Text style={styles.stateBody}>Comprueba tu conexión e inténtalo de nuevo.</Text>
+                    <TouchableOpacity style={styles.stateBtn} onPress={() => navigation.goBack()}>
+                        <Text style={styles.stateBtnText}>Volver</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ─── Estado: test activo ──────────────────────────────────────────────────
+    const isCorrectAnswer = feedback?.correcta === true;
+
+    // Las opciones tras confirmar: solo mostrar la correcta y la elegida (si incorrecta)
+    const displayOptions = currentQ.options.map((text, idx) => ({ text, idx })).filter(({ idx }) => {
+        if (!feedback) return true;
+        if (idx === feedback.correctaIdx) return true;
+        if (idx === selectedOptionIdx) return true;
+        return false;
+    });
 
     return (
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
             <View style={styles.screen}>
-                {/* ── Header ──────────────────────────────────────────────────── */}
+                {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.iconButton}
-                        activeOpacity={0.7}
-                        onPress={handleClose}
-                        accessibilityLabel="Cerrar test"
-                    >
+                    <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={handleClose}>
                         <ChevronLeftIcon />
                     </TouchableOpacity>
                     <View style={styles.headerTitles}>
@@ -220,7 +249,7 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                     <View style={styles.iconButton} />
                 </View>
 
-                {/* ── Píldora de progreso ─────────────────────────────────────── */}
+                {/* Píldora de progreso */}
                 <View style={styles.progressPill}>
                     <ChevronMiniIcon direction="left" />
                     <View style={styles.progressTrack}>
@@ -232,7 +261,7 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                     <ChevronMiniIcon direction="right" />
                 </View>
 
-                {/* ── Contenido ─────────────────────────────────────────────────── */}
+                {/* Contenido */}
                 <ScrollView
                     style={styles.scroll}
                     contentContainerStyle={styles.scrollContent}
@@ -242,86 +271,97 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                     <Text style={styles.questionText}>{currentQ.question}</Text>
 
                     <View style={styles.optionsList}>
-                        {visibleOptions.map(option => {
-                            const isSelected = selectedOption === option.id;
+                        {displayOptions.map(({ text, idx }) => {
+                            const isSelected = selectedOptionIdx === idx;
                             let borderColor = FIGMA.optionBorder;
                             let bg = 'transparent';
                             let textColor = colors.textDark;
+                            let labelColor = colors.textDark;
 
-                            if (!isSubmitted) {
+                            if (!feedback) {
                                 if (isSelected) {
                                     borderColor = colors.purple;
                                     bg = FIGMA.optionSelectedBg;
                                     textColor = colors.purple;
+                                    labelColor = colors.purple;
                                 }
-                            } else if (option.isCorrect) {
+                            } else if (idx === feedback.correctaIdx) {
                                 borderColor = colors.ctaGreen;
                                 bg = `${colors.ctaGreen}1A`;
+                                textColor = colors.textDark;
                             } else if (isSelected) {
                                 borderColor = colors.statRed;
                                 bg = `${colors.statRed}1A`;
+                                textColor = colors.textDark;
                             }
+
+                            const label = String.fromCharCode(65 + idx); // A, B, C…
 
                             return (
                                 <TouchableOpacity
-                                    key={option.id}
+                                    key={idx}
                                     style={[styles.optionRow, { borderColor, backgroundColor: bg }]}
-                                    onPress={() => handleSelect(option.id)}
-                                    disabled={isSubmitted}
+                                    onPress={() => !feedback && setSelectedOptionIdx(idx)}
+                                    disabled={!!feedback}
                                     activeOpacity={0.8}
-                                    accessibilityLabel={`Opción ${option.id}: ${option.text}`}
-                                    accessibilityState={{ selected: isSelected }}
                                 >
-                                    <Text style={[styles.optionLabel, { color: textColor }]}>{option.id}.</Text>
-                                    <Text style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
+                                    <Text style={[styles.optionLabel, { color: labelColor }]}>{label}.</Text>
+                                    <Text style={[styles.optionText, { color: textColor }]}>{text}</Text>
+                                    {feedback && idx === feedback.correctaIdx && (
+                                        <Ionicons name="checkmark-circle" size={18} color={colors.ctaGreen} />
+                                    )}
+                                    {feedback && idx === selectedOptionIdx && idx !== feedback.correctaIdx && (
+                                        <Ionicons name="close-circle" size={18} color={colors.statRed} />
+                                    )}
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
 
-                    {/* Feedback tras enviar respuesta */}
-                    {isSubmitted && (
-                        <View style={[
-                            styles.feedbackCard,
-                            isCorrectAnswer ? styles.feedbackOk : styles.feedbackErr,
-                        ]}>
+                    {/* Feedback tras confirmar */}
+                    {feedback && (
+                        <View style={[styles.feedbackCard, isCorrectAnswer ? styles.feedbackOk : styles.feedbackErr]}>
                             <View style={styles.feedbackHeader}>
                                 <Ionicons
                                     name={isCorrectAnswer ? 'checkmark-circle' : 'close-circle'}
                                     size={22}
                                     color={isCorrectAnswer ? colors.ctaGreen : colors.statRed}
                                 />
-                                <Text style={[
-                                    styles.feedbackTitle,
-                                    { color: isCorrectAnswer ? colors.ctaGreen : colors.statRed },
-                                ]}>
+                                <Text style={[styles.feedbackTitle, { color: isCorrectAnswer ? colors.ctaGreen : colors.statRed }]}>
                                     {isCorrectAnswer ? '¡Correcto!' : 'Incorrecto'}
                                 </Text>
                             </View>
-                            <Text style={styles.feedbackBody}>
-                                {isCorrectAnswer ? currentQ.explanation : currentQ.explanationWrong}
-                            </Text>
+                            {!!feedback.explicacion && (
+                                <Text style={styles.feedbackBody}>{feedback.explicacion}</Text>
+                            )}
+                            {/* Evidencia verbatim del temario — solo con Motor activo */}
+                            {feedback.evidencia?.cita ? (
+                                <View style={styles.evidenciaBox}>
+                                    <Text style={styles.evidenciaLabel}>
+                                        Fuente — pág. {feedback.evidencia.pagina}
+                                    </Text>
+                                    <Text style={styles.evidenciaText}>"{feedback.evidencia.cita}"</Text>
+                                </View>
+                            ) : null}
                         </View>
                     )}
                 </ScrollView>
 
-                {/* ── Botón fijo al fondo ───────────────────────────────────────── */}
+                {/* Botón fijo al fondo */}
                 <View style={[styles.actionArea, { paddingBottom: spacing.sm + insets.bottom }]}>
-                    {!isSubmitted ? (
+                    {!feedback ? (
                         <TouchableOpacity
-                            style={[styles.confirmBtn, !selectedOption && styles.confirmBtnDisabled]}
+                            style={[styles.confirmBtn, (selectedOptionIdx === null || isSubmitting) && styles.confirmBtnDisabled]}
                             onPress={handleConfirm}
-                            disabled={!selectedOption}
-                            accessibilityLabel="Confirmar respuesta"
+                            disabled={selectedOptionIdx === null || isSubmitting}
                         >
-                            <Text style={styles.confirmBtnText}>Confirmar</Text>
+                            {isSubmitting
+                                ? <ActivityIndicator size="small" color={colors.white} />
+                                : <Text style={styles.confirmBtnText}>Confirmar</Text>
+                            }
                         </TouchableOpacity>
                     ) : (
-                        <TouchableOpacity
-                            style={styles.confirmBtn}
-                            onPress={handleNext}
-                            accessibilityLabel={isLastQuestion ? 'Finalizar test' : 'Siguiente pregunta'}
-                        >
+                        <TouchableOpacity style={styles.confirmBtn} onPress={handleNext}>
                             <Text style={styles.confirmBtnText}>
                                 {isLastQuestion ? 'Finalizar test' : 'Siguiente pregunta'}
                             </Text>
@@ -343,6 +383,48 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
         paddingHorizontal: spacing.lg,
         paddingTop: spacing.lg,
+    },
+
+    // ── Estados de carga / error / no disponible ───────────────────────────────
+    centeredState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 32,
+    },
+    stateText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: colors.textDark,
+        marginTop: 16,
+        textAlign: 'center',
+    },
+    stateTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 20,
+        color: colors.textDark,
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    stateBody: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 14,
+        color: colors.textDark,
+        opacity: 0.7,
+        textAlign: 'center',
+        lineHeight: 21,
+        marginBottom: 28,
+    },
+    stateBtn: {
+        backgroundColor: colors.purple,
+        paddingVertical: 14,
+        paddingHorizontal: 40,
+        borderRadius: 14,
+    },
+    stateBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 15,
+        color: colors.white,
     },
 
     // ── Header ────────────────────────────────────────────────────
@@ -373,7 +455,7 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
 
-    // ── Píldora de progreso ────────────────────────────────────────
+    // ── Progreso ──────────────────────────────────────────────────
     progressPill: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -407,14 +489,9 @@ const styles = StyleSheet.create({
     },
 
     // ── Contenido ─────────────────────────────────────────────────
-    scroll: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingBottom: spacing.md,
-    },
+    scroll: { flex: 1 },
+    scrollContent: { paddingBottom: spacing.md },
 
-    // ── Pregunta ──────────────────────────────────────────────────
     questionText: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 18,
@@ -424,9 +501,7 @@ const styles = StyleSheet.create({
     },
 
     // ── Opciones ──────────────────────────────────────────────────
-    optionsList: {
-        gap: spacing.sm + 4,
-    },
+    optionsList: { gap: spacing.sm + 4 },
     optionRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -446,7 +521,7 @@ const styles = StyleSheet.create({
         lineHeight: 19,
     },
 
-    // ── Feedback card ─────────────────────────────────────────────
+    // ── Feedback ──────────────────────────────────────────────────
     feedbackCard: {
         borderRadius: 14,
         padding: spacing.md,
@@ -478,10 +553,33 @@ const styles = StyleSheet.create({
         lineHeight: 21,
     },
 
-    // ── Botón fijo al fondo ────────────────────────────────────────
-    actionArea: {
-        paddingTop: spacing.sm,
+    // ── Evidencia verbatim ─────────────────────────────────────────
+    evidenciaBox: {
+        marginTop: 12,
+        backgroundColor: FIGMA.evidenciaBg,
+        borderWidth: 1,
+        borderColor: FIGMA.evidenciaBorder,
+        borderRadius: 10,
+        padding: 12,
     },
+    evidenciaLabel: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 11,
+        color: colors.purple,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    evidenciaText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: colors.textDark,
+        lineHeight: 19,
+        fontStyle: 'italic',
+    },
+
+    // ── Botón fijo ─────────────────────────────────────────────────
+    actionArea: { paddingTop: spacing.sm },
     confirmBtn: {
         height: 61.3,
         borderRadius: 14.2,
@@ -489,9 +587,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    confirmBtnDisabled: {
-        opacity: 0.4,
-    },
+    confirmBtnDisabled: { opacity: 0.4 },
     confirmBtnText: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,

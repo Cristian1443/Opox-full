@@ -73,6 +73,38 @@ export interface MotorCambio {
     preguntas_afectadas: MotorCambioPregunta[];
 }
 
+// ─── DTOs del mini-test BOE (pantalla 10.4) ─────────────────────────────────
+
+/** Pregunta de la sesión — sin respuesta correcta (se revela en answerMiniTestQuestion). */
+export interface MotorBoeSessionPregunta {
+    id: string;
+    enunciado: string;
+    opciones: string[];
+    dificultad: string;
+    tema_id: string;
+    origen: string;
+    ref_legislativa: string;
+}
+
+/** SesionOut del Motor para el mini-test BOE. */
+export interface MotorBoeSessionOut {
+    sesion_id: string;
+    tipo: string;
+    curso_id: string;
+    contrarreloj_seg: number;
+    preguntas: MotorBoeSessionPregunta[];
+    deficit: { pedidas: number; publicadas: number; motivos_descarte: Record<string, unknown> };
+}
+
+/** Respuesta del Motor al responder una pregunta de la sesión. */
+export interface MotorBoeAnswerOut {
+    correcta: boolean;
+    correcta_idx: number;
+    explicacion: string;
+    justificaciones: string[];
+    evidencia: { cita: string; pagina: number; chunk_id: string } | null;
+}
+
 export interface MotorBoeContract {
     // ── Detección de cambios ──────────────────────────────────────────────────
 
@@ -114,4 +146,26 @@ export interface MotorBoeContract {
      * Devuelve el job_id (fire-and-forget — no requiere polling del caller).
      */
     regenerateQuestions(changeId: string, cursoId: string): Promise<string>;
+
+    // ── Mini-test de validación (pantalla 10.4) ───────────────────────────────
+
+    /**
+     * Obtiene (o reanuda) la sesión de mini-test para el alumno sobre un cambio BOE.
+     * GET /v1/boe/changes/{changeId}/mini-test?course_id=...&user_id=...
+     * Lanza error con status 409 si el cambio aún no fue regenerado.
+     */
+    getMiniTest(changeId: string, courseId: string, userId: string): Promise<MotorBoeSessionOut>;
+
+    /**
+     * Envía la respuesta del alumno a una pregunta de la sesión.
+     * POST /v1/tests/{sesionId}/answer
+     * Devuelve la corrección con explicación y evidencia verbatim del temario.
+     */
+    answerMiniTestQuestion(
+        sesionId: string,
+        userId: string,
+        preguntaId: string,
+        elegidaIdx: number,
+        tiempoMs?: number,
+    ): Promise<MotorBoeAnswerOut>;
 }

@@ -109,15 +109,35 @@ export interface BoeMiniTestQuestionDto {
     question: string;
     /** Exactamente 3 opciones — la app añade el prefijo A/B/C */
     options: [string, string, string];
-    correctIndex: 0 | 1 | 2;
-    /** Justificación breve citando la redacción vigente (máx. 300 chars) */
-    explanation: string;
+    /** Solo presente en el path de fallback (sin Motor). Omitido con Motor activo. */
+    correctIndex?: 0 | 1 | 2;
+    /** Solo presente en el path de fallback (sin Motor). */
+    explanation?: string;
 }
 
 export interface BoeMiniTestResponse {
     changeId: string;
     articulo: string;
+    /** null cuando el Motor no está configurado — la app usa correctIndex local. */
+    sesionId: string | null;
     questions: BoeMiniTestQuestionDto[];
+}
+
+/** Respuesta al responder una pregunta vía Motor (POST /boe/changes/:id/mini-test/answer). */
+export interface BoeMiniTestAnswerResponse {
+    correcta: boolean;
+    correctaIdx: number;
+    explicacion: string;
+    justificaciones: string[];
+    /** Cita verbatim del temario + número de página. null si el Motor no la incluye. */
+    evidencia: { cita: string; pagina: number; chunkId: string } | null;
+}
+
+export interface BoeMiniTestAnswerInput {
+    sesionId: string;
+    preguntaId: string;
+    elegidaIdx: number;
+    tiempoMs?: number;
 }
 
 // ─── Request bodies ───────────────────────────────────────────────────────────

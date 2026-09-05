@@ -5,6 +5,70 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-05 — Bloque 10.4 · Mini-test BOE con Motor real
+
+Rama: `fix/revision-bloques-bugfixes`. Implementación completa del flujo
+Motor real para el mini-test BOE y fix crítico de API key en `.env`.
+
+### Nueva colección Motor BOE v4
+
+El equipo IA entregó los endpoints del mini-test BOE. Flujo real:
+
+1. `GET /v1/boe/changes/{id}/mini-test?course_id=&user_id=` → `SesionOut`
+   con preguntas SIN respuesta correcta (la sesión es idempotente por user_id).
+2. `POST /v1/tests/{sesionId}/answer` por cada pregunta → devuelve
+   `{ correcta, correcta_idx, explicacion, justificaciones, evidencia }`.
+   La evidencia incluye cita verbatim del texto del BOE + página.
+3. `POST /boe/changes/:id/mini-test/complete` → guarda resultado + Opopoints.
+- Si el Motor devuelve 409 `mini_test_no_disponible`: el cambio existe pero
+  la regeneración de preguntas no ha terminado aún.
+- Path stub (sin Motor): `sesionId: null`, preguntas con `correctIndex` para
+  resolución local en el móvil, sin llamadas a `/answer`.
+
+### Archivos modificados (12)
+
+| Capa | Archivo | Cambio |
+|---|---|---|
+| Contrato | `MotorBoeContract.ts` | `MotorBoeSessionOut`, `MotorBoeAnswerOut`, `getMiniTest`, `answerMiniTestQuestion` |
+| Tipos | `packages/types/src/boe.ts` | `BoeMiniTestAnswerResponse`, `BoeMiniTestAnswerInput`, `sesionId: null` en response |
+| Constantes | `routes.js` + `index.d.ts` | `CHANGE_MINI_TEST_ANSWER` |
+| Dominio | `BoeError.ts` | `BoeMiniTestNotAvailableError` (409) |
+| Infra | `MotorBoeClient.ts` | `getMiniTest()`, `answerMiniTestQuestion()` |
+| Aplicación | `BoeUseCases.ts` | Reescritura `GetBoeMiniTestUseCase`, nuevo `AnswerBoeMiniTestUseCase` |
+| Controller | `BoeController.ts` | `answerMiniTest` handler |
+| Rutas | `boeRoutes.ts` | `POST /boe/changes/:id/mini-test/answer` |
+| Container | `container.ts` | Cableado `answerBoeMiniTest` |
+| Mobile API | `boe.js` | `answerMiniTest()` |
+| Mobile UI | `BoeMiniTestScreen.js` | Reescritura completa con path Motor + path stub + estado 409 |
+| Test | `scripts/test_boe_minitest.js` | Script E2E 6 secciones + idempotencia |
+
+### Fix crítico: API key truncada por `#` en `.env`
+
+`MOTOR_API_KEY` y `MOTOR_BOE_API_KEY` contenían `#` sin comillas. Los
+parsers de `.env` tratan `#` como inicio de comentario, por lo que el
+backend enviaba `opox-ZV*umdh9PdKFyb5NXtVx` en lugar de la clave completa.
+El Motor devolvía 401 → el sync y otros endpoints fallaban con 500 genérico.
+**Fix**: claves entre comillas dobles en `.env`.
+
+### Resultado E2E mini-test BOE
+
+Script `scripts/test_boe_minitest.js`:
+- **16 PASS · 0 FAIL · 1 SKIP** (17 checks totales)
+- SKIP esperado: sección 4 `/answer` — el cambio de seed usa el path stub
+  (`sesionId=null`); el endpoint Motor se activa cuando el Motor regenera
+  preguntas para ese cambio específico.
+- Login, feed, GET mini-test (3 preguntas stub), POST complete (204),
+  GET detalle (`miniTestCompleted: true`, score y total) → todo verde.
+
+### Estado Bloque 10
+
+Cerrado con Motor real para mini-test. El path stub sigue activo como
+fallback cuando el Motor no está configurado o el cambio aún no fue
+regenerado. El path Motor real se ejercitará en cuanto el Motor complete
+la regeneración de un cambio con preguntas afectadas.
+
+---
+
 ## 2026-09-04 — Alineación completa clientes Motor IA + E2E usuario nuevo
 
 Rama: `fix/revision-bloques-bugfixes`. Sesión de alineación de los 4 clientes del

@@ -339,10 +339,22 @@ word-by-word con el paquete npm `diff` en `application/boe/boeDiff.ts` y devuelv
 Cada segmento tiene `type: 'normal' | 'deleted' | 'added'`. El mobile renderiza
 directamente los segmentos — no hay diff en cliente.
 
-**IA mini-test**: `AiApiContract.generateBoeMiniTest` definido. `AiApiClient` delega
-en `AiApiClientStub` hasta que el equipo IA entregue el prompt del
-`packages/ai/BRIEF_IA_BLOQUE10.md`. Las preguntas tienen **exactamente 3 opciones**
-(no 4 como el Generador Infinito). Marcador `TODO(ia-bloque10)`.
+**Mini-test BOE con Motor real (2026-09-05)**: flujo Motor activo vía `MotorBoeClient`.
+- `GET /boe/changes/:id/mini-test` → `GET /v1/boe/changes/{id}/mini-test?course_id=&user_id=`
+  al Motor → `{ sesionId, questions }`. Sesión idempotente por `user_id`. Preguntas SIN `correctIndex`.
+- `POST /boe/changes/:id/mini-test/answer` → `POST /v1/tests/{sesionId}/answer` al Motor →
+  `{ correcta, correctaIdx, explicacion, justificaciones, evidencia }`.
+  `evidencia.cita` = cita verbatim del BOE + `evidencia.pagina`.
+- 409 `mini_test_no_disponible` → `BoeMiniTestNotAvailableError` (409) → móvil muestra
+  "Preguntas en preparación".
+- Path stub (Motor sin configurar o cambio sin regenerar): `sesionId: null`, preguntas con
+  `correctIndex` para resolución local — no llama a `/answer`.
+- Las preguntas tienen **exactamente 3 opciones** (no 4 como el Generador Infinito).
+- `BoeMiniTestAnswerInput` / `BoeMiniTestAnswerResponse` en `packages/types/src/boe.ts`.
+- Ruta `CHANGE_MINI_TEST_ANSWER` en `packages/constants` (routes.js + index.d.ts).
+- E2E: `scripts/test_boe_minitest.js` → 16/17 PASS.
+- **Fix `.env`**: `MOTOR_API_KEY` y `MOTOR_BOE_API_KEY` deben ir entre comillas dobles —
+  contienen `#` que dotenv interpreta como comentario (truncaba la clave → 401 del Motor).
 
 **`TrainingTopic.topicId`**: identificador semántico (`'constitucion'`, `'ley-39'`,
 etc.) distinto del `id` UUID. El mobile y el backend de generación de preguntas
@@ -704,7 +716,7 @@ pnpm lint                       # lint completo
 | 7 | Sesión de test activa | Frontend + backend + IA completo. Pista IA vía `/v1/modes/hint` del Motor (requiere `pregunta_id` real del banco). Fallback a OpenAI directo. |
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma (2026-08-26). Motor IA operativo (2026-09-04): chat → `/v1/classroom/tutor`, flashcards → `/v1/classroom/flashcards/generate`, summary → `/v1/classroom/summary`. `cursoId` propagado desde container. Stubs como fallback. |
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
-| 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
+| 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-09-05: mini-test con Motor real operativo — `GET /boe/changes/:id/mini-test` → sesión Motor idempotente, `POST /boe/changes/:id/mini-test/answer` → corrección + evidencia verbatim. Path stub (sesionId null) como fallback. 409 `mini_test_no_disponible` manejado. E2E 16/17 PASS. Fix API key `.env` (# como comentario). Revisión 2026-08-27: fallback catálogo, UPSERT idempotente, campo resumen, modal "Añadir norma", cross-bloque. |
 | 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-28: motor earn automático por tests (1 O/acierto × multiplicador, cap 100 O/día), mini-test BOE hasta 5 O, `getTodayTestEarnings` en repo. Revisión 2026-08-27: puente earn→ledger, `POST /store/discounts/:id/redeem`, 8 pantallas sin mocks, canje por `redeemType`, fixes tabs UI. |
 | 12 | Configuración | Frontend + backend completo. Revisión 2026-08-30 (3 pasadas): feedback real, tono IA multi-dispositivo, accesibilidad mapeada, stats reales con velocidad, subtextos API, PDF real (pdfkit+Supabase Storage URL firmada), racha caduca correctamente en lectura, botón envío TutorChat. Gaps pendientes: ThemeContext global, chat soporte (Intercom), RevenueCat (suscripción). |
 | 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |

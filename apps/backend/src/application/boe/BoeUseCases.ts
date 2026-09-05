@@ -2,10 +2,12 @@ import type { IBoeRepository, IDashboardRepository, BoeChange, BoeChangeFragment
 import { computeBoeDiff } from './boeDiff';
 import {
     BoeChangeNotFoundError,
+    BoeMiniTestNotAvailableError,
 } from '../../domain';
 import type {
     AiApiContract,
     BoeMiniTestQuestionDto,
+    BoeMiniTestAnswerResponse,
     MotorBoeContract,
     MotorCambio,
     MotorBoeCatalogResult,
@@ -158,6 +160,8 @@ export class GetBoeMiniTestUseCase {
     constructor(
         private readonly repo: IBoeRepository,
         private readonly ai: AiApiContract,
+        private readonly motor: MotorBoeContract | null,
+        private readonly cursoId: string | null,
     ) {}
 
     async execute(changeId: string, userId: string): Promise<BoeMiniTestResponse> {
@@ -168,10 +172,32 @@ export class GetBoeMiniTestUseCase {
 
         if (!change) throw new BoeChangeNotFoundError();
 
+        // Marcar como leído al abrir el mini-test
+        await this.repo.markRead(userId, changeId).catch(() => void 0);
+
+        // ── Path Motor: sesión idempotente por alumno, respuestas pregunta a pregunta ──
+        if (this.motor && this.cursoId) {
+            try {
+                const sesion = await this.motor.getMiniTest(changeId, this.cursoId, userId);
+                const questions: BoeMiniTestQuestionDto[] = sesion.preguntas.map((p) => ({
+                    id: p.id,
+                    context: change.articulo,
+                    question: p.enunciado,
+                    options: p.opciones as [string, string, string],
+                }));
+                return { changeId: change.id, articulo: change.articulo, sesionId: sesion.sesion_id, questions };
+            } catch (err: any) {
+                if (err?.response?.status === 409) throw new BoeMiniTestNotAvailableError();
+                // Otros errores del Motor → fallback al stub
+                logger.warn('[boe] getMiniTest motor error — fallback stub', { changeId, err: err?.message });
+            }
+        }
+
+        // ── Path fallback: stub/OpenAI — devuelve correctIndex para manejo local ──
         const antes = fragments.find((f) => f.fragType === 'antes')?.text ?? '';
         const despues = fragments.find((f) => f.fragType === 'despues')?.text ?? '';
 
-        logger.info('[boe] generateBoeMiniTest', { changeId, articulo: change.articulo });
+        logger.info('[boe] generateBoeMiniTest (stub)', { changeId, articulo: change.articulo });
 
         const result = await this.ai.generateBoeMiniTest({
             oposicion: 'justicia-tramitacion',
@@ -192,13 +218,34 @@ export class GetBoeMiniTestUseCase {
             explanation: q.explanation,
         }));
 
-        // Marcar como leído al abrir el mini-test
-        await this.repo.markRead(userId, changeId).catch(() => void 0);
+        return { changeId: change.id, articulo: change.articulo, sesionId: null, questions };
+    }
+}
 
+// ─── Responder pregunta del mini-test (10.4 — con Motor activo) ──────────────
+
+export class AnswerBoeMiniTestUseCase {
+    constructor(private readonly motor: MotorBoeContract | null) {}
+
+    async execute(
+        sesionId: string,
+        userId: string,
+        preguntaId: string,
+        elegidaIdx: number,
+        tiempoMs?: number,
+    ): Promise<BoeMiniTestAnswerResponse> {
+        if (!this.motor) {
+            throw new Error('Motor BOE no configurado — endpoint de respuesta no disponible en modo stub.');
+        }
+        const out = await this.motor.answerMiniTestQuestion(sesionId, userId, preguntaId, elegidaIdx, tiempoMs);
         return {
-            changeId: change.id,
-            articulo: change.articulo,
-            questions,
+            correcta: out.correcta,
+            correctaIdx: out.correcta_idx,
+            explicacion: out.explicacion,
+            justificaciones: out.justificaciones ?? [],
+            evidencia: out.evidencia
+                ? { cita: out.evidencia.cita, pagina: out.evidencia.pagina, chunkId: out.evidencia.chunk_id }
+                : null,
         };
     }
 }

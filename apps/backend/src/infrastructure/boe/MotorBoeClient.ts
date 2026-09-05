@@ -1,6 +1,12 @@
 import axios, { type AxiosInstance } from 'axios';
 import { logger } from '@opox/utils';
-import type { MotorBoeContract, MotorBoeNorma, MotorBoeCatalogResult } from '@opox/types';
+import type {
+    MotorBoeContract,
+    MotorBoeNorma,
+    MotorBoeCatalogResult,
+    MotorBoeSessionOut,
+    MotorBoeAnswerOut,
+} from '@opox/types';
 
 /**
  * Cliente HTTP para el Motor BOE externo.
@@ -161,5 +167,43 @@ export class MotorBoeClient implements MotorBoeContract {
     async pollJob(jobId: string): Promise<import('@opox/types').MotorJobStatus> {
         const { data } = await this.http.get<MotorJobFull>(`/v1/jobs/${jobId}`);
         return { id: data.id, estado: data.estado as import('@opox/types').MotorJobEstado, mensaje: data.mensaje };
+    }
+
+    /**
+     * Obtiene (o reanuda) la sesión de mini-test del alumno para un cambio BOE.
+     * Idempotente por user_id — devuelve la misma sesión si ya existe.
+     * Lanza AxiosError 409 si el cambio aún no fue regenerado.
+     */
+    async getMiniTest(changeId: string, courseId: string, userId: string): Promise<MotorBoeSessionOut> {
+        logger.info('[motor-boe] getMiniTest', { changeId, courseId, userId });
+        const { data } = await this.http.get<MotorBoeSessionOut>(
+            `/v1/boe/changes/${changeId}/mini-test`,
+            { params: { course_id: courseId, user_id: userId } },
+        );
+        return data;
+    }
+
+    /**
+     * Envía la respuesta del alumno a una pregunta de la sesión.
+     * Devuelve la corrección con explicación y evidencia verbatim del temario.
+     */
+    async answerMiniTestQuestion(
+        sesionId: string,
+        userId: string,
+        preguntaId: string,
+        elegidaIdx: number,
+        tiempoMs?: number,
+    ): Promise<MotorBoeAnswerOut> {
+        logger.info('[motor-boe] answerMiniTest', { sesionId, preguntaId, elegidaIdx });
+        const { data } = await this.http.post<MotorBoeAnswerOut>(
+            `/v1/tests/${sesionId}/answer`,
+            {
+                user_id: userId,
+                pregunta_id: preguntaId,
+                elegida_idx: elegidaIdx,
+                tiempo_ms: tiempoMs ?? 0,
+            },
+        );
+        return data;
     }
 }

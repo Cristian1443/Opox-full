@@ -31,6 +31,7 @@ export function createBoeRouter(
 
     // Mini-test de validación (10.4)
     r.get(B.CHANGE_MINI_TEST, authMiddleware, controller.getMiniTest);
+    r.post(B.CHANGE_MINI_TEST_ANSWER, authMiddleware, controller.answerMiniTest);
     r.post(B.CHANGE_MINI_TEST_COMPLETE, authMiddleware, validateBody(completeMiniTestBody), controller.completeMiniTest);
 
     // Interacciones del usuario

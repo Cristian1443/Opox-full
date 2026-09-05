@@ -40,6 +40,14 @@ export const boeApi = {
     getMiniTest: (changeId) =>
         api.get(B.CHANGE_MINI_TEST.replace(':id', changeId), { auth: true }),
 
+    // Responde una pregunta de la sesión Motor. Devuelve { correcta, correctaIdx, explicacion, justificaciones, evidencia }.
+    answerMiniTest: (changeId, { sesionId, preguntaId, elegidaIdx, tiempoMs }) =>
+        api.post(
+            B.CHANGE_MINI_TEST_ANSWER.replace(':id', changeId),
+            { sesionId, preguntaId, elegidaIdx, tiempoMs },
+            { auth: true },
+        ),
+
     completeMiniTest: (changeId, score, total) =>
         api.post(
             B.CHANGE_MINI_TEST_COMPLETE.replace(':id', changeId),

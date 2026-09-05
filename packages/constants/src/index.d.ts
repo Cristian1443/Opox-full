@@ -69,6 +69,7 @@ declare const API_ROUTES: {
         readonly CHANGE_DETAIL: string;
         readonly CHANGE_COMPARISON: string;
         readonly CHANGE_MINI_TEST: string;
+        readonly CHANGE_MINI_TEST_ANSWER: string;
         readonly CHANGE_MINI_TEST_COMPLETE: string;
         readonly CHANGE_READ: string;
         readonly CHANGE_BOOKMARK: string;
