@@ -54,14 +54,14 @@ OnboardingSlider
 
 | Atributo | Valor real |
 |---|---|
-| Generado por | Preguntas estáticas (no IA) |
+| Generado por | Motor IA (`/v1/courses/{id}/questions`) si responde ≥10 preguntas en 5 s · fallback a banco estático |
 | Total preguntas | 20 únicas |
-| Distribución | 8 Constitución · 8 Ley 39/2015 · 2 Ley 40/2015 · 2 Org. del Estado |
+| Distribución (estático) | 8 Constitución · 8 Ley 39/2015 · 2 Ley 40/2015 · 2 Org. del Estado |
 | Cálculo de nivel | ≥75% → Avanzado/`high` · ≥50% → Intermedio/`medium` · <50% → Básico/`low` |
 | Efecto en el plan | Inicializa la intensidad (`PATCH /planning/plan`) en el primer login |
 | Resultado guardado | `AsyncStorage('opox.levelTestResult')` hasta que se aplica en login |
 
-> ⚠️ **Corrección importante**: el test **no es generado por IA** ni tiene límite de 5 minutos. Es un cuestionario calibrado fijo con cronómetro que mide el tiempo total, pero no corta al usuario.
+> **Estado actual**: el Motor IA entrega preguntas reales del banco del curso (con `correcta_idx`). Si el Motor no responde en 5 s, el test carga las 20 preguntas estáticas. No hay límite de tiempo para el usuario — el cronómetro solo mide el tiempo total.
 
 ### `PermissionsScreen`
 
@@ -377,7 +377,7 @@ Dashboard (tab Entreno)
 
 ### Generador Infinito — detalles técnicos
 
-- IA: OpenAI `gpt-4o-mini` (directo). Motor RAG desactivado hasta que equipo IA resuelva INC-04.
+- IA: **Motor RAG activo** (`ia.opox.ai` → `/v1/tests/generate`). Workaround INC-04: IDs del job coinciden con banco → `correcta_idx` resuelto por cruce. ~5.6 s con evidencia verbatim. Fallback a OpenAI `gpt-4o-mini` si el Motor falla.
 - TTL: aviso visual a 15 s · cancelación automática a 240 s.
 - Multi-selección de temas: "Todos los temas" o checkboxes individuales acumulables.
 - TTL configurado para soportar 10+ preguntas sin cancelar.
@@ -405,12 +405,13 @@ Dashboard (sección Repaso)
                     └─ empty state si la IA no devuelve tarjetas
 ```
 
-**Tono del Tutor**: configurable en Bloque 12 → `ConfigTone`. Opciones: `cercano / equilibrado / exigente`. Se propaga a cada llamada a `POST /tutor/message`.
+**Tono del Tutor**: configurable en Bloque 12 → `ConfigTone`. Opciones: `cercano / formal / directo / motivador`. Se propaga a cada llamada a `POST /tutor/message` con `tonePrefs`.
 
-**Estado IA**:
-- Chat: ✅ OpenAI real
-- Podcast y Resúmenes: datos de Supabase (seed)
-- Flashcards: stub IA (`TODO(ia-bloque8)`)
+**Estado IA** (Motor real operativo desde 2026-09-04):
+- Chat: ✅ Motor IA real (`/v1/classroom/tutor`) · fallback stub personalidad
+- Resúmenes: ✅ Motor IA real (`/v1/classroom/summary`) · fallback `SummaryNotFoundError`
+- Flashcards: ✅ Motor IA real (`/v1/classroom/flashcards/generate`) · fallback stub por topicId
+- Podcast: datos de Supabase (seed) — sin Motor para audio
 
 ---
 
@@ -465,13 +466,17 @@ Dashboard (sección Monitor BOE)
 ```
 
 **Fuentes de actualización**:
-- `POST /boe/sync` → Motor BOE en `https://ingesta-demo.onrender.com`
+- `POST /boe/sync` → Motor BOE en `https://ia.opox.ai` (host consolidado)
 - Supabase Realtime: cuando el backend inserta en `boe_changes`, la app muestra banner in-app inmediato
 - Notificación push: si el usuario tiene la app cerrada (Bloque 13)
 
 **`BoeComparison`**: diff calculado en backend con el paquete `diff` (word-by-word). El mobile solo renderiza los segmentos, sin cálculo en cliente. Tipos de segmento: `normal / deleted / added`.
 
-**Mini-test BOE**: 3 preguntas (no 4 como el Generador). IA pendiente (`BRIEF_IA_BLOQUE10.md`). Hasta 5 Opopoints al completarlo.
+**Mini-test BOE** (Motor real operativo desde 2026-09-05): 3 preguntas por cambio. Hasta 5 Opopoints al completarlo.
+- Path Motor: `GET /boe/changes/:id/mini-test` → sesión idempotente (`sesionId`). Preguntas sin respuesta correcta.
+  `POST /boe/changes/:id/mini-test/answer` por pregunta → corrección + explicación + evidencia verbatim del BOE.
+- Path stub (Motor no disponible o cambio sin regenerar): `sesionId: null`, preguntas con `correctIndex` para resolución local.
+- 409 `mini_test_no_disponible`: el cambio existe pero la regeneración de preguntas aún no terminó.
 
 **Cross-bloque**:
 - `DashboardScreen`: alerta de leyes obsoletas con datos reales de `totalUnread`
@@ -637,11 +642,11 @@ Automático en `SesionIniciadaScreen` tras login (fire-and-forget). Guarda el to
 | 3 · Salud | ✅ | ⏳ endpoints pendientes | ⏳ 4 tareas (ver `BRIEF_IA_BLOQUE3.md`) | Requiere EAS build · Línea base personal por implementar |
 | 4 · Planificación | ✅ | ✅ | — | — |
 | 5 · Motivación | ✅ | ✅ | — | Duelos (placeholder) y clanes privados (Fase 2) |
-| 6 · Entrenamiento | ✅ | ✅ | ✅ OpenAI | Motor RAG desactivado (INC-04 pendiente equipo IA) |
-| 7 · Sesión de Test | ✅ | ✅ | ✅ OpenAI | — |
-| 8 · Aula Virtual | ✅ | ✅ | Parcial | Flashcards IA pendiente (`TODO(ia-bloque8)`) |
+| 6 · Entrenamiento | ✅ | ✅ | ✅ Motor IA | Workaround INC-04 activo (~5.6 s). Fallback OpenAI. |
+| 7 · Sesión de Test | ✅ | ✅ | ✅ Motor IA | Pista vía `/v1/modes/hint`. Fallback OpenAI. |
+| 8 · Aula Virtual | ✅ | ✅ | ✅ Motor IA | Chat + flashcards + summary con Motor real. Podcast sin Motor. |
 | 9 · Factoría | ✅ | ✅ | Stub | IA real esperando prompts (`BRIEF_IA_BLOQUE9.md`) |
-| 10 · Monitor BOE | ✅ | ✅ | Stub | Mini-test IA pendiente (`BRIEF_IA_BLOQUE10.md`) |
+| 10 · Monitor BOE | ✅ | ✅ | ✅ Motor IA | Mini-test con Motor real (sesión + `/answer` + evidencia verbatim). Stub como fallback. |
 | 11 · Tienda | ✅ | ✅ | — | RevenueCat para suscripción real (pendiente) |
 | 12 · Configuración | ✅ | ✅ | — | ThemeContext global · Chat soporte (Intercom) · RevenueCat |
 | 13 · Notificaciones | ✅ | ✅ | — | Prueba E2E pendiente de EAS development build |
