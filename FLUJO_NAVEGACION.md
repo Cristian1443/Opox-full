@@ -1,7 +1,7 @@
 # OPOX — Flujo de Navegación Completo
 
 > Documento de referencia para producto, diseño y desarrollo.  
-> Fuente de verdad: código fuente en `apps/mobile/`. Última revisión: 2026-09-02.
+> Fuente de verdad: código fuente en `apps/mobile/`. Última revisión: 2026-09-05.
 
 ---
 
@@ -201,7 +201,7 @@ Dashboard
 
 | Tarea IA | Pantalla | Qué reemplaza | Estado |
 |---|---|---|---|
-| `analyzeFatigueState` | `HomeHealth` + `FatigueEngine` | Heurística fija + reglas hardcodeadas | ⏳ Pendiente prompt |
+| `analyzeFatigueState` | `HomeHealth` + `FatigueEngine` | Heurística fija + reglas hardcodeadas | ✅ Motor IA real (`/v1/fatigue/biometrics`) · fallback `buildFatigueLocally` |
 | `generateDailyMenus` | `Menus` + `MenuDetail` | JSON estático `healthContent.js` | ⏳ Pendiente prompt |
 | `suggestStudyTechnique` | `StudyTips` | Lista fija sin contexto | ⏳ Pendiente prompt |
 | `generateMeditationScript` | `MeditationPlayer` | Guiones estáticos fijos | ⏳ Pendiente prompt |
@@ -391,16 +391,16 @@ Dashboard (tab Entreno)
 ```
 Dashboard (sección Repaso)
   └─► TutorHome           (hub del Aula Virtual)
-        ├─► TutorChat     (chat con IA · OpenAI gpt-4o-mini · tono personalizable)
+        ├─► TutorChat     (chat con Motor IA real · tono personalizable · historial 10 msg)
         │     └─ puede lanzar test ──► GeneratorConfig (Bloque 6)
         │
         ├─► TutorPodcast  (podcast IA por episodio · EpisodePicker si no hay episodioId)
         │     └─ velocidades: 0.5x / 1x / 1.5x / 2x · guarda progreso cada 10 s
         │
-        ├─► TutorSummaries (resúmenes inteligentes por tema · TopicPicker si no hay topicId)
+        ├─► TutorSummaries (resúmenes con Motor IA real · TopicPicker si no hay topicId)
         │     └─ puede generar flashcards o podcast del resumen
         │
-        └─► TutorFlashcardsLoading  (genera flashcards · stub IA pendiente)
+        └─► TutorFlashcardsLoading  (genera flashcards con Motor IA real)
               └─► TutorFlashcards   (práctica libre · girar carta · sin puntaje)
                     └─ empty state si la IA no devuelve tarjetas
 ```
@@ -543,8 +543,8 @@ Settings (engranaje desde Dashboard)
         ├─► ConfigDevices         (12.3 · wearables conectados · eliminar dispositivo)
         │     └─► [Pairing en Bloque 3]
         │
-        ├─► ConfigTone            (12.5 · tono IA: cercano/equilibrado/exigente)
-        │     (se propaga a TutorChat en tiempo real)
+        ├─► ConfigTone            (12.5 · tono IA: cercano/formal/directo/motivador)
+        │     (se propaga a TutorChat en tiempo real · alineado con Motor IA)
         │
         ├─► ConfigAccessibility   (12.4 · tema: auto/claro/oscuro · fuente · animaciones)
         │
@@ -639,7 +639,7 @@ Automático en `SesionIniciadaScreen` tras login (fire-and-forget). Guarda el to
 | 0 · Onboarding | ✅ | — | — | — |
 | 1 · Acceso | ✅ | ✅ | — | Login social (Google/Meta/Apple) pendiente de SDK nativo |
 | 2 · Dashboard | ✅ | ✅ | — | — |
-| 3 · Salud | ✅ | ⏳ endpoints pendientes | ⏳ 4 tareas (ver `BRIEF_IA_BLOQUE3.md`) | Requiere EAS build · Línea base personal por implementar |
+| 3 · Salud | ✅ | ✅ FatigueEngine · ⏳ resto | ✅ Fatiga con Motor IA · ⏳ 3 tareas pendientes (menús/técnica/meditación) | Requiere EAS build · Línea base personal por implementar |
 | 4 · Planificación | ✅ | ✅ | — | — |
 | 5 · Motivación | ✅ | ✅ | — | Duelos (placeholder) y clanes privados (Fase 2) |
 | 6 · Entrenamiento | ✅ | ✅ | ✅ Motor IA | Workaround INC-04 activo (~5.6 s). Fallback OpenAI. |
