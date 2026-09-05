@@ -7,6 +7,7 @@ import {
     SafeAreaView,
     StatusBar,
     ScrollView,
+    Alert,
 } from 'react-native';
 import Svg, { Path, Circle, G, Rect, Line, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -702,19 +703,21 @@ export default function DashboardScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
 
-                {/* Bloque 9 · Factoría de Apuntes (fuera del frame Figma) */}
+                {/* Bloque 9 · Factoría de Apuntes — Próximamente */}
                 <TouchableOpacity
-                    style={[styles.legacyWidget, { backgroundColor: '#EFF6FF', marginTop: 22 }]}
-                    onPress={() => navigation.navigate('NotesHome')}
-                    activeOpacity={0.85}
-                    accessibilityLabel="Ir a la Factoría de Apuntes"
+                    style={[styles.legacyWidget, { backgroundColor: '#F1F5F9', marginTop: 22, opacity: 0.7 }]}
+                    onPress={() => Alert.alert('Próximamente', 'La Factoría de Apuntes estará disponible muy pronto. Podrás subir PDFs y fotos de tu temario y practicar con preguntas generadas por IA.')}
+                    activeOpacity={0.9}
+                    accessibilityLabel="Factoría de Apuntes — próximamente"
                 >
                     <View style={styles.widgetHead}>
                         <IconNotes />
-                        <Text style={[styles.legacyWidgetHeadText, { color: '#2563EB' }]}>Mis apuntes</Text>
-                        <Text style={styles.chev}>›</Text>
+                        <Text style={[styles.legacyWidgetHeadText, { color: '#94A3B8' }]}>Mis apuntes</Text>
+                        <View style={{ backgroundColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>PRÓXIMAMENTE</Text>
+                        </View>
                     </View>
-                    <Text style={styles.tutorText}>Sube PDFs o fotos y practica con preguntas generadas por IA.</Text>
+                    <Text style={[styles.tutorText, { color: '#94A3B8' }]}>Sube PDFs o fotos y practica con preguntas generadas por IA.</Text>
                 </TouchableOpacity>
 
                 {/* Bloque 10 · Monitor BOE (fuera del frame Figma) */}
