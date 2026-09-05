@@ -622,88 +622,60 @@ Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, devic
 
 **Limitación Expo Go**: push remotos no funcionan en Expo Go SDK 53+. Requiere EAS development build (`eas build --profile development`) para prueba end-to-end de tokens reales.
 
-### Motor de IA del cliente (ACTIVO — INC-04 aún pendiente)
+### Motor de IA del cliente (ACTIVO — operativo 2026-09-04)
 
-Microservicio RAG del equipo IA. URL configurada en `.env` (`MOTOR_API_BASE_URL`).
+Microservicio RAG del equipo IA. Dominio: `ia.opox.ai`. URL en `.env` (`MOTOR_API_BASE_URL`).
 Auth: `X-API-Key: MOTOR_API_KEY`. `isMotorConfigured = Boolean(MOTOR_API_BASE_URL && MOTOR_API_KEY)`.
+Curso activo: `MOTOR_DEFAULT_CURSO_ID=0bed919120024e5f` (Bloque 1, 266 páginas, 11 temas).
 
-**Endpoints en uso (2026-09-02)**:
-- `/v1/classroom/chat` — chat del Tutor IA con historial y tono (Bloque 8).
-- `/v1/classroom/flashcards` — generación de mazos de flashcards (Bloque 8).
-- `/v1/classroom/resumen` — resúmenes de tema (Bloque 8).
-- `/v1/onboarding/preguntas` — preguntas del test de nivel (Bloque 0, timeout 5 s).
-- `/v1/fatigue/analyze` — análisis de fatiga (Bloque 3).
-- (Bloques 6/7): generación de preguntas de entrenamiento — activo con fallback a OpenAI por INC-04.
+**Endpoints reales en uso (2026-09-04)** — alineados con OpenAPI `ia.opox.ai`:
+- `/v1/classroom/tutor` — chat Tutor IA con historial y tono (Bloque 8).
+- `/v1/classroom/flashcards/generate` — generación de mazos (Bloque 8).
+- `/v1/classroom/summary` — resúmenes de tema (`nivel: 'esquema'|'medio'|'profundo'`).
+- `/v1/courses/{curso_id}/questions` — banco de preguntas del test de nivel (Bloque 0).
+- `/v1/fatigue/biometrics` — análisis de fatiga (Bloque 3; campos: `hrv_ms`, `fc_reposo`, `horas_sueno`).
+- `/v1/tests/generate` — generador de preguntas de entrenamiento (Bloques 6/7).
+- `/v1/modes/hint` — pista IA por pregunta (Bloque 7; requiere `pregunta_id` del banco).
+- `/v1/tone/{user_id}` — perfil de tono (`nivel_detalle: 'breve'|'medio'|'profundo'`).
+- `/v1/bank/exams?course_id=` — banco de exámenes oficiales.
+- `/v1/boe/regulations?course_id=` — regulaciones BOE del Motor.
 
-**Estado Bloque 6/7 — INC-04 aún pendiente (2026-08-25)**: activo en `.env`.
-Con el Motor activo, `CompositeAiClient` lo intenta primero y cae a OpenAI directo
-cuando el Motor falla por INC-04. El usuario no ve error pero espera ~67s en lugar de ~10s.
+**Estado INC-04 (verificado 2026-09-04)**:
+El job result de `/v1/tests/generate` y `/v1/onboarding/placement-test` sigue sin
+incluir `correcta_idx` en el payload. Sin embargo, los **IDs de las preguntas del job
+coinciden con los IDs del banco** (`/v1/courses/{id}/questions`), por lo que el
+workaround por id-cruce del `MotorAiClient` funciona correctamente:
+1. Job devuelve preguntas sin `correcta_idx` (~5 s en caché, ~30 s generación fresca).
+2. `MotorAiClient.ensureQuestionBank()` carga el banco completo (paginado `limit=200`).
+3. Cruza por `id` → obtiene `correcta_idx` del banco → pregunta válida.
+4. Resultado: ~5.6 s total, `articleRef` presente (evidencia verbatim del temario).
+Pendiente del equipo IA: exponer `correcta_idx` en el job para eliminar la carga extra del banco.
 
-**INC-04 confirmado pendiente (2026-08-25)**: diagnóstico ejecutado contra el Motor real
-(`scripts/diagnostico_motor.js`). El job result sigue sin incluir `correcta_idx`:
-campos reales del job = `[id, enunciado, opciones, dificultad, tema_id, origen, ref_legislativa]`.
-El equipo de IA probó `/v1/courses/{id}/questions` (el banco), que SÍ tiene `correcta_idx`,
-pero los IDs del banco y del LLM son distintos → el workaround por id-cruce nunca funciona.
+**Comportamiento con Motor activo**:
+- `generateQuestions` / `generateSurgicalTest` → `MotorAiClient` (RAG + banco) → ~5.6 s.
+  Fallback `CompositeAiClient` → OpenAI directo si el Motor falla.
+- `analyzeFatigue` → `MotorFatigueClient` `/v1/fatigue/biometrics` → mapeo color→nivel.
+  Fallback → `buildFatigueLocally` en `HealthController`.
+- `getTutorChat` / `generateFlashcards` / `getSummary` → `MotorTutorClient` → Motor real.
+  Fallback → stub personalidad / stub banco por topicId / `SummaryNotFoundError`.
+- `getLevelTestQuestions` → `MotorOnboardingClient` `/v1/courses/{id}/questions` directo
+  (banco tiene `correcta_idx`; no usa el job de placement-test). Timeout 5 s → estáticas.
 
-**Comportamiento actual con Motor activo**:
-1. Motor lanza job → polling ~57s → fail-fast (todas `origen="generada"` sin correcta_idx)
-2. `CompositeAiClient` captura → OpenAI directo ~10s
-Total: ~67s vs ~10s sin Motor. Si la latencia es inaceptable, vaciar `MOTOR_API_BASE_URL`.
+**Clientes y mapeos clave**:
+- `MotorTutorClient`: constructor recibe `cursoId` (desde `env.MOTOR_DEFAULT_CURSO_ID`).
+  Respuesta tutor: `respuesta` → `content`, `acciones` → `suggestedActions`.
+  Flashcards: array directo `{front, back}`, no `{tarjetas:[{pregunta,respuesta}]}`.
+  Summary: `{resumen:{titulo,ideas_clave,desarrollo}}` → `[{title,content}]`.
+- `MotorFatigueClient`: mapeo request `hrv→hrv_ms`, `sueno_horas→horas_sueno`.
+  Mapeo respuesta: `nivel:'verde'→'bajo'`, `'amarillo'→'medio'`, `'rojo'→'alto'`.
+- `MotorAiClient`: `fail-fast` si TODAS las preguntas del job son `origen="generada"`
+  sin `correcta_idx` y no están en el banco → `CompositeAiClient` cae a OpenAI.
 
-**Fixes defensivos activos**:
-- `MotorAiClient.generateQuestions` — fail-fast si todas las preguntas son `origen="generada"`
-  sin `correcta_idx` (no carga el banco en vano). Cuando alguna tenga `correcta_idx` en el
-  job, la usa directamente sin consultar el banco (preparado para Opción A de INC-04).
-- `MotorPreguntaJob` — tipado con `correcta_idx?` y `explicacion?` opcionales. Cuando el
-  equipo IA los añada al job result, el cliente los usará automáticamente.
-- `CompositeAiClient.generateQuestions` / `generateSurgicalTest` — try/catch con fallback
-  automático a OpenAI. El usuario nunca ve error.
-- `MotorAiClient.ensureQuestionBank` — paginado con `limit=200`.
-- Timeouts: `pollTimeoutMs` 240 s; mobile `TTL_KILL_MS` 240 s.
-
-**[INC-04] Bloqueante del Motor**: el job result no expone `correcta_idx`. Opciones para el equipo IA:
-- **A** (recomendada): incluir `correcta_idx` + `explicacion` en el payload de
-  cada pregunta del job result. El cliente ya está listo para recibirlos.
-- **B**: implementar `POST /v1/tests/{sesion_id}/answer` que valida respuesta a
-  respuesta (requiere refactor del flujo mobile).
-
-Ver `packages/ai/MOTOR_INTEGRATION.md` para el detalle histórico.
-
-**Smoke test E2E:** `scripts/smoke_bloques_0_6_7.js` — 30/30 PASS (bloques 0, 6 y 7).
-**Diagnóstico Motor:** `scripts/diagnostico_motor.js` — verifica correcta_idx en job result.
-**E2E FLUJO_NAVEGACION** (2026-09-03): `scripts/e2e_flujo_navegacion.js` — 60/60 PASS
-recorriendo el flujo completo contra backend local. `scripts/e2e_motor_coleccion.js`
-ejecuta la colección Postman "Motor de IA — colección completa" contra
-`MOTOR_API_BASE_URL`. Ejecutar con `SKIP_REGISTER=1 node scripts/e2e_flujo_navegacion.js`
-si Supabase tiene "Confirm email" ON.
-
-### ⚠ AVISO CRÍTICO (2026-09-03) — endpoints Motor desalineados
-
-E2E contra `ia.opox.jaeverba.com/openapi.json` (46 paths reales) reveló que los
-clientes del backend llaman rutas que **no existen** en el Motor real. Todos caen a
-fallback silencioso (OpenAI directo o stub), así que la app "funciona" pero la IA
-prometida el 2026-09-02 nunca se ejecuta contra el Motor.
-
-Además, el Motor de producción está **vacío**: `GET /v1/courses` devuelve `[]`. El
-`MOTOR_DEFAULT_CURSO_ID=1357e871b542425b` existe en `ingesta-demo.onrender.com` pero
-no en `ia.opox.jaeverba.com` — todos los endpoints por curso responden 404.
-
-**Rutas a corregir en los clientes del backend:**
-
-| Cliente / línea | Backend llama (roto) | Endpoint real del Motor |
-|---|---|---|
-| `MotorTutorClient.ts:54` | `POST /v1/classroom/chat` | `POST /v1/classroom/tutor` |
-| `MotorTutorClient.ts:89` | `POST /v1/classroom/resumen` | `POST /v1/classroom/summary` |
-| `MotorTutorClient.ts:70` | `POST /v1/classroom/flashcards` | `POST /v1/classroom/flashcards/generate` |
-| `MotorFatigueClient.ts:54` | `POST /v1/fatigue/analyze` | `POST /v1/fatigue/biometrics` + `GET /v1/fatigue/status/{user_id}` |
-| `MotorOnboardingClient.ts:40` | `GET /v1/onboarding/preguntas` | `POST /v1/onboarding/placement-test` (async, requiere polling de job) |
-| `MotorAiClient` (hint) | `POST /v1/hint` | `POST /v1/modes/hint` |
-| Config tono | `PUT /v1/users/:id/tone` | `PUT /v1/tone/{user_id}` |
-
-**Prerrequisito para probar IA real end-to-end:** subir un curso al Motor de prod
-con `POST /v1/courses` (multipart form-data con PDF, `titulo`) y actualizar
-`MOTOR_DEFAULT_CURSO_ID` en `.env` con el `curso_id` devuelto. Después el generator,
-placement-test, aula y RAG search deberían responder con contenido real.
+**Scripts E2E**:
+- `scripts/e2e_flujo_navegacion.js` — 60/60 PASS (backend OPOX completo, usuario real).
+  Usar `SKIP_REGISTER=1 SEED_EMAIL=x SEED_PASS=y node ...` con usuario ya verificado.
+- `scripts/e2e_motor_coleccion.js` — 27/27 PASS (Motor directo, rutas reales).
+- `scripts/diagnostico_motor.js` — verifica `correcta_idx` en job result del generador.
 
 ---
 
@@ -723,14 +695,14 @@ pnpm lint                       # lint completo
 
 | Bloque | Nombre | Estado |
 |---|---|---|
-| 1 | Acceso (Auth/Onboarding) | Frontend cerrado + Bloque 0 revisado: onboarding no repetido, test real de 20 preguntas, inicialización de intensidad del plan. Revisión 2026-09-02: test de nivel intenta Motor IA (`GET /training/level-test` ruta pública, 5 s timeout), fallback a preguntas estáticas |
+| 1 | Acceso (Auth/Onboarding) | Frontend cerrado + Bloque 0 revisado: onboarding no repetido, test real de 20 preguntas, inicialización de intensidad del plan. Revisión 2026-09-04: `MotorOnboardingClient` usa banco `/v1/courses/{id}/questions` (tiene `correcta_idx`); timeout 5 s → estáticas si el Motor tarda. |
 | 2 | Dashboard | Frontend + backend completo |
-| 3 | Salud | Frontend cerrado. Revisión 2026-09-03: `HealthController.analyzeFatigue` con try/catch + `buildFatigueLocally` — el endpoint devuelve 200 aunque el Motor de fatiga esté caído o el endpoint desalineado. |
+| 3 | Salud | Frontend cerrado. `HealthController.analyzeFatigue` llama `MotorFatigueClient` → `/v1/fatigue/biometrics` con mapeo de campos. Try/catch → `buildFatigueLocally` si el Motor falla. Siempre devuelve 200. |
 | 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |
 | 5 | Motivación | Frontend + backend completo |
-| 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **desactivado por INC-04** (generaba con LLM y no exponía `correcta_idx` → primera opción siempre "correcta"). Fallback a OpenAI directo activo. Blindaje `CompositeAiClient` para reactivar sin riesgo cuando el equipo IA cierre INC-04 |
-| 7 | Sesión de test activa | Frontend + backend + IA completo (Pista IA vía OpenAI) |
-| 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 6 pantallas + modal reestilizados. EpisodePicker y TopicPicker funcionales. Revisión 2026-09-02: Motor IA wired para chat (historial+tono), flashcards y resúmenes; stubs como fallback. `ITutorAiClient` en dominio. `tonePrefs` desde AsyncStorage en TutorChatScreen |
+| 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **activo** vía workaround banco (2026-09-04): job IDs coinciden con banco → `correcta_idx` resuelto por id-cruce → ~5.6 s, `articleRef` presente. INC-04 pendiente en el Motor (job result sin `correcta_idx` directo). |
+| 7 | Sesión de test activa | Frontend + backend + IA completo. Pista IA vía `/v1/modes/hint` del Motor (requiere `pregunta_id` real del banco). Fallback a OpenAI directo. |
+| 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma (2026-08-26). Motor IA operativo (2026-09-04): chat → `/v1/classroom/tutor`, flashcards → `/v1/classroom/flashcards/generate`, summary → `/v1/classroom/summary`. `cursoId` propagado desde container. Stubs como fallback. |
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-08-27: fallback catálogo→listRegulations, UPSERT idempotente en addRegulation, campo resumen, regenerateQuestions fire-and-forget, modal "Añadir norma" con preload + badge "Siguiendo", cross-bloque (Dashboard alerta real, TrainingResult hint, Realtime → BoeDetail). IA real (`generateBoeMiniTest`) esperando prompt `BRIEF_IA_BLOQUE10.md` del equipo IA |
 | 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-28: motor earn automático por tests (1 O/acierto × multiplicador, cap 100 O/día), mini-test BOE hasta 5 O, `getTodayTestEarnings` en repo. Revisión 2026-08-27: puente earn→ledger, `POST /store/discounts/:id/redeem`, 8 pantallas sin mocks, canje por `redeemType`, fixes tabs UI. |

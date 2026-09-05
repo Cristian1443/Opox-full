@@ -74,18 +74,31 @@ Script Motor actualizado con todas las rutas reales del OpenAPI actual:
   - 0 GAPS detectados
 
 - **E2E Motor directo** (`ia.opox.ai`): **27/27 PASS · 0 FAIL**
-  - 2 GAPS pendientes del equipo IA: INC-04 (`correcta_idx` ausente en job results
-    del placement-test y del generador)
+
+### Clarificación INC-04 (verificado 2026-09-04)
+
+El equipo IA indicó que INC-04 estaba resuelto. Verificación directa contra el Motor:
+
+- **Job result sigue SIN `correcta_idx`** — campos del job: `id, enunciado, opciones,
+  dificultad, tema_id, origen, ref_legislativa`. El Motor no añadió `correcta_idx`
+  al payload del generador ni del placement-test.
+- **Workaround banco SÍ funciona** — lo que cambió es que los IDs del job coinciden
+  con los IDs del banco de preguntas (`/v1/courses/{id}/questions`). Al cruzar por
+  `id`, el banco devuelve `correcta_idx`. El `MotorAiClient` ya implementaba este
+  cruce desde antes; lo que era falso era la asunción anterior de que los IDs no
+  coincidían (hipótesis del 2026-08-25 que resultó incorrecta).
+- **Efecto neto**: el workaround funciona en producción, `generate` tarda ~5.6 s
+  (carga del banco en memoria + mapeo), y el usuario recibe preguntas válidas con
+  respuesta correcta. No hay regresión funcional.
+- **Pendiente real para el equipo IA**: incluir `correcta_idx` directamente en el
+  job result eliminaría la carga extra del banco (~200 preguntas por petición).
+  Hasta entonces el sistema es correcto pero hace una llamada redundante.
 
 ### Estado tras la sesión
 
-- Todos los clientes del Motor alineados con el OpenAPI real.
-- INC-04 sigue activo en el Motor: el generador (`/v1/tests/generate`) y el
-  placement-test no exponen `correcta_idx` en el job result. El banco de preguntas
-  SÍ tiene `correcta_idx` y se usa como workaround para onboarding y para
-  `MotorAiClient`.
-- Pendiente para el equipo IA: exponer `correcta_idx` en el job result del
-  generador (Opción A de INC-04) y del placement-test.
+- Todos los clientes del Motor alineados con el OpenAPI real de `ia.opox.ai`.
+- INC-04: job result sin `correcta_idx` pero workaround banco operativo y eficiente.
+- E2E completo verde: 60/60 OPOX backend + 27/27 Motor directo.
 
 ---
 
