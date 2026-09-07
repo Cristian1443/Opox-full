@@ -30,13 +30,13 @@ services:
       - key: AI_API_DEFAULT_MODEL
         value: gpt-4o-mini
       - key: MOTOR_API_BASE_URL
-        value: https://ia.opox.jaeverba.com
+        value: https://ia.opox.ai/
       - key: MOTOR_API_KEY
         sync: false
       - key: MOTOR_DEFAULT_CURSO_ID
-        value: 1357e871b542425b
+        value: 0bed919120024e5f
       - key: MOTOR_BOE_BASE_URL
-        value: https://ia.opox.jaeverba.com
+        value: https://ia.opox.ai/
       - key: MOTOR_BOE_API_KEY
         sync: false
       - key: MOTOR_BOE_CURSO_ID
