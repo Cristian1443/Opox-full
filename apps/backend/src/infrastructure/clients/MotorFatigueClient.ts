@@ -99,7 +99,7 @@ export class MotorFatigueClient {
         }));
 
         const historial_7_dias = (data.historico ?? []).slice(0, 7).map((h) => ({
-            fecha: typeof h.fecha === 'string' ? h.fecha.split('T')[0] : h.fecha,
+            fecha: typeof h.fecha === 'string' ? (h.fecha.split('T')[0] ?? h.fecha) : String(h.fecha ?? ''),
             nivel: COLOR_TO_NIVEL[h.nivel] ?? 'bajo',
         }));
 

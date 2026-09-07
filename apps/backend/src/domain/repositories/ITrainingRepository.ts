@@ -31,6 +31,10 @@ export interface ResponseInput {
 
 /** Contrato del repositorio del Bloque 6 · Entrenamiento. */
 export interface ITrainingRepository {
+    // ─── Multi-curso ──────────────────────────────
+    /** Devuelve el motor_curso_id para la oposición dada, o null si no está en training_courses. */
+    getCursoId(oposicion: string): Promise<string | null>;
+
     // ─── Simulacros ───────────────────────────────
     listMockExams(input: { oposicion: string; userId: string }): Promise<MockExamWithStatus[]>;
     getMockExam(id: string): Promise<MockExam | null>;

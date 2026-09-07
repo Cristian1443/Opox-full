@@ -15,11 +15,11 @@ const DEFAULT_SUGGESTED_ACTIONS: Array<{ label: string; icon: string }> = [
 function buildStubAiResponse(personality: string = 'equilibrado'): { content: string; suggestedActions: Array<{ label: string; icon: string }> } {
     let content: string;
     if (personality === 'cercano' || personality === 'motivador') {
-        content = '¡Claro que sí! Voy a explicarte este tema de forma sencilla. En la versión con IA activa, recibirás una respuesta personalizada con referencias a los artículos y normativa relevante. ¡Cualquier duda, me dices!';
+        content = '¡Claro! Estoy buscando la información en tu temario. Puede que tarde un momento — prueba a enviar de nuevo tu pregunta si no ves respuesta.';
     } else if (personality === 'directo') {
-        content = 'Entendido. En la versión con IA activa, recibirás aquí la explicación directa con referencias normativas.';
+        content = 'Consultando el temario. Si la respuesta tarda, vuelve a enviar tu pregunta.';
     } else {
-        content = 'Entendido. Voy a preparar la explicación de este tema según tu temario. En la versión con IA activa, recibirás aquí una respuesta personalizada con referencias a los artículos y normativa relevante.';
+        content = 'Estoy consultando el temario para responderte. Si la respuesta tarda más de lo esperado, prueba a enviar de nuevo tu pregunta.';
     }
     return { content, suggestedActions: DEFAULT_SUGGESTED_ACTIONS };
 }
@@ -65,6 +65,7 @@ export class SendMessageUseCase {
         conversationId: string;
         userId: string;
         content: string;
+        cursoId?: string;
         personality?: string;
         toneProfile?: ToneProfile;
     }): Promise<{ userMessage: TutorMessage; aiMessage: TutorMessage }> {
@@ -92,6 +93,7 @@ export class SendMessageUseCase {
                 const result = await this.tutorAi.chat({
                     message: params.content,
                     userId: params.userId,
+                    cursoId: params.cursoId,
                     toneProfile: params.toneProfile,
                     history,
                     topic: conversation.topic,

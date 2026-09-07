@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
-import { tutorApi } from '../../api';
+import { tutorApi, api } from '../../api';
 
 // Colores confirmados contra Figma (frame PODCAST, Bloque 8) sin
 // equivalente exacto en theme.js.
@@ -163,8 +163,17 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
     );
 }
 export default function TutorPodcastScreen({ navigation, route }) {
-    const oposicion        = route?.params?.oposicion ?? 'aux-adm-estado';
     const initialEpisodeId = route?.params?.episodeId ?? null;
+    const [oposicion, setOposicion] = useState(route?.params?.oposicion ?? 'justicia-tramitacion');
+
+    useEffect(() => {
+        if (route?.params?.oposicion) return;
+        api.loadSession().then((session) => {
+            const s = session?.user?.oposicion ?? session?.user?.user_metadata?.oposicion;
+            if (s) setOposicion(s);
+        }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ── Todos los hooks deben ir ANTES de cualquier return condicional ─────────
     const [selectedEpisode, setSelectedEpisode] = useState(

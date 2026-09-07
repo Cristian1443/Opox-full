@@ -408,6 +408,20 @@ desplegado para detectar cambios en el BOE oficial. Integrado en:
   más checkboxes individuales acumulables. Múltiple selección → IDs separados por
   coma en `topicId`. Sin cambio en `GenerateQuestionsParams`.
 
+**Infraestructura multi-curso (revisión 2026-09-07)**:
+- `training_courses` (tabla Supabase): `oposicion TEXT PK → motor_curso_id TEXT`.
+  Seed: `policia-local-galicia → 0bed919120024e5f` (is_default=true).
+  SQL: `apps/backend/supabase/training_courses.sql`.
+- `GetCursoIdUseCase`: resuelve `oposicion → cursoId` vía DB; fallback `MOTOR_DEFAULT_CURSO_ID`.
+  Siempre devuelve un ID, nunca lanza excepción.
+- `authMiddleware`: expone `oposicion: string | null` en `req.authUser`.
+- `TrainingController` y `TutorController`: llaman `getCursoId.execute(oposicion)` antes
+  de cada llamada al Motor. `TrainingController` lee `body.oposicion`;
+  `TutorController` lee `req.authUser!.oposicion`.
+- `bloque6_topics.sql`: `policia-local-galicia` usa IDs hex del Motor
+  (`3b6f62d89ac74a78`, `ebc2cc44282048f1`, etc.); `justicia-tramitacion` mantiene slugs semánticos.
+  Ambos formatos son válidos — el Motor acepta cualquiera como `tema_id`.
+
 ### Tienda OPOX (Bloque 11) — endpoints propios
 
 Canje de Opopoints por recompensas reales y virtuales + marketplace de tests
@@ -682,7 +696,9 @@ Pendiente del equipo IA: exponer `correcta_idx` en el job para eliminar la carga
 
 **Clientes y mapeos clave**:
 - `MotorTutorClient`: constructor recibe `cursoId` (desde `env.MOTOR_DEFAULT_CURSO_ID`).
-  Respuesta tutor: `respuesta` → `content`, `acciones` → `suggestedActions`.
+  Respuesta tutor: `respuesta` → `content`. El campo `acciones` del Motor son trazas
+  internas RAG (`{ tool, resumen, datos }`), NO botones UI — `chat()` devuelve
+  `suggestedActions: undefined`; `SendMessageUseCase` aplica `DEFAULT_SUGGESTED_ACTIONS`.
   Flashcards: array directo `{front, back}`, no `{tarjetas:[{pregunta,respuesta}]}`.
   Summary: `{resumen:{titulo,ideas_clave,desarrollo}}` → `[{title,content}]`.
 - `MotorFatigueClient`: mapeo request `hrv→hrv_ms`, `sueno_horas→horas_sueno`.
@@ -691,6 +707,9 @@ Pendiente del equipo IA: exponer `correcta_idx` en el job para eliminar la carga
   sin `correcta_idx` y no están en el banco → `CompositeAiClient` cae a OpenAI.
 
 **Scripts E2E**:
+- `scripts/e2e_smoke_full.js` — **64/64 PASS** (2026-09-07). Cubre los 13 bloques de
+  `FLUJO_NAVEGACION.md` + verificación explícita multi-curso. Usuario:
+  `tester.contrax.2026@gmail.com`. Usar `ACCESS_TOKEN=xxx node scripts/e2e_smoke_full.js`.
 - `scripts/e2e_flujo_navegacion.js` — 60/60 PASS (backend OPOX completo, usuario real).
   Usar `SKIP_REGISTER=1 SEED_EMAIL=x SEED_PASS=y node ...` con usuario ya verificado.
 - `scripts/e2e_motor_coleccion.js` — 27/27 PASS (Motor directo, rutas reales).

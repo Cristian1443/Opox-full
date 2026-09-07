@@ -12,6 +12,7 @@ declare module 'express-serve-static-core' {
             id: string;
             email: string;
             accessToken: string;
+            oposicion: string | null;
         };
     }
 }
@@ -35,6 +36,7 @@ export function createAuthMiddleware(getSession: GetSessionUseCase) {
                 id: session.user.id,
                 email: session.user.email,
                 accessToken: token,
+                oposicion: session.user.oposicion,
             };
             next();
         } catch (err) {

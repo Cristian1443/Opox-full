@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
-import { tutorApi } from '../../api';
+import { tutorApi, api } from '../../api';
 
 // Colores confirmados contra Figma (frame RESUMEN INTELIGENTE, Bloque 8)
 // sin equivalente exacto en theme.js.
@@ -129,8 +129,17 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 export default function TutorSummariesScreen({ navigation, route }) {
     // topicId + oposicion llegan cuando se navega desde un selector de temas
-    const initialTopicId = route?.params?.topicId   ?? null;
-    const oposicion      = route?.params?.oposicion  ?? 'aux-adm-estado';
+    const initialTopicId = route?.params?.topicId ?? null;
+    const [oposicion, setOposicion] = useState(route?.params?.oposicion ?? 'justicia-tramitacion');
+
+    useEffect(() => {
+        if (route?.params?.oposicion) return;
+        api.loadSession().then((session) => {
+            const s = session?.user?.oposicion ?? session?.user?.user_metadata?.oposicion;
+            if (s) setOposicion(s);
+        }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     // title y sections son el fallback cuando no hay topicId (o mientras carga)
     const paramTitle    = route?.params?.title    ?? null;
     const paramSections = route?.params?.sections ?? null;
@@ -222,7 +231,7 @@ export default function TutorSummariesScreen({ navigation, route }) {
                 <TouchableOpacity
                     style={styles.secondaryButton}
                     activeOpacity={0.7}
-                    onPress={() => navigation.navigate('TutorPodcast', { title: displayTitle })}
+                    onPress={() => navigation.navigate('TutorPodcast', { title: displayTitle, oposicion })}
                 >
                     <Text style={styles.secondaryButtonText}>Escuchar</Text>
                 </TouchableOpacity>

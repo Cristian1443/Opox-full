@@ -117,8 +117,13 @@ export interface GeneratedQuestion {
 // ─── generateQuestions ────────────────────────────────────────────────────────
 
 export interface GenerateQuestionsParams {
-    /** Código de la oposición del usuario (ej. 'justicia-tramitacion') */
+    /** Código de la oposición del usuario (ej. 'policia-local-galicia') */
     oposicion: string;
+    /**
+     * ID del curso en el Motor IA (tabla training_courses).
+     * Si se omite, el cliente Motor usa su defaultCursoId de constructor.
+     */
+    cursoId?: string;
     /**
      * ID del tema seleccionado. 'all' = todo el temario.
      * Los IDs concretos los define el backend según la oposición.
@@ -165,6 +170,8 @@ export interface PhotoTestResult {
 
 export interface GenerateSurgicalTestParams {
     oposicion: string;
+    /** ID del curso en el Motor IA (tabla training_courses). Opcional — fallback al defaultCursoId. */
+    cursoId?: string;
     /** Patrones de error del usuario calculados por el backend */
     errorPatterns: Array<{
         topicId: string;
@@ -204,8 +211,10 @@ export interface HintParams {
     topicId: string;
     /** Nombre legible del tema */
     topic: string;
-    /** Oposición del usuario (ej. 'justicia-tramitacion') */
+    /** Oposición del usuario (ej. 'policia-local-galicia') */
     oposicion: string;
+    /** ID del curso en el Motor IA (tabla training_courses). Opcional — fallback al defaultCursoId. */
+    cursoId?: string;
 }
 
 export interface HintResult {

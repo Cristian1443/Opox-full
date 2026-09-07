@@ -32,6 +32,7 @@ import type {
     GenerateHintUseCase,
     ReportQuestionUseCase,
     ListTopicsUseCase,
+    GetCursoIdUseCase,
 } from '../../application';
 import type { MockExamWithStatus } from '../../domain/entities/MockExam';
 import type { TrainingAttempt } from '../../domain/entities/TrainingAttempt';
@@ -81,6 +82,7 @@ export class TrainingController {
             generateHint: GenerateHintUseCase;
             reportQuestion: ReportQuestionUseCase;
             listTopics: ListTopicsUseCase;
+            getCursoId: GetCursoIdUseCase;
             motorOnboarding?: MotorOnboardingClient;
         },
     ) { }
@@ -184,9 +186,11 @@ export class TrainingController {
     generateQuestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const body = req.body as GenerateQuestionsRequest;
+            const cursoId = await this.deps.getCursoId.execute(body.oposicion);
             const questions = await this.deps.generateQuestions.execute({
                 userId: req.authUser!.id,
                 oposicion: body.oposicion,
+                cursoId,
                 topicId: body.topicId,
                 difficulty: body.difficulty,
                 count: body.count,
@@ -206,9 +210,11 @@ export class TrainingController {
     generateSurgicalTest = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const body = req.body as GenerateSurgicalRequest;
+            const cursoId = await this.deps.getCursoId.execute(body.oposicion);
             const result = await this.deps.generateSurgicalTest.execute({
                 userId: req.authUser!.id,
                 oposicion: body.oposicion,
+                cursoId,
                 count: body.count,
             });
             this.ok<SurgicalTestResult>(res, 200, result);
@@ -264,6 +270,7 @@ export class TrainingController {
     generateHint = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const body = req.body as HintRequest;
+            const cursoId = await this.deps.getCursoId.execute(body.oposicion);
             const result = await this.deps.generateHint.execute({
                 questionId: body.questionId,
                 questionText: body.questionText,
@@ -271,6 +278,7 @@ export class TrainingController {
                 topicId: body.topicId,
                 topic: body.topic,
                 oposicion: body.oposicion,
+                cursoId,
             });
             this.ok<HintResult>(res, 200, result);
         } catch (err) { next(err); }

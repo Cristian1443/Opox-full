@@ -27,6 +27,7 @@ import type {
     SaveProgressUseCase,
     ListSummariesUseCase,
     GetSummaryUseCase,
+    GetCursoIdUseCase,
 } from '../../application';
 import type {
     TutorConversation,
@@ -61,6 +62,7 @@ export class TutorController {
             saveProgress: SaveProgressUseCase;
             listSummaries: ListSummariesUseCase;
             getSummary: GetSummaryUseCase;
+            getCursoId: GetCursoIdUseCase;
         },
     ) {}
 
@@ -120,10 +122,12 @@ export class TutorController {
                 })
                 : undefined;
 
+            const cursoId = await this.deps.getCursoId.execute(req.authUser!.oposicion);
             const { userMessage, aiMessage } = await this.deps.sendMessage.execute({
                 conversationId: (req.params.id as string),
                 userId: req.authUser!.id,
                 content,
+                cursoId,
                 personality,
                 toneProfile,
             });
@@ -157,7 +161,8 @@ export class TutorController {
     generateDeck = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { topicId, topicTitle, oposicion } = req.body as { topicId: string; topicTitle: string; oposicion: string };
-            const { deck, cards } = await this.deps.generateDeck.execute({ userId: req.authUser!.id, topicId, topicTitle, oposicion });
+            const cursoId = await this.deps.getCursoId.execute(oposicion);
+            const { deck, cards } = await this.deps.generateDeck.execute({ userId: req.authUser!.id, topicId, topicTitle, oposicion, cursoId });
             ok(res, 201, { deck: this.serializeDeck(deck), cards: cards.map(this.serializeCard) });
         } catch (err) { next(err); }
     };
@@ -222,7 +227,8 @@ export class TutorController {
     getSummary = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { oposicion } = req.validatedQuery as { oposicion: string };
-            const summary = await this.deps.getSummary.execute((req.params.topicId as string), oposicion);
+            const cursoId = await this.deps.getCursoId.execute(oposicion);
+            const summary = await this.deps.getSummary.execute((req.params.topicId as string), oposicion, cursoId);
             ok(res, 200, this.serializeSummary(summary));
         } catch (err) { next(err); }
     };

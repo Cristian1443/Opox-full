@@ -3,18 +3,38 @@ import type { ITrainingRepository } from '../../domain';
 import { PhotoAnalysisError } from '../../domain';
 import { logger } from '@opox/utils';
 
+// ─── Resolución de curso (multi-curso) ────────────────────────────────────────
+
+export class GetCursoIdUseCase {
+    constructor(
+        private readonly trainingRepo: ITrainingRepository,
+        private readonly defaultCursoId: string,
+    ) {}
+
+    /** Devuelve el motor_curso_id para la oposición dada, o el defaultCursoId si no está mapeado. */
+    async execute(oposicion: string | null | undefined): Promise<string> {
+        if (!oposicion) return this.defaultCursoId;
+        const id = await this.trainingRepo.getCursoId(oposicion);
+        return id ?? this.defaultCursoId;
+    }
+}
+
+// ─── Generación de preguntas ──────────────────────────────────────────────────
+
 export class GenerateQuestionsUseCase {
     constructor(private readonly aiApi: AiApiContract) { }
 
     async execute(input: {
         userId: string;
         oposicion: string;
+        cursoId?: string;
         topicId?: string;
         difficulty?: 'easy' | 'medium' | 'hard';
         count?: number;
     }): Promise<GeneratedQuestion[]> {
         return this.aiApi.generateQuestions({
             oposicion: input.oposicion,
+            cursoId: input.cursoId,
             topicId: input.topicId ?? 'all',
             difficulty: input.difficulty ?? 'medium',
             count: input.count ?? 10,
@@ -54,6 +74,7 @@ export class GenerateSurgicalTestUseCase {
     async execute(input: {
         userId: string;
         oposicion: string;
+        cursoId?: string;
         count?: number;
     }): Promise<SurgicalTestResult> {
         const patterns = await this.trainingRepo.listErrorPatterns(input.userId);
@@ -62,6 +83,7 @@ export class GenerateSurgicalTestUseCase {
             // Sin historial aún — el stub devuelve un test genérico
             return this.aiApi.generateSurgicalTest({
                 oposicion: input.oposicion,
+                cursoId: input.cursoId,
                 errorPatterns: [{ topicId: 'all', topic: 'Todo el temario', failRate: 50, domain: 50 }],
                 count: input.count ?? 20,
             });
@@ -69,6 +91,7 @@ export class GenerateSurgicalTestUseCase {
 
         return this.aiApi.generateSurgicalTest({
             oposicion: input.oposicion,
+            cursoId: input.cursoId,
             errorPatterns: patterns.map((p) => ({
                 topicId: p.topicId,
                 topic: p.topic,
@@ -90,6 +113,7 @@ export class GenerateHintUseCase {
         topicId: string;
         topic: string;
         oposicion: string;
+        cursoId?: string;
     }): Promise<HintResult> {
         return this.aiApi.generateHint({
             questionText: input.questionText,
@@ -97,6 +121,7 @@ export class GenerateHintUseCase {
             topicId: input.topicId,
             topic: input.topic,
             oposicion: input.oposicion,
+            cursoId: input.cursoId,
         });
     }
 }

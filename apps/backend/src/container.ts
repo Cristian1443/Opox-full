@@ -51,7 +51,8 @@ import {
     ListGraduatesUseCase,
     GetStreakDetailUseCase,
     GetMotivationSummaryUseCase,
-    // Bloque 6 · Entrenamiento
+    // Bloque 6 · Entrenamiento — multi-curso
+    GetCursoIdUseCase,
     ListMockExamsUseCase,
     GetMockExamUseCase,
     GenerateQuestionsUseCase,
@@ -398,7 +399,8 @@ export function buildContainer() {
         getStreakDetail: new GetStreakDetailUseCase(dashboardRepo, motivationRepo),
         getMotivationSummary: new GetMotivationSummaryUseCase(dashboardRepo, motivationRepo),
 
-        // Bloque 6 · Entrenamiento
+        // Bloque 6 · Entrenamiento — multi-curso
+        getCursoId: new GetCursoIdUseCase(trainingRepo, env.MOTOR_DEFAULT_CURSO_ID ?? ''),
         listMockExams: new ListMockExamsUseCase(trainingRepo),
         getMockExam: new GetMockExamUseCase(trainingRepo),
         generateQuestions: new GenerateQuestionsUseCase(aiApi),
@@ -541,6 +543,7 @@ export function buildContainer() {
         generateHint: useCases.generateHint,
         reportQuestion: useCases.reportQuestion,
         listTopics: useCases.listTopics,
+        getCursoId: useCases.getCursoId,
         motorOnboarding,
     });
 
@@ -603,6 +606,7 @@ export function buildContainer() {
         saveProgress: useCases.saveProgress,
         listSummaries: useCases.listSummaries,
         getSummary: useCases.getSummary,
+        getCursoId: useCases.getCursoId,
     });
 
     const healthController = new HealthController({

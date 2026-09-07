@@ -42,7 +42,7 @@ export class MotorTutorClient implements ITutorAiClient {
     async chat(params: TutorAiChatParams): Promise<TutorAiChatResult> {
         const body: Record<string, unknown> = {
             user_id: params.userId ?? 'opox-backend',
-            curso_id: this.cursoId,
+            curso_id: params.cursoId ?? this.cursoId,
             mensaje: params.message,
         };
         if (params.toneProfile) body.tono = params.toneProfile;
@@ -56,12 +56,15 @@ export class MotorTutorClient implements ITutorAiClient {
 
         const data = await this.post<{
             respuesta?: string;
-            acciones?: Array<{ label: string; icon: string }>;
+            // acciones son trazas internas del Motor (tool calls RAG), no botones UI
+            acciones?: unknown;
         }>('/v1/classroom/tutor', body);
 
         return {
             content: data.respuesta ?? '',
-            suggestedActions: data.acciones,
+            // No mapeamos acciones del Motor — son trazas RAG internas, no sugerencias UI.
+            // SendMessageUseCase aplica DEFAULT_SUGGESTED_ACTIONS como fallback.
+            suggestedActions: undefined,
         };
     }
 
@@ -69,13 +72,14 @@ export class MotorTutorClient implements ITutorAiClient {
         topicId: string;
         topicTitle: string;
         oposicion: string;
+        cursoId?: string;
         count?: number;
     }): Promise<Array<{ question: string; answer: string }>> {
         // Motor returns a direct array of {id, tema_id, front, back}
         const data = await this.post<Array<{ front?: string; back?: string }>>(
             '/v1/classroom/flashcards/generate',
             {
-                curso_id: this.cursoId,
+                curso_id: params.cursoId ?? this.cursoId,
                 tema_id: params.topicId,
                 n: params.count ?? 10,
             },
@@ -91,6 +95,7 @@ export class MotorTutorClient implements ITutorAiClient {
     async getSummary(params: {
         topicId: string;
         oposicion: string;
+        cursoId?: string;
         detailLevel?: number;
     }): Promise<Array<{ title: string; content: string }>> {
         // Map detailLevel (0|1|2) → Motor nivel ('esquema'|'medio'|'profundo')
@@ -106,7 +111,7 @@ export class MotorTutorClient implements ITutorAiClient {
                 desarrollo?: string;
             };
         }>('/v1/classroom/summary', {
-            curso_id: this.cursoId,
+            curso_id: params.cursoId ?? this.cursoId,
             tema_id: params.topicId,
             nivel,
         });

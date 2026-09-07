@@ -64,7 +64,7 @@ function SparklesIcon({ width = 81, height = 76, color = colors.accentOrange }) 
 export default function TutorFlashcardsLoadingScreen({ navigation, route }) {
     const topicId    = route?.params?.topicId    ?? 'constitucion';
     const topicTitle = route?.params?.topicTitle ?? 'Tema de estudio';
-    const oposicion  = route?.params?.oposicion  ?? 'aux-adm-estado';
+    const oposicion  = route?.params?.oposicion  ?? 'justicia-tramitacion';
 
     const progressAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim    = useRef(new Animated.Value(0.35)).current;

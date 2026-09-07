@@ -3,6 +3,8 @@ import type { ToneProfile } from '../entities';
 export interface TutorAiChatParams {
     message: string;
     userId?: string;
+    /** ID del curso en el Motor IA (tabla training_courses). Opcional — fallback al defaultCursoId. */
+    cursoId?: string;
     toneProfile?: ToneProfile;
     history?: Array<{ role: 'user' | 'assistant'; content: string }>;
     topic?: string | null;
@@ -21,11 +23,15 @@ export interface ITutorAiClient {
         topicId: string;
         topicTitle: string;
         oposicion: string;
+        /** ID del curso en el Motor IA (tabla training_courses). Opcional — fallback al defaultCursoId. */
+        cursoId?: string;
         count?: number;
     }): Promise<Array<{ question: string; answer: string }>>;
 
     getSummary(params: {
         topicId: string;
         oposicion: string;
+        /** ID del curso en el Motor IA (tabla training_courses). Opcional — fallback al defaultCursoId. */
+        cursoId?: string;
     }): Promise<Array<{ title: string; content: string }>>;
 }

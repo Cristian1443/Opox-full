@@ -5,6 +5,69 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-07 — Multi-curso + E2E smoke 64/64 + fix Tutor IA acciones
+
+Rama: `fix/revision-bloques-bugfixes`.
+
+### Infraestructura multi-curso (training_courses + GetCursoIdUseCase)
+
+OPOX pasa de un único curso hardcodeado (`MOTOR_DEFAULT_CURSO_ID`) a resolución
+dinámica por oposición. Nuevo fichero SQL `apps/backend/supabase/training_courses.sql`.
+
+- **`training_courses`** (nueva tabla Supabase): mapea `oposicion TEXT PK → motor_curso_id TEXT`.
+  Seed inicial: `policia-local-galicia → 0bed919120024e5f` (is_default=true),
+  `justicia-tramitacion → 0bed919120024e5f` (placeholder hasta que el equipo IA entregue su curso).
+- **`GetCursoIdUseCase`** (nueva): busca `oposicion` en `training_courses`; si no hay fila,
+  cae al `MOTOR_DEFAULT_CURSO_ID` del `.env`. Sin excepciones — siempre devuelve un ID.
+- **`authMiddleware`**: expone `oposicion: string | null` en `req.authUser` leyendo
+  `session.user.oposicion`. Antes era `undefined` y los controllers no lo tenían.
+- **`TrainingController`**: `generateQuestions`, `generateSurgicalTest`, `generateHint`
+  llaman `getCursoId.execute(body.oposicion)` y pasan el cursoId al use case.
+- **`TutorController`**: `sendMessage`, `generateDeck`, `getSummary` llaman
+  `getCursoId.execute(req.authUser!.oposicion)` y propagan `cursoId` al Motor.
+- **`bloque6_topics.sql`**: filas de `policia-local-galicia` migradas de slugs semánticos
+  a IDs hex del Motor (`3b6f62d89ac74a78`, `ebc2cc44282048f1`, ...). Justicia mantiene slugs.
+- **SQL a ejecutar en Supabase**: `training_courses.sql` y `bloque6_topics.sql` (ya aplicados).
+
+### E2E smoke test completo — 64/64 PASS
+
+Nuevo script `apps/backend/scripts/e2e_smoke_full.js`: cubre los 13 bloques del
+`FLUJO_NAVEGACION.md` más verificación explícita de multi-curso. Usuario de prueba:
+`tester.contrax.2026@gmail.com`. Todos los tests PASS, incluyendo Motor RAG (~60 s
+generación fría) y Motor Tutor (~7 s), BOE, Tienda, Config, Salud, Push.
+
+### Fix Tutor IA — acciones Motor mal mapeadas + texto stub confuso
+
+**Bug**: `MotorTutorClient.chat()` mapeaba el campo `acciones` del Motor
+(trazas internas de herramientas RAG: `{ tool, resumen, datos }`) como
+`suggestedActions: Array<{ label, icon }>`. Cuando el Motor responde correctamente,
+los action chips aparecían con `label: undefined`. Corregido: `suggestedActions: undefined`
+→ `SendMessageUseCase` aplica `DEFAULT_SUGGESTED_ACTIONS`.
+
+**Stub confuso**: el texto "En la versión con IA activa, recibirás aquí una respuesta
+personalizada..." hacía creer al usuario que necesitaba una versión de pago.
+Reemplazado por: "Estoy consultando el temario para responderte. Si la respuesta
+tarda más de lo esperado, prueba a enviar de nuevo tu pregunta."
+
+### Archivos modificados (9 backend + 1 nuevo script + 1 nuevo SQL)
+
+| Archivo | Cambio |
+|---|---|
+| `supabase/training_courses.sql` | Nueva tabla + seed (policia→0bed919120024e5f) |
+| `supabase/bloque6_topics.sql` | Hex IDs Motor para policia-local-galicia |
+| `application/training/GenerateUseCases.ts` | `GetCursoIdUseCase` |
+| `domain/repositories/ITrainingRepository.ts` | `getCursoId(oposicion)` |
+| `infrastructure/training/SupabaseTrainingRepository.ts` | Query a `training_courses` |
+| `presentation/middleware/authMiddleware.ts` | `oposicion` en `req.authUser` |
+| `presentation/controllers/TrainingController.ts` | `getCursoId` en generate/hint |
+| `presentation/controllers/TutorController.ts` | `getCursoId` en message/deck/summary |
+| `container.ts` | Cableado `getCursoId` en ambos controllers |
+| `infrastructure/clients/MotorTutorClient.ts` | `suggestedActions: undefined` (no trazas RAG) |
+| `application/tutor/ChatUseCases.ts` | Stub text sin "versión con IA activa" |
+| `scripts/e2e_smoke_full.js` | Nuevo — 64/64 PASS |
+
+---
+
 ## 2026-09-07 — Auditoría frontend + fix user_id Motor Tutor + fixes menores
 
 Rama: `fix/revision-bloques-bugfixes`. Auditoría completa de código frontend contra

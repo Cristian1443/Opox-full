@@ -145,11 +145,11 @@ export class MotorAiClient implements AiApiContract {
     // ─── generateQuestions ────────────────────────────────────────────────────
 
     async generateQuestions(params: GenerateQuestionsParams): Promise<GeneratedQuestion[]> {
-        const cursoId = this.config.defaultCursoId;
+        const cursoId = params.cursoId ?? this.config.defaultCursoId;
         if (!cursoId) {
             throw new Error(
-                '[MotorAiClient] MOTOR_DEFAULT_CURSO_ID no configurado. ' +
-                'Rellenar la variable en .env con el ID del curso ingestado en el Motor.',
+                '[MotorAiClient] curso_id no resuelto. ' +
+                'Verifica training_courses en Supabase o MOTOR_DEFAULT_CURSO_ID en .env.',
             );
         }
 
@@ -266,6 +266,7 @@ export class MotorAiClient implements AiApiContract {
         // esperada a partir de los failRate del usuario.
         const questions = await this.generateQuestions({
             oposicion: params.oposicion,
+            cursoId: params.cursoId,
             topicId: 'all',
             difficulty: 'medium',
             count: params.count,

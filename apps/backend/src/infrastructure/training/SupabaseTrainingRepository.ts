@@ -131,6 +131,17 @@ function toBookmark(row: BookmarkRow): TrainingBookmark {
 export class SupabaseTrainingRepository implements ITrainingRepository {
     constructor(private readonly supabaseAdmin: SupabaseClient) { }
 
+    // ─── Multi-curso ───────────────────────────────
+
+    async getCursoId(oposicion: string): Promise<string | null> {
+        const { data } = await this.supabaseAdmin
+            .from('training_courses')
+            .select('motor_curso_id')
+            .eq('oposicion', oposicion)
+            .maybeSingle();
+        return data?.motor_curso_id ?? null;
+    }
+
     // ─── Simulacros ────────────────────────────────
 
     async listMockExams(input: { oposicion: string; userId: string }): Promise<MockExamWithStatus[]> {

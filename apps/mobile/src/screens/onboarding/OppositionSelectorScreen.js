@@ -59,6 +59,7 @@ const OPPOSITIONS = [
     {
         id: '1',
         name: 'Policía local',
+        slug: 'policia-local-galicia',
         sub: 'Tramitación · Auxilio · Gestión',
         Icon: PoliciaIcon,
         isFirst: true,
@@ -66,12 +67,14 @@ const OPPOSITIONS = [
     {
         id: '2',
         name: 'Justicia',
+        slug: 'justicia-tramitacion',
         sub: 'Tramitación · Auxilio · Gestión',
         Icon: JusticiaIcon,
     },
     {
         id: '3',
         name: 'Hacienda',
+        slug: 'hacienda',
         sub: 'Agentes · Administrativos',
         Icon: HaciendaIcon,
     },
@@ -121,7 +124,7 @@ export default function OppositionSelectorScreen({ navigation }) {
     );
 
     const handleSelect = async (item) => {
-        await AsyncStorage.setItem(PENDING_OPOSICION_KEY, item.name);
+        await AsyncStorage.setItem(PENDING_OPOSICION_KEY, item.slug);
         navigation.navigate('LevelTestProposal');
     };
 
