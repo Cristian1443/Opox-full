@@ -146,12 +146,16 @@ export default function HomeHealthScreen({ navigation }) {
     const energyPct = calcEnergy(metrics);
     const { title: energyTitle, subtitle: energySubtitle } = energyLabel(energyPct);
 
-    const hasData = !!metrics && isHealthAvailable();
     const hr = metrics?.heartRate ?? null;
     const restHr = metrics?.restingHeartRate ?? null;
     const hrv = metrics?.hrv ?? null;
     const spo2 = metrics?.spo2 ?? null;
     const sleep = metrics?.sleepHours ?? null;
+    // hasData: hay al menos UNA métrica con valor real. `!!metrics` sin esto
+    // devolvía true aunque todos los campos vinieran null (wearable no vinculado).
+    const hasData = isHealthAvailable()
+        && !!metrics
+        && [hr, restHr, hrv, spo2, sleep].some((v) => v != null);
 
     const wearableIndicator = (
         <TouchableOpacity

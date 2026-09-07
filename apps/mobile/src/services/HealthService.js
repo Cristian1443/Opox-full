@@ -54,6 +54,45 @@ export function isHealthAvailable() {
 }
 
 /**
+ * En Android, comprueba si Health Connect está instalado en el dispositivo.
+ * Devuelve uno de: 'available' | 'not_installed' | 'update_required' | 'not_supported' | 'not_android'.
+ *
+ * react-native-health-connect getSdkStatus() retorna:
+ *   0 = SDK_UNAVAILABLE (no soportado, Android <8)
+ *   1 = SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED (Health Connect no instalado o desactualizado)
+ *   2 = SDK_AVAILABLE
+ *   3 = SDK_AVAILABLE_PROVIDER_UPDATE_REQUIRED
+ */
+export async function getHealthConnectStatus() {
+    if (Platform.OS !== 'android') return 'not_android';
+    if (!HealthConnect) return 'not_installed';
+    try {
+        const status = await HealthConnect.getSdkStatus();
+        if (status === 2) return 'available';
+        if (status === 3) return 'update_required';
+        if (status === 1) return 'not_installed';
+        return 'not_supported';
+    } catch (err) {
+        console.warn('[HealthService] getSdkStatus error:', err);
+        return 'not_installed';
+    }
+}
+
+/** Abre Google Play Store en la ficha de Health Connect para que el usuario lo instale/actualice. */
+export function openHealthConnectPlayStore() {
+    if (Platform.OS !== 'android') return;
+    const url = 'market://details?id=com.google.android.apps.healthdata';
+    const fallback = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata';
+    try {
+        require('react-native').Linking.openURL(url).catch(() =>
+            require('react-native').Linking.openURL(fallback),
+        );
+    } catch {
+        require('react-native').Linking.openURL(fallback).catch(() => {});
+    }
+}
+
+/**
  * Solicita permisos de lectura de salud al SO.
  * Retorna true si el usuario los concede, false si los deniega o hay error.
  */
@@ -72,7 +111,18 @@ export async function requestHealthPermissions() {
 
     if (Platform.OS === 'android') {
         try {
-            await HealthConnect.initialize();
+            // Comprobar disponibilidad ANTES de intentar inicializar — evita crash
+            // nativo si Health Connect no está instalado en el dispositivo.
+            const status = await getHealthConnectStatus();
+            if (status !== 'available') {
+                console.warn('[HealthService] Health Connect no disponible:', status);
+                return false;
+            }
+            const initialized = await HealthConnect.initialize();
+            if (!initialized) {
+                console.warn('[HealthService] HealthConnect.initialize() devolvió false');
+                return false;
+            }
             const granted = await HealthConnect.requestPermission(ANDROID_PERMISSIONS);
             return Array.isArray(granted) && granted.length > 0;
         } catch (err) {

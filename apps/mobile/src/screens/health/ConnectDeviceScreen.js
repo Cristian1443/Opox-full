@@ -1,18 +1,27 @@
 // Bloque 3 · Salud — Pantalla 3.2 · Conexión de dispositivo
-// Todos los wearables sincronizan a través de HealthKit (iOS) o Health Connect (Android).
-// Seleccionar uno navega al flujo de permisos real en PairingScreen.
-import React from 'react';
+// En Android, TODOS los wearables (Wear OS, Samsung, Xiaomi, Fitbit, Garmin…)
+// sincronizan a través de Health Connect. En iOS, todos van vía HealthKit.
+// Detectamos plataforma y mostramos solo las opciones reales.
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
     ScrollView,
     StyleSheet,
     TouchableOpacity,
+    Platform,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import {
+    isHealthAvailable,
+    getHealthConnectStatus,
+    openHealthConnectPlayStore,
+} from '../../services/HealthService';
 
 // Colores confirmados contra Figma (frame CONEXION DISPOSITIVO, Bloque 3)
 // sin equivalente exacto en theme.js.
@@ -22,114 +31,167 @@ const FIGMA = {
     cardHighlightFill: 'rgba(235,235,235,0.5)',
     textNote: '#343A3D',
     greenBadgeBg: 'rgba(36,189,144,0.15)',
+    warnBadgeBg: 'rgba(255,159,0,0.15)',
 };
 
-// Datos de dispositivos (mock hasta integrar backend). Solo Apple Watch
-// llega "connected"; Garmin dispara el mock de error de emparejamiento;
-// el resto ofrece "Conectar", salvo "Solo smartphone" que ofrece "Usar".
-const devicesData = [
-    {
-        id: 'apple-watch',
-        name: 'Apple Watch',
-        sublabel: 'Series 9 · sincronizado hace 2 min',
-        status: 'connected',
-        icon: 'watch',
-    },
-    {
-        id: 'garmin',
-        name: 'Garmin',
-        sublabel: 'Connect',
-        status: 'connect',
-        icon: 'roundWatch',
-    },
-    {
-        id: 'fitbit',
-        name: 'Fitbit/Pixel Watch',
-        sublabel: 'Google Health',
-        status: 'connect',
-        icon: 'phone',
-    },
-    {
-        id: 'samsung',
-        name: 'Samsung Galaxy Watch',
-        sublabel: 'Samsung Health',
-        status: 'connect',
-        icon: 'phone',
-    },
-    {
-        id: 'solo-smartphone',
-        name: 'Solo smartphone',
-        sublabel: 'Sensores del móvil (limitado)',
-        status: 'use',
-        icon: 'phone',
-    },
-];
-
-// Reloj (Apple Watch / Garmin) y celular (Fitbit/Pixel, Samsung, solo
-// smartphone) con los iconos estándar del sistema — más nítidos y
-// reconocibles que un trazo SVG a mano en tamaños pequeños.
-function DeviceIcon({ type }) {
-    if (type === 'watch' || type === 'roundWatch') {
-        return <Ionicons name="watch-outline" size={30} color={colors.accentOrange} />;
-    }
-    return <Ionicons name="phone-portrait-outline" size={28} color={colors.accentOrange} />;
-}
-
 export default function ConnectDeviceScreen({ navigation }) {
-    // Todos los dispositivos abren el flujo de permisos de salud del SO real
-    // (HealthKit/Health Connect vía PairingScreen) — ya no hay mock de error
-    // específico para Garmin.
-    const handleConnect = (device) => {
-        navigation.navigate('Pairing', { device });
-    };
+    const [hcStatus, setHcStatus] = useState(null); // 'available' | 'not_installed' | 'update_required' | 'not_supported' | 'not_android'
+    const [loading, setLoading] = useState(Platform.OS === 'android');
 
-    const renderDeviceItem = (device) => {
-        const isConnected = device.status === 'connected';
+    const checkStatus = useCallback(() => {
+        let cancelled = false;
+        (async () => {
+            if (Platform.OS !== 'android') {
+                if (!cancelled) { setHcStatus('not_android'); setLoading(false); }
+                return;
+            }
+            const s = await getHealthConnectStatus();
+            if (!cancelled) { setHcStatus(s); setLoading(false); }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
+    useFocusEffect(checkStatus);
+
+    // ── iOS: HealthKit único ────────────────────────────────────────────────
+    if (Platform.OS === 'ios') {
+        const hkAvailable = isHealthAvailable();
         return (
-            <View
-                key={device.id}
-                style={[styles.card, isConnected && styles.cardHighlighted]}
-            >
-                <View style={styles.iconWrap}>
-                    <DeviceIcon type={device.icon} />
-                </View>
-
-                <View style={styles.deviceTextWrap}>
-                    <Text style={styles.deviceName}>{device.name}</Text>
-                    <Text style={styles.deviceSublabel}>{device.sublabel}</Text>
-                </View>
-
-                {isConnected ? (
-                    <View style={styles.connectedBadge}>
-                        <Text style={styles.connectedBadgeText}>Conectado</Text>
+            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+                <HealthScreenHeader title="Conectar dispositivo" onBack={() => navigation.goBack()} />
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <Text style={styles.subtitle}>
+                        Todos los wearables (Apple Watch, Garmin, Fitbit…) sincronizan a través
+                        de Apple Salud. Conéctalo una vez y OPOX leerá tus datos.
+                    </Text>
+                    <View style={styles.devicesList}>
+                        <DeviceCard
+                            icon="heart-circle-outline"
+                            name="Apple Salud"
+                            sublabel="HealthKit · datos de tu wearable"
+                            statusBadge={hkAvailable ? { text: 'Disponible', color: colors.ctaGreen, bg: FIGMA.greenBadgeBg } : null}
+                            actionText="Conectar"
+                            onPress={() => navigation.navigate('Pairing', {
+                                device: { name: 'Apple Salud', platform: 'ios_healthkit', icon: 'heart-circle-outline' },
+                            })}
+                        />
+                        <DeviceCard
+                            icon="phone-portrait-outline"
+                            name="Solo smartphone"
+                            sublabel="Sensores del móvil (limitado)"
+                            actionText="Usar"
+                            onPress={() => navigation.navigate('HomeHealth')}
+                        />
                     </View>
-                ) : (
-                    <TouchableOpacity activeOpacity={0.7} onPress={() => handleConnect(device)}>
-                        <Text style={styles.actionText}>{device.status === 'use' ? 'Usar' : 'Conectar'}</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
+                </ScrollView>
+            </SafeAreaView>
         );
-    };
+    }
 
+    // ── Android: Health Connect ─────────────────────────────────────────────
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title="Conectar dispositivo" onBack={() => navigation.goBack()} />
-
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Text style={styles.subtitle}>
-                    Sincroniza tu wearable para el control de fatiga en tiempo real.
+                    En Android, todos los wearables (Wear OS, Samsung, Xiaomi, Fitbit, Garmin…)
+                    sincronizan a través de Health Connect. Instálalo una vez y OPOX leerá
+                    tus datos automáticamente.
                 </Text>
 
-                <View style={styles.devicesList}>
-                    {devicesData.map((device) => renderDeviceItem(device))}
-                </View>
+                {loading ? (
+                    <View style={styles.loadingWrap}>
+                        <ActivityIndicator size="small" color={colors.accentOrange} />
+                    </View>
+                ) : (
+                    <View style={styles.devicesList}>
+                        {/* Health Connect — tarjeta principal según estado real */}
+                        {hcStatus === 'available' && (
+                            <DeviceCard
+                                icon="fitness-outline"
+                                name="Health Connect"
+                                sublabel="Wear OS, Samsung, Xiaomi, Fitbit, Garmin…"
+                                statusBadge={{ text: 'Disponible', color: colors.ctaGreen, bg: FIGMA.greenBadgeBg }}
+                                actionText="Conectar"
+                                onPress={() => navigation.navigate('Pairing', {
+                                    device: { name: 'Health Connect', platform: 'health_connect', icon: 'fitness-outline' },
+                                })}
+                            />
+                        )}
+
+                        {hcStatus === 'update_required' && (
+                            <DeviceCard
+                                icon="fitness-outline"
+                                name="Health Connect"
+                                sublabel="Necesita actualizar Health Connect"
+                                statusBadge={{ text: 'Actualizar', color: colors.accentOrange, bg: FIGMA.warnBadgeBg }}
+                                actionText="Actualizar"
+                                onPress={openHealthConnectPlayStore}
+                            />
+                        )}
+
+                        {hcStatus === 'not_installed' && (
+                            <DeviceCard
+                                icon="fitness-outline"
+                                name="Health Connect"
+                                sublabel="No instalado — descarga desde Google Play"
+                                statusBadge={{ text: 'Instalar', color: colors.accentOrange, bg: FIGMA.warnBadgeBg }}
+                                actionText="Instalar"
+                                onPress={openHealthConnectPlayStore}
+                            />
+                        )}
+
+                        {hcStatus === 'not_supported' && (
+                            <View style={styles.card}>
+                                <View style={styles.iconWrap}>
+                                    <Ionicons name="alert-circle-outline" size={30} color={colors.statRed} />
+                                </View>
+                                <View style={styles.deviceTextWrap}>
+                                    <Text style={styles.deviceName}>Health Connect no soportado</Text>
+                                    <Text style={styles.deviceSublabel}>Requiere Android 8 o superior.</Text>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Solo smartphone — siempre disponible como fallback */}
+                        <DeviceCard
+                            icon="phone-portrait-outline"
+                            name="Solo smartphone"
+                            sublabel="Sensores del móvil (limitado)"
+                            actionText="Usar"
+                            onPress={() => navigation.navigate('HomeHealth')}
+                        />
+                    </View>
+                )}
 
                 <View style={{ height: spacing.lg }} />
             </ScrollView>
-
         </SafeAreaView>
+    );
+}
+
+// ─── Tarjeta reutilizable ────────────────────────────────────────────────────
+function DeviceCard({ icon, name, sublabel, statusBadge, actionText, onPress }) {
+    return (
+        <View style={[styles.card, statusBadge?.color === colors.ctaGreen && styles.cardHighlighted]}>
+            <View style={styles.iconWrap}>
+                <Ionicons name={icon} size={30} color={colors.accentOrange} />
+            </View>
+            <View style={styles.deviceTextWrap}>
+                <Text style={styles.deviceName}>{name}</Text>
+                <Text style={styles.deviceSublabel}>{sublabel}</Text>
+            </View>
+            {statusBadge ? (
+                <View style={[styles.statusBadge, { backgroundColor: statusBadge.bg, borderColor: statusBadge.color }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusBadge.color }]}>{statusBadge.text}</Text>
+                </View>
+            ) : null}
+            {onPress ? (
+                <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.actionBtn}>
+                    <Text style={styles.actionText}>{actionText}</Text>
+                </TouchableOpacity>
+            ) : null}
+        </View>
     );
 }
 
@@ -145,7 +207,8 @@ const styles = StyleSheet.create({
     subtitle: {
         textAlign: 'center',
         fontFamily: 'Poppins-Regular',
-        fontSize: 10.5,
+        fontSize: 11.5,
+        lineHeight: 16,
         color: FIGMA.subtitleMuted,
         marginBottom: spacing.lg,
         paddingHorizontal: spacing.sm,
@@ -153,13 +216,19 @@ const styles = StyleSheet.create({
     devicesList: {
         gap: 14,
     },
+    loadingWrap: {
+        paddingVertical: spacing.xl,
+        alignItems: 'center',
+    },
     card: {
         flexDirection: 'row',
         alignItems: 'center',
-        height: 119,
+        minHeight: 90,
         paddingHorizontal: spacing.md,
-        borderWidth: 0.3,
+        paddingVertical: spacing.md,
+        borderWidth: 0.5,
         borderColor: FIGMA.cardBorder,
+        borderRadius: 12,
     },
     cardHighlighted: {
         backgroundColor: FIGMA.cardHighlightFill,
@@ -184,22 +253,24 @@ const styles = StyleSheet.create({
         fontSize: 11.5,
         color: FIGMA.textNote,
     },
-    connectedBadge: {
-        backgroundColor: FIGMA.greenBadgeBg,
+    statusBadge: {
         borderWidth: 0.4,
-        borderColor: colors.ctaGreen,
         borderRadius: 20,
         paddingHorizontal: 10,
         paddingVertical: 4,
+        marginRight: 8,
     },
-    connectedBadgeText: {
+    statusBadgeText: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 9.8,
-        color: colors.ctaGreen,
+    },
+    actionBtn: {
+        paddingHorizontal: 4,
+        paddingVertical: 8,
     },
     actionText: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 9.8,
-        color: colors.textDark,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 11.5,
+        color: colors.accentOrange,
     },
 });
