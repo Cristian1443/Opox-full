@@ -8,6 +8,7 @@ import {
   TextInput,
   StatusBar,
   Alert,
+  Linking,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -98,16 +99,21 @@ export default function ConfigHelpScreen({ navigation }) {
     setExpandedFaq(expandedFaq === id ? null : id);
   };
 
+  // PENDIENTE §2.4 PENDIENTES_EXTERNOS: reemplazar con el número real de WhatsApp Business.
+  // Cuando llegue: cambiar a p.ej. '34612345678' (sin + ni espacios).
+  const SUPPORT_WHATSAPP = '';
+
   const handleChatSupport = () => {
-    // TODO: integrar canal de soporte real (Intercom, Crisp, etc.)
-    Alert.alert(
-      'Chat con Soporte',
-      'Conectando con un agente de soporte...',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Abrir Chat', onPress: () => {} },
-      ],
-    );
+    if (SUPPORT_WHATSAPP) {
+      const msg = encodeURIComponent('Hola, necesito ayuda con la app OPOX.');
+      Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP}?text=${msg}`);
+    } else {
+      Alert.alert(
+        'Soporte',
+        'El canal de soporte por WhatsApp está en configuración. Mientras tanto, escríbenos desde el formulario de feedback.',
+        [{ text: 'Entendido' }],
+      );
+    }
   };
 
   const filteredFaqs = FAQS.filter(

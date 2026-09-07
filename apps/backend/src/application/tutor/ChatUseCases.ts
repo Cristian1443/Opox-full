@@ -91,6 +91,7 @@ export class SendMessageUseCase {
 
                 const result = await this.tutorAi.chat({
                     message: params.content,
+                    userId: params.userId,
                     toneProfile: params.toneProfile,
                     history,
                     topic: conversation.topic,

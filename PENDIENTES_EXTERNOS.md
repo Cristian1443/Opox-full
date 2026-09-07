@@ -246,15 +246,16 @@ reduce la fricción de registro y mejora la conversión de nuevos usuarios.
 
 ### 2.4 Canal de soporte vía WhatsApp Business
 
-**Contexto:** La pantalla de ayuda de la app tiene un botón "Contactar con soporte"
-que ya abre WhatsApp. Para que funcione en producción con un número fijo de empresa
-(no un teléfono personal), hace falta una cuenta de WhatsApp Business.
+**Contexto:** La pantalla de ayuda tiene un botón "Contactar con soporte" preparado
+para abrir WhatsApp directamente. El código está listo: en cuanto tengamos el número,
+es una sola línea cambiar la constante `SUPPORT_WHATSAPP` en `ConfigHelpScreen.js`.
+Mientras tanto el botón muestra un mensaje informativo.
 
 **Lo que necesitamos:**
 - Una cuenta de **WhatsApp Business** registrada con el número de atención al
   cliente de OPOX.
-- El número de teléfono de esa cuenta para configurarlo en la app (es un cambio
-  de una línea).
+- El número de teléfono de esa cuenta (formato internacional sin +: p.ej. `34612345678`).
+  Con ese dato lo configuramos en menos de 5 minutos.
 - Opcional pero recomendado: activar la **API de WhatsApp Business** (Meta)
   para poder gestionar los mensajes desde una herramienta de soporte en lugar
   del teléfono directamente — si el volumen de consultas crece, se agradece.

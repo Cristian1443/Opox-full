@@ -2,6 +2,7 @@ import type { ToneProfile } from '../entities';
 
 export interface TutorAiChatParams {
     message: string;
+    userId?: string;
     toneProfile?: ToneProfile;
     history?: Array<{ role: 'user' | 'assistant'; content: string }>;
     topic?: string | null;

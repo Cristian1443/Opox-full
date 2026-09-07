@@ -5,6 +5,58 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-07 — Auditoría frontend + fix user_id Motor Tutor + fixes menores
+
+Rama: `fix/revision-bloques-bugfixes`. Auditoría completa de código frontend contra
+`FLUJO_NAVEGACION.md`. Se encontraron y solucionaron 3 gaps técnicos; el resto
+documentados como pendientes de terceros o TODOs de producto.
+
+### Fix 1 · `user_id` hardcodeado en `MotorTutorClient` (Bloque 8)
+
+`MotorTutorClient.chat()` enviaba `user_id: 'opox-backend'` fijo para todos los usuarios.
+El Motor trata a todos los usuarios como la misma persona, compartiendo historial de
+conversación y perdiendo el contexto individual. Este es el motivo por el que el tutor
+"siempre responde lo mismo" — el Motor confunde usuarios.
+
+- `ITutorAiClient.TutorAiChatParams`: nuevo campo `userId?: string`.
+- `SendMessageUseCase.execute()`: propaga `params.userId` a `tutorAi.chat()`.
+- `MotorTutorClient.chat()`: usa `params.userId ?? 'opox-backend'`.
+
+### Fix 2 · TTL de aviso en el Generador Infinito (Bloque 6)
+
+`TTL_WARN_MS` estaba a 30 s en el código pero `FLUJO_NAVEGACION.md` documenta 15 s.
+Corregido a 15 s. El kill (240 s) ya coincidía.
+
+### Fix 3 · Botón "Contactar con soporte" (Bloque 12)
+
+`ConfigHelpScreen.handleChatSupport` mostraba un `Alert.alert` genérico.
+Se reemplaza por un patrón listo para WhatsApp: si `SUPPORT_WHATSAPP` tiene número,
+abre `wa.me`; si está vacío, muestra un mensaje claro. Una sola constante a rellenar
+cuando llegue el número de WhatsApp Business (PENDIENTES_EXTERNOS §2.4).
+
+### Gaps de producto documentados (no corregibles en código)
+
+| Gap | Archivo | Naturaleza |
+|---|---|---|
+| RevenueCat stub | `StoreSubscriptionScreen.js` | Esperando integración RevenueCat |
+| Cambio de foto de perfil | `ConfigPerfilScreen.js` | Falta endpoint + expo-image-picker |
+| Cambio de contraseña in-app | `ConfigPerfilScreen.js` | Falta `PATCH /auth/password` en backend |
+| Términos/Privacidad sin URLs | `TerminosScreen.js` | Esperando URLs reales del cliente |
+| Audio meditaciones | `MeditationPlayerScreen.js` | `expo-av` incompatible JSI; pendiente migrar a `expo-audio` |
+
+### Archivos modificados (6)
+
+| Archivo | Cambio |
+|---|---|
+| `apps/backend/src/domain/repositories/ITutorAiClient.ts` | `userId` en `TutorAiChatParams` |
+| `apps/backend/src/application/tutor/ChatUseCases.ts` | Propaga `userId` a `tutorAi.chat()` |
+| `apps/backend/src/infrastructure/clients/MotorTutorClient.ts` | `user_id` real del usuario |
+| `apps/mobile/src/screens/training/GeneratorConfigScreen.js` | TTL_WARN_MS 30s → 15s |
+| `apps/mobile/src/screens/settings/ConfigHelpScreen.js` | WhatsApp listo, Alert informativo hasta tener número |
+| `PENDIENTES_EXTERNOS.md` | Corrige estado del botón de WhatsApp (era Alert, ahora preparado) |
+
+---
+
 ## 2026-09-07 — Bloque 3 · Fixes Motor Fatiga + auditoría de integraciones
 
 Rama: `fix/revision-bloques-bugfixes`. Auditoría de estado real de dos integraciones

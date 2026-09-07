@@ -163,7 +163,7 @@ function FatigueToggle({ value, onValueChange }) {
     );
 }
 
-const TTL_WARN_MS  = 30_000;
+const TTL_WARN_MS  = 15_000;
 const TTL_KILL_MS  = 240_000;
 
 // ─── Pantalla 6.2 · Generador infinito ───────────────────────────────────────

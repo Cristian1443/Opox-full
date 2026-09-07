@@ -41,7 +41,7 @@ export class MotorTutorClient implements ITutorAiClient {
 
     async chat(params: TutorAiChatParams): Promise<TutorAiChatResult> {
         const body: Record<string, unknown> = {
-            user_id: 'opox-backend',
+            user_id: params.userId ?? 'opox-backend',
             curso_id: this.cursoId,
             mensaje: params.message,
         };
