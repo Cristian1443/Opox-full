@@ -2,8 +2,10 @@ import axios, { type AxiosInstance } from 'axios';
 import { logger } from '@opox/utils';
 
 export interface MotorFatigueInput {
+    userId?: string;
     hrv?: number | null;
     fc_reposo?: number | null;
+    spo2?: number | null;
     sueno_horas?: number | null;
     fecha: string; // YYYY-MM-DD
 }
@@ -73,12 +75,13 @@ export class MotorFatigueClient {
 
     async analyze(input: MotorFatigueInput): Promise<MotorFatigueResult> {
         const body: Record<string, unknown> = {
-            user_id: 'opox-backend',
+            user_id: input.userId ?? 'opox-backend',
             ts: input.fecha,
         };
         if (input.hrv != null) body.hrv_ms = input.hrv;
         if (input.fc_reposo != null) body.fc_reposo = input.fc_reposo;
         if (input.sueno_horas != null) body.horas_sueno = input.sueno_horas;
+        if (input.spo2 != null) body.spo2 = input.spo2;
 
         const { data } = await this.http.post<MotorFatiguaApiResponse>('/v1/fatigue/biometrics', body);
 

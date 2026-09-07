@@ -54,25 +54,27 @@ export class HealthController {
     };
 
     analyzeFatigue = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-        const { hrv, fc_reposo, sueno_horas } = req.body as {
+        const { hrv, fc_reposo, spo2, sueno_horas } = req.body as {
             hrv?: number | null;
             fc_reposo?: number | null;
+            spo2?: number | null;
             sueno_horas?: number | null;
         };
         const fecha = new Date().toLocaleDateString('sv');
+        const userId = req.authUser!.id;
 
         // Intentar Motor si está configurado; ante cualquier fallo, caer al
         // cálculo local para no exponer 500 al mobile.
         if (this.deps.motorFatigue) {
             try {
-                const result = await this.deps.motorFatigue.analyze({ hrv, fc_reposo, sueno_horas, fecha });
+                const result = await this.deps.motorFatigue.analyze({ userId, hrv, fc_reposo, spo2, sueno_horas, fecha });
                 ok(res, 200, result);
                 return;
             } catch {
                 // fallthrough al cálculo local
             }
         }
-        ok(res, 200, buildFatigueLocally({ hrv, fc_reposo, sueno_horas, fecha }));
+        ok(res, 200, buildFatigueLocally({ hrv, fc_reposo, spo2, sueno_horas, fecha }));
     };
 }
 
@@ -82,6 +84,7 @@ export class HealthController {
 function buildFatigueLocally(input: {
     hrv?: number | null;
     fc_reposo?: number | null;
+    spo2?: number | null;
     sueno_horas?: number | null;
     fecha: string;
 }) {
@@ -111,6 +114,16 @@ function buildFatigueLocally(input: {
         valor: hr != null ? `${hr > HR_BASE ? '+' : ''}${hr - HR_BASE}` : 'Sin datos',
         estado: hr == null ? 'desconocido' : hr > HR_BASE ? 'alerta' : 'ok',
         severidad: hr == null ? 'unknown' : hr > HR_BASE + 6 ? 'critical' : hr > HR_BASE ? 'warning' : 'ok',
+    });
+
+    const spo2 = input.spo2;
+    senales.push({
+        id: 'spo2',
+        label: 'Saturación de oxígeno',
+        nota: 'Rendimiento aeróbico',
+        valor: spo2 != null ? `${spo2}%` : 'Sin datos',
+        estado: spo2 == null ? 'desconocido' : spo2 >= 95 ? 'ok' : 'alerta',
+        severidad: spo2 == null ? 'unknown' : spo2 >= 95 ? 'ok' : 'warning',
     });
 
     const sleep = input.sueno_horas;

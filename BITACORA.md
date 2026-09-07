@@ -5,6 +5,61 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-07 — Bloque 3 · Fixes Motor Fatiga + auditoría de integraciones
+
+Rama: `fix/revision-bloques-bugfixes`. Auditoría de estado real de dos integraciones
+confirmadas como operativas y corrección de dos gaps menores en el Motor de Fatiga.
+
+### Auditoría — integraciones confirmadas
+
+**Motor de Fatiga (Bloque 3)**: integración completa y funcional. La cadena
+`FatigueEngineScreen → healthApi.analyzeFatigue → POST /health/fatigue →
+MotorFatigueClient → /v1/fatigue/biometrics → mapeo color→nivel` opera
+correctamente. Fallback `buildFatigueLocally` activo ante cualquier fallo del Motor.
+
+**Tono de IA (Bloque 12 → Bloque 8)**: integración completa y funcional. El perfil
+de tono del usuario (`personality`, `detailLevel`, `hintStyle`, `reinforcementLevel`)
+viaja desde `ConfigToneScreen` (AsyncStorage + backend) hasta el Motor en cada
+llamada de chat/flashcards/resúmenes vía `buildToneProfile()` en `ConfigUseCases.ts`.
+El endpoint `PUT /v1/tone/{user_id}` del Motor no es necesario — enviarlo por request
+es suficiente y más simple.
+
+### Fixes aplicados (2 gaps — Motor Fatiga)
+
+**Fix 1 · `user_id` hardcodeado en `MotorFatigueClient`**
+
+`MotorFatigueClient.analyze()` enviaba `user_id: 'opox-backend'` fijo al Motor,
+impidiendo que el Motor personalice el análisis por usuario ni acumule historial
+real por persona.
+
+- `MotorFatigueInput`: nuevo campo opcional `userId?: string`.
+- `MotorFatigueClient.analyze()`: usa `input.userId ?? 'opox-backend'` como fallback.
+- `HealthController.analyzeFatigue`: extrae `req.authUser!.id` y lo pasa al cliente.
+
+**Fix 2 · SpO₂ no viajaba al Motor ni al fallback local**
+
+La pantalla `HomeHealthScreen` tiene `spo2` disponible de HealthKit/Health Connect
+y la pasa a `FatigueEngineScreen` vía `route.params.metrics`. Sin embargo,
+`healthApi.analyzeFatigue` no la incluía en el POST, `MotorFatigueClient` no la
+enviaba y `buildFatigueLocally` tampoco la calculaba como señal.
+
+- `health.js` (mobile): `analyzeFatigue` acepta y envía `spo2` en el body.
+- `MotorFatigueInput`: nuevo campo `spo2?: number | null`.
+- `MotorFatigueClient.analyze()`: incluye `body.spo2` si no es null.
+- `HealthController.analyzeFatigue`: extrae `spo2` del body y lo propaga.
+- `buildFatigueLocally`: añade señal `spo2` (ok ≥95%, warning <95%, unknown si null).
+
+### Archivos modificados (4)
+
+| Archivo | Cambio |
+|---|---|
+| `apps/backend/src/infrastructure/clients/MotorFatigueClient.ts` | `userId` + `spo2` en input y body |
+| `apps/backend/src/presentation/controllers/HealthController.ts` | Pasa `userId` real + `spo2`; añade señal spo2 en fallback local |
+| `apps/mobile/src/api/health.js` | `analyzeFatigue` envía `spo2` |
+| `PENDIENTES_EXTERNOS.md` | Elimina tono IA (resuelto); actualiza Bloque 3 (integración básica confirmada, 3 tareas de IA pendientes de prompts) |
+
+---
+
 ## 2026-09-05 — Bloque 10.4 · Mini-test BOE con Motor real
 
 Rama: `fix/revision-bloques-bugfixes`. Implementación completa del flujo

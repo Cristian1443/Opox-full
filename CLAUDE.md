@@ -579,7 +579,7 @@ automáticamente. Estados: `loading → complete / denied / unavailable`.
 Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.
 
 **Motor de fatiga** (`FatigueEngineScreen.js`): recibe `metrics` vía `route.params`.
-Al montar, llama `healthApi.analyzeFatigue(metrics)` → `POST /health/fatigue` → `MotorFatigueClient` → Motor IA `/v1/fatigue/analyze`.
+Al montar, llama `healthApi.analyzeFatigue(metrics)` → `POST /health/fatigue` → `MotorFatigueClient` → Motor IA `/v1/fatigue/biometrics`.
 Si el Motor responde, usa sus señales y nivel; si falla (timeout/offline), cae al cálculo local:
 `buildSignals(metrics)` → status `ok/warning/critical/unknown` por señal.
 Nivel local: `high` (≥2 críticas), `medium` (1 crítica o ≥2 warning), `low` (resto).
@@ -591,6 +591,13 @@ por cualquier motivo (404, timeout, offline), el controller cae a
 `buildFatigueLocally(input)` — heurística en el mismo controller con la misma forma
 que `MotorFatigueResult`. Antes propagaba `AxiosError 404` como 500 crudo al mobile;
 ahora siempre devuelve 200 con nivel válido.
+
+**Revisión 2026-09-07 — fixes Motor Fatiga**: `MotorFatigueClient` ahora recibe el
+`userId` real del usuario autenticado (antes enviaba `'opox-backend'` hardcodeado,
+impidiendo personalización e historial por usuario en el Motor). Se añade `spo2`
+al payload enviado al Motor y al fallback local `buildFatigueLocally` — mobile ya
+tenía el dato de HealthKit pero no lo enviaba. `healthApi.analyzeFatigue` acepta
+y envía `spo2` desde `FatigueEngineScreen` (llega vía `route.params.metrics`).
 
 **Permisos de notificaciones** (`PermissionsScreen.js`):
 - "¡A por más!" → `Notifications.requestPermissionsAsync()` real (lazy require).
@@ -709,7 +716,7 @@ pnpm lint                       # lint completo
 |---|---|---|
 | 1 | Acceso (Auth/Onboarding) | Frontend cerrado + Bloque 0 revisado: onboarding no repetido, test real de 20 preguntas, inicialización de intensidad del plan. Revisión 2026-09-04: `MotorOnboardingClient` usa banco `/v1/courses/{id}/questions` (tiene `correcta_idx`); timeout 5 s → estáticas si el Motor tarda. |
 | 2 | Dashboard | Frontend + backend completo |
-| 3 | Salud | Frontend cerrado. `HealthController.analyzeFatigue` llama `MotorFatigueClient` → `/v1/fatigue/biometrics` con mapeo de campos. Try/catch → `buildFatigueLocally` si el Motor falla. Siempre devuelve 200. |
+| 3 | Salud | Frontend cerrado. `HealthController.analyzeFatigue` llama `MotorFatigueClient` → `/v1/fatigue/biometrics` con mapeo de campos y `userId` real del usuario. Envía HRV, FC reposo, SpO₂ y horas de sueño. Try/catch → `buildFatigueLocally` si el Motor falla. Siempre devuelve 200. |
 | 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |
 | 5 | Motivación | Frontend + backend completo |
 | 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **activo** vía workaround banco (2026-09-04): job IDs coinciden con banco → `correcta_idx` resuelto por id-cruce → ~5.6 s, `articleRef` presente. INC-04 pendiente en el Motor (job result sin `correcta_idx` directo). |
