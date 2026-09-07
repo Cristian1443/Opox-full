@@ -15,7 +15,7 @@ import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 const DIFF_STEPS = ['easy', 'medium', 'hard'];
 const DIFF_LABELS = ['Fácil', 'Medio', 'Difícil'];
 
-const COUNT_MIN = 10;
+const COUNT_MIN = 5;
 const COUNT_MAX = 100;
 const COUNT_STEP = 5;
 
@@ -178,9 +178,14 @@ export default function GeneratorConfigScreen({ navigation, route }) {
     } = route?.params ?? {};
 
     const isChallengeMode = !!challengeId;
+    // Modo bloqueado: reto de clan (challengeId) o tarea de planificación (taskId)
+    // En este modo el tema y el número de preguntas están fijos — no se editan.
+    const isLockedMode = !!(challengeId || taskId);
+
+    const clampToRange = (v) => Math.max(COUNT_MIN, Math.min(COUNT_MAX, v ?? DEFAULTS.count));
 
     const [difficulty, setDifficulty] = useState(DEFAULTS.difficulty);
-    const [count, setCount] = useState(challengeQuestionCount ?? DEFAULTS.count);
+    const [count, setCount] = useState(clampToRange(challengeQuestionCount));
     const [fatigueMode, setFatigueMode] = useState(DEFAULTS.timed);
 
     // Multi-selección de temas — 'all' es el valor especial "Todos los temas"
@@ -188,7 +193,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
         challengeTopicId ? new Set([challengeTopicId]) : new Set(['all'])
     );
     const [topics, setTopics] = useState([]);
-    const [topicOpen, setTopicOpen] = useState(!isChallengeMode); // cerrado en modo reto
+    const [topicOpen, setTopicOpen] = useState(!isLockedMode); // cerrado en modo bloqueado
 
     const [exitOpen, setExitOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -200,10 +205,12 @@ export default function GeneratorConfigScreen({ navigation, route }) {
     const warnTimerRef = useRef(null);
     const killTimerRef = useRef(null);
 
-    const hasChanges =
+    // En modo bloqueado no hay cambios configurables → sin confirmación al salir.
+    const hasChanges = !isLockedMode && (
         difficulty !== DEFAULTS.difficulty ||
         count !== DEFAULTS.count ||
-        fatigueMode !== DEFAULTS.timed;
+        fatigueMode !== DEFAULTS.timed
+    );
 
     const handleBack = () => {
         if (hasChanges) setExitOpen(true);
@@ -344,6 +351,16 @@ export default function GeneratorConfigScreen({ navigation, route }) {
         ? 'Todos los temas'
         : `${selectedTopicIds.size} tema${selectedTopicIds.size > 1 ? 's' : ''} seleccionado${selectedTopicIds.size > 1 ? 's' : ''}`;
 
+    // Label del tema para modo bloqueado.
+    // Si el reto no especificó tema (topicId null) → "Todos los temas".
+    // Si especificó tema → busca el label real; mientras topics carga, muestra el id humanizado.
+    const lockedTopicLabel = challengeTopicId
+        ? (topics.find((t) => t.topicId === challengeTopicId)?.label
+            ?? challengeTopicId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()))
+        : 'Todos los temas';
+
+    const lockedModeTitle = challengeId ? 'Reto de clan' : 'Tarea del plan';
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
@@ -359,7 +376,9 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                         <Ionicons name="settings-outline" size={20} color={COLORS.purple} />
                     </TouchableOpacity>
                 </View>
-                <Text style={styles.headerSubtitle}>Generador infinito</Text>
+                <Text style={styles.headerSubtitle}>
+                    {isLockedMode ? lockedModeTitle : 'Generador infinito'}
+                </Text>
 
                 <View style={styles.divider} />
 
@@ -379,14 +398,28 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                 {/* Número de preguntas */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Número de preguntas</Text>
-                    <Text style={styles.sectionDesc}>Selecciona el número de preguntas por test</Text>
-                    <RangeSlider
-                        min={COUNT_MIN}
-                        max={COUNT_MAX}
-                        step={COUNT_STEP}
-                        value={count}
-                        onChange={setCount}
-                    />
+                    {isLockedMode && challengeQuestionCount != null ? (
+                        <View style={styles.lockedRow}>
+                            <Text style={styles.lockedValue}>{count}</Text>
+                            <View style={styles.lockedBadge}>
+                                <Ionicons name="lock-closed-outline" size={11} color={COLORS.purple} />
+                                <Text style={styles.lockedBadgeText}>
+                                    {challengeId ? 'Fijadas por el reto' : 'Fijadas por la tarea'}
+                                </Text>
+                            </View>
+                        </View>
+                    ) : (
+                        <>
+                            <Text style={styles.sectionDesc}>Selecciona el número de preguntas por test</Text>
+                            <RangeSlider
+                                min={COUNT_MIN}
+                                max={COUNT_MAX}
+                                step={COUNT_STEP}
+                                value={count}
+                                onChange={setCount}
+                            />
+                        </>
+                    )}
                 </View>
 
                 <View style={styles.divider} />
@@ -402,75 +435,94 @@ export default function GeneratorConfigScreen({ navigation, route }) {
 
                 <View style={styles.divider} />
 
-                {/* Temario — multi-selección */}
-                <View style={styles.temarioCard}>
-                    <TouchableOpacity
-                        style={styles.temarioHeader}
-                        activeOpacity={0.7}
-                        onPress={() => setTopicOpen((v) => !v)}
-                    >
-                        <View>
-                            <Text style={styles.temarioLabel}>Temario</Text>
-                            <Text style={styles.temarioSublabel}>{selectionLabel}</Text>
+                {/* Temario */}
+                {isLockedMode ? (
+                    // Modo bloqueado: tema fijo del reto/tarea, sin picker editable
+                    <View style={styles.temarioCard}>
+                        <View style={styles.temarioHeader}>
+                            <View>
+                                <Text style={styles.temarioLabel}>Temario</Text>
+                                <Text style={styles.temarioSublabel}>{lockedTopicLabel}</Text>
+                            </View>
+                            <View style={styles.lockedBadge}>
+                                <Ionicons name="lock-closed-outline" size={11} color={COLORS.purple} />
+                                <Text style={styles.lockedBadgeText}>
+                                    {challengeId ? 'Tema del reto' : 'Tema de la tarea'}
+                                </Text>
+                            </View>
                         </View>
-                        <Ionicons
-                            name={topicOpen ? 'chevron-up' : 'chevron-down'}
-                            size={18}
-                            color={COLORS.purple}
-                        />
-                    </TouchableOpacity>
+                    </View>
+                ) : (
+                    // Modo libre: picker multi-selección completo
+                    <View style={styles.temarioCard}>
+                        <TouchableOpacity
+                            style={styles.temarioHeader}
+                            activeOpacity={0.7}
+                            onPress={() => setTopicOpen((v) => !v)}
+                        >
+                            <View>
+                                <Text style={styles.temarioLabel}>Temario</Text>
+                                <Text style={styles.temarioSublabel}>{selectionLabel}</Text>
+                            </View>
+                            <Ionicons
+                                name={topicOpen ? 'chevron-up' : 'chevron-down'}
+                                size={18}
+                                color={COLORS.purple}
+                            />
+                        </TouchableOpacity>
 
-                    {topicOpen && (
-                        <View style={styles.temarioList}>
-                            {topics.length === 0 ? (
-                                <ActivityIndicator
-                                    size="small"
-                                    color={COLORS.purple}
-                                    style={{ marginVertical: 12 }}
-                                />
-                            ) : (
-                                <>
-                                    {/* Opción "Todos los temas" */}
-                                    <TouchableOpacity
-                                        onPress={() => toggleTopic('all')}
-                                        style={[styles.topicItem, selectedTopicIds.has('all') && styles.topicItemActive]}
-                                    >
-                                        <View style={styles.topicRow}>
-                                            <Text style={[styles.topicText, selectedTopicIds.has('all') && styles.topicTextActive]}>
-                                                Todos los temas
-                                            </Text>
-                                            {selectedTopicIds.has('all') && (
-                                                <Ionicons name="checkmark" size={16} color={COLORS.purple} />
-                                            )}
-                                        </View>
-                                    </TouchableOpacity>
+                        {topicOpen && (
+                            <View style={styles.temarioList}>
+                                {topics.length === 0 ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={COLORS.purple}
+                                        style={{ marginVertical: 12 }}
+                                    />
+                                ) : (
+                                    <>
+                                        {/* Opción "Todos los temas" */}
+                                        <TouchableOpacity
+                                            onPress={() => toggleTopic('all')}
+                                            style={[styles.topicItem, selectedTopicIds.has('all') && styles.topicItemActive]}
+                                        >
+                                            <View style={styles.topicRow}>
+                                                <Text style={[styles.topicText, selectedTopicIds.has('all') && styles.topicTextActive]}>
+                                                    Todos los temas
+                                                </Text>
+                                                {selectedTopicIds.has('all') && (
+                                                    <Ionicons name="checkmark" size={16} color={COLORS.purple} />
+                                                )}
+                                            </View>
+                                        </TouchableOpacity>
 
-                                    <View style={styles.topicDivider} />
+                                        <View style={styles.topicDivider} />
 
-                                    {topics.map((t) => {
-                                        const active = selectedTopicIds.has(t.topicId);
-                                        return (
-                                            <TouchableOpacity
-                                                key={t.id}
-                                                onPress={() => toggleTopic(t.topicId)}
-                                                style={[styles.topicItem, active && styles.topicItemActive]}
-                                            >
-                                                <View style={styles.topicRow}>
-                                                    <Text style={[styles.topicText, active && styles.topicTextActive, { flex: 1 }]}>
-                                                        {t.label}
-                                                    </Text>
-                                                    {active && (
-                                                        <Ionicons name="checkmark" size={16} color={COLORS.purple} />
-                                                    )}
-                                                </View>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </>
-                            )}
-                        </View>
-                    )}
-                </View>
+                                        {topics.map((t) => {
+                                            const active = selectedTopicIds.has(t.topicId);
+                                            return (
+                                                <TouchableOpacity
+                                                    key={t.id}
+                                                    onPress={() => toggleTopic(t.topicId)}
+                                                    style={[styles.topicItem, active && styles.topicItemActive]}
+                                                >
+                                                    <View style={styles.topicRow}>
+                                                        <Text style={[styles.topicText, active && styles.topicTextActive, { flex: 1 }]}>
+                                                            {t.label}
+                                                        </Text>
+                                                        {active && (
+                                                            <Ionicons name="checkmark" size={16} color={COLORS.purple} />
+                                                        )}
+                                                    </View>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </>
+                                )}
+                            </View>
+                        )}
+                    </View>
+                )}
 
                 {/* Botón generar / estado error */}
                 {generateError ? (
@@ -503,7 +555,9 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                                     </Text>
                                 </View>
                             ) : (
-                                <Text style={styles.buttonText}>Generar test</Text>
+                                <Text style={styles.buttonText}>
+                                {challengeId ? 'Empezar reto' : taskId ? 'Empezar tarea' : 'Generar test'}
+                            </Text>
                             )}
                         </TouchableOpacity>
 
@@ -720,6 +774,39 @@ const styles = StyleSheet.create({
     },
     topicTextActive: {
         fontFamily: FONTS.medium,
+        color: COLORS.purple,
+    },
+
+    /* Modo bloqueado (reto / tarea) */
+    lockedRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 14,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        backgroundColor: 'rgba(65,41,80,0.05)',
+        borderWidth: 1,
+        borderColor: COLORS.purpleBorder30,
+    },
+    lockedValue: {
+        fontFamily: FONTS.semiBold,
+        fontSize: 22,
+        color: COLORS.purple,
+    },
+    lockedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: COLORS.orangeBg15,
+    },
+    lockedBadgeText: {
+        fontFamily: FONTS.regular,
+        fontSize: 11,
         color: COLORS.purple,
     },
 
