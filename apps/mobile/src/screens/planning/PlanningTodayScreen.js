@@ -30,7 +30,7 @@ function tryParseTestParams(subtitle) {
 
 function IconCheck() {
     return (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
             <Path d="M5 13l4.5 4.5L19 7" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
@@ -193,7 +193,7 @@ export default function PlanningTodayScreen({ navigation }) {
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.iconBtn}
+                    style={styles.backBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                     <Ionicons name="chevron-back" size={24} color={colors.textDark} />
@@ -385,6 +385,14 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
     },
     iconBtn: { width: 32, padding: 4 },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     headerTitle: {
         flex: 1,
         fontFamily: 'Poppins-SemiBold',
@@ -408,41 +416,41 @@ const styles = StyleSheet.create({
     goalLabel: {
         marginTop: 20,
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 16,
+        fontSize: 18,
         color: colors.textDark,
         textAlign: 'center',
     },
     goalNote: {
-        marginTop: 4,
+        marginTop: 6,
         fontFamily: 'Poppins-Regular',
-        fontSize: 10.5,
-        lineHeight: 13.9,
+        fontSize: 13,
+        lineHeight: 17.5,
         color: colors.textDark,
         textAlign: 'center',
-        maxWidth: 260,
+        maxWidth: 280,
     },
     sectionLabel: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 16,
+        fontSize: 18,
         color: colors.textDark,
         marginBottom: 8,
     },
     empty: { textAlign: 'center', fontFamily: 'Poppins-Regular', color: FIGMA.textNote, fontSize: 12.5, marginTop: 20 },
     tasksList: { marginBottom: 8 },
-    task: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16 },
+    task: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingVertical: 26 },
     taskSeparator: { borderBottomWidth: 0.44, borderBottomColor: FIGMA.separator },
-    chk: { width: 29, height: 29, borderRadius: 2.7, borderWidth: 0.44, borderColor: FIGMA.checkboxBorder, alignItems: 'center', justifyContent: 'center' },
+    chk: { width: 44, height: 44, borderRadius: 11, borderWidth: 0.6, borderColor: FIGMA.checkboxBorder, alignItems: 'center', justifyContent: 'center' },
     chkOn: { backgroundColor: colors.ctaGreen, borderWidth: 0 },
-    taskTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
+    taskTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: colors.textDark },
     taskTitleDone: { textDecorationLine: 'line-through', color: FIGMA.textNote },
-    taskSubtitle: { marginTop: 2, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote },
+    taskSubtitle: { marginTop: 3, fontFamily: 'Poppins-Regular', fontSize: 12, color: FIGMA.textNote },
     startBadge: { backgroundColor: FIGMA.startBadgeBg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
     startBadgeText: { fontFamily: 'Poppins-SemiBold', fontSize: 9.5, color: colors.accentOrange },
     ctaButton: {
-        marginHorizontal: 40,
+        marginHorizontal: 24,
         marginBottom: spacing.md,
         height: 61,
-        borderRadius: 14,
+        borderRadius: 30,
         backgroundColor: colors.ctaGreen,
         alignItems: 'center',
         justifyContent: 'center',

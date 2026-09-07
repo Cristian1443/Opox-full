@@ -21,7 +21,7 @@ const FIGMA = {
     tabInactive: 'rgba(52,58,61,0.5)',
 };
 
-function CheckMarkIcon({ size = 16, color = colors.white }) {
+function CheckMarkIcon({ size = 22, color = colors.white }) {
     return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
             <Path d="M4 13l5 5L20 6" stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -126,33 +126,33 @@ const styles = StyleSheet.create({
     foodRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 14,
+        paddingVertical: 26,
     },
     foodRowSeparator: {
         borderTopWidth: 0.4,
         borderTopColor: FIGMA.separator,
     },
     badge: {
-        width: 29,
-        height: 29,
-        borderRadius: 8,
+        width: 44,
+        height: 44,
+        borderRadius: 11,
         backgroundColor: colors.ctaGreen,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 14,
+        marginRight: 18,
     },
     foodTextWrap: {
         flex: 1,
     },
     foodName: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 16,
+        fontSize: 18,
         color: colors.textDark,
     },
     foodNote: {
-        marginTop: 2,
+        marginTop: 3,
         fontFamily: 'Poppins-Regular',
-        fontSize: 9,
+        fontSize: 12,
         color: FIGMA.textNote,
     },
 });

@@ -151,13 +151,13 @@ export default function PlanningEditScreen({ navigation }) {
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.iconBtn}
+                    style={styles.backBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                     <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Ajustar mi plan</Text>
-                <View style={styles.iconBtn} />
+                <View style={styles.headerSpacer} />
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -266,6 +266,15 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
     },
     iconBtn: { width: 32, padding: 4 },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerSpacer: { width: 44 },
     headerTitle: {
         flex: 1,
         fontFamily: 'Poppins-SemiBold',
@@ -275,19 +284,19 @@ const styles = StyleSheet.create({
     },
     scroll: { flex: 1 },
     body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 40 },
-    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, marginBottom: 16 },
+    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: colors.textDark, marginBottom: 16 },
     sectionSpacingTop: { marginTop: 40 },
     sliderBlock: {},
     slider: { width: '100%', height: 32 },
     sliderLabelsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-    sliderMinMaxLabel: { fontFamily: 'Poppins-Regular', fontSize: 12.7, color: colors.textDark },
-    sliderValueLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 12.7, color: colors.accentOrange },
-    effectiveGoal: { marginTop: 12, fontFamily: 'Poppins-Regular', fontSize: 10.5, color: FIGMA.textNote, textAlign: 'center' },
+    sliderMinMaxLabel: { fontFamily: 'Poppins-Regular', fontSize: 13, color: colors.textDark },
+    sliderValueLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.accentOrange },
+    effectiveGoal: { marginTop: 12, fontFamily: 'Poppins-Regular', fontSize: 12, color: FIGMA.textNote, textAlign: 'center' },
     effectiveGoalBold: { fontFamily: 'Poppins-SemiBold', color: colors.accentOrange },
     daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    dayCirc: { width: 42.9, height: 42.9, borderRadius: 21.45, borderWidth: 0.44, borderColor: FIGMA.dayOutline, alignItems: 'center', justifyContent: 'center' },
+    dayCirc: { width: 48, height: 48, borderRadius: 24, borderWidth: 0.6, borderColor: FIGMA.dayOutline, alignItems: 'center', justifyContent: 'center' },
     dayCircActive: { backgroundColor: colors.selectionBorder, borderWidth: 0 },
-    dayCircText: { fontFamily: 'Poppins-SemiBold', fontSize: 18.7, color: colors.textDark },
+    dayCircText: { fontFamily: 'Poppins-SemiBold', fontSize: 19, color: colors.textDark },
     dayCircTextActive: { color: colors.white },
     intensitySubtitle: { fontFamily: 'Poppins-Regular', fontSize: 11.6, color: FIGMA.textNote, marginBottom: 12 },
     intensityBtns: { flexDirection: 'row', gap: 8 },
@@ -309,7 +318,7 @@ const styles = StyleSheet.create({
         marginTop: 40,
         width: 322,
         height: 61,
-        borderRadius: 14.2,
+        borderRadius: 30,
         backgroundColor: colors.ctaGreen,
         alignItems: 'center',
         justifyContent: 'center',

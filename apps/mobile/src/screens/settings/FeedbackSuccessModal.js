@@ -18,17 +18,12 @@ const FIGMA = {
   overlay: 'rgba(0, 0, 0, 0.55)',
 };
 
+// Ruta exacta exportada de Figma (icono "Feedback enviado", 156×133).
 function PaperPlaneIcon({ size = 40, color = colors.accentOrange }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        d="M3 11L21 3L13 21L11 13L3 11Z"
-        stroke={color}
-        strokeWidth={1.6}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <Svg width={size} height={size * (133 / 156)} viewBox="0 0 156 133" fill="none">
+      <Path d="M146.127 3.75029H8.76762C7.65484 3.72986 6.56682 4.08009 5.67455 4.74592C4.78228 5.41175 4.13633 6.35545 3.83823 7.42871C3.54013 8.50196 3.60677 9.64393 4.02768 10.6752C4.44859 11.7064 5.19991 12.5684 6.16356 13.1257L70.6468 53.9464L94.6266 125.8C94.9524 126.806 95.5884 127.684 96.4433 128.306C97.2982 128.928 98.3281 129.263 99.3851 129.263C100.442 129.263 101.472 128.928 102.327 128.306C103.182 127.684 103.818 126.806 104.144 125.8L151.747 12.3382C152.176 11.4059 152.361 10.3799 152.285 9.35636C152.209 8.33286 151.874 7.34549 151.313 6.48695C150.751 5.62841 149.98 4.92686 149.073 4.44817C148.166 3.96947 147.152 3.72933 146.127 3.75029Z" stroke={color} strokeWidth={8} strokeMiterlimit={10} />
+      <Path d="M70.647 53.9464L151.335 6.61914" stroke={color} strokeWidth={8} strokeMiterlimit={10} />
     </Svg>
   );
 }

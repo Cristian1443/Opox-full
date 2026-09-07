@@ -19,7 +19,7 @@ const FIGMA = {
 
 function CheckIcon() {
     return (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
             <Path d="M5 13l4.5 4.5L19 7" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
@@ -106,13 +106,13 @@ export default function PlanningMacroScreen({ navigation, route }) {
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.iconBtn}
+                    style={styles.backBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                     <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Rumbo a la plaza</Text>
-                <View style={styles.iconBtn} />
+                <View style={styles.headerSpacer} />
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -124,7 +124,17 @@ export default function PlanningMacroScreen({ navigation, route }) {
                             <Text style={styles.cardGoal}>Objetivo diario: {goalCount} tests</Text>
                         </View>
 
-                        <Text style={styles.sectionLabel}>RUTAS POR FASES</Text>
+                        <View style={styles.sectionRow}>
+                            <Text style={styles.sectionLabel}>RUTAS POR FASES</Text>
+                            <TouchableOpacity
+                                style={styles.sectionLink}
+                                onPress={() => navigation.navigate('PlanningAgenda')}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.sectionLinkText}>Ver agenda</Text>
+                                <Ionicons name="chevron-forward" size={16} color={colors.textDark} />
+                            </TouchableOpacity>
+                        </View>
                         <View style={styles.phasesList}>
                             {macro.phases.map((p, i) => (
                                 <PhaseRow key={p.key} phase={p} index={i} isLast={i === macro.phases.length - 1} navigation={navigation} />
@@ -155,6 +165,15 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
     },
     iconBtn: { width: 32, padding: 4 },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerSpacer: { width: 44 },
     headerTitle: {
         flex: 1,
         fontFamily: 'Poppins-SemiBold',
@@ -174,24 +193,32 @@ const styles = StyleSheet.create({
     cardFaltan: { fontFamily: 'Poppins-Light', fontSize: 14.3, color: FIGMA.cardFaltan, textAlign: 'center' },
     cardTime: { marginTop: 4, fontFamily: 'Poppins-SemiBold', fontSize: 42.7, color: colors.white, textAlign: 'center' },
     cardGoal: { marginTop: 4, fontFamily: 'Poppins-SemiBold', fontSize: 14.2, color: colors.accentOrange, textAlign: 'center' },
-    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, marginBottom: 8 },
+    sectionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: colors.textDark },
+    sectionLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    sectionLinkText: { fontFamily: 'Poppins-Light', fontSize: 13, color: colors.textDark },
     phasesList: { marginBottom: 24 },
     phaseRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        paddingVertical: 16,
+        paddingVertical: 26,
     },
     phaseRowTop: { borderTopWidth: 0.44, borderTopColor: FIGMA.separator },
     phaseRowSeparator: { borderBottomWidth: 0.44, borderBottomColor: FIGMA.separator },
-    phaseIcon: { width: 29, height: 29, borderRadius: 2.7, alignItems: 'center', justifyContent: 'center', marginRight: 14, marginTop: 2 },
+    phaseIcon: { width: 44, height: 44, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 18, marginTop: 2 },
     phaseIconCompleted: { backgroundColor: colors.ctaGreen },
     phaseIconInProgress: { backgroundColor: colors.accentOrange },
-    phaseIconDot: { width: 13, height: 13, borderRadius: 6.5, backgroundColor: colors.white },
-    phaseIconPending: { borderWidth: 0.44, borderColor: FIGMA.pendingOutline },
+    phaseIconDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.white },
+    phaseIconPending: { borderWidth: 0.6, borderColor: FIGMA.pendingOutline },
     phaseTextWrap: { flex: 1 },
-    phaseTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark },
-    phaseSubtitle: { marginTop: 2, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote },
-    topicLine: { marginTop: 3, fontFamily: 'Poppins-Regular', fontSize: 9, color: FIGMA.textNote, lineHeight: 13 },
+    phaseTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: colors.textDark },
+    phaseSubtitle: { marginTop: 3, fontFamily: 'Poppins-Regular', fontSize: 12, color: FIGMA.textNote },
+    topicLine: { marginTop: 3, fontFamily: 'Poppins-Regular', fontSize: 12, color: FIGMA.textNote, lineHeight: 16 },
     ctaBtn: {
         flexDirection: 'row',
         alignItems: 'center',

@@ -72,11 +72,13 @@ function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
   );
 }
 
-function ExportIcon({ size = 22, color = colors.accentOrange }) {
+// Ruta exacta exportada de Figma (icono "Exportar", 40×54 — flecha + subrayado).
+function ExportIcon({ size = 16, color = colors.accentOrange }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M12 15V3M12 3L8 7M12 3L16 7" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M4 15V19C4 20.1 4.9 21 6 21H18C19.1 21 20 20.1 20 19V15" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={size} height={size * (54 / 40)} viewBox="0 0 40 54" fill="none">
+      <Path d="M22.2216 0H17.7784V39.856H22.2216V0Z" fill={color} />
+      <Path d="M4.24735 20.8038L20.0029 39.3472L35.7526 20.8038L39.122 23.7128L21.6877 44.2375L20.0029 46.2247L18.3182 44.2375L0.87793 23.7128L4.24735 20.8038Z" fill={color} />
+      <Path d="M40 49.5107H0V53.994H40V49.5107Z" fill={color} />
     </Svg>
   );
 }

@@ -58,20 +58,26 @@ function IconFlame({ size = 32, color = colors.accentOrange }) {
 }
 
 // Figma confirma que los 3 íconos de EXPLORAR usan el MISMO naranja (colors.accentOrange),
-// no colores distintos por ícono.
-function IconRankings() {
+// no colores distintos por ícono. Paths exactos exportados de Figma (antes eran
+// aproximaciones con trazos genéricos de Ionicons-style).
+function IconRankings({ size = 28, color = colors.accentOrange }) {
     return (
-        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <Path d="M6 9V3h12v6a6 6 0 0 1-12 0zM9 21h6M12 15v6" stroke={colors.accentOrange} strokeWidth={1.6} strokeLinecap="round" />
+        <Svg width={(size * 43) / 57} height={size} viewBox="0 0 43 57" fill="none">
+            <Path d="M18.7539 28.8288V36.4625H13.9362C12.6223 36.4625 11.8121 38.1681 11.8121 39.387H13.564C13.5771 38.9591 13.7311 38.5476 14.0019 38.2163H29.0156C29.2864 38.5476 29.4404 38.9591 29.4536 39.387H31.2054C31.2054 38.1681 30.3996 36.4625 29.0813 36.4625H20.5058V27.8248L20.0678 27.5748C15.9161 25.1427 12.6846 21.404 10.8768 16.9414C9.06905 12.4787 8.78654 7.54278 10.0733 2.90262H12.4647V14.8551L16.9582 12.0402L21.4606 14.8551V0H12.4515V1.14877H8.75942L8.56671 1.75385C8.38277 2.35015 8.2251 2.95085 8.08933 3.55592H0V4.43285C0.0788348 13.4564 5.36952 21.3136 13.1961 24.1154C14.7894 25.9696 16.6651 27.5603 18.7539 28.8288ZM14.2034 1.75385H19.7087V11.6894L16.967 9.96623L14.2253 11.6894L14.2034 1.75385ZM1.78254 5.31854H7.76523C6.95562 10.8377 8.12895 16.4655 11.0763 21.1996C5.69362 18.1172 2.11978 12.1322 1.78254 5.31854Z" fill={color} />
+            <Path d="M34.9106 3.56532C34.7749 2.96024 34.5997 2.35955 34.4332 1.75447L34.2449 1.14062H23.5584V2.89447H32.9441C34.2319 7.5373 33.9485 12.4763 32.1382 16.9409C30.3278 21.4056 27.0924 25.1449 22.9365 27.5755L22.4985 27.8254V34.4856H24.2504V28.8295C26.3393 27.5609 28.215 25.9702 29.8083 24.116C37.6348 21.3362 42.9474 13.4789 42.9956 4.47293V3.59601L34.9106 3.56532ZM31.9237 21.2002C34.2416 17.4691 35.4718 13.1637 35.4756 8.76986C35.4737 7.62245 35.3903 6.47664 35.226 5.34109H41.2174C40.8846 12.1329 37.3151 18.1179 31.9237 21.2002Z" fill={color} />
+            <Path d="M28.8012 47.2578H14.2036V49.0117H28.8012V47.2578Z" fill={color} />
+            <Path d="M35.1251 41.3867H7.88331V51.0329H6.87598V57.0003H36.1324V51.0109H35.1251V41.3867ZM34.3806 55.2465H8.62348V52.7648H9.63519V43.1186H33.3732V52.7648H34.3806V55.2465Z" fill={color} />
         </Svg>
     );
 }
 
-function IconClan() {
+function IconClan({ size = 26, color = colors.accentOrange }) {
     return (
-        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <Path d="M9 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke={colors.accentOrange} strokeWidth={1.6} />
-            <Path d="M3 19a6 6 0 0 1 12 0M16 7a3 3 0 0 1 0 6M21 19a5 5 0 0 0-3-4.5" stroke={colors.accentOrange} strokeWidth={1.5} strokeLinecap="round" />
+        <Svg width={(size * 55) / 39} height={size} viewBox="0 0 55 39" fill="none">
+            <Path d="M22.3566 21.8671C20.1869 21.8671 18.066 21.2256 16.262 20.0236C14.4581 18.8217 13.0522 17.1133 12.2221 15.1146C11.3921 13.1159 11.1752 10.9167 11.5989 8.79506C12.0225 6.67344 13.0677 4.72476 14.6023 3.19547C16.1369 1.66619 18.0918 0.625017 20.2199 0.203635C22.3481 -0.217747 24.5537 -0.000404757 26.5579 0.828172C28.5621 1.65675 30.2748 3.05934 31.4795 4.85854C32.6841 6.65773 33.3265 8.77272 33.3254 10.936C33.3226 13.8351 32.1659 16.6147 30.1093 18.6642C28.0527 20.7137 25.2643 21.8657 22.3566 21.8671ZM22.3566 2.13971C20.6117 2.13971 18.906 2.6556 17.4552 3.62215C16.0043 4.58869 14.8735 5.96248 14.2058 7.56979C13.5381 9.1771 13.3634 10.9457 13.7038 12.652C14.0442 14.3584 14.8844 15.9257 16.1182 17.1559C17.3521 18.3861 18.9241 19.2238 20.6354 19.5632C22.3468 19.9026 24.1207 19.7284 25.7327 19.0627C27.3448 18.3969 28.7227 17.2695 29.6921 15.8229C30.6615 14.3764 31.1789 12.6757 31.1789 10.936C31.1775 8.6035 30.2475 6.36695 28.5933 4.71764C26.9391 3.06833 24.696 2.14112 22.3566 2.13971Z" fill={color} />
+            <Path d="M40.645 39C40.4209 38.9995 40.2026 38.929 40.0207 38.7985C39.8388 38.668 39.7024 38.484 39.6307 38.2723C38.4028 34.677 36.077 31.5551 32.9796 29.3443C29.8821 27.1335 26.1683 25.9448 22.3591 25.9448C18.5498 25.9448 14.836 27.1335 11.7385 29.3443C8.6411 31.5551 6.31532 34.677 5.08737 38.2723C5.04784 38.4123 4.98012 38.5428 4.88832 38.6558C4.79652 38.7689 4.68257 38.8621 4.55344 38.9297C4.42431 38.9973 4.28271 39.038 4.13728 39.0493C3.99184 39.0605 3.84564 39.0421 3.70759 38.9952C3.56953 38.9482 3.44254 38.8736 3.33435 38.7761C3.22616 38.6785 3.13904 38.56 3.07833 38.4278C3.01762 38.2955 2.98459 38.1523 2.98124 38.0069C2.97789 37.8615 3.00431 37.717 3.05887 37.5821C4.43283 33.5663 7.03244 30.0797 10.4935 27.6108C13.9545 25.1419 18.1034 23.8145 22.3591 23.8145C26.6147 23.8145 30.7636 25.1419 34.2246 27.6108C37.6857 30.0797 40.2853 33.5663 41.6592 37.5821C41.7515 37.8503 41.7333 38.1441 41.6085 38.3989C41.4838 38.6537 41.2627 38.8487 40.9938 38.9411C40.8812 38.9784 40.7636 38.9983 40.645 39Z" fill={color} />
+            <Path d="M37.5863 5.1639C38.8888 4.75356 40.2735 4.67458 41.6143 4.93413C42.9552 5.19369 44.2097 5.78353 45.2636 6.64997C46.3174 7.5164 47.1371 8.6319 47.6481 9.8949C48.1591 11.1579 48.3451 12.5283 48.1892 13.8813C48.0333 15.2343 47.5405 16.5269 46.7555 17.6414C45.9706 18.756 44.9185 19.6571 43.695 20.2627C42.4716 20.8683 41.1156 21.1591 39.7506 21.1087C38.3856 21.0583 37.055 20.6683 35.8798 19.9742C35.51 20.5342 35.1049 21.0704 34.667 21.5793C36.2746 22.5865 38.1347 23.1206 40.0334 23.1203C41.5237 23.1389 43 22.8316 44.3583 22.2199C45.7166 21.6083 46.9239 20.7071 47.8952 19.58C48.8665 18.4528 49.5781 17.127 49.9799 15.696C50.3818 14.265 50.4641 12.7636 50.2211 11.2974C49.9781 9.8313 49.4156 8.43611 48.5734 7.21011C47.7311 5.98412 46.6295 4.95714 45.3461 4.20149C44.0628 3.44585 42.6289 2.97992 41.1454 2.83651C39.6619 2.69311 38.1649 2.87571 36.7599 3.37147C37.0713 3.95181 37.3473 4.55037 37.5863 5.1639Z" fill={color} />
+            <Path d="M57.9466 37.6829C56.6667 33.959 54.2515 30.727 51.0388 28.439C47.826 26.1509 43.9764 24.9212 40.0282 24.9219C39.8082 24.9219 39.5936 24.9219 39.3789 24.9486C40.0986 25.5833 40.7813 26.2586 41.4235 26.9711C44.7065 27.2397 47.8398 28.4567 50.4399 30.4733C53.04 32.4898 54.9941 35.2183 56.063 38.3249C56.1302 38.5215 56.2574 38.6922 56.4267 38.8131C56.5961 38.934 56.7992 38.9991 57.0075 38.9991C57.1168 38.997 57.2253 38.979 57.3294 38.9456C57.5789 38.8593 57.7839 38.678 57.8996 38.4413C58.0152 38.2047 58.0321 37.9319 57.9466 37.6829Z" fill={color} />
         </Svg>
     );
 }
@@ -123,11 +129,11 @@ function IconOpoxMark({ size = 40 }) {
     );
 }
 
-// Figma ("ICONO RETO", 2333:202): una bandera, no un rayo.
-function IconChallenge() {
+// Figma ("ICONO RETO", 2333:202): una bandera, no un rayo. Path exacto exportado.
+function IconChallenge({ size = 28, color = colors.accentOrange }) {
     return (
-        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <Path d="M5 3v18M5 4h13l-3 4 3 4H5" stroke={colors.accentOrange} strokeWidth={1.6} strokeLinejoin="round" />
+        <Svg width={(size * 39) / 43} height={size} viewBox="0 0 39 43" fill="none">
+            <Path d="M32.1914 15.5281L38.6452 9.20666C38.8148 9.03892 38.9301 8.82577 38.9766 8.594C39.023 8.36223 38.9985 8.12217 38.9062 7.904C38.8138 7.68583 38.6578 7.49928 38.4575 7.36778C38.2573 7.23629 38.0219 7.16572 37.7809 7.16494H19.5123V3.58419C19.5123 3.42525 19.48 3.2679 19.4172 3.12135C19.3544 2.97481 19.2624 2.84202 19.1466 2.73075C19.0308 2.61949 18.8935 2.532 18.7427 2.47339C18.5919 2.41479 18.4308 2.38626 18.2686 2.38946H2.43816V1.19473C2.43816 0.877869 2.30972 0.573984 2.0811 0.349929C1.85248 0.125873 1.5424 0 1.21908 0C0.895759 0 0.585682 0.125873 0.35706 0.349929C0.128438 0.573984 0 0.877869 0 1.19473L0 41.8225C0 42.1393 0.128438 42.4432 0.35706 42.6673C0.585682 42.8913 0.895759 43.0172 1.21908 43.0172C1.5424 43.0172 1.85248 42.8913 2.0811 42.6673C2.30972 42.4432 2.43816 42.1393 2.43816 41.8225V19.1123H12.1873V22.693C12.1873 23.0099 12.3157 23.3138 12.5443 23.5378C12.773 23.7619 13.083 23.8877 13.4064 23.8877H37.7809C38.022 23.8879 38.2576 23.8181 38.4582 23.687C38.6587 23.556 38.8151 23.3696 38.9076 23.1515C39.0001 22.9333 39.0245 22.6932 38.9778 22.4615C38.9311 22.2297 38.8153 22.0168 38.6452 21.8495L32.1914 15.5281ZM2.43816 4.77893H17.0636V16.7228H2.43816V4.77893ZM14.6254 21.4983V19.1123H18.2686C18.431 19.1136 18.5919 19.0833 18.7422 19.0231C18.8924 18.9628 19.0289 18.8739 19.1437 18.7614C19.2585 18.6489 19.3493 18.5151 19.4108 18.3679C19.4722 18.2206 19.5032 18.0628 19.5018 17.9038V9.55441H34.8404L29.6092 14.6845C29.4956 14.795 29.4054 14.9264 29.3438 15.0711C29.2822 15.2159 29.2505 15.3712 29.2505 15.5281C29.2505 15.6849 29.2822 15.8402 29.3438 15.985C29.4054 16.1298 29.4956 16.2612 29.6092 16.3716L34.8404 21.4983H14.6254Z" fill={color} />
         </Svg>
     );
 }
@@ -174,11 +180,10 @@ export default function MotivationHomeScreen({ navigation }) {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
 
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <IconChevronLeft />
+                    <IconChevronLeft size={22} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Motivación</Text>
             </View>
@@ -248,7 +253,7 @@ export default function MotivationHomeScreen({ navigation }) {
                         activeOpacity={0.85}
                     >
                         <View style={styles.clanCtaLeft}>
-                            <IconClan />
+                            <IconClan size={18} />
                         </View>
                         <View style={styles.clanCtaBody}>
                             <Text style={styles.clanCtaTitle}>Únete a un clan</Text>
@@ -304,27 +309,24 @@ export default function MotivationHomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.grayLight },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: colors.textDark, marginRight: 'auto' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.sm,
         paddingHorizontal: spacing.md,
-        paddingTop: 6,
+        paddingTop: spacing.sm,
         paddingBottom: spacing.sm,
     },
-    // Figma (2332:60): botón de volver = círculo de 24x24dp exacto (1dp = 2.25px de Figma).
     backBtn: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)', // colors.textDark @ 10% opacity
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F2',
         alignItems: 'center',
         justifyContent: 'center',
     },
     // Figma (2332:62 "Motivación"): fontSize 21dp exacto.
-    headerTitle: { fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3 },
+    headerTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3, textAlign: 'center' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: spacing.lg },
     heroWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingVertical: spacing.lg },
@@ -408,6 +410,5 @@ const styles = StyleSheet.create({
     // Figma ("EXPLORAR", 2337:1207): fila de 339dp de ancho, sin chevrons
     exploreRow: { flexDirection: 'row', justifyContent: 'space-between' },
     exploreItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-    // Figma (2337:1209 "Rankings"): fontSize 14dp exacto.
-    exploreLabel: { fontSize: 14, fontWeight: '500', color: colors.textDark },
+    exploreLabel: { fontSize: 16, fontWeight: '500', color: colors.textDark },
 });

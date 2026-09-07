@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { motivationApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
@@ -45,7 +46,6 @@ export default function ClansListScreen({ navigation }) {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
 
             <View style={styles.header}>
                 <TouchableOpacity
@@ -53,7 +53,7 @@ export default function ClansListScreen({ navigation }) {
                     onPress={() => navigation.goBack()}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    <Text style={styles.backBtnText}>‹</Text>
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle} numberOfLines={1}>Clanes</Text>
             </View>
@@ -150,50 +150,42 @@ export default function ClansListScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: colors.textDark, marginRight: 'auto' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.sm,
         paddingHorizontal: spacing.md,
-        paddingTop: spacing.xs,
+        paddingTop: spacing.sm,
         paddingBottom: spacing.sm,
     },
-    // Figma: botón de volver = 24x24dp exacto (1dp = 2.25px de Figma).
     backBtn: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: `${colors.textDark}1A`,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F2',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    backBtnText: { color: colors.textDark, fontWeight: '700', fontSize: 14, marginTop: -1 },
     // Figma (2334:540 "Clanes"): fontSize 21dp exacto.
-    headerTitle: { fontSize: 21, fontWeight: '700', color: colors.textDark, letterSpacing: -0.4, flexShrink: 1 },
+    headerTitle: { flex: 1, fontSize: 21, fontWeight: '700', color: colors.textDark, letterSpacing: -0.4, textAlign: 'center' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: spacing.lg },
-    // Figma (2334:642/612 "MIS CLANES"/"EXPLORAR CLANES"): fontSize 16dp exacto.
-    groupTitle: { fontSize: 16, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: spacing.sm, marginTop: spacing.sm },
-    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+    groupTitle: { fontSize: 18, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: spacing.sm, marginTop: spacing.sm },
+    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 4, paddingVertical: 20 },
     // Figma (2336:894 "ICONO CLAN 1"): círculo de 54x54dp exacto, verde sólido con iniciales blancas.
     myClanIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.ctaGreen, alignItems: 'center', justifyContent: 'center' },
     myClanIconText: { color: colors.white, fontWeight: '800', fontSize: 18 },
     // Figma: en EXPLORAR CLANES no hay círculo — solo iniciales en texto naranja.
-    exploreClanInitials: { width: 54, fontWeight: '800', fontSize: 22, color: colors.accentOrange },
-    // Figma (2334:643 "Opo Justicia"): fontSize 16dp exacto.
-    clanName: { fontSize: 16, fontWeight: '700', color: colors.textDark },
-    // Figma (2334:649 "28 miembros..."): fontSize 9dp exacto.
-    clanCaption: { fontSize: 9, color: colors.textMuted },
-    chevron: { color: colors.textDark, fontSize: 18 },
+    exploreClanInitials: { width: 54, fontWeight: '800', fontSize: 24, color: colors.accentOrange },
+    clanName: { fontSize: 18, fontWeight: '700', color: colors.textDark },
+    clanCaption: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+    chevron: { color: colors.textDark, fontSize: 20 },
     empty: { textAlign: 'center', color: colors.textMuted, fontSize: 12.5, marginTop: 10 },
     separator: { height: 1, backgroundColor: colors.grayLight },
     // Figma: pill de borde fino (no relleno), morado oscuro
-    joinBtn: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.textDark, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 14 },
-    joinBtnText: { fontSize: 12, fontWeight: '700', color: colors.textDark },
-    // Figma (2334:633 "Rectangle 1"): botón de 322x61dp exacto.
-    createBtn: { backgroundColor: colors.ctaGreen, borderRadius: 24, paddingVertical: 16, alignItems: 'center', marginTop: spacing.md },
+    joinBtn: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.textDark, borderRadius: 20, paddingVertical: 10, paddingHorizontal: 20 },
+    joinBtnText: { fontSize: 14, fontWeight: '700', color: colors.textDark },
+    createBtn: { backgroundColor: colors.ctaGreen, height: 61, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md },
     createBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
     overlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
     modalCard: { backgroundColor: colors.white, borderRadius: 16, padding: 18, width: '100%' },

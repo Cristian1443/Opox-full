@@ -10,7 +10,7 @@ const ICON_FOTO_TEST = require('../../../assets/icon-foto-test.png');
 const ICON_LABORATORIO = require('../../../assets/icon-laboratorio-errores.png');
 
 function ModeIcon({ source }) {
-    return <Image source={source} resizeMode="contain" style={{ width: 48, height: 48 }} />;
+    return <Image source={source} resizeMode="contain" style={{ width: 72, height: 72 }} />;
 }
 
 // Figma ("HUB DE ENTRENAMIENTO 1"): iconos naranja exactos del mockup, header
@@ -90,7 +90,7 @@ export default function TrainingHomeScreen({ navigation }) {
                                 <Text style={styles.cardSubtitle}>{mode.subtitle}</Text>
                             </View>
 
-                            <Feather name="chevron-right" size={20} color={colors.textDark} />
+                            <Feather name="chevron-right" size={24} color={colors.textDark} />
                         </TouchableOpacity>
                     ))}
                 </View>
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    cardsWrapper: { gap: spacing.md },
+    cardsWrapper: { gap: spacing.md + 2 },
     card: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -140,30 +140,30 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(65, 41, 80, 0.3)',
         borderRadius: 16,
-        paddingVertical: 18,
+        paddingVertical: 24,
         paddingHorizontal: spacing.md,
     },
     cardHighlighted: {
         backgroundColor: '#F5F5F5',
     },
     iconWrapper: {
-        width: 56,
-        height: 56,
+        width: 80,
+        height: 80,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: spacing.sm + 6,
+        marginRight: spacing.md,
     },
     cardTextWrapper: { flex: 1, marginRight: spacing.sm },
     cardTitle: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 16,
+        fontSize: 19,
         color: colors.textDark,
         marginBottom: 4,
     },
     cardSubtitle: {
         fontFamily: 'Poppins-Regular',
-        fontSize: 12.5,
-        lineHeight: 16,
+        fontSize: 14,
+        lineHeight: 18,
         color: 'rgba(52, 58, 61, 0.6)',
     },
 });

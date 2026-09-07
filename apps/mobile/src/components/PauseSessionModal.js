@@ -61,7 +61,7 @@ export default function PauseSessionModal({
         <View style={styles.center}>
           {/* Círculo morado con play naranja */}
           <View style={styles.iconCircle}>
-            <Ionicons name="play" size={44} color={colors.accentOrange} />
+            <Ionicons name="play" size={50} color={colors.accentOrange} />
           </View>
 
           <Text style={styles.title}>Test en pausa</Text>
@@ -106,9 +106,9 @@ const styles = StyleSheet.create({
   },
   // Círculo morado con play naranja (sin card contenedora)
   iconCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 108,
+    height: 108,
+    borderRadius: 54,
     backgroundColor: colors.purple,
     justifyContent: 'center',
     alignItems: 'center',
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   infoLine: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: colors.textSecondary,
     textAlign: 'center',
@@ -136,8 +136,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   clockLine: {
-    fontSize: 13,
-    color: colors.statRed,
+    fontSize: 14,
+    color: colors.textDark,
     fontFamily: 'Poppins-SemiBold',
     marginBottom: spacing.lg,
     textAlign: 'center',
@@ -156,18 +156,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
   },
   exitBtn: {
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
     width: '100%',
     maxWidth: 320,
     borderWidth: 1.5,
-    borderColor: colors.gray,
+    borderColor: 'rgba(255,255,255,0.7)',
     marginTop: 10,
   },
   exitBtnText: {
-    color: colors.textDark,
+    color: colors.white,
     fontSize: 15,
     fontFamily: 'Poppins-SemiBold',
   },

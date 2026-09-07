@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 import ConnectionSuccessModal from '../../components/ConnectionSuccessModal';
+import ConnectionErrorModal from '../../components/ConnectionErrorModal';
 import { requestHealthPermissions, isHealthAvailable } from '../../services/HealthService';
 import { healthApi } from '../../api';
 
@@ -106,13 +107,21 @@ function _wait(ms) {
     return new Promise((res) => setTimeout(res, ms));
 }
 
+const PAIRING_TIMEOUT_MS = 15000;
+const TIMED_OUT = Symbol('timed-out');
+
+function _timeoutAfter(ms) {
+    return new Promise((resolve) => setTimeout(() => resolve(TIMED_OUT), ms));
+}
+
 export default function PairingScreen({ navigation, route }) {
     const device = route?.params?.device;
     const deviceName = device?.name ?? 'dispositivo';
 
-    // 'loading' | 'complete' | 'denied' | 'unavailable'
+    // 'loading' | 'complete' | 'denied' | 'unavailable' | 'error'
     const [phase, setPhase] = useState('loading');
     const [stepIdx, setStepIdx] = useState(0);
+    const [retryKey, setRetryKey] = useState(0);
 
     const spin = useRef(new Animated.Value(0)).current;
 
@@ -147,9 +156,18 @@ export default function PairingScreen({ navigation, route }) {
             await _wait(1200);
 
             if (!cancelled) setStepIdx(1);
-            const granted = await requestHealthPermissions();
+            const result = await Promise.race([
+                requestHealthPermissions(),
+                _timeoutAfter(PAIRING_TIMEOUT_MS),
+            ]);
             if (cancelled) return;
 
+            if (result === TIMED_OUT) {
+                setPhase('error');
+                return;
+            }
+
+            const granted = result;
             if (!granted) {
                 setPhase('denied');
                 return;
@@ -167,7 +185,13 @@ export default function PairingScreen({ navigation, route }) {
 
         run();
         return () => { cancelled = true; };
-    }, []);
+    }, [retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleRetry = () => {
+        setStepIdx(0);
+        setPhase('loading');
+        setRetryKey((k) => k + 1);
+    };
 
     const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
     const isComplete = phase === 'complete';
@@ -279,6 +303,13 @@ export default function PairingScreen({ navigation, route }) {
                 visible={isComplete}
                 deviceName={deviceName}
                 onClose={() => navigation.navigate('HomeHealth')}
+            />
+
+            <ConnectionErrorModal
+                visible={phase === 'error'}
+                deviceName={deviceName}
+                onRetry={handleRetry}
+                onCancel={() => navigation.goBack()}
             />
         </SafeAreaView>
     );

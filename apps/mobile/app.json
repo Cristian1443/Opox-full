@@ -71,6 +71,7 @@
       "expo-status-bar"
     ],
     "ios": {
+      "bundleIdentifier": "com.opox.app",
       "supportsTablet": true,
       "infoPlist": {
         "NSHealthShareUsageDescription": "OPOX necesita acceso a tus datos de salud para calcular tu nivel de fatiga y optimizar tus sesiones de estudio.",
@@ -105,7 +106,6 @@
       "eas": {
         "projectId": "dd64413c-d30a-4304-8ac5-1976c0deb3c6"
       }
-    },
-    "owner": "cristian_reyes"
+    }
   }
 }
