@@ -12,9 +12,12 @@ const DEFAULT_SUGGESTED_ACTIONS: Array<{ label: string; icon: string }> = [
     { label: 'Lanzar test', icon: 'flash-outline' },
 ];
 
-function buildStubAiResponse(personality: string = 'equilibrado'): { content: string; suggestedActions: Array<{ label: string; icon: string }> } {
+function buildStubAiResponse(personality: string = 'equilibrado', isServerError = false): { content: string; suggestedActions: Array<{ label: string; icon: string }> } {
     let content: string;
-    if (personality === 'cercano' || personality === 'motivador') {
+    if (isServerError) {
+        // Motor devolvió 5xx — mensaje honesto, no de "espera"
+        content = 'El tutor no está disponible en este momento. Puedes usar las flashcards o lanzar un test mientras lo resolvemos.';
+    } else if (personality === 'cercano' || personality === 'motivador') {
         content = '¡Claro! Estoy buscando la información en tu temario. Puede que tarde un momento — prueba a enviar de nuevo tu pregunta si no ves respuesta.';
     } else if (personality === 'directo') {
         content = 'Consultando el temario. Si la respuesta tarda, vuelve a enviar tu pregunta.';
@@ -101,8 +104,10 @@ export class SendMessageUseCase {
                 aiContent = result.content;
                 suggestedActions = result.suggestedActions ?? DEFAULT_SUGGESTED_ACTIONS;
             } catch (err) {
-                logger.warn('[SendMessage] Motor falló, usando stub', { err: String(err) });
-                const stub = buildStubAiResponse(params.personality);
+                const code = (err as NodeJS.ErrnoException).code;
+                const isServerError = code === 'MOTOR_SERVER_ERROR';
+                logger.warn('[SendMessage] Motor falló, usando stub', { code, err: String(err) });
+                const stub = buildStubAiResponse(params.personality, isServerError);
                 aiContent = stub.content;
                 suggestedActions = stub.suggestedActions;
             }

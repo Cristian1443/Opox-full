@@ -73,7 +73,7 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
             );
             return;
         }
-        navigation.navigate('TrainingSession', {
+        navigation.replace('TrainingSession', {
             source: 'surgical',
             questions: adaptGeneratedQuestions(data.questions),
             examTitle: 'Test quirúrgico',

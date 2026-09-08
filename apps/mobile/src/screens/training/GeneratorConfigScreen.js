@@ -337,7 +337,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
             }
 
             allowExitRef.current = true;
-            navigation.navigate('TrainingSession', {
+            navigation.replace('TrainingSession', {
                 source: 'generator',
                 questions: adaptGeneratedQuestions(data),
                 examTitle: isChallengeMode ? 'Reto de clan' : 'Generador infinito',

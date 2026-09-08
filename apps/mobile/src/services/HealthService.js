@@ -57,20 +57,19 @@ export function isHealthAvailable() {
  * En Android, comprueba si Health Connect está instalado en el dispositivo.
  * Devuelve uno de: 'available' | 'not_installed' | 'update_required' | 'not_supported' | 'not_android'.
  *
- * react-native-health-connect getSdkStatus() retorna:
- *   0 = SDK_UNAVAILABLE (no soportado, Android <8)
- *   1 = SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED (Health Connect no instalado o desactualizado)
- *   2 = SDK_AVAILABLE
- *   3 = SDK_AVAILABLE_PROVIDER_UPDATE_REQUIRED
+ * react-native-health-connect v3 SdkAvailabilityStatus:
+ *   1 = SDK_UNAVAILABLE                          (Android < 26, no soportado)
+ *   2 = SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED (HC no instalado o desactualizado)
+ *   3 = SDK_AVAILABLE                            (disponible y listo)
  */
 export async function getHealthConnectStatus() {
     if (Platform.OS !== 'android') return 'not_android';
     if (!HealthConnect) return 'not_installed';
     try {
         const status = await HealthConnect.getSdkStatus();
-        if (status === 2) return 'available';
-        if (status === 3) return 'update_required';
-        if (status === 1) return 'not_installed';
+        if (status === 3) return 'available';
+        if (status === 2) return 'update_required';
+        if (status === 1) return 'not_supported';
         return 'not_supported';
     } catch (err) {
         console.warn('[HealthService] getSdkStatus error:', err);
@@ -111,18 +110,16 @@ export async function requestHealthPermissions() {
 
     if (Platform.OS === 'android') {
         try {
-            // Comprobar disponibilidad ANTES de intentar inicializar — evita crash
+            // Comprobar disponibilidad ANTES de pedir permisos — evita crash
             // nativo si Health Connect no está instalado en el dispositivo.
             const status = await getHealthConnectStatus();
             if (status !== 'available') {
                 console.warn('[HealthService] Health Connect no disponible:', status);
                 return false;
             }
-            const initialized = await HealthConnect.initialize();
-            if (!initialized) {
-                console.warn('[HealthService] HealthConnect.initialize() devolvió false');
-                return false;
-            }
+            // v3: no se llama initialize() — requestPermission() directamente.
+            // initialize() en v3 lanza excepción nativa desde ciertos contextos
+            // de Activity de Expo, que JS try/catch no intercepta → crash.
             const granted = await HealthConnect.requestPermission(ANDROID_PERMISSIONS);
             return Array.isArray(granted) && granted.length > 0;
         } catch (err) {

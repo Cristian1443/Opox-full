@@ -176,8 +176,7 @@ export default function TutorFlashcardsLoadingScreen({ navigation, route }) {
                 count={cardCount}
                 mazoName={mazoName}
                 onReviewNow={() => {
-                    setShowSuccess(false);
-                    navigation.navigate('TutorFlashcards', {
+                    navigation.replace('TutorFlashcards', {
                         cards:  deckResult?.cards  ?? [],
                         deckId: deckResult?.deck?.id ?? null,
                         topicId,

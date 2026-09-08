@@ -31,7 +31,9 @@ export class MotorTutorClient implements ITutorAiClient {
             });
             if (!res.ok) {
                 const text = await res.text().catch(() => '');
-                throw new Error(`Motor tutor ${path} → ${res.status}: ${text.slice(0, 200)}`);
+                const err = new Error(`Motor tutor ${path} → ${res.status}: ${text.slice(0, 200)}`);
+                (err as NodeJS.ErrnoException).code = res.status >= 500 ? 'MOTOR_SERVER_ERROR' : 'MOTOR_CLIENT_ERROR';
+                throw err;
             }
             return res.json() as Promise<T>;
         } finally {
@@ -108,7 +110,8 @@ export class MotorTutorClient implements ITutorAiClient {
             resumen?: {
                 titulo?: string;
                 ideas_clave?: string[];
-                desarrollo?: string;
+                desarrollo?: string | string[];
+                puntos_examen?: string[];
             };
         }>('/v1/classroom/summary', {
             curso_id: params.cursoId ?? this.cursoId,
@@ -123,7 +126,13 @@ export class MotorTutorClient implements ITutorAiClient {
             sections.push({ title: r.titulo, content: (r.ideas_clave ?? []).join('\n') });
         }
         if (r.desarrollo) {
-            sections.push({ title: 'Desarrollo', content: r.desarrollo });
+            const desarrollo = Array.isArray(r.desarrollo)
+                ? r.desarrollo.join('\n\n')
+                : r.desarrollo;
+            sections.push({ title: 'Desarrollo', content: desarrollo });
+        }
+        if (r.puntos_examen?.length) {
+            sections.push({ title: 'Puntos de examen', content: r.puntos_examen.join('\n') });
         }
         return sections;
     }

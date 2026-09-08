@@ -33,5 +33,7 @@ export interface ITutorAiClient {
         oposicion: string;
         /** ID del curso en el Motor IA (tabla training_courses). Opcional — fallback al defaultCursoId. */
         cursoId?: string;
+        /** 0=esquema, 1=medio, 2=profundo. Default: 1. */
+        detailLevel?: number;
     }): Promise<Array<{ title: string; content: string }>>;
 }

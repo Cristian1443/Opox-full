@@ -66,9 +66,9 @@ export const tutorApi = {
     listSummaries: (oposicion) =>
         api.get(`${T.SUMMARIES}?oposicion=${encodeURIComponent(oposicion)}`, { auth: true }),
 
-    getSummary: (topicId, oposicion) =>
+    getSummary: (topicId, oposicion, detailLevel = null) =>
         api.get(
-            `${T.SUMMARY.replace(':topicId', topicId)}?oposicion=${encodeURIComponent(oposicion)}`,
+            `${T.SUMMARY.replace(':topicId', topicId)}?oposicion=${encodeURIComponent(oposicion)}${detailLevel != null ? `&detailLevel=${detailLevel}` : ''}`,
             { auth: true },
         ),
 };

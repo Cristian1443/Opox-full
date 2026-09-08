@@ -53,6 +53,38 @@ const MOCK_SUMMARY = {
     ],
 };
 
+// ─── Selector de profundidad ─────────────────────────────────────────────────
+const DEPTH_OPTIONS = [
+    { level: 0, label: 'Esquema',  sub: 'Lo esencial' },
+    { level: 1, label: 'Medio',    sub: 'Para repasar' },
+    { level: 2, label: 'Profundo', sub: 'Para estudiar' },
+];
+
+function DepthSelector({ value, onChange }) {
+    return (
+        <View style={styles.depthRow}>
+            {DEPTH_OPTIONS.map((opt) => {
+                const active = value === opt.level;
+                return (
+                    <TouchableOpacity
+                        key={opt.level}
+                        style={[styles.depthPill, active && styles.depthPillActive]}
+                        onPress={() => onChange(opt.level)}
+                        activeOpacity={0.75}
+                    >
+                        <Text style={[styles.depthLabel, active && styles.depthLabelActive]}>
+                            {opt.label}
+                        </Text>
+                        <Text style={[styles.depthSub, active && styles.depthSubActive]}>
+                            {opt.sub}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
+        </View>
+    );
+}
+
 // ─── Subcomponentes ───────────────────────────────────────────────────────────
 function SectionBlock({ section }) {
     return (
@@ -149,20 +181,22 @@ export default function TutorSummariesScreen({ navigation, route }) {
     );
     const topicId = selectedTopic?.topicId ?? null;
 
-    const [summary, setSummary]     = useState(null);
-    const [isLoading, setIsLoading] = useState(!!topicId && !paramSections);
+    const [summary, setSummary]       = useState(null);
+    const [isLoading, setIsLoading]   = useState(!!topicId && !paramSections);
+    const [detailLevel, setDetailLevel] = useState(1); // 0=Esquema, 1=Medio, 2=Profundo
 
     // Hooks siempre antes de cualquier return condicional
     useEffect(() => {
         if (!topicId) return;
         setIsLoading(true);
-        tutorApi.getSummary(topicId, oposicion)
+        setSummary(null);
+        tutorApi.getSummary(topicId, oposicion, detailLevel)
             .then((res) => {
                 if (!res?.error && res?.data) setSummary(res.data);
             })
             .catch(() => {})
             .finally(() => setIsLoading(false));
-    }, [topicId, oposicion]);
+    }, [topicId, oposicion, detailLevel]);
 
     // Muestra el selector si aún no hay tema elegido
     if (!selectedTopic) {
@@ -199,6 +233,7 @@ export default function TutorSummariesScreen({ navigation, route }) {
         return (
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
                 <Header />
+                <DepthSelector value={detailLevel} onChange={setDetailLevel} />
                 <View style={styles.loadingCenter}>
                     <ActivityIndicator color={colors.accentOrange} size="large" />
                 </View>
@@ -209,6 +244,7 @@ export default function TutorSummariesScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <Header />
+            <DepthSelector value={detailLevel} onChange={setDetailLevel} />
 
             <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
                 {displaySections.map((section) => (
@@ -387,5 +423,43 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
         color: colors.textDark,
+    },
+    // ── Selector de profundidad ─────────────────────────────────────────────
+    depthRow: {
+        flexDirection: 'row',
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.md,
+        gap: 8,
+    },
+    depthPill: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderRadius: 12,
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    depthPillActive: {
+        backgroundColor: `${colors.purple}18`,
+        borderColor: colors.purple,
+    },
+    depthLabel: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.textSecondary,
+    },
+    depthLabelActive: {
+        color: colors.purple,
+    },
+    depthSub: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 10,
+        color: FIGMA.subtitleMuted,
+        marginTop: 1,
+    },
+    depthSubActive: {
+        color: colors.purple,
+        opacity: 0.7,
     },
 });

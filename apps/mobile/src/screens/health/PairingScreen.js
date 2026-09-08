@@ -33,13 +33,18 @@ const FIGMA = {
     subtitleMuted: 'rgba(65,41,80,0.5)',
 };
 
-// Pasos del checklist — Figma solo muestra 2 filas. El paso 2 ("permisos")
-// ahora corresponde al tiempo real que tarda el diálogo del SO, no a un
-// temporizador fijo.
-const STEPS = [
-    { id: 'searching', label: 'Dispositivo encontrado' },
-    { id: 'permissions', label: 'Concediendo permisos de salud.' },
+// Pasos del checklist — diferenciados por plataforma porque el flujo
+// es distinto: HC/HealthKit solo piden permisos de lectura al SO, no
+// hay búsqueda Bluetooth de ningún tipo.
+const STEPS_ANDROID = [
+    { id: 'verify', label: 'Health Connect verificado' },
+    { id: 'permissions', label: 'Concediendo permisos de lectura' },
 ];
+const STEPS_IOS = [
+    { id: 'verify', label: 'HealthKit verificado' },
+    { id: 'permissions', label: 'Concediendo permisos de lectura' },
+];
+const STEPS = Platform.OS === 'android' ? STEPS_ANDROID : STEPS_IOS;
 
 const RING_SIZE = 199;
 const RING_STROKE = 15;
@@ -258,8 +263,8 @@ export default function PairingScreen({ navigation, route }) {
                     <Ionicons name="fitness-outline" size={64} color={colors.accentOrange} />
                     <Text style={styles.stateTitle}>Instala Health Connect</Text>
                     <Text style={styles.stateSubtitle}>
-                        Para leer los datos de tu wearable necesitas Health Connect de Google.{'\n\n'}
-                        Es gratis y solo hace falta instalarlo una vez desde Google Play.
+                        Health Connect es el hub de salud de Android. Tu wearable (Samsung, Garmin, Fitbit…) sincroniza datos ahí y OPOX los lee desde ahí.{'\n\n'}
+                        Es gratis, de Google, y solo se instala una vez.
                     </Text>
                     <TouchableOpacity
                         style={styles.primaryButton}
@@ -306,7 +311,7 @@ export default function PairingScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <HealthScreenHeader title="Emparejando" onBack={() => navigation.goBack()} />
+            <HealthScreenHeader title="Configurando acceso" onBack={() => navigation.goBack()} />
 
             <View style={styles.content}>
                 <View style={styles.ringWrap}>
@@ -316,8 +321,12 @@ export default function PairingScreen({ navigation, route }) {
                     </View>
                 </View>
 
-                <Text style={styles.title}>Buscando tu {deviceName}...</Text>
-                <Text style={styles.subtitle}>Acerca el reloj y mantenlo desbloqueado.</Text>
+                <Text style={styles.title}>Conectando con {deviceName}...</Text>
+                <Text style={styles.subtitle}>
+                    {Platform.OS === 'android'
+                        ? 'Acepta los permisos de lectura que aparecerán en la siguiente pantalla.'
+                        : 'Acepta los permisos de salud para que OPOX pueda leer tus datos.'}
+                </Text>
 
                 {/* Checklist de estado */}
                 <View style={styles.checklist}>

@@ -20,15 +20,18 @@ export class GetSummaryUseCase {
         private readonly tutorAi?: ITutorAiClient,
     ) {}
 
-    async execute(topicId: string, oposicion: string, cursoId?: string): Promise<TutorSummary> {
-        const cached = await this.tutorRepo.getSummary(topicId, oposicion);
+    async execute(topicId: string, oposicion: string, cursoId?: string, detailLevel?: number): Promise<TutorSummary> {
+        // Solo usar caché cuando el nivel es el default (medio=1) — niveles distintos deben ir al Motor
+        const cached = detailLevel === undefined || detailLevel === 1
+            ? await this.tutorRepo.getSummary(topicId, oposicion)
+            : null;
         if (cached) return cached;
 
         if (!this.tutorAi) throw new SummaryNotFoundError();
 
         // Motor como fallback — construir TutorSummary temporal (no se persiste)
         try {
-            const sections = await this.tutorAi.getSummary({ topicId, oposicion, cursoId });
+            const sections = await this.tutorAi.getSummary({ topicId, oposicion, cursoId, detailLevel });
             if (!sections.length) throw new Error('Motor devolvió 0 secciones');
 
             // Adaptar al formato de TutorSummary con secciones tipadas

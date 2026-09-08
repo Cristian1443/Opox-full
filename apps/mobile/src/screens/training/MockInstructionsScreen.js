@@ -122,7 +122,7 @@ export default function MockInstructionsScreen({ navigation, route }) {
             30,
             Math.round((safeExam.minutes * 60) / data.length),
         );
-        navigation.navigate('TrainingSession', {
+        navigation.replace('TrainingSession', {
             source: 'official',
             questions: adaptGeneratedQuestions(data),
             examTitle: safeExam.title,

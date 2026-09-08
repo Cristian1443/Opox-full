@@ -9,6 +9,7 @@ import {
     submitReviewBody,
     saveProgressBody,
     oposicionQuery,
+    summaryQuery,
 } from '../validators/tutorValidators';
 import type { RequestHandler } from 'express';
 
@@ -41,7 +42,7 @@ export function createTutorRouter(
 
     // ── Resúmenes ─────────────────────────────────────────────────────────────
     r.get(T.SUMMARIES, authMiddleware, validateQuery(oposicionQuery), controller.listSummaries);
-    r.get(T.SUMMARY, authMiddleware, validateQuery(oposicionQuery), controller.getSummary);
+    r.get(T.SUMMARY, authMiddleware, validateQuery(summaryQuery), controller.getSummary);
 
     return r;
 }
