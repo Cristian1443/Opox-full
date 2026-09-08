@@ -110,7 +110,8 @@ export class MotorTutorClient implements ITutorAiClient {
             resumen?: {
                 titulo?: string;
                 ideas_clave?: string[];
-                desarrollo?: string;
+                desarrollo?: string | string[];
+                puntos_examen?: string[];
             };
         }>('/v1/classroom/summary', {
             curso_id: params.cursoId ?? this.cursoId,
@@ -125,7 +126,13 @@ export class MotorTutorClient implements ITutorAiClient {
             sections.push({ title: r.titulo, content: (r.ideas_clave ?? []).join('\n') });
         }
         if (r.desarrollo) {
-            sections.push({ title: 'Desarrollo', content: r.desarrollo });
+            const desarrollo = Array.isArray(r.desarrollo)
+                ? r.desarrollo.join('\n\n')
+                : r.desarrollo;
+            sections.push({ title: 'Desarrollo', content: desarrollo });
+        }
+        if (r.puntos_examen?.length) {
+            sections.push({ title: 'Puntos de examen', content: r.puntos_examen.join('\n') });
         }
         return sections;
     }
