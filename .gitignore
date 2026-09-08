@@ -41,6 +41,10 @@ logs/
 .env.local
 .env.*.local
 
+# Firebase (contiene API key y project id, no subir)
+google-services.json
+GoogleService-Info.plist
+
 # typescript
 *.tsbuildinfo
 
