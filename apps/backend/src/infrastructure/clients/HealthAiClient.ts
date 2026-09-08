@@ -180,7 +180,7 @@ ${restrictionsText}
 ${fatigueNote}
 Incluye ingredientes fáciles de encontrar en España. Las kcal deben ser realistas (1800-2200 kcal/día total).`;
 
-        return this.chatJson(system, user, 1500);
+        return this.chatJson(system, user, 2500);
     }
 
     // ─── Tarea 3: Guión de meditación ────────────────────────────────────────
@@ -213,7 +213,7 @@ Nivel de fatiga del usuario: ${input.fatigueLevel}.
 ${examContext}
 Divide la sesión en 3-4 fases (introducción, ejercicio principal, cierre). Suma total: ${totalSegundos} segundos.`;
 
-        return this.chatJson(system, user, 1200);
+        return this.chatJson(system, user, 2000);
     }
 
     // ─── Tarea 4: Técnica de estudio recomendada ──────────────────────────────
