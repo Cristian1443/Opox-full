@@ -226,9 +226,9 @@ export class TutorController {
 
     getSummary = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const { oposicion } = req.validatedQuery as { oposicion: string };
+            const { oposicion, detailLevel } = req.validatedQuery as { oposicion: string; detailLevel?: number };
             const cursoId = await this.deps.getCursoId.execute(oposicion);
-            const summary = await this.deps.getSummary.execute((req.params.topicId as string), oposicion, cursoId);
+            const summary = await this.deps.getSummary.execute((req.params.topicId as string), oposicion, cursoId, detailLevel);
             ok(res, 200, this.serializeSummary(summary));
         } catch (err) { next(err); }
     };

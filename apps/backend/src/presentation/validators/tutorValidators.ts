@@ -35,3 +35,8 @@ export const saveProgressBody = z.object({
 export const oposicionQuery = z.object({
     oposicion: z.string().min(1).max(80),
 });
+
+export const summaryQuery = z.object({
+    oposicion: z.string().min(1).max(80),
+    detailLevel: z.coerce.number().int().min(0).max(2).optional(),
+});
