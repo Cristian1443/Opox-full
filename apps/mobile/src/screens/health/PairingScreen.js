@@ -18,8 +18,14 @@ import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 import ConnectionSuccessModal from '../../components/ConnectionSuccessModal';
 import ConnectionErrorModal from '../../components/ConnectionErrorModal';
-import { requestHealthPermissions, isHealthAvailable } from '../../services/HealthService';
+import {
+    requestHealthPermissions,
+    isHealthAvailable,
+    getHealthConnectStatus,
+    openHealthConnectPlayStore,
+} from '../../services/HealthService';
 import { healthApi } from '../../api';
+import { Platform } from 'react-native';
 
 // Colores confirmados contra Figma (frame EMPAREJANDO, Bloque 3) sin
 // equivalente exacto en theme.js.
@@ -152,6 +158,21 @@ export default function PairingScreen({ navigation, route }) {
                 return;
             }
 
+            // Android: comprobar que Health Connect está instalado antes de
+            // pedir permisos (si no lo está, el nativo crashea la app).
+            if (Platform.OS === 'android') {
+                const status = await getHealthConnectStatus();
+                if (cancelled) return;
+                if (status === 'not_installed' || status === 'update_required') {
+                    setPhase('needs_install');
+                    return;
+                }
+                if (status === 'not_supported') {
+                    setPhase('unavailable');
+                    return;
+                }
+            }
+
             if (!cancelled) setStepIdx(0);
             await _wait(1200);
 
@@ -222,6 +243,37 @@ export default function PairingScreen({ navigation, route }) {
                         activeOpacity={0.7}
                     >
                         <Text style={styles.skipButtonText}>Continuar igualmente</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ── Estado: Health Connect no instalado en el dispositivo ────────────────
+    if (phase === 'needs_install') {
+        return (
+            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+                <HealthScreenHeader title="Falta Health Connect" onBack={() => navigation.goBack()} />
+                <View style={styles.centeredContent}>
+                    <Ionicons name="fitness-outline" size={64} color={colors.accentOrange} />
+                    <Text style={styles.stateTitle}>Instala Health Connect</Text>
+                    <Text style={styles.stateSubtitle}>
+                        Para leer los datos de tu wearable necesitas Health Connect de Google.{'\n\n'}
+                        Es gratis y solo hace falta instalarlo una vez desde Google Play.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={openHealthConnectPlayStore}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.primaryButtonText}>Abrir Google Play</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.skipButton}
+                        onPress={() => navigation.navigate('HomeHealth')}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.skipButtonText}>Continuar sin datos</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>

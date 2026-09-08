@@ -582,15 +582,35 @@ y `react-native-health-connect` con permisos `android.permission.health.*`.
 Plugin `expo-build-properties` con `android.minSdkVersion: 26` — obligatorio para que
 `react-native-health-connect` compile en EAS (la librería exige API 26+).
 
-**`ConnectDeviceScreen.js`**: iconos SVG inline de reloj/smartwatch eliminados,
-reemplazados por `Ionicons` para mayor consistencia visual con el resto de la app.
+**`ConnectDeviceScreen.js` (revisión 2026-09-07)**: reescrito para reflejar la
+realidad de cada plataforma. Antes tenía 5 tarjetas hardcodeadas (Apple Watch,
+Garmin, Fitbit, Samsung, Solo smartphone) con Apple Watch fake "Conectado".
+Ahora:
+- **iOS**: 2 tarjetas — "Apple Salud" + "Solo smartphone"
+- **Android**: tarjeta única de **Health Connect** según estado real via
+  `getHealthConnectStatus()`: `available` (verde), `not_installed` (naranja +
+  "Instalar" → Play Store), `update_required` (naranja + "Actualizar"),
+  `not_supported` (Android <8). Plus tarjeta "Solo smartphone".
 
-**Flujo pairing** (`PairingScreen.js`): monta pantalla → llama `requestHealthPermissions()`
-automáticamente. Estados: `loading → complete / denied / unavailable`.
-`denied`: "Ir a Ajustes" (`Linking.openSettings()`) + "Continuar igualmente".
+**Flujo pairing** (`PairingScreen.js`): monta pantalla → chequea `getHealthConnectStatus()`
+en Android **antes** de llamar `requestHealthPermissions()` (evita crash nativo si
+Health Connect no está instalado). Estados: `loading → complete / denied / unavailable / needs_install`.
+- `denied`: "Ir a Ajustes" (`Linking.openSettings()`) + "Continuar igualmente".
+- `needs_install`: "Abrir Google Play" (`openHealthConnectPlayStore()`) + "Continuar sin datos".
 
 **Datos en HomeHealth** (`HomeHealthScreen.js`): `useFocusEffect` + `getHealthMetrics()`.
 Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.
+`hasData` correcto (revisión 2026-09-07): `isHealthAvailable() && !!metrics &&
+[hr, restHr, hrv, spo2, sleep].some((v) => v != null)`. Antes solo comprobaba
+truthiness del objeto y ocultaba la CTA "Conecta tu wearable" cuando Health Connect
+respondía con todos los campos null (caso real sin wearable emparejado).
+
+**Widget de Salud del Dashboard** (`DashboardScreen.js`, revisión 2026-09-07):
+antes hardcodeado con `77 ppm` y `85%`. Ahora carga `getHealthMetrics()` en paralelo
+con dashboard summary. Muestra HR real o `—`, `%` de energía real (misma fórmula
+que HomeHealthScreen) y color dinámico del anillo: verde ≥75%, naranja 50-74%,
+rojo <50%, morado sin datos. Label: "Energía buena / media / Nivel de fatiga elevado /
+Sin datos de wearable".
 
 **Motor de fatiga** (`FatigueEngineScreen.js`): recibe `metrics` vía `route.params`.
 Al montar, llama `healthApi.analyzeFatigue(metrics)` → `POST /health/fatigue` → `MotorFatigueClient` → Motor IA `/v1/fatigue/biometrics`.

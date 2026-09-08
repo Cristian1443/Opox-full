@@ -17,6 +17,28 @@ import BoeAlertBanner from '../components/BoeAlertBanner';
 import AlertCardModal from '../components/AlertCardModal';
 import { dashboardApi, planningApi, boeApi } from '../api';
 import { colors } from '../theme';
+import { getHealthMetrics, isHealthAvailable } from '../services/HealthService';
+
+// Heurística de energía: HRV (principal) + sueño + FC reposo — misma
+// fórmula que HomeHealthScreen para que el % del dashboard coincida.
+function calcHealthEnergy(metrics) {
+    if (!metrics) return null;
+    const { hrv, sleepHours, restingHeartRate } = metrics;
+    let score = 0;
+    let parts = 0;
+    if (hrv != null) { score += Math.min(1, hrv / 50) * 50; parts += 50; }
+    if (sleepHours != null) { score += Math.min(1, sleepHours / 8) * 30; parts += 30; }
+    if (restingHeartRate != null) { score += Math.max(0, 1 - (restingHeartRate - 40) / 60) * 20; parts += 20; }
+    if (parts === 0) return null;
+    return Math.round((score / parts) * 100);
+}
+
+function healthStatusLabel(pct) {
+    if (pct == null) return 'Sin datos de wearable';
+    if (pct >= 75) return 'Energía buena';
+    if (pct >= 50) return 'Energía media';
+    return 'Nivel de fatiga elevado';
+}
 
 // Evita mostrar la alerta BOE más de una vez por sesión de app
 let _boeAlertShownThisSession = false;
@@ -466,6 +488,7 @@ export default function DashboardScreen({ navigation }) {
 
     const [summary, setSummary] = useState(null);
     const [planSummary, setPlanSummary] = useState(null);
+    const [healthMetrics, setHealthMetrics] = useState(null);
     const [realNudgeVisible, setRealNudgeVisible] = useState(false);
     const nudgeShownRef = useRef(false);
 
@@ -482,6 +505,10 @@ export default function DashboardScreen({ navigation }) {
         planningApi.getSummary().then(({ data }) => {
             if (!cancelled && data) setPlanSummary(data);
         });
+        // Métricas reales de salud (HealthKit iOS / Health Connect Android)
+        if (isHealthAvailable()) {
+            getHealthMetrics().then((m) => { if (!cancelled) setHealthMetrics(m); });
+        }
         boeApi.getFeed().then(res => {
             if (cancelled || res?.error || !res?.data) return;
             const unread = res.data.totalUnread ?? 0;
@@ -509,6 +536,20 @@ export default function DashboardScreen({ navigation }) {
     const planPercent = planSummary?.today.percent ?? 0;
     const planCompleted = planSummary?.today.completedCount ?? 0;
     const planGoal = planSummary?.today.goalCount ?? 3;
+
+    // Widget de salud — datos reales del wearable o fallback "—"
+    const healthHr = healthMetrics?.heartRate ?? healthMetrics?.restingHeartRate ?? null;
+    const healthEnergy = calcHealthEnergy(healthMetrics);
+    const healthStatus = healthStatusLabel(healthEnergy);
+    const healthRingPct = healthEnergy != null ? healthEnergy : 0;
+    // Rojo si fatiga alta (<50%), verde si energía buena (≥75%), morado por defecto
+    const healthRingColor = healthEnergy == null
+        ? colors.textDark
+        : healthEnergy >= 75
+            ? colors.ctaGreen
+            : healthEnergy < 50
+                ? colors.statRed
+                : colors.accentOrange;
 
     const realNudge = summary?.nextNudge ?? null;
     const realNudgeVisuals = realNudge ? NUDGE_VISUALS[realNudge.nudgeKind] : null;
@@ -567,13 +608,13 @@ export default function DashboardScreen({ navigation }) {
                     <View style={styles.healthRow}>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.healthValue}>
-                                77 <Text style={styles.healthUnit}>ppm</Text>
+                                {healthHr != null ? healthHr : '—'} <Text style={styles.healthUnit}>ppm</Text>
                             </Text>
-                            <Text style={styles.healthStatus}>Nivel de fatiga elevado</Text>
+                            <Text style={styles.healthStatus}>{healthStatus}</Text>
                         </View>
                         <View style={styles.ringWrap}>
-                            <ProgressRing percent={85} size={76} strokeWidth={8} arcColor={colors.statRed} />
-                            <Text style={styles.ringText}>85%</Text>
+                            <ProgressRing percent={healthRingPct} size={76} strokeWidth={8} arcColor={healthRingColor} />
+                            <Text style={styles.ringText}>{healthEnergy != null ? `${healthEnergy}%` : '—'}</Text>
                         </View>
                         <IconChevronRight size={13} />
                     </View>

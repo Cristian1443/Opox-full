@@ -5,6 +5,77 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-07 — Bloque 3 Salud · APK bugs (dashboard hardcoded, crash Connect, permission prompt)
+
+Rama: `fix/revision-bloques-bugfixes`. Auditoría contra APK real (screenshots
+del usuario `screenshots/bloque3_salud_apk/`). 5 bugs corregidos.
+
+### Bugs detectados en APK
+
+1. **Dashboard**: `77 ppm` y `85%` hardcodeados en tarjeta de Salud. Siempre
+   mostraba "Nivel de fatiga elevado" aunque no hubiera datos.
+2. **ConnectDeviceScreen**: lista fake de 5 marcas (Apple Watch, Garmin, Fitbit,
+   Samsung, Solo smartphone). Apple Watch aparecía "Conectado hace 2 min"
+   hardcodeado incluso sin wearable real.
+3. **Crash al pulsar Conectar**: `HealthConnect.initialize()` crashea nativo
+   si Health Connect no está instalado en el dispositivo. El try/catch en JS
+   no atrapa la excepción nativa.
+4. **No aparece diálogo de permisos**: por el mismo motivo — sin Health Connect
+   instalado, no hay UI de permisos que mostrar.
+5. **HomeHealthScreen `hasData` mal calculado**: `!!metrics && isHealthAvailable()`
+   devolvía `true` aunque todos los campos vinieran `null`, ocultando la CTA
+   "Conecta tu wearable" cuando debía mostrarse.
+
+### Fixes aplicados (5 archivos)
+
+**Fix 1 · `DashboardScreen.js`** — carga `getHealthMetrics()` real y muestra:
+- HR real o `—` en lugar de `77 ppm`
+- `%` de energía real o `—` en lugar de `85%`
+- Color del anillo dinámico (verde ≥75%, naranja 50-75%, rojo <50%, morado sin datos)
+- Label dinámico: "Energía buena / media / Nivel de fatiga elevado / Sin datos"
+
+**Fix 2 · `HealthService.js`** — nuevas funciones para gestionar Health Connect:
+- `getHealthConnectStatus()`: devuelve `'available' | 'not_installed' | 'update_required' | 'not_supported' | 'not_android'`
+- `openHealthConnectPlayStore()`: abre Google Play para instalar/actualizar
+- `requestHealthPermissions()` en Android ahora comprueba `getSdkStatus()` **antes**
+  de llamar a `initialize()` — evita el crash nativo.
+
+**Fix 3 · `ConnectDeviceScreen.js`** — reescrito completo:
+- **iOS**: 2 tarjetas — "Apple Salud" + "Solo smartphone"
+- **Android**: tarjeta dinámica de Health Connect según estado real:
+  - `available` → badge verde "Disponible" + botón "Conectar"
+  - `not_installed` → badge naranja "Instalar" + botón "Instalar" (Play Store)
+  - `update_required` → badge naranja "Actualizar" + botón "Actualizar" (Play Store)
+  - `not_supported` → mensaje "Requiere Android 8+"
+- Subtítulo explica que en Android Wear OS/Samsung/Fitbit/Garmin/Xiaomi todos van
+  vía Health Connect (elimina falsa expectativa de tarjetas por marca).
+- `useFocusEffect` re-comprueba estado al volver de Play Store.
+
+**Fix 4 · `PairingScreen.js`** — nuevo estado `'needs_install'`:
+- Antes de pedir permisos, comprueba `getHealthConnectStatus()` en Android.
+- Si Health Connect no está instalado o requiere update: nueva UI con icono,
+  mensaje amable y botón "Abrir Google Play" → `openHealthConnectPlayStore()`.
+- Si `not_supported` → cae al estado `'unavailable'`.
+
+**Fix 5 · `HomeHealthScreen.js`** — `hasData` correcto:
+```js
+const hasData = isHealthAvailable()
+    && !!metrics
+    && [hr, restHr, hrv, spo2, sleep].some((v) => v != null);
+```
+Ahora la CTA "Conecta tu wearable para ver datos reales" aparece cuando el
+objeto `metrics` existe pero está vacío (caso real cuando Health Connect está
+instalado pero sin wearable emparejado).
+
+### Motor de fatiga
+
+El Motor de fatiga funciona correctamente — el bloque 3 fatiga siempre devolvía
+"Fatiga baja / 0 de 4 señales" porque `FatigueEngineScreen` recibía `metrics: null`.
+Con los fixes anteriores, cuando el usuario conecta Health Connect correctamente,
+las métricas fluyen al Motor y las 4 señales se activan según los umbrales reales.
+
+---
+
 ## 2026-09-07 — Multi-curso + E2E smoke 64/64 + fix Tutor IA acciones
 
 Rama: `fix/revision-bloques-bugfixes`.
