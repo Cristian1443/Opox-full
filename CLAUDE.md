@@ -258,6 +258,14 @@ Patrón de respuesta del API client mobile: devuelve `{ data, error }` — **nun
   Flashcards y resúmenes del Motor funcionan correctamente. `buildStubAiResponse` distingue
   ahora entre 5xx (`code: 'MOTOR_SERVER_ERROR'` → "tutor no disponible") y timeout/otros
   (→ mensaje de "espera, reintenta").
+- **Fix `getSummary` (2026-09-08)**: Motor devuelve `desarrollo: string[]` (no `string`) y
+  `puntos_examen: string[]`. `MotorTutorClient` corregido: tipo `string | string[]`, join
+  con `\n\n` si es array, nueva sección "Puntos de examen". Sin este fix el Resumen
+  Inteligente llegaba con secciones vacías.
+- **Selector de profundidad (2026-09-08)**: `TutorSummariesScreen` tiene pills Esquema /
+  Medio / Profundo. `tutorApi.getSummary(topicId, oposicion, detailLevel)` acepta tercer
+  param. Backend: `summaryQuery` Zod con `?detailLevel=0|1|2`, `GetSummaryUseCase` propaga
+  al Motor y salta caché de Supabase para nivel ≠ 1. Sin cambios en DB.
 
 **Rediseño Figma (2026-08-26)**: 6 pantallas + 1 modal completamente reestilizados
 con tokens exactos de Figma (`Poppins-*`, border-radius, paleta morada/verde):
@@ -270,7 +278,10 @@ episodio navega al player. El timer simulado avanza con la velocidad elegida
 (`0.5x / 1x / 1.5x / 2x`) y guarda progreso via `tutorApi.saveProgress` cada 10 s.
 
 **`TutorSummariesScreen` — `TopicPicker`**: cuando no hay `topicId` en los params,
-muestra un selector que carga `tutorApi.listSummaries(oposicion)`.
+muestra un selector que carga `tutorApi.listSummaries(oposicion)`. Una vez elegido
+el tema, la pantalla muestra el resumen con un selector de 3 pills de profundidad
+(Esquema=0 / Medio=1 / Profundo=2) debajo del header; al cambiar recarga desde el Motor.
+`tutorApi.getSummary(topicId, oposicion, detailLevel)` envía `?detailLevel=N`.
 
 **`TutorFlashcardsScreen` — empty state**: si `paramCards` llega como array vacío
 (`paramCards.length === 0`), muestra pantalla de error en lugar de intentar renderizar

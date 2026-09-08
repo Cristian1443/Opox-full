@@ -67,6 +67,22 @@ usaban `navigation.navigate('TrainingSession')` al iniciar el test. El stack que
 Al terminar el test y volver, el usuario atravesaba las pantallas de config.
 Fix: `navigate` → `replace` en los tres puntos de entrada a `TrainingSession`.
 
+### Bloque 8 — Resumen Inteligente (1 bug + 1 feature)
+
+**Bug 11: Resumen Inteligente no aparecía en pantalla**
+`MotorTutorClient.getSummary()` declaraba `desarrollo?: string` pero el Motor devuelve
+`string[]`. El contenido llegaba como array anidado a `SectionBlock`, que esperaba strings,
+y la sección se renderizaba vacía. Adicionalmente, el campo `puntos_examen: string[]` no
+estaba mapeado. Fix en `MotorTutorClient.ts`: tipo corregido a `string | string[]`, join
+con `\n\n` si es array, y nueva sección "Puntos de examen" con `puntos_examen`.
+
+**Feature: Selector de profundidad en Resumen Inteligente**
+`TutorSummariesScreen` tiene ahora un selector de 3 pills (Esquema / Medio / Profundo)
+debajo del header. Al cambiar la profundidad recarga el resumen desde el Motor. El backend
+acepta `?detailLevel=0|1|2` (`summaryQuery` Zod con `coerce`), lo propaga a
+`GetSummaryUseCase` y al Motor. Para niveles ≠ 1 se salta la caché de Supabase.
+Sin cambios en base de datos — el Motor genera el contenido on-demand.
+
 ---
 
 ## 2026-09-07 — Bloque 3 Salud · APK bugs (dashboard hardcoded, crash Connect, permission prompt)
