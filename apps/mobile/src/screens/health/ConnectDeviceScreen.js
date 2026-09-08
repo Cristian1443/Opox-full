@@ -94,9 +94,9 @@ export default function ConnectDeviceScreen({ navigation }) {
             <HealthScreenHeader title="Conectar dispositivo" onBack={() => navigation.goBack()} />
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Text style={styles.subtitle}>
-                    En Android, todos los wearables (Wear OS, Samsung, Xiaomi, Fitbit, Garmin…)
-                    sincronizan a través de Health Connect. Instálalo una vez y OPOX leerá
-                    tus datos automáticamente.
+                    En Android, los wearables (Wear OS, Samsung, Xiaomi, Fitbit, Garmin…)
+                    sincronizan sus datos en Health Connect. OPOX los lee desde ahí —
+                    no se conecta directamente al reloj por Bluetooth.
                 </Text>
 
                 {loading ? (
@@ -124,7 +124,7 @@ export default function ConnectDeviceScreen({ navigation }) {
                                 icon="fitness-outline"
                                 name="Health Connect"
                                 sublabel="Necesita actualizar Health Connect"
-                                statusBadge={{ text: 'Actualizar', color: colors.accentOrange, bg: FIGMA.warnBadgeBg }}
+                                statusBadge={{ text: 'Desactualizado', color: colors.accentOrange, bg: FIGMA.warnBadgeBg }}
                                 actionText="Actualizar"
                                 onPress={openHealthConnectPlayStore}
                             />
@@ -135,7 +135,7 @@ export default function ConnectDeviceScreen({ navigation }) {
                                 icon="fitness-outline"
                                 name="Health Connect"
                                 sublabel="No instalado — descarga desde Google Play"
-                                statusBadge={{ text: 'Instalar', color: colors.accentOrange, bg: FIGMA.warnBadgeBg }}
+                                statusBadge={{ text: 'No instalado', color: colors.accentOrange, bg: FIGMA.warnBadgeBg }}
                                 actionText="Instalar"
                                 onPress={openHealthConnectPlayStore}
                             />
