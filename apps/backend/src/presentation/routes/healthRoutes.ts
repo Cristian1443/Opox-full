@@ -18,6 +18,9 @@ export function createHealthRouter(
         router.post(API_ROUTES.HEALTH_DEVICES, authMiddleware, controller.addDevice);
         router.delete(API_ROUTES.HEALTH_DEVICE, authMiddleware, controller.removeDevice);
         router.post(API_ROUTES.HEALTH_FATIGUE, authMiddleware, controller.analyzeFatigue);
+        router.post(API_ROUTES.HEALTH_MENUS, authMiddleware, controller.generateMenus);
+        router.post(API_ROUTES.HEALTH_MEDITATION, authMiddleware, controller.generateMeditation);
+        router.post(API_ROUTES.HEALTH_STUDY_TECHNIQUE, authMiddleware, controller.recommendStudyTechnique);
     }
 
     return router;

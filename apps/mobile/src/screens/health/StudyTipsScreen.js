@@ -1,16 +1,20 @@
 // Bloque 3 · Salud — Pantalla 3.7 · Consejos de Estudio
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     ScrollView,
     StyleSheet,
     TouchableOpacity,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import { healthApi } from '../../api';
+import { FATIGUE_LEVEL_KEY } from './FatigueEngineScreen';
 
 // Colores confirmados contra Figma (frame CONSEJOS DE ESTUDIO, Bloque 3)
 // sin equivalente exacto en theme.js.
@@ -79,11 +83,41 @@ const STUDY_TECHNIQUES = [
 ];
 
 export default function StudyTipsScreen({ navigation }) {
+    const [aiRec, setAiRec] = useState(null);
+    const [loadingRec, setLoadingRec] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const fatigueLevel = (await AsyncStorage.getItem(FATIGUE_LEVEL_KEY)) ?? 'bajo';
+            const res = await healthApi.recommendStudyTechnique({ fatigueLevel }).catch(() => null);
+            if (!cancelled && !res?.error && res?.data) setAiRec(res.data);
+            if (!cancelled) setLoadingRec(false);
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title="Cómo estudiar mejor" onBack={() => navigation.goBack()} />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+                {/* Card de recomendación IA */}
+                {loadingRec ? (
+                    <View style={styles.recCard}>
+                        <Text style={styles.recEyebrow}>TÉCNICA RECOMENDADA HOY</Text>
+                        <ActivityIndicator color={colors.white} style={{ marginTop: 12 }} />
+                    </View>
+                ) : aiRec ? (
+                    <View style={styles.recCard}>
+                        <Text style={styles.recEyebrow}>TÉCNICA RECOMENDADA HOY</Text>
+                        <Text style={styles.recTitle}>{aiRec.tecnica}</Text>
+                        <Text style={styles.recPorque}>{aiRec.porque}</Text>
+                        <Text style={styles.recAdaptacion}>{aiRec.adaptacion}</Text>
+                    </View>
+                ) : null}
+
                 <View style={styles.list}>
                     {STUDY_TECHNIQUES.map((tech, index) => {
                         const { Icon } = tech;
@@ -208,5 +242,37 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-Regular',
         fontSize: 12.4,
         color: colors.white,
+    },
+    recCard: {
+        backgroundColor: colors.bannerPurple,
+        borderRadius: 20,
+        paddingVertical: 20,
+        paddingHorizontal: 16,
+        marginBottom: 24,
+    },
+    recEyebrow: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 12,
+        color: 'rgba(245,245,245,0.8)',
+        letterSpacing: 0.5,
+        marginBottom: 6,
+    },
+    recTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 18.2,
+        color: colors.white,
+        marginBottom: 6,
+    },
+    recPorque: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: colors.accentOrange,
+        marginBottom: 6,
+    },
+    recAdaptacion: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: 'rgba(245,245,245,0.85)',
+        lineHeight: 18,
     },
 });

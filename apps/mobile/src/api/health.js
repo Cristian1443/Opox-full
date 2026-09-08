@@ -19,4 +19,16 @@ export const healthApi = {
             spo2: spo2 ?? null,
             sueno_horas: sleepHours ?? null,
         }, { auth: true }),
+
+    // Tarea 2 — Menús de estudio personalizados
+    generateMenus: ({ objetivo = 'concentracion', fatigueLevel = 'bajo', restrictions = [], count = 1 } = {}) =>
+        api.post(API_ROUTES.HEALTH_MENUS, { objetivo, fatigueLevel, restrictions, count }, { auth: true }),
+
+    // Tarea 3 — Guión de meditación dinámico
+    generateMeditation: ({ tipo = 'focus', duracion = 5, fatigueLevel = 'bajo', diasHastaExamen = null } = {}) =>
+        api.post(API_ROUTES.HEALTH_MEDITATION, { tipo, duracion, fatigueLevel, diasHastaExamen }, { auth: true }),
+
+    // Tarea 4 — Técnica de estudio recomendada según estado del día
+    recommendStudyTechnique: ({ fatigueLevel = 'bajo', fatigueType = null, diasHastaExamen = null, ultimoTema = null, tiempoDisponible = null } = {}) =>
+        api.post(API_ROUTES.HEALTH_STUDY_TECHNIQUE, { fatigueLevel, fatigueType, diasHastaExamen, ultimoTema, tiempoDisponible }, { auth: true }),
 };

@@ -6,3 +6,4 @@ export * from './CompositeAiClient';
 export * from './MotorFatigueClient';
 export * from './MotorTutorClient';
 export * from './MotorOnboardingClient';
+export * from './HealthAiClient';

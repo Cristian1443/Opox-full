@@ -3,6 +3,7 @@ import type { ApiSuccessResponse } from '@opox/types';
 import type { GetDevicesUseCase, RegisterDeviceUseCase, DeleteDeviceUseCase } from '../../application';
 import type { UserDevice } from '../../domain/entities';
 import type { MotorFatigueClient } from '../../infrastructure/clients/MotorFatigueClient';
+import type { HealthAiClient } from '../../infrastructure/clients/HealthAiClient';
 
 function ok<T>(res: Response, status: number, data: T): void {
     res.status(status).json({ ok: true, data } satisfies ApiSuccessResponse<T>);
@@ -13,6 +14,7 @@ interface HealthControllerDeps {
     registerDevice: RegisterDeviceUseCase;
     deleteDevice: DeleteDeviceUseCase;
     motorFatigue?: MotorFatigueClient;
+    healthAi?: HealthAiClient;
 }
 
 export class HealthController {
@@ -75,6 +77,58 @@ export class HealthController {
             }
         }
         ok(res, 200, buildFatigueLocally({ hrv, fc_reposo, spo2, sueno_horas, fecha }));
+    };
+
+    generateMenus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.healthAi) {
+                ok(res, 200, { menus: [] });
+                return;
+            }
+            const { objetivo = 'concentracion', fatigueLevel = 'bajo', restrictions = [], count = 1 } = req.body as {
+                objetivo?: string;
+                fatigueLevel?: string;
+                restrictions?: string[];
+                count?: number;
+            };
+            const result = await this.deps.healthAi.generateMenus({ objetivo, fatigueLevel, restrictions, count });
+            ok(res, 200, result);
+        } catch (err) { next(err); }
+    };
+
+    generateMeditation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.healthAi) {
+                ok(res, 200, { titulo: '', subtitulo: '', fases: [] });
+                return;
+            }
+            const { tipo = 'focus', duracion = 5, fatigueLevel = 'bajo', diasHastaExamen } = req.body as {
+                tipo?: string;
+                duracion?: number;
+                fatigueLevel?: string;
+                diasHastaExamen?: number | null;
+            };
+            const result = await this.deps.healthAi.generateMeditation({ tipo, duracion, fatigueLevel, diasHastaExamen });
+            ok(res, 200, result);
+        } catch (err) { next(err); }
+    };
+
+    recommendStudyTechnique = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.healthAi) {
+                ok(res, 200, { tecnica: '', porque: '', adaptacion: '', tema_sugerido: null });
+                return;
+            }
+            const { fatigueLevel = 'bajo', fatigueType, diasHastaExamen, ultimoTema, tiempoDisponible } = req.body as {
+                fatigueLevel?: string;
+                fatigueType?: string | null;
+                diasHastaExamen?: number | null;
+                ultimoTema?: string | null;
+                tiempoDisponible?: number | null;
+            };
+            const result = await this.deps.healthAi.recommendStudyTechnique({ fatigueLevel, fatigueType, diasHastaExamen, ultimoTema, tiempoDisponible });
+            ok(res, 200, result);
+        } catch (err) { next(err); }
     };
 }
 

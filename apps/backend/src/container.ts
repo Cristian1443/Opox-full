@@ -162,6 +162,7 @@ import {
     MotorFatigueClient,
     MotorTutorClient,
     MotorOnboardingClient,
+    HealthAiClient,
 } from './infrastructure';
 import {
     HealthController,
@@ -321,6 +322,10 @@ export function buildContainer() {
 
     const motorFatigue = isMotorConfigured
         ? new MotorFatigueClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 10_000)
+        : undefined;
+
+    const healthAiClient = env.AI_API_BASE_URL && env.AI_API_KEY
+        ? new HealthAiClient({ baseUrl: env.AI_API_BASE_URL, apiKey: env.AI_API_KEY })
         : undefined;
 
     const motorTutor = isMotorConfigured
@@ -614,6 +619,7 @@ export function buildContainer() {
         registerDevice: useCases.registerHealthDevice,
         deleteDevice:   useCases.deleteHealthDevice,
         motorFatigue,
+        healthAi: healthAiClient,
     });
 
     const pushTokenController = new PushTokenController({

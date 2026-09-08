@@ -6,11 +6,29 @@ import {
     ScrollView,
     StyleSheet,
     TouchableOpacity,
+    Modal,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 import { MENUS_DATA } from '../../data/healthContent';
+import { healthApi } from '../../api';
+import { FATIGUE_LEVEL_KEY } from './FatigueEngineScreen';
+
+const OBJETIVOS = [
+    { key: 'concentracion', label: 'Concentración' },
+    { key: 'energia', label: 'Energía' },
+    { key: 'examen', label: 'Día de examen' },
+    { key: 'recuperacion', label: 'Recuperación' },
+];
+
+const RESTRICCIONES = [
+    { key: 'vegetariano', label: 'Vegetariano' },
+    { key: 'sin gluten', label: 'Sin gluten' },
+    { key: 'sin lactosa', label: 'Sin lactosa' },
+];
 
 // Colores confirmados contra Figma (frame MENUS EQUILIBRADOS, Bloque 3)
 // sin equivalente exacto en theme.js. El gris del tab inactivo es el mismo
@@ -50,18 +68,113 @@ function MenuCardItem({ menu, onViewRecipe }) {
     );
 }
 
+// Convierte la respuesta de la IA al formato que espera MenuCardItem
+function mapAiMenus(aiMenus) {
+    return (aiMenus ?? []).map((m, i) => ({
+        id: `ai_${i}`,
+        type: 'AI',
+        title: m.titulo ?? 'Menú IA',
+        subtitle: m.beneficio ?? '',
+        highlighted: i === 0,
+        filterKey: m.tipo ?? 'Todos',
+        meals: [
+            { id: 'desayuno', label: 'DESAYUNO', name: m.comidas?.desayuno?.nombre ?? '', note: `${m.comidas?.desayuno?.kcal ?? ''} kcal` },
+            { id: 'comida',   label: 'COMIDA',   name: m.comidas?.comida?.nombre ?? '',   note: `${m.comidas?.comida?.kcal ?? ''} kcal` },
+            { id: 'cena',     label: 'CENA',     name: m.comidas?.cena?.nombre ?? '',     note: `${m.comidas?.cena?.kcal ?? ''} kcal` },
+        ],
+        listaCompra: m.lista_compra ?? [],
+    }));
+}
+
 export default function MenusScreen({ navigation }) {
     const [activeFilter, setActiveFilter] = useState('Todos');
+    const [aiMenus, setAiMenus] = useState([]);
+    const [showAiModal, setShowAiModal] = useState(false);
+    const [loadingAi, setLoadingAi] = useState(false);
+    const [objetivo, setObjetivo] = useState('concentracion');
+    const [restrictions, setRestrictions] = useState([]);
 
+    const allMenus = [...mapAiMenus(aiMenus), ...MENUS_DATA];
     const filteredMenus = activeFilter === 'Todos'
-        ? MENUS_DATA
-        : MENUS_DATA.filter((m) => m.filterKey === activeFilter);
+        ? allMenus
+        : allMenus.filter((m) => m.filterKey === activeFilter);
+
+    const toggleRestriction = (key) => {
+        setRestrictions((prev) =>
+            prev.includes(key) ? prev.filter((r) => r !== key) : [...prev, key],
+        );
+    };
+
+    const handleGenerate = async () => {
+        setLoadingAi(true);
+        const fatigueLevel = (await AsyncStorage.getItem(FATIGUE_LEVEL_KEY).catch(() => null)) ?? 'bajo';
+        const res = await healthApi.generateMenus({ objetivo, fatigueLevel, restrictions, count: 1 }).catch(() => null);
+        setLoadingAi(false);
+        if (!res?.error && res?.data?.menus) {
+            setAiMenus(res.data.menus);
+            setShowAiModal(false);
+        }
+    };
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title="MENÚS" onBack={() => navigation.goBack()} />
 
+            {/* Modal configuración IA */}
+            <Modal visible={showAiModal} transparent animationType="slide" onRequestClose={() => setShowAiModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Generar menú con IA</Text>
+
+                        <Text style={styles.modalLabel}>Objetivo del día</Text>
+                        <View style={styles.pillsRow}>
+                            {OBJETIVOS.map((o) => (
+                                <TouchableOpacity
+                                    key={o.key}
+                                    style={[styles.pill, objetivo === o.key && styles.pillActive]}
+                                    onPress={() => setObjetivo(o.key)}
+                                >
+                                    <Text style={[styles.pillText, objetivo === o.key && styles.pillActiveText]}>{o.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={styles.modalLabel}>Restricciones</Text>
+                        <View style={styles.pillsRow}>
+                            {RESTRICCIONES.map((r) => (
+                                <TouchableOpacity
+                                    key={r.key}
+                                    style={[styles.pill, restrictions.includes(r.key) && styles.pillActive]}
+                                    onPress={() => toggleRestriction(r.key)}
+                                >
+                                    <Text style={[styles.pillText, restrictions.includes(r.key) && styles.pillActiveText]}>{r.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <TouchableOpacity
+                            style={[styles.generateBtn, loadingAi && { opacity: 0.6 }]}
+                            onPress={handleGenerate}
+                            disabled={loadingAi}
+                        >
+                            {loadingAi
+                                ? <ActivityIndicator color={colors.white} />
+                                : <Text style={styles.generateBtnText}>Generar menú</Text>}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => setShowAiModal(false)} style={{ marginTop: 12 }}>
+                            <Text style={styles.cancelText}>Cancelar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* CTA generar con IA */}
+                <TouchableOpacity style={styles.aiCta} onPress={() => setShowAiModal(true)} activeOpacity={0.8}>
+                    <Text style={styles.aiCtaText}>✦ Generar menú con IA</Text>
+                </TouchableOpacity>
+
                 <View style={styles.tabsRow}>
                     {FILTERS.map((filter) => {
                         const active = filter === activeFilter;
@@ -184,5 +297,86 @@ const styles = StyleSheet.create({
         color: FIGMA.textBody,
         textAlign: 'center',
         paddingVertical: spacing.xl,
+    },
+    aiCta: {
+        alignSelf: 'flex-start',
+        backgroundColor: colors.bannerPurple,
+        borderRadius: 9.8,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginBottom: 16,
+    },
+    aiCtaText: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: 13,
+        color: colors.white,
+    },
+    // Modal
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: colors.white,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24,
+        paddingBottom: 36,
+    },
+    modalTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 18,
+        color: colors.textDark,
+        marginBottom: 20,
+    },
+    modalLabel: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: 13,
+        color: FIGMA.textBody,
+        marginBottom: 10,
+    },
+    pillsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 20,
+    },
+    pill: {
+        borderWidth: 1,
+        borderColor: FIGMA.cardBorderNormal,
+        borderRadius: 9.8,
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+    },
+    pillActive: {
+        borderColor: colors.purple,
+        backgroundColor: colors.bannerPurple,
+    },
+    pillText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: colors.textDark,
+    },
+    pillActiveText: {
+        color: colors.white,
+    },
+    generateBtn: {
+        backgroundColor: colors.purple,
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    generateBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 15,
+        color: colors.white,
+    },
+    cancelText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 14,
+        color: FIGMA.textBody,
+        textAlign: 'center',
     },
 });
