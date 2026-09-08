@@ -249,6 +249,15 @@ Patrón de respuesta del API client mobile: devuelve `{ data, error }` — **nun
   `buildToneProfile()` antes de pasarlos al Motor.
 - `tutorApi.sendMessage(conversationId, content, tonePrefs)` — tercer param es el objeto
   OPOX completo (`personality`, `detailLevel`, `hintStyle`, `reinforcementLevel`).
+- **Fix Zod (2026-09-08)**: `sendMessageBody` solo declaraba `content` y `personality` —
+  Zod stripaba `tonePrefs` silenciosamente. Añadido `tonePrefs` al schema y actualizado
+  enum `personality` con los 4 valores actuales (`cercano`, `formal`, `directo`, `motivador`,
+  `equilibrado`, `exigente`). Sin este fix `toneProfile` llegaba siempre `undefined` al Motor.
+- **Motor `/v1/classroom/tutor` — bug conocido (2026-09-08)**: endpoint crashea con 500.
+  Confirmado con payload mínimo `{ curso_id, mensaje, user_id }`. Pendiente de fix por el equipo IA.
+  Flashcards y resúmenes del Motor funcionan correctamente. `buildStubAiResponse` distingue
+  ahora entre 5xx (`code: 'MOTOR_SERVER_ERROR'` → "tutor no disponible") y timeout/otros
+  (→ mensaje de "espera, reintenta").
 
 **Rediseño Figma (2026-08-26)**: 6 pantallas + 1 modal completamente reestilizados
 con tokens exactos de Figma (`Poppins-*`, border-radius, paleta morada/verde):
@@ -407,6 +416,11 @@ desplegado para detectar cambios en el BOE oficial. Integrado en:
 - Selector de tema con **multi-selección**: opción "Todos los temas" (`topicId='all'`)
   más checkboxes individuales acumulables. Múltiple selección → IDs separados por
   coma en `topicId`. Sin cambio en `GenerateQuestionsParams`.
+- **Patrón `replace` al iniciar sesión (revisión 2026-09-08)**: `GeneratorConfigScreen`,
+  `SurgicalTestPreviewScreen` y `MockInstructionsScreen` usan `navigation.replace('TrainingSession')`
+  (antes `navigate`). Evita que la pantalla de config/instrucciones quede en el stack al
+  terminar el test — con `navigate` el usuario atravesaba esas pantallas al volver.
+  Regla: cualquier transición "punto de no retorno" (config → sesión activa) debe usar `replace`.
 
 **Infraestructura multi-curso (revisión 2026-09-07)**:
 - `training_courses` (tabla Supabase): `oposicion TEXT PK → motor_curso_id TEXT`.
@@ -589,14 +603,26 @@ Ahora:
 - **iOS**: 2 tarjetas — "Apple Salud" + "Solo smartphone"
 - **Android**: tarjeta única de **Health Connect** según estado real via
   `getHealthConnectStatus()`: `available` (verde), `not_installed` (naranja +
-  "Instalar" → Play Store), `update_required` (naranja + "Actualizar"),
-  `not_supported` (Android <8). Plus tarjeta "Solo smartphone".
+  "No instalado" badge + "Instalar" → Play Store), `update_required` (naranja +
+  "Desactualizado" badge + "Actualizar" → Play Store), `not_supported` (Android <8).
+  Plus tarjeta "Solo smartphone".
+- Subtítulo aclara que OPOX **no** se conecta por Bluetooth al reloj — lee los datos
+  que la app del fabricante ya escribió en Health Connect.
+
+**`getHealthConnectStatus()` — mapeo correcto (revisión 2026-09-08)**:
+`react-native-health-connect` v3 usa `SDK_AVAILABLE = 3`, `SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED = 2`,
+`SDK_UNAVAILABLE = 1`. El código anterior tenía los valores invertidos (2→available, 3→update_required).
+Mapeo correcto: `3 → 'available'`, `2 → 'update_required'`, `1 → 'not_supported'`.
 
 **Flujo pairing** (`PairingScreen.js`): monta pantalla → chequea `getHealthConnectStatus()`
 en Android **antes** de llamar `requestHealthPermissions()` (evita crash nativo si
 Health Connect no está instalado). Estados: `loading → complete / denied / unavailable / needs_install`.
 - `denied`: "Ir a Ajustes" (`Linking.openSettings()`) + "Continuar igualmente".
 - `needs_install`: "Abrir Google Play" (`openHealthConnectPlayStore()`) + "Continuar sin datos".
+- Textos revisados (2026-09-08): título "Configurando acceso" (antes "Emparejando"), body
+  "Conectando con … / Acepta los permisos de lectura" (antes describía búsqueda BLE inexistente).
+  OPOX no escanea Bluetooth — solo solicita permisos de lectura a Health Connect/HealthKit.
+  Steps diferenciados por plataforma en `STEPS_ANDROID` / `STEPS_IOS`.
 
 **Datos en HomeHealth** (`HomeHealthScreen.js`): `useFocusEffect` + `getHealthMetrics()`.
 Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.

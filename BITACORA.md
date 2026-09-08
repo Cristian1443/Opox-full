@@ -5,6 +5,70 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-08 — Bloque 3 · Bloque 8 · Training: bugfixes APK (Health Connect, Tutor IA, navegación)
+
+Rama: `fix/revision-bloques-bugfixes`. Auditoría contra APK real con Health Connect instalado.
+10 archivos modificados.
+
+### Bloque 3 — Salud (4 bugs)
+
+**Bug 1 (crítico): `getSdkStatus()` mapeado al revés en `HealthService.js`**
+La librería `react-native-health-connect` v3 usa `SDK_AVAILABLE = 3`, `SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED = 2`,
+`SDK_UNAVAILABLE = 1`. El código tenía los valores invertidos: trataba el `2` como
+`available` y el `3` como `update_required`. Consecuencia: con Health Connect instalado
+la app siempre mostraba "Necesita actualizar" y nunca pedía permisos.
+
+**Bug 2: Badge duplicado en tarjeta Health Connect**
+En estados `update_required` y `not_installed`, el `statusBadge` y el `actionText`
+tenían el mismo texto ("Actualizar" / "Instalar"). Ahora el badge describe el estado
+("Desactualizado" / "No instalado") y el botón describe la acción.
+
+**Bug 3: Textos de `PairingScreen` describían conexión Bluetooth que no existe**
+OPOX no escanea BLE — solo pide permisos de lectura a Health Connect. Textos
+corregidos: título "Emparejando" → "Configurando acceso", body "Buscando tu dispositivo /
+Acerca el reloj" → "Conectando con … / Acepta los permisos de lectura". Steps
+diferenciados por plataforma (Android: "Health Connect verificado", iOS: "HealthKit verificado").
+
+**Bug 4: `needs_install` description engañosa**
+Texto actualizado para explicar la arquitectura real: wearable → app fabricante → Health Connect → OPOX.
+
+### Bloque 8 — Tutor IA (3 bugs + diagnóstico Motor)
+
+**Bug 5: Zod validator eliminaba `tonePrefs` silenciosamente**
+`sendMessageBody` solo declaraba `content` y `personality` — Zod stripeaba `tonePrefs`
+antes de llegar al controller. `toneProfile` siempre llegaba `undefined` al Motor.
+Fix: añadido `tonePrefs` al schema y actualizado enum `personality` con los 4 valores
+actuales (`formal`, `directo`, `motivador` faltaban).
+
+**Bug 6: Stack de navegación acumulado en Flashcards**
+`TutorFlashcardsLoadingScreen` usaba `navigate('TutorFlashcards')` → la pantalla Loading
+quedaba en el stack. Al finalizar el mazo y pulsar "Volver al aula", el stack tenía
+`AITutor(dup) → Loading → Flashcards(isDone)`. Pressing back devolvía al resultado.
+Fix: `navigate` → `replace` en `onReviewNow`.
+
+**Bug 7: Mensaje stub engañoso ante error 500 del Motor**
+El stub "Estoy consultando el temario..." implica que la respuesta viene en camino
+cuando en realidad el Motor crasheó. `MotorTutorClient` ahora marca los errores 5xx
+con `code: 'MOTOR_SERVER_ERROR'`. `buildStubAiResponse` usa ese flag para mostrar
+mensaje honesto: "El tutor no está disponible en este momento. Puedes usar las
+flashcards o lanzar un test."
+
+**Diagnóstico Motor `/v1/classroom/tutor`**: endpoint crashea con 500 en producción.
+Confirmado con payload mínimo `{ curso_id, mensaje, user_id }`. Las flashcards
+(`/v1/classroom/flashcards/generate`) funcionan correctamente. Bug en el equipo IA —
+pendiente de fix por su parte.
+
+### Training (3 bugs — patrón `navigate` → `replace`)
+
+**Bug 8–10: Pantallas de configuración/instrucciones permanecen en el stack**
+`GeneratorConfigScreen`, `SurgicalTestPreviewScreen` y `MockInstructionsScreen`
+usaban `navigation.navigate('TrainingSession')` al iniciar el test. El stack quedaba:
+`… → Config/Preview/Instructions → TrainingSession → QuestionActive → TrainingResult`.
+Al terminar el test y volver, el usuario atravesaba las pantallas de config.
+Fix: `navigate` → `replace` en los tres puntos de entrada a `TrainingSession`.
+
+---
+
 ## 2026-09-07 — Bloque 3 Salud · APK bugs (dashboard hardcoded, crash Connect, permission prompt)
 
 Rama: `fix/revision-bloques-bugfixes`. Auditoría contra APK real (screenshots
