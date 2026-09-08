@@ -1,24 +1,35 @@
 import axios, { type AxiosInstance } from 'axios';
 import { logger } from '@opox/utils';
 
+export type HealthAiProvider = 'openai' | 'gemini';
+
 export interface HealthAiConfig {
     baseUrl: string;
     apiKey: string;
     timeoutMs?: number;
+    provider?: HealthAiProvider;
 }
 
 export class HealthAiClient {
     private readonly http: AxiosInstance;
-    private static readonly MODEL = 'gpt-4o-mini';
+    private readonly provider: HealthAiProvider;
+    private readonly apiKey: string;
+    private static readonly OPENAI_MODEL = 'gpt-4o-mini';
+    private static readonly GEMINI_MODEL = 'gemini-3.6-flash';
 
     constructor(config: HealthAiConfig) {
+        this.provider = config.provider ?? 'openai';
+        this.apiKey = config.apiKey;
+
         this.http = axios.create({
             baseURL: config.baseUrl,
             timeout: config.timeoutMs ?? 30_000,
             headers: {
-                Authorization: `Bearer ${config.apiKey}`,
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
+                ...(this.provider === 'openai'
+                    ? { Authorization: `Bearer ${config.apiKey}` }
+                    : {}),
             },
         });
         this.http.interceptors.response.use(
@@ -35,9 +46,15 @@ export class HealthAiClient {
     }
 
     private async chatJson(system: string, user: string, maxTokens: number): Promise<unknown> {
+        return this.provider === 'gemini'
+            ? this.chatJsonGemini(system, user, maxTokens)
+            : this.chatJsonOpenAi(system, user, maxTokens);
+    }
+
+    private async chatJsonOpenAi(system: string, user: string, maxTokens: number): Promise<unknown> {
         for (let attempt = 1; attempt <= 2; attempt++) {
             const { data } = await this.http.post('/chat/completions', {
-                model: HealthAiClient.MODEL,
+                model: HealthAiClient.OPENAI_MODEL,
                 messages: [
                     { role: 'system', content: system },
                     { role: 'user', content: user },
@@ -52,6 +69,70 @@ export class HealthAiClient {
             } catch {
                 if (attempt === 2) throw new Error('[health-ai] JSON parse falló en 2 intentos');
                 logger.warn('[health-ai] JSON parse falló, reintentando');
+            }
+        }
+    }
+
+    // Gemini REST API: POST /models/{model}:generateContent?key={apiKey}
+    // Hasta 3 intentos: reintenta en 5xx transitorio (503), JSON truncado o parse fail.
+    private async chatJsonGemini(system: string, user: string, maxOutputTokens: number): Promise<unknown> {
+        const MAX_ATTEMPTS = 3;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            let responseData: Record<string, unknown>;
+            try {
+                const { data } = await this.http.post(
+                    `/models/${HealthAiClient.GEMINI_MODEL}:generateContent?key=${this.apiKey}`,
+                    {
+                        systemInstruction: { parts: [{ text: system }] },
+                        contents: [{ role: 'user', parts: [{ text: user }] }],
+                        generationConfig: {
+                            temperature: 0.3,
+                            maxOutputTokens,
+                            responseMimeType: 'application/json',
+                        },
+                    },
+                    { timeout: 90_000 },
+                );
+                responseData = data as Record<string, unknown>;
+            } catch (httpErr: unknown) {
+                const status = (httpErr as { response?: { status?: number } }).response?.status ?? 0;
+                if (attempt < MAX_ATTEMPTS && status >= 500) {
+                    logger.warn('[health-ai] Gemini 5xx transitorio, reintentando en 4s', { status, attempt });
+                    await new Promise(r => setTimeout(r, 4_000));
+                    continue;
+                }
+                throw httpErr;
+            }
+
+            const raw: string =
+                ((responseData.candidates as Array<{ content?: { parts?: Array<{ text?: string }> } }>)?.[0]
+                    ?.content?.parts?.[0]?.text) ?? '';
+
+            // Respuesta truncada (model bajo carga, finishReason MAX_TOKENS) — reintentar
+            if (raw.length < 20) {
+                if (attempt < MAX_ATTEMPTS) {
+                    logger.warn('[health-ai] Gemini respuesta truncada, reintentando', { attempt, rawLen: raw.length });
+                    await new Promise(r => setTimeout(r, 2_000));
+                    continue;
+                }
+                throw new Error('[health-ai] Gemini respuesta truncada en todos los intentos');
+            }
+
+            // 1. Quitar bloques markdown si los hay (```json ... ```)
+            let content = raw.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+            // 2. Extraer el objeto JSON más externo — protege frente a texto pre/post
+            const jStart = content.indexOf('{');
+            const jEnd = content.lastIndexOf('}');
+            if (jStart !== -1 && jEnd > jStart) content = content.slice(jStart, jEnd + 1);
+
+            try {
+                return JSON.parse(content);
+            } catch {
+                if (attempt === MAX_ATTEMPTS) {
+                    logger.warn('[health-ai] Gemini raw (300 chars):', { raw: raw.slice(0, 300) });
+                    throw new Error('[health-ai] Gemini JSON parse falló en todos los intentos');
+                }
+                logger.warn('[health-ai] Gemini JSON parse falló, reintentando', { attempt });
             }
         }
     }
@@ -177,6 +258,6 @@ ${examContext}
 ${temaContext}
 ${tiempoContext}`;
 
-        return this.chatJson(system, user, 600);
+        return this.chatJson(system, user, 1000);
     }
 }

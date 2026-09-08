@@ -58,6 +58,10 @@ const envSchema = z.object({
     // ID del curso en el Motor BOE (corresponde a la oposición activa, ej. "justicia-tramitacion")
     MOTOR_BOE_CURSO_ID: optionalString,
 
+    // Gemini — alternativa a OpenAI para los 3 endpoints de Salud IA (/health/menus, /health/meditation, /health/study-technique)
+    // Si está presente tiene prioridad sobre AI_API_KEY para HealthAiClient.
+    HEALTH_GEMINI_API_KEY: optionalString,
+
     REVENUECAT_WEBHOOK_SECRET: optionalString,
     EXPO_ACCESS_TOKEN: optionalString,
 

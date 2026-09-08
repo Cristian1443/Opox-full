@@ -324,9 +324,23 @@ export function buildContainer() {
         ? new MotorFatigueClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 10_000)
         : undefined;
 
-    const healthAiClient = env.AI_API_BASE_URL && env.AI_API_KEY
-        ? new HealthAiClient({ baseUrl: env.AI_API_BASE_URL, apiKey: env.AI_API_KEY })
-        : undefined;
+    const healthAiClient = (() => {
+        if (env.HEALTH_GEMINI_API_KEY) {
+            return new HealthAiClient({
+                baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+                apiKey: env.HEALTH_GEMINI_API_KEY,
+                provider: 'gemini',
+            });
+        }
+        if (env.AI_API_BASE_URL && env.AI_API_KEY) {
+            return new HealthAiClient({
+                baseUrl: env.AI_API_BASE_URL,
+                apiKey: env.AI_API_KEY,
+                provider: 'openai',
+            });
+        }
+        return undefined;
+    })();
 
     const motorTutor = isMotorConfigured
         ? new MotorTutorClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 15_000, env.MOTOR_DEFAULT_CURSO_ID ?? '')
