@@ -7,7 +7,13 @@ export const createConversationBody = z.object({
 
 export const sendMessageBody = z.object({
     content: z.string().min(1).max(4000),
-    personality: z.enum(['cercano', 'equilibrado', 'exigente']).optional(),
+    personality: z.enum(['cercano', 'formal', 'directo', 'motivador', 'equilibrado', 'exigente']).optional(),
+    tonePrefs: z.object({
+        personality: z.string().optional(),
+        detailLevel: z.number().int().min(0).max(2).optional(),
+        hintStyle: z.string().optional(),
+        reinforcementLevel: z.string().optional(),
+    }).optional(),
 });
 
 export const generateDeckBody = z.object({

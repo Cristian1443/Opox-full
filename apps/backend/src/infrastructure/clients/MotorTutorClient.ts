@@ -31,7 +31,9 @@ export class MotorTutorClient implements ITutorAiClient {
             });
             if (!res.ok) {
                 const text = await res.text().catch(() => '');
-                throw new Error(`Motor tutor ${path} → ${res.status}: ${text.slice(0, 200)}`);
+                const err = new Error(`Motor tutor ${path} → ${res.status}: ${text.slice(0, 200)}`);
+                (err as NodeJS.ErrnoException).code = res.status >= 500 ? 'MOTOR_SERVER_ERROR' : 'MOTOR_CLIENT_ERROR';
+                throw err;
             }
             return res.json() as Promise<T>;
         } finally {
