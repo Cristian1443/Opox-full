@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { planningApi } from '../../api';
@@ -55,6 +55,7 @@ export default function PlanningAgendaScreen({ navigation }) {
     const [modalVisible, setModalVisible] = useState(false);
     const [form, setForm] = useState({ title: '', eventDate: '', subtitle: '' });
     const [dateError, setDateError] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     const load = useCallback(() => {
         planningApi.listAgenda().then(({ data }) => { if (data) setDates(data); });
@@ -69,16 +70,21 @@ export default function PlanningAgendaScreen({ navigation }) {
             return;
         }
         setDateError(false);
-        const { data } = await planningApi.createAgendaDate({
+        setSaving(true);
+        const { data, error } = await planningApi.createAgendaDate({
             title: form.title.trim(),
             eventDate: form.eventDate,
             subtitle: form.subtitle.trim() || undefined,
             kind: 'custom',
         });
+        setSaving(false);
         if (data) {
             setDates((prev) => [...prev, data].sort((a, b) => a.eventDate.localeCompare(b.eventDate)));
             setForm({ title: '', eventDate: '', subtitle: '' });
+            setDateError(false);
             setModalVisible(false);
+        } else {
+            Alert.alert('No se pudo guardar', error?.message ?? 'Comprueba tu conexión e inténtalo de nuevo.');
         }
     };
 
@@ -153,8 +159,15 @@ export default function PlanningAgendaScreen({ navigation }) {
                             value={form.subtitle}
                             onChangeText={(subtitle) => setForm((f) => ({ ...f, subtitle }))}
                         />
-                        <TouchableOpacity style={styles.btn} onPress={handleSave} activeOpacity={0.85}>
-                            <Text style={styles.btnText}>Guardar</Text>
+                        <TouchableOpacity
+                            style={[styles.btn, saving && { opacity: 0.6 }]}
+                            onPress={handleSave}
+                            activeOpacity={0.85}
+                            disabled={saving}
+                        >
+                            {saving
+                                ? <ActivityIndicator color={colors.white} size="small" />
+                                : <Text style={styles.btnText}>Guardar</Text>}
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setModalVisible(false)} style={{ marginTop: 8 }}>
                             <Text style={styles.cancel}>Cancelar</Text>
