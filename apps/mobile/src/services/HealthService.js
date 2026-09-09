@@ -40,6 +40,7 @@ const HK_READ_TYPES = [
 const ANDROID_PERMISSIONS = [
     { accessType: 'read', recordType: 'HeartRate' },
     { accessType: 'read', recordType: 'RestingHeartRate' },
+    { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
     { accessType: 'read', recordType: 'OxygenSaturation' },
     { accessType: 'read', recordType: 'SleepSession' },
     { accessType: 'read', recordType: 'Steps' },
@@ -265,9 +266,10 @@ async function _readAndroidMetrics(startTime, endTime) {
     await HealthConnect.initialize();
     const filter = { timeRangeFilter: { operator: 'between', startTime, endTime } };
 
-    const [hrRes, restHrRes, spo2Res, sleepRes, stepsRes] = await Promise.allSettled([
+    const [hrRes, restHrRes, hrvRes, spo2Res, sleepRes, stepsRes] = await Promise.allSettled([
         HealthConnect.readRecords('HeartRate', filter),
         HealthConnect.readRecords('RestingHeartRate', filter),
+        HealthConnect.readRecords('HeartRateVariabilityRmssd', filter),
         HealthConnect.readRecords('OxygenSaturation', filter),
         HealthConnect.readRecords('SleepSession', filter),
         HealthConnect.readRecords('Steps', filter),
@@ -288,6 +290,12 @@ async function _readAndroidMetrics(startTime, endTime) {
         ? Math.round(restHrRecord.beatsPerMinute)
         : null;
 
+    // HRV en Android: recordType HeartRateVariabilityRmssd, campo heartRateVariabilityMillis.
+    const hrvRecord = lastRecord(hrvRes);
+    const hrv = hrvRecord?.heartRateVariabilityMillis != null
+        ? Math.round(hrvRecord.heartRateVariabilityMillis)
+        : null;
+
     const spo2Record = lastRecord(spo2Res);
     const spo2 = spo2Record?.percentage?.value != null
         ? Math.round(spo2Record.percentage.value)
@@ -303,7 +311,7 @@ async function _readAndroidMetrics(startTime, endTime) {
     const stepsRecords = stepsRes?.value?.records ?? [];
     const steps = stepsRecords.reduce((acc, r) => acc + (r.count ?? 0), 0) || null;
 
-    return { heartRate, restingHeartRate, hrv: null, spo2, sleepHours, steps };
+    return { heartRate, restingHeartRate, hrv, spo2, sleepHours, steps };
 }
 
 // ─── Historial de métricas ────────────────────────────────────────────────────
