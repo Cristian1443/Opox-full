@@ -45,6 +45,8 @@ const ANDROID_PERMISSIONS = [
     { accessType: 'read', recordType: 'Steps' },
 ];
 
+export const HEALTH_PAIRING_SKIPPED_KEY = 'opox.health.pairingSkipped';
+
 /** true si los módulos nativos de salud están disponibles en este entorno */
 export function isHealthAvailable() {
     if (IS_EXPO_GO) return false;
@@ -74,6 +76,20 @@ export async function getHealthConnectStatus() {
     } catch (err) {
         console.warn('[HealthService] getSdkStatus error:', err);
         return 'not_installed';
+    }
+}
+
+/**
+ * Comprueba si la app ya tiene todos los permisos de Health Connect concedidos
+ * sin abrir ningún diálogo. Útil para detectar "ya conectado" antes de entrar al flujo.
+ */
+export async function hasAllHealthPermissions() {
+    if (!isHealthAvailable() || Platform.OS !== 'android' || !HealthConnect) return false;
+    try {
+        const granted = (await HealthConnect.getGrantedPermissions()) ?? [];
+        return granted.length >= ANDROID_PERMISSIONS.length;
+    } catch {
+        return false;
     }
 }
 
@@ -116,6 +132,14 @@ export async function requestHealthPermissions() {
             if (status !== 'available') {
                 console.warn('[HealthService] Health Connect no disponible:', status);
                 return false;
+            }
+            // Si ya tiene todos los permisos, no abrir el diálogo de nuevo.
+            // requestPermission llamado sobre permisos ya concedidos puede abrir
+            // el diálogo de HC de nuevo (molestia) o devolver [] silenciosamente
+            // si el usuario denegó con "no volver a preguntar" (confusión).
+            const existing = await HealthConnect.getGrantedPermissions().catch(() => []);
+            if (Array.isArray(existing) && existing.length >= ANDROID_PERMISSIONS.length) {
+                return true;
             }
             // v3: no se llama initialize() — requestPermission() directamente.
             // initialize() en v3 lanza excepción nativa desde ciertos contextos
