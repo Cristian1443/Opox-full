@@ -301,11 +301,11 @@ export function buildContainer() {
     // Se construyen antes del objeto useCases para evitar referencias circulares.
     const pushService = new ExpoPushService(env.EXPO_ACCESS_TOKEN);
     const registerPushToken        = new RegisterPushTokenUseCase(pushRepo);
-    const sendBoeAlert             = new SendBoeAlertUseCase(pushRepo, pushService);
-    const sendNoteReady            = new SendNoteReadyUseCase(pushRepo, pushService);
-    const sendClanChallenge        = new SendClanChallengeNotificationUseCase(motivationRepo, pushRepo, pushService);
-    const sendStreakWarning        = new SendStreakWarningUseCase(pushRepo, pushService);
-    const sendDailyGoalCompleted   = new SendDailyGoalCompletedUseCase(pushRepo, pushService);
+    const sendBoeAlert             = new SendBoeAlertUseCase(pushRepo, pushService, dashboardRepo);
+    const sendNoteReady            = new SendNoteReadyUseCase(pushRepo, pushService, dashboardRepo);
+    const sendClanChallenge        = new SendClanChallengeNotificationUseCase(motivationRepo, pushRepo, pushService, dashboardRepo);
+    const sendStreakWarning        = new SendStreakWarningUseCase(pushRepo, pushService, dashboardRepo);
+    const sendDailyGoalCompleted   = new SendDailyGoalCompletedUseCase(pushRepo, pushService, dashboardRepo);
 
     const motorBoe = env.MOTOR_BOE_BASE_URL
         ? new MotorBoeClient({
