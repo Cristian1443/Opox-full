@@ -85,14 +85,18 @@ const STUDY_TECHNIQUES = [
 export default function StudyTipsScreen({ navigation }) {
     const [aiRec, setAiRec] = useState(null);
     const [loadingRec, setLoadingRec] = useState(true);
+    const [recError, setRecError] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
         (async () => {
             const fatigueLevel = (await AsyncStorage.getItem(FATIGUE_LEVEL_KEY)) ?? 'bajo';
             const res = await healthApi.recommendStudyTechnique({ fatigueLevel }).catch(() => null);
-            if (!cancelled && !res?.error && res?.data) setAiRec(res.data);
-            if (!cancelled) setLoadingRec(false);
+            if (!cancelled) {
+                if (!res?.error && res?.data) setAiRec(res.data);
+                else setRecError(true);
+                setLoadingRec(false);
+            }
         })();
         return () => { cancelled = true; };
     }, []);
@@ -115,6 +119,13 @@ export default function StudyTipsScreen({ navigation }) {
                         <Text style={styles.recTitle}>{aiRec.tecnica}</Text>
                         <Text style={styles.recPorque}>{aiRec.porque}</Text>
                         <Text style={styles.recAdaptacion}>{aiRec.adaptacion}</Text>
+                    </View>
+                ) : recError ? (
+                    <View style={[styles.recCard, { backgroundColor: 'rgba(65,41,80,0.15)' }]}>
+                        <Text style={styles.recEyebrow}>TÉCNICA RECOMENDADA HOY</Text>
+                        <Text style={[styles.recPorque, { color: 'rgba(52,58,61,0.5)' }]}>
+                            No disponible sin conexión al servidor
+                        </Text>
                     </View>
                 ) : null}
 

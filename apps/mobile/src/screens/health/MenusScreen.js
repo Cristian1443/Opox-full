@@ -7,6 +7,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     Modal,
+    Alert,
     ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -113,6 +114,11 @@ export default function MenusScreen({ navigation }) {
         if (!res?.error && res?.data?.menus) {
             setAiMenus(res.data.menus);
             setShowAiModal(false);
+        } else {
+            Alert.alert(
+                'No disponible',
+                res?.error?.message ?? 'No se pudo generar el menú. Verifica tu conexión e inténtalo de nuevo.',
+            );
         }
     };
 

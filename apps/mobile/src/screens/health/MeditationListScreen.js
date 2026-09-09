@@ -6,6 +6,7 @@ import {
     ScrollView,
     StyleSheet,
     TouchableOpacity,
+    Alert,
     ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -68,6 +69,11 @@ export default function MeditationListScreen({ navigation }) {
                     phases: res.data.fases ?? [],
                 },
             });
+        } else {
+            Alert.alert(
+                'No disponible',
+                res?.error?.message ?? 'No se pudo crear la sesión. Verifica tu conexión e inténtalo de nuevo.',
+            );
         }
     };
 
