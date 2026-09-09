@@ -155,6 +155,16 @@ export default function ClanDetailScreen({ navigation, route }) {
                 ))}
 
                 <TouchableOpacity
+                    style={styles.discoverBtn}
+                    onPress={() => navigation.navigate('ClansList')}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="compass-outline" size={16} color={colors.accentOrange} />
+                    <Text style={styles.discoverBtnText}>Descubrir otros clanes</Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.accentOrange} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
                     style={styles.leaveBtn}
                     onPress={handleLeave}
                     disabled={leaving}
@@ -232,4 +242,17 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     leaveBtnText: { fontSize: 14, fontWeight: '600', color: colors.statRed },
+    discoverBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: spacing.lg,
+        paddingVertical: 14,
+        paddingHorizontal: spacing.md,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: `${colors.accentOrange}40`,
+        justifyContent: 'center',
+    },
+    discoverBtnText: { fontSize: 14, fontWeight: '600', color: colors.accentOrange, flex: 1, textAlign: 'center' },
 });
