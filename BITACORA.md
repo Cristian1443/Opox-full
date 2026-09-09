@@ -93,6 +93,63 @@ descomentar la línea y apuntar al backend desplegado en Render antes de generar
 
 ---
 
+## 2026-09-09 — Revisión de gaps · Agenda · Biometría · Notificación reto de clan
+
+Rama: `fix/revision-bloques-bugfixes`. 5 gaps detectados en screenshots del usuario, todos corregidos.
+
+### Gap 1 — Agenda: selector de fecha nativo (antes TextInput libre)
+
+`PlanningAgendaScreen.js` reescrito para eliminar el campo de texto de fecha.
+
+**Problema original**: campo `TextInput` aceptaba cualquier texto (el usuario escribía
+`2026/09/10` con barras). La validación `regex` fallaba silenciosamente sin feedback.
+Incluso con formato correcto, `handleSave` no mostraba feedback de red ni spinner.
+
+**Fix**:
+1. Campo de fecha sustituido por `TouchableOpacity` con icono de calendario.
+2. Al tocar → abre `DateTimePicker` nativo de `@react-native-community/datetimepicker@9.1.0`:
+   - Android: diálogo nativo del SO (`display='default'`), sin modal extra.
+   - iOS: hoja inferior con spinner en español y botón "Confirmar".
+3. `handleSave` añade: spinner `ActivityIndicator` en el botón, `Alert.alert` si la API
+   devuelve error, `Alert.alert` si no se seleccionó fecha.
+4. Paquete instalado correctamente tras limpiar `node_modules` y añadir
+   `neverBuiltDependencies: [expo-build-properties]` en `pnpm-workspace.yaml`
+   (workaround al bug de pnpm 9 en Windows + OneDrive con paquetes de lifecycle scripts).
+
+### Gaps 2–4 — Biometría: toggle no persistía, botón no aparecía en login
+
+**Problema**: `authApi.biometricLink()` devolvía error 500 porque las tablas
+`biometric_challenges` y `biometric_devices` no existían en Supabase. `setupBiometric()`
+detecta el error y llama `clearLocalKeys()` — rollback silencioso que borra todo.
+El toggle mostraba ON momentáneamente (switch Android) pero al volver a la pantalla
+aparecía OFF. El login nunca mostraba el botón de huella porque `useFocusEffect` no
+existía — la verificación corría solo al montar, no al volver de Config.
+
+**Fix**:
+- `apps/backend/supabase/bloque1_biometria.sql` — SQL de creación de las dos tablas
+  con índices y RLS. **Requiere ejecución manual en Supabase SQL Editor.**
+- `LoginScreen.js` — `useEffect(fn, [])` reemplazado por `useFocusEffect(useCallback(fn, []))`
+  para re-verificar `isBiometricLinked()` cada vez que la pantalla recibe foco.
+
+### Gap 5 — Notificación "Reto recibido" de clan
+
+**Problema**: el pop-up "Nombre te ha retado" del wireframe Figma no existía en el código.
+Al crear un reto de clan, ningún miembro recibía notificación.
+
+**Fix** (pipeline completo):
+- `IMotivationRepository` — nuevo método `getClanMemberIds(clanId)`.
+- `SupabaseMotivationRepository` — implementa `getClanMemberIds` con query a `clan_members`.
+- `SendClanChallengeNotificationUseCase` — obtiene miembros del clan, filtra al retador,
+  envía push a los demás con tipo `clan_challenge`, título "Nuevo reto en tu clan",
+  body con el nombre del reto, y `screen: 'Challenges'` como destino de tap.
+- `MotivationController.createClanChallenge` — dispara el use case fire-and-forget tras
+  crear el reto.
+- `container.ts` — instancia y conecta el use case.
+- `packages/types/src/notifications.ts` — tipo `clan_challenge` añadido a `PushNotificationData`.
+- `InAppNotificationBanner.js` — icono `flag` naranja para `clan_challenge`.
+
+---
+
 ## 2026-09-08 — Bloque 3 · Bloque 8 · Training: bugfixes APK (Health Connect, Tutor IA, navegación)
 
 Rama: `fix/revision-bloques-bugfixes`. Auditoría contra APK real con Health Connect instalado.
