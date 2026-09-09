@@ -140,6 +140,7 @@ declare const API_ROUTES: {
         readonly CLAN_CHALLENGES: string;
         readonly CLAN_CHALLENGE_COMPLETE: string;
         readonly CLAN_GRADUATES: string;
+        readonly CLAN_LEAVE: string;
     };
 };
 

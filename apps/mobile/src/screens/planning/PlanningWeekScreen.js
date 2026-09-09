@@ -8,6 +8,15 @@ import { colors, spacing } from '../../theme';
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const WEEKDAY_NAMES = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO'];
 
+// El subtitle de tareas tipo test es JSON: {"topicId":"x","count":10}.
+// Se muestra legible ("10 preguntas") en vez de el JSON crudo.
+function tryParseTestParams(subtitle) {
+    try {
+        const p = JSON.parse(subtitle);
+        return p && p.topicId ? p : null;
+    } catch { return null; }
+}
+
 // Colores confirmados contra Figma (frame SEMANA, Bloque 4) sin
 // equivalente exacto en theme.js.
 const FIGMA = {
@@ -99,7 +108,11 @@ export default function PlanningWeekScreen({ navigation }) {
                                 <View style={styles.bullet} />
                                 <View style={styles.planTextWrap}>
                                     <Text style={styles.planTitle}>{t.title}</Text>
-                                    {t.subtitle && <Text style={styles.planSubtitle}>{t.subtitle}</Text>}
+                                    {t.subtitle && (() => {
+                                        const tp = tryParseTestParams(t.subtitle);
+                                        const text = tp ? `${tp.count} preguntas` : t.subtitle;
+                                        return <Text style={styles.planSubtitle}>{text}</Text>;
+                                    })()}
                                 </View>
                             </View>
                         ))}

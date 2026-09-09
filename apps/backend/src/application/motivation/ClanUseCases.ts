@@ -34,6 +34,14 @@ export class JoinClanUseCase {
     }
 }
 
+export class LeaveClanUseCase {
+    constructor(private readonly motivationRepo: IMotivationRepository) { }
+
+    execute(input: { userId: string; clanId: string }): Promise<void> {
+        return this.motivationRepo.leaveClan(input);
+    }
+}
+
 export class GetClanDetailUseCase {
     constructor(private readonly motivationRepo: IMotivationRepository) { }
 

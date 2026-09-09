@@ -282,7 +282,7 @@ export default function MotivationHomeScreen({ navigation }) {
                     <ExploreItem icon={<IconRankings />} label="Rankings" onPress={() => navigation.navigate('Rankings')} />
                     <ExploreItem
                         icon={<IconClan />}
-                        label={myClan ? myClan.name : 'Ver clanes'}
+                        label={myClan ? 'Mis clanes' : 'Ver clanes'}
                         onPress={() => navigation.navigate(myClan ? 'ClanDetail' : 'ClansList', myClan ? { clanId: myClan.id } : undefined)}
                     />
                     {myClan && (

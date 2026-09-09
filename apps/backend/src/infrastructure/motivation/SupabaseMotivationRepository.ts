@@ -425,6 +425,15 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
         }
     }
 
+    async leaveClan(input: { userId: string; clanId: string }): Promise<void> {
+        const { error } = await this.supabaseAdmin
+            .from('clan_members')
+            .delete()
+            .eq('clan_id', input.clanId)
+            .eq('user_id', input.userId);
+        if (error) throw new Error(`leaveClan: ${error.message}`);
+    }
+
     private async resolveMemberViews(clanId: string): Promise<ClanMemberView[]> {
         const { data: memberRows, error: memErr } = await this.supabaseAdmin
             .from('clan_members')

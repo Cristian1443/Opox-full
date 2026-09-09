@@ -17,6 +17,7 @@ export const motivationApi = {
     listClans: () => api.get(API_ROUTES.MOTIVATION.CLANS, { auth: true }),
     createClan: (input) => api.post(API_ROUTES.MOTIVATION.CLANS, input, { auth: true }),
     joinClan: (clanId) => api.post(API_ROUTES.MOTIVATION.CLAN_JOIN.replace(':id', clanId), {}, { auth: true }),
+    leaveClan: (clanId) => api.delete(API_ROUTES.MOTIVATION.CLAN_LEAVE.replace(':id', clanId), { auth: true }),
     getClanDetail: (clanId) => api.get(API_ROUTES.MOTIVATION.CLAN_DETAIL.replace(':id', clanId), { auth: true }),
 
     listClanMessages: (clanId, after) => {

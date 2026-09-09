@@ -20,6 +20,7 @@ import type {
     ListClansUseCase,
     CreateClanUseCase,
     JoinClanUseCase,
+    LeaveClanUseCase,
     GetClanDetailUseCase,
     ListClanMessagesUseCase,
     SendClanMessageUseCase,
@@ -50,6 +51,7 @@ export class MotivationController {
             listClans: ListClansUseCase;
             createClan: CreateClanUseCase;
             joinClan: JoinClanUseCase;
+            leaveClan: LeaveClanUseCase;
             getClanDetail: GetClanDetailUseCase;
             listClanMessages: ListClanMessagesUseCase;
             sendClanMessage: SendClanMessageUseCase;
@@ -197,6 +199,13 @@ export class MotivationController {
         try {
             await this.deps.joinClan.execute({ userId: req.authUser!.id, clanId: req.params['id'] as string });
             this.ok(res, 200, { joined: true });
+        } catch (err) { next(err); }
+    };
+
+    leaveClan = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            await this.deps.leaveClan.execute({ userId: req.authUser!.id, clanId: req.params['id'] as string });
+            this.ok(res, 200, { left: true });
         } catch (err) { next(err); }
     };
 

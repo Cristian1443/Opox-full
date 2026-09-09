@@ -37,6 +37,7 @@ export function createMotivationRouter(
         controller.createClan,
     );
     r.post(API_ROUTES.MOTIVATION.CLAN_JOIN, authMiddleware, controller.joinClan);
+    r.delete(API_ROUTES.MOTIVATION.CLAN_LEAVE, authMiddleware, controller.leaveClan);
     r.get(API_ROUTES.MOTIVATION.CLAN_DETAIL, authMiddleware, controller.getClanDetail);
 
     r.get(
