@@ -5,6 +5,75 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-09 — Bloque 3 · Health Connect loop fix · Bloque 4 gap subtítulo · Bloque 5 gestión de clanes
+
+Rama: `feat/bloque3-ia-backend`. 10 archivos modificados (6 mobile, 4 backend/constants).
+
+### Bloque 3 — Health Connect "sigue molestando"
+
+**Problema**: en el APK, `PairingScreen` abría el diálogo de permisos Health Connect
+cada vez que el usuario entraba, aunque ya los había concedido. "Continuar igualmente"
+tampoco recordaba la decisión entre sesiones.
+
+**Fix — tres archivos**:
+
+1. `HealthService.js` — nueva función `hasAllHealthPermissions()`: llama
+   `HealthConnect.getGrantedPermissions()` (sin diálogo) y comprueba si todos los
+   permisos de `ANDROID_PERMISSIONS` están ya concedidos. `requestHealthPermissions()`
+   llama esta función primero; si ya están todos, devuelve `true` sin abrir ningún
+   diálogo. Constante `HEALTH_PAIRING_SKIPPED_KEY = 'opox.health.pairingSkipped'`
+   exportada para persistir la decisión del usuario.
+
+2. `PairingScreen.js` — en `run()`: tras verificar estado HC, llama
+   `hasAllHealthPermissions()`; si devuelve `true`, salta directo a `phase = 'complete'`
+   sin pedir nada. Botón "Continuar igualmente" y botón atrás en estado `denied`
+   persisten `HEALTH_PAIRING_SKIPPED_KEY` en AsyncStorage.
+
+3. `HomeHealthScreen.js` — lee `pairingSkipped` al cargar con `Promise.all`. Si el
+   flag existe pero los permisos ya están concedidos (usuario los activó desde Ajustes),
+   borra el flag automáticamente. CTA diferenciada: con flag → "Activa permisos en
+   Ajustes" (→ `Linking.openSettings()`); sin flag → "Conecta tu wearable" (→ `ConnectDevice`).
+
+### Bloque 4 — Plan semanal mostraba JSON raw como subtítulo
+
+**Problema**: `PlanningWeekScreen` mostraba `{"topicId":"constitucion","count":10}`
+como subtítulo de las tareas de test de práctica, en lugar de texto legible.
+
+**Fix**: `tryParseTestParams(subtitle)` añadida en `PlanningWeekScreen.js` (misma
+lógica que ya existía en `PlanningTodayScreen.js`). Ahora muestra "10 preguntas".
+
+### Bloque 5 — Gestión de clanes: salir, descubrir y explorar sin bloqueos
+
+**Problema 1 — Label incorrecto**: EXPLORAR mostraba el nombre del clan (`myClan.name`)
+en lugar de "Mis clanes".
+**Fix**: `MotivationHomeScreen.js` — `label={myClan ? 'Mis clanes' : 'Ver clanes'}`.
+
+**Problema 2 — Sin forma de salir del clan**: no existía ni endpoint ni botón para
+abandonar un clan.
+**Fix (full-stack, 8 archivos)**:
+- `packages/constants`: `CLAN_LEAVE: '/motivation/clans/:id/leave'` en `routes.js` e `index.d.ts`.
+- `IMotivationRepository`: método `leaveClan(input)` añadido a la interfaz de dominio.
+- `LeaveClanUseCase` (nuevo): delega en `motivationRepo.leaveClan`.
+- `SupabaseMotivationRepository`: `leaveClan` — delete de `clan_members` por `clan_id + user_id`.
+- `MotivationController`: handler `leaveClan` + `leaveClan: LeaveClanUseCase` en deps.
+- `motivationRoutes.ts`: `r.delete(CLAN_LEAVE, authMiddleware, controller.leaveClan)`.
+- `container.ts`: instancia y conecta el use case.
+- `motivationApi.js`: `leaveClan: (clanId) => api.delete(...)`.
+- `ClanDetailScreen.js`: botón rojo "Salir del clan" con `Alert.alert` de confirmación y
+  spinner `ActivityIndicator`. Navega a `ClansList` con `navigation.replace` al salir.
+
+**Problema 3 — Sin forma de descubrir otros clanes desde el detalle**:
+**Fix**: `ClanDetailScreen.js` — botón "Descubrir otros clanes" (naranja, ícono brújula +
+chevron) sobre el botón de salir. Navega a `ClansList` sin obligar a salir del clan.
+Estilos `discoverBtn` / `discoverBtnText` añadidos al StyleSheet.
+
+**Problema 4 — Botón "Unirse" oculto al estar en un clan**:
+**Fix**: `ClansListScreen.js` — botón "Unirse" siempre visible. Cuando `myClan` existe:
+botón atenuado (borde/texto gris `#C8CDD8`). Al pulsarlo: `Alert.alert` con opciones
+"Ir a mi clan" (navega a `ClanDetail` del clan actual) y "Cancelar".
+
+---
+
 ## 2026-09-09 — Bloque 3 · IA directa para Menús, Meditación y Técnica de estudio
 
 Rama: `feat/bloque3-ia-backend`. 12 archivos modificados (6 backend, 6 mobile).
@@ -90,6 +159,63 @@ Fase 2.
 `apps/mobile/.env` tiene `EXPO_PUBLIC_API_URL` comentado para desarrollo local —
 `config.js` usa `hostUri` de Metro automáticamente (IP LAN del PC). Para producción:
 descomentar la línea y apuntar al backend desplegado en Render antes de generar el APK.
+
+---
+
+## 2026-09-09 — Revisión de gaps · Agenda · Biometría · Notificación reto de clan
+
+Rama: `fix/revision-bloques-bugfixes`. 5 gaps detectados en screenshots del usuario, todos corregidos.
+
+### Gap 1 — Agenda: selector de fecha nativo (antes TextInput libre)
+
+`PlanningAgendaScreen.js` reescrito para eliminar el campo de texto de fecha.
+
+**Problema original**: campo `TextInput` aceptaba cualquier texto (el usuario escribía
+`2026/09/10` con barras). La validación `regex` fallaba silenciosamente sin feedback.
+Incluso con formato correcto, `handleSave` no mostraba feedback de red ni spinner.
+
+**Fix**:
+1. Campo de fecha sustituido por `TouchableOpacity` con icono de calendario.
+2. Al tocar → abre `DateTimePicker` nativo de `@react-native-community/datetimepicker@9.1.0`:
+   - Android: diálogo nativo del SO (`display='default'`), sin modal extra.
+   - iOS: hoja inferior con spinner en español y botón "Confirmar".
+3. `handleSave` añade: spinner `ActivityIndicator` en el botón, `Alert.alert` si la API
+   devuelve error, `Alert.alert` si no se seleccionó fecha.
+4. Paquete instalado correctamente tras limpiar `node_modules` y añadir
+   `neverBuiltDependencies: [expo-build-properties]` en `pnpm-workspace.yaml`
+   (workaround al bug de pnpm 9 en Windows + OneDrive con paquetes de lifecycle scripts).
+
+### Gaps 2–4 — Biometría: toggle no persistía, botón no aparecía en login
+
+**Problema**: `authApi.biometricLink()` devolvía error 500 porque las tablas
+`biometric_challenges` y `biometric_devices` no existían en Supabase. `setupBiometric()`
+detecta el error y llama `clearLocalKeys()` — rollback silencioso que borra todo.
+El toggle mostraba ON momentáneamente (switch Android) pero al volver a la pantalla
+aparecía OFF. El login nunca mostraba el botón de huella porque `useFocusEffect` no
+existía — la verificación corría solo al montar, no al volver de Config.
+
+**Fix**:
+- `apps/backend/supabase/bloque1_biometria.sql` — SQL de creación de las dos tablas
+  con índices y RLS. **Requiere ejecución manual en Supabase SQL Editor.**
+- `LoginScreen.js` — `useEffect(fn, [])` reemplazado por `useFocusEffect(useCallback(fn, []))`
+  para re-verificar `isBiometricLinked()` cada vez que la pantalla recibe foco.
+
+### Gap 5 — Notificación "Reto recibido" de clan
+
+**Problema**: el pop-up "Nombre te ha retado" del wireframe Figma no existía en el código.
+Al crear un reto de clan, ningún miembro recibía notificación.
+
+**Fix** (pipeline completo):
+- `IMotivationRepository` — nuevo método `getClanMemberIds(clanId)`.
+- `SupabaseMotivationRepository` — implementa `getClanMemberIds` con query a `clan_members`.
+- `SendClanChallengeNotificationUseCase` — obtiene miembros del clan, filtra al retador,
+  envía push a los demás con tipo `clan_challenge`, título "Nuevo reto en tu clan",
+  body con el nombre del reto, y `screen: 'Challenges'` como destino de tap.
+- `MotivationController.createClanChallenge` — dispara el use case fire-and-forget tras
+  crear el reto.
+- `container.ts` — instancia y conecta el use case.
+- `packages/types/src/notifications.ts` — tipo `clan_challenge` añadido a `PushNotificationData`.
+- `InAppNotificationBanner.js` — icono `flag` naranja para `clan_challenge`.
 
 ---
 

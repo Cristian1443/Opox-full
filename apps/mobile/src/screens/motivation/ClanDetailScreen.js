@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -31,6 +31,31 @@ export default function ClanDetailScreen({ navigation, route }) {
     const [detail, setDetail] = useState(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
+    const [leaving, setLeaving] = useState(false);
+
+    const handleLeave = () => {
+        Alert.alert(
+            'Salir del clan',
+            `¿Seguro que quieres salir de ${detail?.name ?? 'este clan'}?`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Salir',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setLeaving(true);
+                        const { error } = await motivationApi.leaveClan(clanId);
+                        setLeaving(false);
+                        if (error) {
+                            Alert.alert('Error', 'No se pudo salir del clan. Inténtalo de nuevo.');
+                        } else {
+                            navigation.replace('ClansList');
+                        }
+                    },
+                },
+            ],
+        );
+    };
 
     const load = useCallback(() => {
         setLoading(true);
@@ -128,6 +153,28 @@ export default function ClanDetailScreen({ navigation, route }) {
                         {i < detail.members.length - 1 && <View style={styles.separator} />}
                     </React.Fragment>
                 ))}
+
+                <TouchableOpacity
+                    style={styles.discoverBtn}
+                    onPress={() => navigation.navigate('ClansList')}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="compass-outline" size={16} color={colors.accentOrange} />
+                    <Text style={styles.discoverBtnText}>Descubrir otros clanes</Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.accentOrange} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.leaveBtn}
+                    onPress={handleLeave}
+                    disabled={leaving}
+                    activeOpacity={0.7}
+                >
+                    {leaving
+                        ? <ActivityIndicator size="small" color={colors.statRed} />
+                        : <Text style={styles.leaveBtnText}>Salir del clan</Text>
+                    }
+                </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
@@ -186,4 +233,26 @@ const styles = StyleSheet.create({
     memberRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: spacing.sm + 4 },
     memberName: { fontSize: 18, fontWeight: '700', color: colors.textDark },
     memberCaption: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+    leaveBtn: {
+        marginTop: spacing.xl,
+        paddingVertical: 14,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: colors.statRed,
+        borderRadius: 12,
+    },
+    leaveBtnText: { fontSize: 14, fontWeight: '600', color: colors.statRed },
+    discoverBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: spacing.lg,
+        paddingVertical: 14,
+        paddingHorizontal: spacing.md,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: `${colors.accentOrange}40`,
+        justifyContent: 'center',
+    },
+    discoverBtnText: { fontSize: 14, fontWeight: '600', color: colors.accentOrange, flex: 1, textAlign: 'center' },
 });

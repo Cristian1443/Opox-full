@@ -158,6 +158,7 @@ export const API_ROUTES = {
         CLAN_CHALLENGES: '/motivation/clans/:id/challenges',
         CLAN_CHALLENGE_COMPLETE: '/motivation/clans/:id/challenges/:challengeId/complete',
         CLAN_GRADUATES: '/motivation/clans/:id/graduates',
+        CLAN_LEAVE: '/motivation/clans/:id/leave',
     },
 };
 

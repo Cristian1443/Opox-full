@@ -42,6 +42,7 @@ import {
     ListClansUseCase,
     CreateClanUseCase,
     JoinClanUseCase,
+    LeaveClanUseCase,
     GetClanDetailUseCase,
     ListClanMessagesUseCase,
     SendClanMessageUseCase,
@@ -327,17 +328,11 @@ export function buildContainer() {
         : undefined;
 
     const healthAiClient = (() => {
-        if (env.HEALTH_GEMINI_API_KEY) {
-            return new HealthAiClient({
-                baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-                apiKey: env.HEALTH_GEMINI_API_KEY,
-                provider: 'gemini',
-            });
-        }
-        if (env.AI_API_BASE_URL && env.AI_API_KEY) {
+        const healthKey = env.HEALTH_OPENAI_API_KEY ?? env.AI_API_KEY;
+        if (env.AI_API_BASE_URL && healthKey) {
             return new HealthAiClient({
                 baseUrl: env.AI_API_BASE_URL,
-                apiKey: env.AI_API_KEY,
+                apiKey: healthKey,
                 provider: 'openai',
             });
         }
@@ -410,6 +405,7 @@ export function buildContainer() {
         listClans: new ListClansUseCase(motivationRepo),
         createClan: new CreateClanUseCase(motivationRepo),
         joinClan: new JoinClanUseCase(motivationRepo),
+        leaveClan: new LeaveClanUseCase(motivationRepo),
         getClanDetail: new GetClanDetailUseCase(motivationRepo),
         listClanMessages: new ListClanMessagesUseCase(motivationRepo),
         sendClanMessage: new SendClanMessageUseCase(motivationRepo),
@@ -659,6 +655,7 @@ export function buildContainer() {
         listClans: useCases.listClans,
         createClan: useCases.createClan,
         joinClan: useCases.joinClan,
+        leaveClan: useCases.leaveClan,
         getClanDetail: useCases.getClanDetail,
         listClanMessages: useCases.listClanMessages,
         sendClanMessage: useCases.sendClanMessage,

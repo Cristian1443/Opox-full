@@ -65,6 +65,7 @@ export interface IMotivationRepository {
         description?: string | null;
     }): Promise<Clan>;
     joinClan(input: { userId: string; clanId: string }): Promise<void>;
+    leaveClan(input: { userId: string; clanId: string }): Promise<void>;
     getClanDetail(input: { userId: string; clanId: string }): Promise<ClanDetail>;
 
     // ─── Chat de clan (polling) ────────────────────

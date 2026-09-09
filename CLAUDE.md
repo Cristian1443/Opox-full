@@ -93,6 +93,17 @@ nunca va al móvil; vive en `apps/backend/.env` (`AI_API_KEY`).
 El flujo de entrada usa AsyncStorage para gestionar el estado de onboarding. No hay
 endpoints nuevos — reutiliza `PATCH /planning/plan` para inicializar la intensidad.
 
+**Biometría — tablas Supabase requeridas (revisión 2026-09-09)**:
+`setupBiometric()` llama `authApi.biometricLink()` → `POST /auth/biometric/link`. Si las
+tablas `biometric_challenges` y `biometric_devices` no existen, la llamada devuelve 500 y
+`setupBiometric()` hace rollback silencioso (`clearLocalKeys()`). La huella nunca queda
+vinculada y el toggle aparece como OFF al volver a la pantalla.
+- `apps/backend/supabase/bloque1_biometria.sql` — SQL de creación de ambas tablas con
+  índices y RLS. **Ejecutar en Supabase SQL Editor antes de habilitar biometría en producción.**
+- `LoginScreen.js` usa `useFocusEffect` (no `useEffect`) para re-verificar `isBiometricLinked()`
+  cada vez que la pantalla recibe foco. Sin esto el botón de huella no aparece tras configurarla
+  en `ConfigPerfilScreen` y volver al login.
+
 **Flags de AsyncStorage** (todos exportados desde su pantalla de origen):
 - `ONBOARDING_COMPLETED_KEY = 'opox.onboardingCompleted'` — exportado desde `SplashScreen.js`.
   Escrito en `SesionIniciadaScreen` al completar login. Mientras exista, `SplashScreen`
@@ -162,11 +173,22 @@ Rutas bajo `/planning/`. Revisado y auditado post-testing (2026-08-23).
 - Tab "Test de práctica": carga temas con `boeApi.listTopics('justicia-tramitacion')` (NO `trainingApi.listTopics()` — sin `oposicion` devuelve 0 filas).
 - `TrainingTopic` usa campo `label` (no `name`).
 - Subtitle de tarea test: `JSON.stringify({ topicId, count })`. `tryParseTestParams(subtitle)` lo decodifica.
+  `PlanningWeekScreen.js` incluye la misma función para evitar que el JSON raw aparezca en la vista semanal (revisión 2026-09-09).
 - Al pulsar "Empezar": `navigation.navigate('GeneratorConfig', { topicId, questionCount })`.
 
 **Macro con temas reales**:
 - `PlanningController.getMacro` llama `listTopics` en paralelo. `enrichMacroWithTopics()` distribuye temas por fase con pesos `[0.35, 0.30, 0.25, 0.10]`.
 - `container.ts` pasa `listTopics: useCases.listTopics` al `PlanningController`.
+
+**`PlanningAgendaScreen` — selector de fecha nativo (revisión 2026-09-09)**:
+El campo de fecha era un `TextInput` libre propenso a errores de formato (`2026/09/10` en vez
+de `2026-09-10`). Reemplazado por `TouchableOpacity` + `DateTimePicker` nativo:
+- `@react-native-community/datetimepicker@9.1.0` instalado en el workspace.
+- Android: `display='default'` → diálogo nativo del SO, sin modal extra.
+- iOS: modal de confirmación con `display='spinner'` y `locale='es-ES'`.
+- `handleSave` tiene spinner en el botón y `Alert.alert` para errores de red o fecha vacía.
+- **Nota pnpm**: añadir `neverBuiltDependencies: [expo-build-properties]` en `pnpm-workspace.yaml`
+  es necesario para que `pnpm install` no falle en Windows con paquetes de lifecycle scripts.
 
 **Alertas del hub (PlanningHome)**:
 - `let _alertsShownThisSession = false` a nivel de módulo (no `useRef`) — persiste aunque el componente se desmonte y remonte al navegar.
@@ -209,7 +231,19 @@ Rutas bajo `/motivation/`. Cubre racha, rankings, clanes, retos de clan y Muro d
 **Discoverabilidad de clanes (mobile)**:
 - `MotivationHomeScreen` muestra una tarjeta CTA "Únete a un clan" cuando `myClan === null`, navegando a `ClansList`.
 - Tras `joinClan` exitoso: si `clan.challengeCount > 0`, navega directo a `Challenges`.
-- Label EXPLORAR cambia de "Mis clanes" a "Ver clanes" cuando sin clan.
+- Label EXPLORAR: `myClan ? 'Mis clanes' : 'Ver clanes'` (revisión 2026-09-09: antes mostraba `myClan.name`).
+- `ClanDetailScreen` tiene botón "Descubrir otros clanes" (naranja, ícono brújula)
+  que navega a `ClansList` sin obligar al usuario a salir de su clan primero.
+- `ClansListScreen` — botón "Unirse" siempre visible (revisión 2026-09-09): cuando el
+  usuario ya pertenece a un clan aparece atenuado (gris) y al pulsarlo muestra un
+  `Alert.alert` con texto explicativo y opción "Ir a mi clan" (navega a `ClanDetail`
+  del clan actual) en lugar de ocultarse sin motivo.
+- `leaveClan` — pipeline full-stack: `DELETE /motivation/clans/:id/leave` + `LeaveClanUseCase`
+  + `SupabaseMotivationRepository.leaveClan` (delete de `clan_members`) +
+  `MotivationController.leaveClan` + ruta en `motivationRoutes.ts` + constante
+  `CLAN_LEAVE` en `packages/constants` + `motivationApi.leaveClan(clanId)` en mobile.
+  `ClanDetailScreen` tiene botón rojo "Salir del clan" con `Alert.alert` de confirmación
+  y spinner `ActivityIndicator` mientras procesa. Navega a `ClansList` con `replace` al salir.
 
 **`RachaPeligroModal`** — 3 botones:
 - Primario: "Hacer test rápido" → `GeneratorConfig`.
@@ -635,6 +669,26 @@ Health Connect no está instalado). Estados: `loading → complete / denied / un
   OPOX no escanea Bluetooth — solo solicita permisos de lectura a Health Connect/HealthKit.
   Steps diferenciados por plataforma en `STEPS_ANDROID` / `STEPS_IOS`.
 
+**Fix "Health Connect sigue molestando" (revisión 2026-09-09)**:
+`PairingScreen` mostraba el diálogo de permisos cada vez que se montaba, aunque el
+usuario ya los había concedido desde Ajustes del dispositivo.
+
+- `HealthService.js` — `hasAllHealthPermissions()` (exportada): llama
+  `HealthConnect.getGrantedPermissions()` (sin dialog) y comprueba si todos los
+  permisos de `ANDROID_PERMISSIONS` están ya concedidos. `requestHealthPermissions()`
+  verifica esto antes de llamar `requestPermission()`; si ya están todos, devuelve
+  `true` sin abrir ningún diálogo.
+- `HEALTH_PAIRING_SKIPPED_KEY = 'opox.health.pairingSkipped'` — constante exportada
+  de `HealthService.js`. Persiste la decisión del usuario de "no vincular ahora".
+- `PairingScreen.js` — `run()`: tras verificar estado HC, llama `hasAllHealthPermissions()`;
+  si `true`, salta directo a `phase = 'complete'`. Botón "Continuar igualmente" y botón
+  atrás en estado `denied` persisten `HEALTH_PAIRING_SKIPPED_KEY` en AsyncStorage.
+- `HomeHealthScreen.js` — lee `pairingSkipped` al cargar. Si el flag existe pero los
+  permisos ya están concedidos (usuario los activó desde Ajustes), borra el flag.
+  CTA: `!hasData && pairingSkipped` → "Activa permisos en Ajustes del dispositivo"
+  (→ `Linking.openSettings()`); `!hasData && !pairingSkipped` → "Conecta tu wearable"
+  (→ `ConnectDevice`).
+
 **Datos en HomeHealth** (`HomeHealthScreen.js`): `useFocusEffect` + `getHealthMetrics()`.
 Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.
 `hasData` correcto (revisión 2026-09-07): `isHealthAvailable() && !!metrics &&
@@ -752,6 +806,13 @@ Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, devic
 - `SendNoteReadyUseCase` — push dirigido al owner del apunte cuando el pipeline OCR→tags→preguntas termina (`UploadNoteUseCase.onNoteReady`).
 - `SendStreakWarningUseCase` — broadcast diario a las 01:00 UTC (20:00h Colombia, sin DST), disparado por `NotificationScheduler` con cron `0 1 * * *`.
 - `SendDailyGoalCompletedUseCase` — push al usuario cuando `ToggleTaskUseCase` detecta que ha cruzado el umbral `plan.testsPerDay`.
+- `SendClanChallengeNotificationUseCase` (revisión 2026-09-09) — push a todos los miembros
+  del clan (excepto el retador) al crear un reto. `MotivationController.createClanChallenge`
+  lo dispara fire-and-forget. Tipo `clan_challenge`, destino `screen: 'Challenges'`.
+  `IMotivationRepository.getClanMemberIds(clanId)` — nuevo método de dominio implementado
+  en `SupabaseMotivationRepository` con query a `clan_members`.
+  `PushNotificationData.type` incluye `'clan_challenge'`. `InAppNotificationBanner` muestra
+  icono `flag` naranja para este tipo.
 
 **Mobile — flujo de registro**:
 1. `App.js` — exporta `registerForPushNotifications()` que usa `require('expo-notifications')` lazy (no `import` top-level, para evitar crash en Expo Go SDK 53+). Guard `IS_EXPO_GO = Constants.appOwnership === 'expo'`.

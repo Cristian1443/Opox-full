@@ -8,14 +8,16 @@ import {
     TouchableOpacity,
     StatusBar,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
-import { getHealthMetrics, isHealthAvailable } from '../../services/HealthService';
+import { getHealthMetrics, isHealthAvailable, hasAllHealthPermissions, HEALTH_PAIRING_SKIPPED_KEY } from '../../services/HealthService';
 
 // Colores confirmados contra Figma (frame DASHBOARD SALUD, Bloque 3) sin
 // equivalente exacto en theme.js.
@@ -126,15 +128,28 @@ function energyLabel(pct) {
 export default function HomeHealthScreen({ navigation }) {
     const [metrics, setMetrics] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [pairingSkipped, setPairingSkipped] = useState(false);
 
-    // Recargar datos cada vez que la pantalla recibe foco
+    // Recargar datos y estado de pairing cada vez que la pantalla recibe foco
     const loadMetrics = useCallback(() => {
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const data = await getHealthMetrics();
+            const [data, skipped, permissionsGranted] = await Promise.all([
+                getHealthMetrics(),
+                AsyncStorage.getItem(HEALTH_PAIRING_SKIPPED_KEY).catch(() => null),
+                hasAllHealthPermissions(),
+            ]);
             if (!cancelled) {
                 setMetrics(data);
+                // Si el usuario fue a Ajustes y concedió permisos, limpiar el flag
+                // para que el CTA vuelva a mostrar "conecta tu wearable" (ya no aplica "ajustes").
+                if (skipped && permissionsGranted) {
+                    AsyncStorage.removeItem(HEALTH_PAIRING_SKIPPED_KEY).catch(() => {});
+                    setPairingSkipped(false);
+                } else {
+                    setPairingSkipped(!!skipped);
+                }
                 setLoading(false);
             }
         })();
@@ -196,19 +211,33 @@ export default function HomeHealthScreen({ navigation }) {
                         </View>
                     </TouchableOpacity>
 
-                    {/* Si no hay datos: CTA para conectar */}
+                    {/* Si no hay datos: CTA para conectar o recuperar permisos */}
                     {!hasData && (
-                        <TouchableOpacity
-                            style={styles.connectCta}
-                            onPress={() => navigation.navigate('ConnectDevice')}
-                            activeOpacity={0.85}
-                        >
-                            <Ionicons name="watch-outline" size={20} color={colors.accentOrange} />
-                            <Text style={styles.connectCtaText}>
-                                Conecta tu wearable para ver datos reales
-                            </Text>
-                            <Ionicons name="chevron-forward" size={16} color={colors.accentOrange} />
-                        </TouchableOpacity>
+                        pairingSkipped ? (
+                            <TouchableOpacity
+                                style={styles.connectCta}
+                                onPress={() => Linking.openSettings()}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons name="settings-outline" size={20} color={colors.accentOrange} />
+                                <Text style={styles.connectCtaText}>
+                                    Activa permisos de salud en Ajustes del dispositivo
+                                </Text>
+                                <Ionicons name="chevron-forward" size={16} color={colors.accentOrange} />
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.connectCta}
+                                onPress={() => navigation.navigate('ConnectDevice')}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons name="watch-outline" size={20} color={colors.accentOrange} />
+                                <Text style={styles.connectCtaText}>
+                                    Conecta tu wearable para ver datos reales
+                                </Text>
+                                <Ionicons name="chevron-forward" size={16} color={colors.accentOrange} />
+                            </TouchableOpacity>
+                        )
                     )}
 
                     {/* CARDIOVASCULAR (2 columnas) */}

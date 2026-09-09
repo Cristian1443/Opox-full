@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { motivationApi } from '../../api';
@@ -20,6 +20,17 @@ export default function ClansListScreen({ navigation }) {
     useEffect(() => { load(); }, [load]);
 
     const handleJoin = async (clan) => {
+        if (myClan) {
+            Alert.alert(
+                'Ya estás en un clan',
+                `Para unirte a "${clan.name}" debes salir primero de "${myClan.name}".`,
+                [
+                    { text: 'Ir a mi clan', onPress: () => navigation.navigate('ClanDetail', { clanId: myClan.id }) },
+                    { text: 'Cancelar', style: 'cancel' },
+                ],
+            );
+            return;
+        }
         const { error } = await motivationApi.joinClan(clan.id);
         if (!error) {
             load();
@@ -90,11 +101,12 @@ export default function ClansListScreen({ navigation }) {
                                     <Text style={styles.clanName}>{c.name}</Text>
                                     <Text style={styles.clanCaption}>{c.memberCount} miembros</Text>
                                 </View>
-                                {!myClan && (
-                                    <TouchableOpacity style={styles.joinBtn} onPress={() => handleJoin(c)}>
-                                        <Text style={styles.joinBtnText}>Unirse</Text>
-                                    </TouchableOpacity>
-                                )}
+                                <TouchableOpacity
+                                    style={[styles.joinBtn, myClan && styles.joinBtnDisabled]}
+                                    onPress={() => handleJoin(c)}
+                                >
+                                    <Text style={[styles.joinBtnText, myClan && styles.joinBtnTextDisabled]}>Unirse</Text>
+                                </TouchableOpacity>
                             </View>
                             {index < clans.length - 1 && <View style={styles.separator} />}
                         </View>
@@ -185,6 +197,8 @@ const styles = StyleSheet.create({
     // Figma: pill de borde fino (no relleno), morado oscuro
     joinBtn: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.textDark, borderRadius: 20, paddingVertical: 10, paddingHorizontal: 20 },
     joinBtnText: { fontSize: 14, fontWeight: '700', color: colors.textDark },
+    joinBtnDisabled: { borderColor: '#C8CDD8', backgroundColor: colors.white },
+    joinBtnTextDisabled: { color: '#C8CDD8' },
     createBtn: { backgroundColor: colors.ctaGreen, height: 61, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md },
     createBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
     overlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },

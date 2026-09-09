@@ -18,11 +18,14 @@ import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 import ConnectionSuccessModal from '../../components/ConnectionSuccessModal';
 import ConnectionErrorModal from '../../components/ConnectionErrorModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     requestHealthPermissions,
+    hasAllHealthPermissions,
     isHealthAvailable,
     getHealthConnectStatus,
     openHealthConnectPlayStore,
+    HEALTH_PAIRING_SKIPPED_KEY,
 } from '../../services/HealthService';
 import { healthApi } from '../../api';
 import { Platform } from 'react-native';
@@ -179,6 +182,18 @@ export default function PairingScreen({ navigation, route }) {
             }
 
             if (!cancelled) setStepIdx(0);
+
+            // Comprobar si ya tiene todos los permisos concedidos antes de abrir
+            // el diálogo — evita la molestia de volver a pedir algo ya concedido
+            // o de mostrar "Permiso denegado" sin que el usuario haya visto diálogo.
+            const alreadyGranted = await hasAllHealthPermissions();
+            if (cancelled) return;
+            if (alreadyGranted) {
+                setStepIdx(STEPS.length);
+                setPhase('complete');
+                return;
+            }
+
             await _wait(1200);
 
             if (!cancelled) setStepIdx(1);
@@ -225,9 +240,13 @@ export default function PairingScreen({ navigation, route }) {
 
     // ── Estado: permisos denegados ───────────────────────────────────────────
     if (phase === 'denied') {
+        const handleDeniedBack = () => {
+            AsyncStorage.setItem(HEALTH_PAIRING_SKIPPED_KEY, '1').catch(() => {});
+            navigation.goBack();
+        };
         return (
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-                <HealthScreenHeader title="Sin acceso" onBack={() => navigation.goBack()} />
+                <HealthScreenHeader title="Sin acceso" onBack={handleDeniedBack} />
                 <View style={styles.centeredContent}>
                     <Ionicons name="alert-circle" size={64} color={colors.statRed} />
                     <Text style={styles.stateTitle}>Permiso denegado</Text>
@@ -244,7 +263,10 @@ export default function PairingScreen({ navigation, route }) {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.skipButton}
-                        onPress={() => navigation.navigate('HomeHealth')}
+                        onPress={() => {
+                            AsyncStorage.setItem(HEALTH_PAIRING_SKIPPED_KEY, '1').catch(() => {});
+                            navigation.navigate('HomeHealth');
+                        }}
                         activeOpacity={0.7}
                     >
                         <Text style={styles.skipButtonText}>Continuar igualmente</Text>
