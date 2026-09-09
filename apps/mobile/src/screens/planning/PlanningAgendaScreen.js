@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { planningApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
@@ -19,41 +20,12 @@ const BADGE_PALETTE = [
     { solid: colors.purple, bg: 'rgba(114,65,184,0.15)' },
 ];
 
-const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-function daysInMonth(month, year) {
-    return new Date(year, month, 0).getDate();
+function toIso(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
-
-function todayParts() {
-    const t = new Date();
-    return { day: t.getDate(), month: t.getMonth() + 1, year: t.getFullYear() };
-}
-
-function pad2(n) { return String(n).padStart(2, '0'); }
-
-// ─── Selector +/- para un valor numérico o de lista ──────────────────────────
-function Spinner({ label, value, onDec, onInc }) {
-    return (
-        <View style={sp.col}>
-            <TouchableOpacity onPress={onInc} style={sp.btn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Ionicons name="chevron-up" size={20} color={colors.purple} />
-            </TouchableOpacity>
-            <Text style={sp.value}>{value}</Text>
-            <TouchableOpacity onPress={onDec} style={sp.btn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Ionicons name="chevron-down" size={20} color={colors.purple} />
-            </TouchableOpacity>
-            <Text style={sp.label}>{label}</Text>
-        </View>
-    );
-}
-
-const sp = StyleSheet.create({
-    col: { alignItems: 'center', flex: 1 },
-    btn: { padding: 6 },
-    value: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: colors.textDark, minWidth: 48, textAlign: 'center' },
-    label: { fontFamily: 'Poppins-Regular', fontSize: 10, color: FIGMA.textNote, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
-});
 
 // ─── Fila de fecha en la lista ────────────────────────────────────────────────
 function formatDay(dateIso) {
@@ -88,12 +60,9 @@ export default function PlanningAgendaScreen({ navigation }) {
     const [form, setForm] = useState({ title: '', subtitle: '' });
     const [saving, setSaving] = useState(false);
 
-    // Estado del date picker
     const [pickerVisible, setPickerVisible] = useState(false);
-    const [pickerDay, setPickerDay] = useState(todayParts().day);
-    const [pickerMonth, setPickerMonth] = useState(todayParts().month);
-    const [pickerYear, setPickerYear] = useState(todayParts().year);
-    const [selectedDate, setSelectedDate] = useState('');  // YYYY-MM-DD confirmado
+    const [selectedDate, setSelectedDate] = useState(null);   // Date object confirmado
+    const [tempDate, setTempDate] = useState(new Date());     // iOS: pendiente de confirmar
 
     const load = useCallback(() => {
         planningApi.listAgenda().then(({ data }) => { if (data) setDates(data); });
@@ -101,28 +70,30 @@ export default function PlanningAgendaScreen({ navigation }) {
 
     useEffect(() => { load(); }, [load]);
 
-    // Clamp día cuando cambia mes/año
-    const clampDay = (d, m, y) => Math.min(d, daysInMonth(m, y));
-
-    const incDay   = () => { const max = daysInMonth(pickerMonth, pickerYear); setPickerDay(d => d >= max ? 1 : d + 1); };
-    const decDay   = () => { const max = daysInMonth(pickerMonth, pickerYear); setPickerDay(d => d <= 1 ? max : d - 1); };
-    const incMonth = () => { const nm = pickerMonth >= 12 ? 1 : pickerMonth + 1; setPickerMonth(nm); setPickerDay(d => clampDay(d, nm, pickerYear)); };
-    const decMonth = () => { const nm = pickerMonth <= 1 ? 12 : pickerMonth - 1; setPickerMonth(nm); setPickerDay(d => clampDay(d, nm, pickerYear)); };
-    const incYear  = () => { const ny = pickerYear + 1; setPickerYear(ny); setPickerDay(d => clampDay(d, pickerMonth, ny)); };
-    const decYear  = () => { const ny = pickerYear - 1; setPickerYear(ny); setPickerDay(d => clampDay(d, pickerMonth, ny)); };
-
-    const confirmDate = () => {
-        const iso = `${pickerYear}-${pad2(pickerMonth)}-${pad2(pickerDay)}`;
-        setSelectedDate(iso);
-        setPickerVisible(false);
-    };
-
     const openModal = () => {
-        const { day, month, year } = todayParts();
-        setPickerDay(day); setPickerMonth(month); setPickerYear(year);
-        setSelectedDate('');
+        setSelectedDate(null);
+        setTempDate(new Date());
         setForm({ title: '', subtitle: '' });
         setModalVisible(true);
+    };
+
+    const openPicker = () => {
+        setTempDate(selectedDate ?? new Date());
+        setPickerVisible(true);
+    };
+
+    const handlePickerChange = (event, date) => {
+        if (Platform.OS === 'android') {
+            setPickerVisible(false);
+            if (event.type !== 'dismissed' && date) setSelectedDate(date);
+        } else {
+            if (date) setTempDate(date);
+        }
+    };
+
+    const confirmIosPicker = () => {
+        setSelectedDate(tempDate);
+        setPickerVisible(false);
     };
 
     const handleSave = async () => {
@@ -134,7 +105,7 @@ export default function PlanningAgendaScreen({ navigation }) {
         setSaving(true);
         const { data, error } = await planningApi.createAgendaDate({
             title: form.title.trim(),
-            eventDate: selectedDate,
+            eventDate: toIso(selectedDate),
             subtitle: form.subtitle.trim() || undefined,
             kind: 'custom',
         });
@@ -148,7 +119,7 @@ export default function PlanningAgendaScreen({ navigation }) {
     };
 
     const displayDate = selectedDate
-        ? `${pad2(parseInt(selectedDate.split('-')[2]))} ${MONTHS_ES[parseInt(selectedDate.split('-')[1]) - 1]} ${selectedDate.split('-')[0]}`
+        ? selectedDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
         : 'Seleccionar fecha';
 
     return (
@@ -190,10 +161,10 @@ export default function PlanningAgendaScreen({ navigation }) {
                             onChangeText={(title) => setForm(f => ({ ...f, title }))}
                         />
 
-                        {/* Campo de fecha — abre el picker al tocar */}
+                        {/* Campo de fecha — abre el picker nativo al tocar */}
                         <TouchableOpacity
-                            style={[styles.input, styles.dateTouchable, !selectedDate && styles.datePlaceholder]}
-                            onPress={() => setPickerVisible(true)}
+                            style={[styles.input, styles.dateTouchable]}
+                            onPress={openPicker}
                             activeOpacity={0.7}
                         >
                             <Ionicons name="calendar-outline" size={16} color={selectedDate ? colors.textDark : '#AEB5C2'} style={{ marginRight: 8 }} />
@@ -228,44 +199,40 @@ export default function PlanningAgendaScreen({ navigation }) {
                 </View>
             </Modal>
 
-            {/* ── Modal: selector de fecha ───────────────────────────────── */}
-            <Modal transparent visible={pickerVisible} animationType="slide" onRequestClose={() => setPickerVisible(false)}>
-                <View style={styles.pickerOverlay}>
-                    <View style={styles.pickerCard}>
-                        <Text style={styles.pickerTitle}>Seleccionar fecha</Text>
+            {/* ── DateTimePicker nativo ──────────────────────────────────── */}
+            {/* Android: se muestra como diálogo nativo directamente */}
+            {pickerVisible && Platform.OS === 'android' && (
+                <DateTimePicker
+                    value={tempDate}
+                    mode="date"
+                    display="default"
+                    onChange={handlePickerChange}
+                />
+            )}
 
-                        <View style={styles.pickersRow}>
-                            <Spinner
-                                label="DÍA"
-                                value={pad2(pickerDay)}
-                                onInc={incDay}
-                                onDec={decDay}
+            {/* iOS: envuelto en modal de confirmación */}
+            {Platform.OS === 'ios' && (
+                <Modal transparent visible={pickerVisible} animationType="slide" onRequestClose={() => setPickerVisible(false)}>
+                    <View style={styles.pickerOverlay}>
+                        <View style={styles.pickerCard}>
+                            <Text style={styles.pickerTitle}>Seleccionar fecha</Text>
+                            <DateTimePicker
+                                value={tempDate}
+                                mode="date"
+                                display="spinner"
+                                onChange={handlePickerChange}
+                                locale="es-ES"
                             />
-                            <View style={styles.pickerDivider} />
-                            <Spinner
-                                label="MES"
-                                value={MONTHS_ES[pickerMonth - 1]}
-                                onInc={incMonth}
-                                onDec={decMonth}
-                            />
-                            <View style={styles.pickerDivider} />
-                            <Spinner
-                                label="AÑO"
-                                value={String(pickerYear)}
-                                onInc={incYear}
-                                onDec={decYear}
-                            />
+                            <TouchableOpacity style={[styles.btn, { marginTop: 12 }]} onPress={confirmIosPicker} activeOpacity={0.85}>
+                                <Text style={styles.btnText}>Confirmar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setPickerVisible(false)} style={{ marginTop: 8 }}>
+                                <Text style={styles.cancel}>Cancelar</Text>
+                            </TouchableOpacity>
                         </View>
-
-                        <TouchableOpacity style={[styles.btn, { marginTop: 20 }]} onPress={confirmDate} activeOpacity={0.85}>
-                            <Text style={styles.btnText}>Confirmar</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setPickerVisible(false)} style={{ marginTop: 8 }}>
-                            <Text style={styles.cancel}>Cancelar</Text>
-                        </TouchableOpacity>
                     </View>
-                </View>
-            </Modal>
+                </Modal>
+            )}
         </SafeAreaView>
     );
 }
@@ -297,16 +264,13 @@ const styles = StyleSheet.create({
     modalTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: colors.textDark, marginBottom: 12 },
     input: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.textDark, marginBottom: 10 },
     dateTouchable: { flexDirection: 'row', alignItems: 'center' },
-    datePlaceholder: { borderColor: '#E4E8F0' },
     dateText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: colors.textDark },
     datePlaceholderText: { color: '#AEB5C2' },
     btn: { backgroundColor: colors.ctaGreen, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
     btnText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: colors.white },
     cancel: { textAlign: 'center', fontFamily: 'Poppins-SemiBold', color: FIGMA.textNote, fontSize: 12 },
-    // Modal selector de fecha
+    // Modal picker iOS
     pickerOverlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', justifyContent: 'flex-end' },
     pickerCard: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 36 },
-    pickerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, textAlign: 'center', marginBottom: 24 },
-    pickersRow: { flexDirection: 'row', alignItems: 'center' },
-    pickerDivider: { width: 1, height: 60, backgroundColor: '#E4E8F0', marginHorizontal: 4 },
+    pickerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, textAlign: 'center', marginBottom: 8 },
 });
