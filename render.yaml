@@ -45,5 +45,5 @@ services:
         sync: false
       - key: EXPO_ACCESS_TOKEN
         sync: false
-      - key: HEALTH_GEMINI_API_KEY
+      - key: HEALTH_OPENAI_API_KEY
         sync: false
