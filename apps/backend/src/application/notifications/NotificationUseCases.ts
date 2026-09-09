@@ -1,4 +1,5 @@
 import type { IPushRepository } from '../../domain/repositories/IPushRepository';
+import type { IMotivationRepository } from '../../domain/repositories/IMotivationRepository';
 import type { UpsertPushTokenInput } from '../../domain/entities/PushToken';
 import type { ExpoPushService, PushMessage } from '../../infrastructure/push/ExpoPushService';
 import { PushTokenInvalidError } from '../../domain/errors/NotificationsError';
@@ -99,6 +100,46 @@ export class SendDailyGoalCompletedUseCase {
 
         await this.pushService.send(messages);
         logger.info('[notifications] daily-goal-completed enviado', { userId });
+    }
+}
+
+// ── 13.6 Reto de clan recibido ────────────────────────────────────────────────
+// Notifica a todos los miembros del clan (excepto al creador) que hay un nuevo reto.
+
+export class SendClanChallengeNotificationUseCase {
+    constructor(
+        private readonly motivationRepo: IMotivationRepository,
+        private readonly pushRepo: IPushRepository,
+        private readonly pushService: ExpoPushService,
+    ) {}
+
+    async execute(input: {
+        clanId: string;
+        challengerId: string;
+        challengeTitle: string;
+        clanName: string;
+    }): Promise<void> {
+        const memberIds = await this.motivationRepo.getClanMemberIds(input.clanId);
+        const recipientIds = memberIds.filter((id) => id !== input.challengerId);
+        if (recipientIds.length === 0) return;
+
+        const messages: PushMessage[] = [];
+        for (const userId of recipientIds) {
+            const tokens = await this.pushRepo.getTokensByUser(userId);
+            for (const t of tokens) {
+                messages.push({
+                    to: t.token,
+                    title: '⚔️ ¡Nuevo reto de clan!',
+                    body: `${input.challengeTitle} — ¿Aceptas el desafío?`,
+                    data: { type: 'clan_challenge', screen: 'Challenges', params: { clanId: input.clanId } },
+                    sound: 'default',
+                });
+            }
+        }
+
+        if (messages.length === 0) return;
+        await this.pushService.send(messages);
+        logger.info('[notifications] clan-challenge enviado', { clanId: input.clanId, recipients: messages.length });
     }
 }
 

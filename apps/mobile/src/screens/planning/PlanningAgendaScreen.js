@@ -54,6 +54,7 @@ export default function PlanningAgendaScreen({ navigation }) {
     const [dates, setDates] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [form, setForm] = useState({ title: '', eventDate: '', subtitle: '' });
+    const [dateError, setDateError] = useState(false);
 
     const load = useCallback(() => {
         planningApi.listAgenda().then(({ data }) => { if (data) setDates(data); });
@@ -62,7 +63,12 @@ export default function PlanningAgendaScreen({ navigation }) {
     useEffect(() => { load(); }, [load]);
 
     const handleSave = async () => {
-        if (!form.title.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(form.eventDate)) return;
+        if (!form.title.trim()) return;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(form.eventDate)) {
+            setDateError(true);
+            return;
+        }
+        setDateError(false);
         const { data } = await planningApi.createAgendaDate({
             title: form.title.trim(),
             eventDate: form.eventDate,
@@ -128,12 +134,18 @@ export default function PlanningAgendaScreen({ navigation }) {
                             onChangeText={(title) => setForm((f) => ({ ...f, title }))}
                         />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, dateError && { borderColor: '#E53E3E' }]}
                             placeholder="Fecha (YYYY-MM-DD)"
                             placeholderTextColor="#AEB5C2"
+                            keyboardType="numeric"
                             value={form.eventDate}
-                            onChangeText={(eventDate) => setForm((f) => ({ ...f, eventDate }))}
+                            onChangeText={(eventDate) => { setDateError(false); setForm((f) => ({ ...f, eventDate })); }}
                         />
+                        {dateError && (
+                            <Text style={styles.dateErrorText}>
+                                Formato incorrecto. Usa AAAA-MM-DD (ej. 2026-09-10)
+                            </Text>
+                        )}
                         <TextInput
                             style={styles.input}
                             placeholder="Detalle (opcional)"
@@ -199,6 +211,7 @@ const styles = StyleSheet.create({
     modalCard: { backgroundColor: colors.white, borderRadius: 16, padding: 18, width: '100%' },
     modalTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: colors.textDark, marginBottom: 12 },
     input: { borderWidth: 1.5, borderColor: '#E4E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.textDark, marginBottom: 10 },
+    dateErrorText: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#E53E3E', marginTop: -6, marginBottom: 8 },
     btn: { backgroundColor: colors.ctaGreen, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
     btnText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: colors.white },
     cancel: { textAlign: 'center', fontFamily: 'Poppins-SemiBold', color: FIGMA.textNote, fontSize: 12 },

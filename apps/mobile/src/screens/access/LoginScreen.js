@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     StyleSheet,
     Text,
@@ -12,6 +12,7 @@ import {
     Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
@@ -128,17 +129,21 @@ export default function LoginScreen({ navigation, route }) {
     const [biometricLabelText, setBiometricLabelText] = useState('Face ID');
     const [biometricType, setBiometricType] = useState(null);
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
+        let cancelled = false;
         (async () => {
             const [type, linked] = await Promise.all([
                 detectBiometricType(),
                 isBiometricLinked(),
             ]);
-            setBiometricAvailable(type !== 'none' && linked);
-            setBiometricLabelText(biometricLabel(type) || 'biometría');
-            setBiometricType(type);
+            if (!cancelled) {
+                setBiometricAvailable(type !== 'none' && linked);
+                setBiometricLabelText(biometricLabel(type) || 'biometría');
+                setBiometricType(type);
+            }
         })();
-    }, []);
+        return () => { cancelled = true; };
+    }, []));
 
     const handleBiometricLogin = async () => {
         setError(null);

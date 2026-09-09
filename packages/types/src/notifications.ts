@@ -14,5 +14,5 @@ export interface RegisterPushTokenResponse {
 export interface PushNotificationData {
     screen?: string;
     params?: Record<string, unknown>;
-    type?: 'boe_alert' | 'note_ready' | 'streak_warning' | 'daily_reminder';
+    type?: 'boe_alert' | 'note_ready' | 'streak_warning' | 'daily_reminder' | 'clan_challenge';
 }
