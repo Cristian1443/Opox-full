@@ -173,6 +173,7 @@ Rutas bajo `/planning/`. Revisado y auditado post-testing (2026-08-23).
 - Tab "Test de práctica": carga temas con `boeApi.listTopics('justicia-tramitacion')` (NO `trainingApi.listTopics()` — sin `oposicion` devuelve 0 filas).
 - `TrainingTopic` usa campo `label` (no `name`).
 - Subtitle de tarea test: `JSON.stringify({ topicId, count })`. `tryParseTestParams(subtitle)` lo decodifica.
+  `PlanningWeekScreen.js` incluye la misma función para evitar que el JSON raw aparezca en la vista semanal (revisión 2026-09-09).
 - Al pulsar "Empezar": `navigation.navigate('GeneratorConfig', { topicId, questionCount })`.
 
 **Macro con temas reales**:
@@ -230,7 +231,19 @@ Rutas bajo `/motivation/`. Cubre racha, rankings, clanes, retos de clan y Muro d
 **Discoverabilidad de clanes (mobile)**:
 - `MotivationHomeScreen` muestra una tarjeta CTA "Únete a un clan" cuando `myClan === null`, navegando a `ClansList`.
 - Tras `joinClan` exitoso: si `clan.challengeCount > 0`, navega directo a `Challenges`.
-- Label EXPLORAR cambia de "Mis clanes" a "Ver clanes" cuando sin clan.
+- Label EXPLORAR: `myClan ? 'Mis clanes' : 'Ver clanes'` (revisión 2026-09-09: antes mostraba `myClan.name`).
+- `ClanDetailScreen` tiene botón "Descubrir otros clanes" (naranja, ícono brújula)
+  que navega a `ClansList` sin obligar al usuario a salir de su clan primero.
+- `ClansListScreen` — botón "Unirse" siempre visible (revisión 2026-09-09): cuando el
+  usuario ya pertenece a un clan aparece atenuado (gris) y al pulsarlo muestra un
+  `Alert.alert` con texto explicativo y opción "Ir a mi clan" (navega a `ClanDetail`
+  del clan actual) en lugar de ocultarse sin motivo.
+- `leaveClan` — pipeline full-stack: `DELETE /motivation/clans/:id/leave` + `LeaveClanUseCase`
+  + `SupabaseMotivationRepository.leaveClan` (delete de `clan_members`) +
+  `MotivationController.leaveClan` + ruta en `motivationRoutes.ts` + constante
+  `CLAN_LEAVE` en `packages/constants` + `motivationApi.leaveClan(clanId)` en mobile.
+  `ClanDetailScreen` tiene botón rojo "Salir del clan" con `Alert.alert` de confirmación
+  y spinner `ActivityIndicator` mientras procesa. Navega a `ClansList` con `replace` al salir.
 
 **`RachaPeligroModal`** — 3 botones:
 - Primario: "Hacer test rápido" → `GeneratorConfig`.
@@ -655,6 +668,26 @@ Health Connect no está instalado). Estados: `loading → complete / denied / un
   "Conectando con … / Acepta los permisos de lectura" (antes describía búsqueda BLE inexistente).
   OPOX no escanea Bluetooth — solo solicita permisos de lectura a Health Connect/HealthKit.
   Steps diferenciados por plataforma en `STEPS_ANDROID` / `STEPS_IOS`.
+
+**Fix "Health Connect sigue molestando" (revisión 2026-09-09)**:
+`PairingScreen` mostraba el diálogo de permisos cada vez que se montaba, aunque el
+usuario ya los había concedido desde Ajustes del dispositivo.
+
+- `HealthService.js` — `hasAllHealthPermissions()` (exportada): llama
+  `HealthConnect.getGrantedPermissions()` (sin dialog) y comprueba si todos los
+  permisos de `ANDROID_PERMISSIONS` están ya concedidos. `requestHealthPermissions()`
+  verifica esto antes de llamar `requestPermission()`; si ya están todos, devuelve
+  `true` sin abrir ningún diálogo.
+- `HEALTH_PAIRING_SKIPPED_KEY = 'opox.health.pairingSkipped'` — constante exportada
+  de `HealthService.js`. Persiste la decisión del usuario de "no vincular ahora".
+- `PairingScreen.js` — `run()`: tras verificar estado HC, llama `hasAllHealthPermissions()`;
+  si `true`, salta directo a `phase = 'complete'`. Botón "Continuar igualmente" y botón
+  atrás en estado `denied` persisten `HEALTH_PAIRING_SKIPPED_KEY` en AsyncStorage.
+- `HomeHealthScreen.js` — lee `pairingSkipped` al cargar. Si el flag existe pero los
+  permisos ya están concedidos (usuario los activó desde Ajustes), borra el flag.
+  CTA: `!hasData && pairingSkipped` → "Activa permisos en Ajustes del dispositivo"
+  (→ `Linking.openSettings()`); `!hasData && !pairingSkipped` → "Conecta tu wearable"
+  (→ `ConnectDevice`).
 
 **Datos en HomeHealth** (`HomeHealthScreen.js`): `useFocusEffect` + `getHealthMetrics()`.
 Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.
