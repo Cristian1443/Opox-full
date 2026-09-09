@@ -625,6 +625,15 @@ export class SupabaseMotivationRepository implements IMotivationRepository {
         };
     }
 
+    async getClanMemberIds(clanId: string): Promise<string[]> {
+        const { data, error } = await this.supabaseAdmin
+            .from('clan_members')
+            .select('user_id')
+            .eq('clan_id', clanId);
+        if (error) throw new Error(`getClanMemberIds: ${error.message}`);
+        return ((data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
+    }
+
     async completeChallenge(input: { challengeId: string; userId: string }): Promise<void> {
         const { data: challengeRow, error: chErr } = await this.supabaseAdmin
             .from('clan_challenges')

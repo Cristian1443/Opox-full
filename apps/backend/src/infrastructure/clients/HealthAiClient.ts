@@ -71,6 +71,7 @@ export class HealthAiClient {
                 logger.warn('[health-ai] JSON parse falló, reintentando');
             }
         }
+        throw new Error('[health-ai] openai: bucle terminó sin resultado');
     }
 
     // Gemini REST API: POST /models/{model}:generateContent?key={apiKey}
@@ -135,6 +136,7 @@ export class HealthAiClient {
                 logger.warn('[health-ai] Gemini JSON parse falló, reintentando', { attempt });
             }
         }
+        throw new Error('[health-ai] gemini: bucle terminó sin resultado');
     }
 
     // ─── Tarea 2: Menús de estudio ────────────────────────────────────────────

@@ -39,6 +39,7 @@ export default function InAppNotificationBanner({
     note_ready:      { name: 'checkmark-circle', color: '#1f9d6b' },
     streak_warning:  { name: 'flame', color: '#F26C4F' },
     daily_reminder:  { name: 'notifications', color: '#7B4BC4' },
+    clan_challenge:  { name: 'flag', color: '#F37D27' },
   };
   const icon = iconMap[type] ?? iconMap.daily_reminder;
 

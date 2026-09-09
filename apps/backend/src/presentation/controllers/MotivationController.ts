@@ -57,6 +57,7 @@ export class MotivationController {
             createClanChallenge: CreateClanChallengeUseCase;
             completeChallenge: CompleteChallengeUseCase;
             listGraduates: ListGraduatesUseCase;
+            notifyClanChallenge?: (input: { clanId: string; challengerId: string; challengeTitle: string; clanName: string }) => void;
         },
     ) { }
 
@@ -252,9 +253,10 @@ export class MotivationController {
                 expiresAt?: string;
                 topicId?: string;
             };
+            const clanId = req.params['id'] as string;
             const result = await this.deps.createClanChallenge.execute({
                 userId: req.authUser!.id,
-                clanId: req.params['id'] as string,
+                clanId,
                 title,
                 subtitle,
                 questionCount,
@@ -262,6 +264,7 @@ export class MotivationController {
                 expiresAt,
                 topicId,
             });
+            this.deps.notifyClanChallenge?.({ clanId, challengerId: req.authUser!.id, challengeTitle: title, clanName: '' });
             this.ok(res, 201, this.serializeChallenge(result));
         } catch (err) { next(err); }
     };

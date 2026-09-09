@@ -136,6 +136,7 @@ import {
     SendNoteReadyUseCase,
     SendStreakWarningUseCase,
     SendDailyGoalCompletedUseCase,
+    SendClanChallengeNotificationUseCase,
 } from './application';
 import {
     getSupabaseAuth,
@@ -301,6 +302,7 @@ export function buildContainer() {
     const registerPushToken        = new RegisterPushTokenUseCase(pushRepo);
     const sendBoeAlert             = new SendBoeAlertUseCase(pushRepo, pushService);
     const sendNoteReady            = new SendNoteReadyUseCase(pushRepo, pushService);
+    const sendClanChallenge        = new SendClanChallengeNotificationUseCase(motivationRepo, pushRepo, pushService);
     const sendStreakWarning        = new SendStreakWarningUseCase(pushRepo, pushService);
     const sendDailyGoalCompleted   = new SendDailyGoalCompletedUseCase(pushRepo, pushService);
 
@@ -664,6 +666,7 @@ export function buildContainer() {
         createClanChallenge: useCases.createClanChallenge,
         completeChallenge: useCases.completeChallenge,
         listGraduates: useCases.listGraduates,
+        notifyClanChallenge: (input) => { sendClanChallenge.execute(input).catch(() => {}); },
     });
 
     return {
