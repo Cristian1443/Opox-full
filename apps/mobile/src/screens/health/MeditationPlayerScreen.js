@@ -195,6 +195,18 @@ export default function MeditationPlayerScreen({ navigation, route }) {
     const progressed = totalSeconds - timeLeft;
     const progressPct = totalSeconds > 0 ? (progressed / totalSeconds) * 100 : 0;
 
+    // Fase activa cuando hay guion IA (session.phases)
+    const phases = session.phases ?? null;
+    let activePhase = null;
+    if (phases && phases.length > 0) {
+        let acc = 0;
+        for (const phase of phases) {
+            acc += phase.segundos ?? 0;
+            if (progressed < acc) { activePhase = phase; break; }
+        }
+        if (!activePhase) activePhase = phases[phases.length - 1];
+    }
+
     // ── Handlers ──────────────────────────────────────────────────────────────
 
     const handlePlayPause = useCallback(async () => {
@@ -256,11 +268,18 @@ export default function MeditationPlayerScreen({ navigation, route }) {
 
             <View style={styles.content}>
                 <View style={styles.moonCircle}>
-                    <MoonIcon size={100} />
+                    <MoonIcon size={70} />
                 </View>
 
                 <Text style={styles.title}>{session.title}</Text>
                 <Text style={styles.subtitle}>{session.subtitle}</Text>
+
+                {activePhase && (
+                    <View style={styles.phaseWrap}>
+                        <Text style={styles.phaseName}>{activePhase.nombre}</Text>
+                        <Text style={styles.phaseText}>{activePhase.texto}</Text>
+                    </View>
+                )}
 
                 <View style={styles.progressWrap}>
                     <View style={styles.progressBg}>
@@ -358,35 +377,56 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-evenly',
         paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.sm,
     },
     moonCircle: {
-        width: 249,
-        height: 249,
-        borderRadius: 249 / 2,
+        width: 172,
+        height: 172,
+        borderRadius: 86,
         backgroundColor: FIGMA.moonCircleBg,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.xl,
     },
     title: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 21,
+        fontSize: 19,
         color: '#FFFFFF',
         textAlign: 'center',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     subtitle: {
         fontFamily: 'Poppins-Light',
-        fontSize: 13.8,
+        fontSize: 13,
         color: FIGMA.subtitleGray,
         textAlign: 'center',
-        marginBottom: spacing.xl * 2,
+    },
+    phaseWrap: {
+        alignSelf: 'stretch',
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 14,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+    },
+    phaseName: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 12,
+        color: colors.accentOrange,
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    phaseText: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 13.5,
+        color: '#FFFFFF',
+        textAlign: 'center',
+        lineHeight: 20,
     },
     progressWrap: {
         alignSelf: 'stretch',
-        marginBottom: spacing.xl,
     },
     progressBg: {
         height: 7.3,

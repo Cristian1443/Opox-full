@@ -8,10 +8,13 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 import { healthApi } from '../../api';
+
+export const FATIGUE_LEVEL_KEY = 'opox.health.fatigueLevel';
 
 // Colores confirmados contra Figma (frame MOTOR DE FATIGA, Bloque 3) sin
 // equivalente exacto en theme.js.
@@ -135,6 +138,21 @@ export default function FatigueEngineScreen({ navigation, route }) {
         }).catch(() => { /* fallback silencioso al cálculo local */ });
         return () => { cancelled = true; };
     }, []);
+
+    // Persistir nivel de fatiga para que MenusScreen, StudyTipsScreen y
+    // MeditationListScreen lo lean sin necesitar params de navegación.
+    useEffect(() => {
+        if (motorResult) {
+            // El Motor ya da 'bajo'|'medio'|'alto'
+            AsyncStorage.setItem(FATIGUE_LEVEL_KEY, motorResult.nivel ?? 'bajo');
+        } else if (metrics) {
+            const sigs = buildSignals(metrics);
+            const crit = sigs.filter((s) => s.severity === 'critical').length;
+            const warn = sigs.filter((s) => s.severity === 'warning').length;
+            const level = crit >= 2 ? 'alto' : (crit === 1 || warn >= 2) ? 'medio' : 'bajo';
+            AsyncStorage.setItem(FATIGUE_LEVEL_KEY, level);
+        }
+    }, [motorResult, metrics]);
 
     // Motor disponible → usa sus datos; sin Motor → cálculo local.
     const SIGNALS = motorResult
