@@ -77,7 +77,7 @@ export class GenerateDeckUseCase {
                     topicTitle: params.topicTitle,
                     oposicion: params.oposicion,
                     cursoId: params.cursoId,
-                    count: 10,
+                    count: 15,
                 });
                 if (!cards.length) throw new Error('Motor devolvió 0 tarjetas');
             } catch (err) {

@@ -162,7 +162,7 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
 export default function TutorSummariesScreen({ navigation, route }) {
     // topicId + oposicion llegan cuando se navega desde un selector de temas
     const initialTopicId = route?.params?.topicId ?? null;
-    const [oposicion, setOposicion] = useState(route?.params?.oposicion ?? 'justicia-tramitacion');
+    const [oposicion, setOposicion] = useState(route?.params?.oposicion ?? 'policia-local-galicia');
 
     useEffect(() => {
         if (route?.params?.oposicion) return;

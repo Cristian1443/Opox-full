@@ -104,6 +104,8 @@ export const API_ROUTES = {
         EPISODES:             '/tutor/podcast/episodes',
         EPISODE:              '/tutor/podcast/episodes/:id',
         PODCAST_PROGRESS:     '/tutor/podcast/progress/:episodeId',
+        PODCAST_GENERATE:     '/tutor/podcast/generate',
+        PODCAST_AUDIO:        '/tutor/podcast/audio/:filename',
         // Resúmenes
         SUMMARIES:            '/tutor/summaries',
         SUMMARY:              '/tutor/summaries/:topicId',

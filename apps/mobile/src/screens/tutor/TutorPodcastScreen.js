@@ -11,36 +11,40 @@ import {
     Alert,
     FlatList,
     ActivityIndicator,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
+import { API_BASE_URL } from '../../api/config';
 
-// Colores confirmados contra Figma (frame PODCAST, Bloque 8) sin
-// equivalente exacto en theme.js.
+// Colores confirmados contra Figma (frame PODCAST, Bloque 8).
 const FIGMA = {
     progressTrack: '#F1F1F1',
     timeLabel: '#919097',
     controlBg: '#EDEDED',
     playBg: 'rgba(36,189,144,0.15)',
-    // Verde más claro que colors.ctaGreen, documentado tal cual está en
-    // Figma (a confirmar con diseño si debería unificarse).
     playIcon: '#65C681',
     subtitleMuted: 'rgba(65,41,80,0.5)',
 };
 
-// Alturas máximas (px) de cada barra del waveform — distribución asimétrica
-// para que parezca una onda de audio real y no un bloque uniforme.
+// Alturas máximas (px) de cada barra del waveform.
 const WAVE_HEIGHTS = [10, 18, 26, 16, 22, 12, 20];
 
 const SPEEDS = [0.5, 1.0, 1.5, 2.0];
-const TOTAL_SECONDS = 600; // 10:00
+
+const DURACIONES = [
+    { key: 'corta', label: 'Corta', sub: '≈ 5 min · repaso' },
+    { key: 'media', label: 'Media', sub: '≈ 10 min · tema con calma' },
+];
 
 const formatTime = (seconds) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
     const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const s = Math.floor(seconds % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
 };
 
@@ -79,8 +83,6 @@ function RepeatIcon({ size = 16, color = colors.textDark }) {
     );
 }
 
-// Waveform animado (mejora funcional, no viene del diseño estático) dentro
-// de la carátula circular, con las barras naranjas confirmadas en Figma.
 function Waveform({ waveAnim, isPlaying }) {
     return (
         <View style={styles.waveRow}>
@@ -103,7 +105,7 @@ function Waveform({ waveAnim, isPlaying }) {
     );
 }
 
-// ─── Selector de episodios ────────────────────────────────────────────────────
+// ─── 1) Selector de temas ─────────────────────────────────────────────────────
 function EpisodePicker({ oposicion, onSelect, onBack }) {
     const [episodes, setEpisodes] = useState([]);
     const [loading, setLoading]   = useState(true);
@@ -123,7 +125,7 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
                 <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
-                <Text style={styles.pickerTitle}>Episodios</Text>
+                <Text style={styles.pickerTitle}>Podcast</Text>
                 <View style={{ width: 24 }} />
             </View>
 
@@ -132,12 +134,17 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
             ) : episodes.length === 0 ? (
                 <View style={styles.pickerEmpty}>
                     <Ionicons name="headset-outline" size={44} color={colors.textDark} />
-                    <Text style={styles.pickerEmptyText}>No hay episodios disponibles</Text>
+                    <Text style={styles.pickerEmptyText}>Aún no hay temas para tu oposición.</Text>
                 </View>
             ) : (
                 <FlatList
                     data={episodes}
                     keyExtractor={(ep) => ep.id}
+                    ListHeaderComponent={
+                        <Text style={styles.pickerHint}>
+                            Elige un tema y genera un podcast con la IA.
+                        </Text>
+                    }
                     contentContainerStyle={styles.pickerList}
                     renderItem={({ item }) => (
                         <TouchableOpacity
@@ -149,10 +156,8 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
                                 <Ionicons name="headset-outline" size={22} color={colors.accentOrange} />
                             </View>
                             <View style={styles.episodeInfo}>
-                                <Text style={styles.episodeName} numberOfLines={2}>{item.title}</Text>
-                                <Text style={styles.episodeDuration}>
-                                    {Math.floor((item.totalSeconds ?? TOTAL_SECONDS) / 60)} min
-                                </Text>
+                                <Text style={styles.episodeName} numberOfLines={3}>{item.title}</Text>
+                                <Text style={styles.episodeDuration}>Generar podcast con IA</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
                         </TouchableOpacity>
@@ -162,82 +167,146 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
         </SafeAreaView>
     );
 }
-export default function TutorPodcastScreen({ navigation, route }) {
-    const initialEpisodeId = route?.params?.episodeId ?? null;
-    const [oposicion, setOposicion] = useState(route?.params?.oposicion ?? 'justicia-tramitacion');
 
-    useEffect(() => {
-        if (route?.params?.oposicion) return;
-        api.loadSession().then((session) => {
-            const s = session?.user?.oposicion ?? session?.user?.user_metadata?.oposicion;
-            if (s) setOposicion(s);
-        }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+// ─── 2) Configuración: duración + velocidad ─────────────────────────────────
+function PodcastConfig({ topic, oposicion, onGenerated, onBack }) {
+    const [duracion, setDuracion]     = useState('media');
+    const [velocidad, setVelocidad]   = useState(1.0);
+    const [generating, setGenerating] = useState(false);
+    const [error, setError]           = useState(null);
 
-    // ── Todos los hooks deben ir ANTES de cualquier return condicional ─────────
-    const [selectedEpisode, setSelectedEpisode] = useState(
-        initialEpisodeId ? { id: initialEpisodeId, title: route?.params?.title, totalSeconds: null } : null
+    const handleGenerate = useCallback(async () => {
+        setGenerating(true);
+        setError(null);
+        try {
+            const res = await tutorApi.generatePodcast(
+                topic.topicId,
+                topic.title,
+                oposicion,
+                duracion,
+                velocidad,
+            );
+            if (res?.error || !res?.data?.filename) {
+                setError(res?.error?.message ?? 'No se pudo generar el podcast');
+                setGenerating(false);
+                return;
+            }
+            const mp3Url = `${API_BASE_URL}/tutor/podcast/audio/${res.data.filename}`;
+            onGenerated({ ...res.data, mp3Url, velocidad });
+        } catch (e) {
+            setError('Error inesperado generando el podcast');
+            setGenerating(false);
+        }
+    }, [topic, oposicion, duracion, velocidad, onGenerated]);
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={onBack} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Podcast</Text>
+                <View style={styles.iconBtn} />
+            </View>
+
+            <ScrollView contentContainerStyle={styles.genBody} showsVerticalScrollIndicator={false}>
+                <Text style={styles.genTopicTitle} numberOfLines={4}>{topic.title}</Text>
+                <Text style={styles.genTopicSub}>narrado por la IA</Text>
+
+                <Text style={styles.sectionLabel}>Duración</Text>
+                <View style={styles.optRow}>
+                    {DURACIONES.map((d) => {
+                        const active = duracion === d.key;
+                        return (
+                            <TouchableOpacity
+                                key={d.key}
+                                style={[styles.optPill, active && styles.optPillActive]}
+                                onPress={() => setDuracion(d.key)}
+                                disabled={generating}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={[styles.optLabel, active && styles.optLabelActive]}>{d.label}</Text>
+                                <Text style={[styles.optSub, active && styles.optSubActive]}>{d.sub}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                <Text style={styles.sectionLabel}>Velocidad</Text>
+                <View style={styles.optRow}>
+                    {SPEEDS.map((v) => {
+                        const active = velocidad === v;
+                        return (
+                            <TouchableOpacity
+                                key={v}
+                                style={[styles.optSmall, active && styles.optSmallActive]}
+                                onPress={() => setVelocidad(v)}
+                                disabled={generating}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={[styles.optLabel, active && styles.optLabelActive]}>{v}x</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                {error ? (
+                    <View style={styles.errorCard}>
+                        <Ionicons name="alert-circle" size={18} color="#c33" />
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                ) : null}
+
+                {generating ? (
+                    <View style={styles.loadingBlock}>
+                        <ActivityIndicator size="large" color={colors.accentOrange} />
+                        <Text style={styles.loadingTitle}>Generando podcast…</Text>
+                        <Text style={styles.loadingSub}>
+                            La IA está redactando y sintetizando el audio.{'\n'}
+                            Puede tardar entre 30 s y 2 minutos.
+                        </Text>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={handleGenerate}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="sparkles" size={18} color={colors.white} />
+                        <Text style={styles.primaryButtonText}>  Generar podcast con IA</Text>
+                    </TouchableOpacity>
+                )}
+            </ScrollView>
+        </SafeAreaView>
     );
-    const [title, setTitle]                     = useState(route?.params?.title    ?? 'Constitución Española');
-    const [subtitle, setSubtitle]               = useState(route?.params?.subtitle ?? 'Título I');
-    const [totalSecs, setTotalSecs]             = useState(TOTAL_SECONDS);
-    const [isPlaying, setIsPlaying]             = useState(false);
-    const [elapsed, setElapsed]                 = useState(0);
-    const [speedIdx, setSpeedIdx]               = useState(2);
-    const [showExitModal, setShowExitModal]     = useState(false);
-    const [sleepMinutes, setSleepMinutes]       = useState(null);
+}
 
-    const waveAnim        = useRef(new Animated.Value(0)).current;
-    const waveLoop        = useRef(null);
-    const timerRef        = useRef(null);
-    const sleepTimerRef   = useRef(null);
-    const progressSaveRef = useRef(null);
+// ─── 3) Player Figma con expo-audio ──────────────────────────────────────────
+function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
+    // podcast.velocidad viene del config — la velocidad Ya va grabada en el mp3,
+    // pero también podemos aplicar rate del player para ajuste fino.
+    const player = useAudioPlayer({ uri: podcast.mp3Url });
+    const status = useAudioPlayerStatus(player);
 
-    const episodeId = selectedEpisode?.id ?? null;
+    const [showExitModal, setShowExitModal] = useState(false);
+    const [sleepMinutes, setSleepMinutes]   = useState(null);
+    const sleepTimerRef = useRef(null);
+    const waveAnim      = useRef(new Animated.Value(0)).current;
+    const waveLoop      = useRef(null);
 
-    useEffect(() => () => clearTimeout(sleepTimerRef.current), []);
+    const isPlaying = status?.playing ?? false;
+    const elapsed   = status?.currentTime ?? 0;
+    const totalSecs = status?.duration ?? podcast.totalSeconds ?? 600;
+    const progressPct = totalSecs > 0 ? Math.min((elapsed / totalSecs) * 100, 100) : 0;
 
-    // Carga el progreso guardado del episodio (metadatos ya vienen del selector o params)
+    // Waveform animado mientras reproduce
     useEffect(() => {
-        if (!episodeId) return;
-        tutorApi.getProgress(episodeId)
-            .then((progRes) => {
-                if (!progRes?.error && progRes?.data?.positionSecs != null) {
-                    setElapsed(progRes.data.positionSecs);
-                }
-            })
-            .catch(() => {});
-    }, [episodeId]);
-
-    // Guarda el progreso cada 10 s mientras se reproduce
-    useEffect(() => {
-        if (!episodeId || !isPlaying) return;
-        progressSaveRef.current = setInterval(() => {
-            tutorApi.saveProgress(episodeId, elapsed).catch(() => {});
-        }, 10_000);
-        return () => clearInterval(progressSaveRef.current);
-    }, [episodeId, isPlaying, elapsed]);
-
-    // ── Animación de onda ─────────────────────────────────────────────────────
-    useEffect(() => {
-        if (!selectedEpisode) return;
         if (isPlaying) {
             waveLoop.current = Animated.loop(
                 Animated.sequence([
-                    Animated.timing(waveAnim, {
-                        toValue: 1,
-                        duration: 480,
-                        easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: false,
-                    }),
-                    Animated.timing(waveAnim, {
-                        toValue: 0,
-                        duration: 480,
-                        easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: false,
-                    }),
-                ])
+                    Animated.timing(waveAnim, { toValue: 1, duration: 480, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+                    Animated.timing(waveAnim, { toValue: 0, duration: 480, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+                ]),
             );
             waveLoop.current.start();
         } else {
@@ -245,46 +314,29 @@ export default function TutorPodcastScreen({ navigation, route }) {
             waveAnim.setValue(0);
         }
         return () => waveLoop.current?.stop();
-    }, [isPlaying, selectedEpisode]);
+    }, [isPlaying, waveAnim]);
 
-    // ── Timer simulado — TODO: reemplazar por expo-av cuando se integre audio real ──
-    useEffect(() => {
-        if (!selectedEpisode || !isPlaying || elapsed >= totalSecs) return;
-        const speed = SPEEDS[speedIdx];
-        timerRef.current = setInterval(() => {
-            setElapsed((prev) => {
-                if (prev + 1 >= totalSecs) {
-                    setIsPlaying(false);
-                    return totalSecs;
-                }
-                return prev + 1;
-            });
-        }, 1000 / speed);
-        return () => clearInterval(timerRef.current);
-    }, [isPlaying, speedIdx, elapsed, totalSecs, selectedEpisode]);
+    // Cleanup del sleep timer al desmontar
+    useEffect(() => () => clearTimeout(sleepTimerRef.current), []);
+
+    const togglePlay = useCallback(() => {
+        if (isPlaying) player.pause();
+        else player.play();
+    }, [player, isPlaying]);
 
     const skipBy = useCallback((delta) => {
-        setElapsed((prev) => Math.max(0, Math.min(totalSecs, prev + delta)));
-    }, [totalSecs]);
-
-    const cycleSpeed = useCallback(() => {
-        setSpeedIdx((prev) => (prev + 1) % SPEEDS.length);
-    }, []);
-
-    const confirmExit = useCallback(() => {
-        setShowExitModal(false);
-        setIsPlaying(false);
-        navigation.goBack();
-    }, [navigation]);
+        const nextTime = Math.max(0, Math.min(totalSecs, elapsed + delta));
+        player.seekTo(nextTime);
+    }, [player, elapsed, totalSecs]);
 
     const scheduleSleep = useCallback((minutes) => {
         clearTimeout(sleepTimerRef.current);
         setSleepMinutes(minutes);
         sleepTimerRef.current = setTimeout(() => {
-            setIsPlaying(false);
+            player.pause();
             setSleepMinutes(null);
         }, minutes * 60 * 1000);
-    }, []);
+    }, [player]);
 
     const handleSleepTimer = useCallback(() => {
         Alert.alert('Apagar en…', sleepMinutes ? `Activo: ${sleepMinutes} min` : null, [
@@ -304,32 +356,18 @@ export default function TutorPodcastScreen({ navigation, route }) {
         ]);
     }, [sleepMinutes, scheduleSleep]);
 
+    const confirmExit = useCallback(() => {
+        setShowExitModal(false);
+        player.pause();
+        onBack();
+    }, [player, onBack]);
+
     const handleMoreOptions = useCallback(() => {
         Alert.alert('Opciones', null, [
-            { text: 'Compartir episodio', onPress: () => {} },
-            { text: 'Ver transcripción', onPress: () => {} },
+            { text: 'Generar otro podcast', onPress: onNewPodcast },
             { text: 'Cancelar', style: 'cancel' },
         ]);
-    }, []);
-
-    const speed       = SPEEDS[speedIdx];
-    const progressPct = Math.min((elapsed / totalSecs) * 100, 100);
-
-    // ── Selector de episodios (return condicional DESPUÉS de todos los hooks) ──
-    if (!selectedEpisode) {
-        return (
-            <EpisodePicker
-                oposicion={oposicion}
-                onSelect={(ep) => {
-                    setTitle(ep.title);
-                    setSubtitle(ep.oposicion ?? oposicion);
-                    setTotalSecs(ep.totalSeconds ?? TOTAL_SECONDS);
-                    setSelectedEpisode(ep);
-                }}
-                onBack={() => navigation.goBack()}
-            />
-        );
-    }
+    }, [onNewPodcast]);
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -342,11 +380,10 @@ export default function TutorPodcastScreen({ navigation, route }) {
                 >
                     <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Podcasts</Text>
+                <Text style={styles.headerTitle}>Podcast</Text>
                 <TouchableOpacity
                     style={styles.iconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Más opciones"
                     onPress={handleMoreOptions}
                 >
                     <Ionicons name="ellipsis-horizontal" size={22} color={colors.textDark} />
@@ -358,8 +395,8 @@ export default function TutorPodcastScreen({ navigation, route }) {
                     <Waveform waveAnim={waveAnim} isPlaying={isPlaying} />
                 </View>
 
-                <Text style={styles.title} numberOfLines={2}>{title}</Text>
-                <Text style={styles.subtitle}>{subtitle} · narrado por la IA</Text>
+                <Text style={styles.title} numberOfLines={3}>{topic.title}</Text>
+                <Text style={styles.subtitle}>{podcast.velocidad}x · narrado por la IA</Text>
 
                 <View style={styles.progressWrap}>
                     <View style={styles.progressTrack}>
@@ -372,9 +409,6 @@ export default function TutorPodcastScreen({ navigation, route }) {
                     </View>
                 </View>
 
-                {/* Controles: aleatorio y repetir son decorativos (no hay cola de
-                    reproducción real); anterior/siguiente hacen skip ±15s real —
-                    mismo patrón usado en MeditationPlayerScreen. */}
                 <View style={styles.controlsRow}>
                     <TouchableOpacity activeOpacity={0.7}>
                         <ShuffleIcon />
@@ -387,7 +421,7 @@ export default function TutorPodcastScreen({ navigation, route }) {
                     <TouchableOpacity
                         style={styles.playButton}
                         activeOpacity={0.85}
-                        onPress={() => setIsPlaying((v) => !v)}
+                        onPress={togglePlay}
                         accessibilityLabel={isPlaying ? 'Pausar' : 'Reproducir'}
                     >
                         {isPlaying ? (
@@ -409,18 +443,7 @@ export default function TutorPodcastScreen({ navigation, route }) {
                     </TouchableOpacity>
                 </View>
 
-                {/* Controles secundarios (velocidad, temporizador de sueño) — sin
-                    datos de Figma, restyleados al lenguaje visual claro del bloque. */}
                 <View style={styles.secondaryControls}>
-                    <TouchableOpacity
-                        style={styles.secondaryBtn}
-                        onPress={cycleSpeed}
-                        accessibilityLabel={`Velocidad: ${speed}x`}
-                    >
-                        <Ionicons name="speedometer-outline" size={16} color={colors.textDark} />
-                        <Text style={styles.secondaryBtnText}>{speed}x</Text>
-                    </TouchableOpacity>
-
                     <TouchableOpacity
                         style={styles.secondaryBtn}
                         accessibilityLabel="Temporizador de sueño"
@@ -448,7 +471,7 @@ export default function TutorPodcastScreen({ navigation, route }) {
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>¿Salir del podcast?</Text>
                         <Text style={styles.modalText}>
-                            El audio se detendrá. Tu progreso está guardado automáticamente.
+                            El audio se detendrá.
                         </Text>
                         <View style={styles.modalBtns}>
                             <TouchableOpacity
@@ -471,13 +494,61 @@ export default function TutorPodcastScreen({ navigation, route }) {
     );
 }
 
+// ─── Pantalla principal ───────────────────────────────────────────────────────
+export default function TutorPodcastScreen({ navigation, route }) {
+    const [oposicion, setOposicion] = useState(route?.params?.oposicion ?? 'policia-local-galicia');
+
+    useEffect(() => {
+        if (route?.params?.oposicion) return;
+        api.loadSession().then((session) => {
+            const s = session?.user?.oposicion ?? session?.user?.user_metadata?.oposicion;
+            if (s) setOposicion(s);
+        }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Estados de navegación interna:
+    // - selectedTopic === null            → picker
+    // - selectedTopic && !podcast         → config
+    // - podcast                           → player
+    const [selectedTopic, setSelectedTopic] = useState(null);
+    const [podcast, setPodcast]             = useState(null);
+
+    if (podcast && selectedTopic) {
+        return (
+            <PodcastPlayer
+                topic={selectedTopic}
+                podcast={podcast}
+                onBack={() => navigation.goBack()}
+                onNewPodcast={() => { setPodcast(null); }}
+            />
+        );
+    }
+
+    if (selectedTopic) {
+        return (
+            <PodcastConfig
+                topic={selectedTopic}
+                oposicion={oposicion}
+                onGenerated={(p) => setPodcast(p)}
+                onBack={() => setSelectedTopic(null)}
+            />
+        );
+    }
+
+    return (
+        <EpisodePicker
+            oposicion={oposicion}
+            onSelect={(ep) => setSelectedTopic({ topicId: ep.topicId, title: ep.title })}
+            onBack={() => navigation.goBack()}
+        />
+    );
+}
+
 const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.white,
-    },
+    container: { flex: 1, backgroundColor: colors.white },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -493,6 +564,147 @@ const styles = StyleSheet.create({
         color: colors.textDark,
         textAlign: 'center',
     },
+
+    // ── Picker ──────────────────────────────────────────────────────────────
+    pickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FIGMA.progressTrack,
+    },
+    pickerTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+    },
+    pickerHint: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: FIGMA.subtitleMuted,
+        marginBottom: spacing.md,
+    },
+    pickerList: { padding: spacing.md, gap: spacing.sm },
+    pickerEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
+    pickerEmptyText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: FIGMA.subtitleMuted,
+        textAlign: 'center',
+    },
+    episodeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: FIGMA.controlBg,
+        borderRadius: 14,
+        padding: spacing.md,
+        gap: spacing.md,
+    },
+    episodeIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: `${colors.accentOrange}20`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    episodeInfo: { flex: 1 },
+    episodeName: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: colors.textDark, marginBottom: 3 },
+    episodeDuration: { fontFamily: 'Poppins-Regular', fontSize: 12, color: FIGMA.subtitleMuted },
+
+    // ── Config ──────────────────────────────────────────────────────────────
+    genBody: { padding: spacing.md, paddingBottom: spacing.xl },
+    genTopicTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 20,
+        color: colors.textDark,
+        textAlign: 'center',
+        marginTop: spacing.md,
+    },
+    genTopicSub: {
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: FIGMA.subtitleMuted,
+        textAlign: 'center',
+        marginBottom: spacing.xl,
+    },
+    sectionLabel: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: spacing.sm,
+        marginTop: spacing.md,
+    },
+    optRow: { flexDirection: 'row', gap: 8 },
+    optPill: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: FIGMA.controlBg,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    optPillActive: { backgroundColor: `${colors.accentOrange}20`, borderColor: colors.accentOrange },
+    optSmall: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: FIGMA.controlBg,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    optSmallActive: { backgroundColor: `${colors.accentOrange}20`, borderColor: colors.accentOrange },
+    optLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: colors.textDark },
+    optLabelActive: { color: colors.accentOrange },
+    optSub: { fontFamily: 'Poppins-Regular', fontSize: 10.5, color: FIGMA.subtitleMuted, marginTop: 2 },
+    optSubActive: { color: colors.accentOrange, opacity: 0.85 },
+
+    errorCard: {
+        marginTop: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        padding: spacing.md,
+        borderRadius: 10,
+        backgroundColor: '#fbeaea',
+    },
+    errorText: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 13, color: '#a33' },
+
+    loadingBlock: { alignItems: 'center', marginTop: spacing.lg, gap: spacing.sm, paddingHorizontal: spacing.md },
+    loadingTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
+        marginTop: spacing.sm,
+    },
+    loadingSub: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.5,
+        color: FIGMA.subtitleMuted,
+        textAlign: 'center',
+    },
+    primaryButton: {
+        marginTop: spacing.lg,
+        height: 56,
+        borderRadius: 14,
+        backgroundColor: colors.accentOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        paddingHorizontal: spacing.lg,
+    },
+    primaryButtonText: {
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.white,
+        fontSize: 15,
+    },
+
+    // ── Player ──────────────────────────────────────────────────────────────
     content: {
         flex: 1,
         alignItems: 'center',
@@ -508,40 +720,24 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginBottom: spacing.lg,
     },
-    waveRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: 30,
-        gap: 6,
-    },
-    waveBar: {
-        width: 5,
-        borderRadius: 2.5,
-        backgroundColor: colors.accentOrange,
-    },
+    waveRow: { flexDirection: 'row', alignItems: 'center', height: 30, gap: 6 },
+    waveBar: { width: 5, borderRadius: 2.5, backgroundColor: colors.accentOrange },
     title: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
+        fontSize: 18,
         color: colors.textDark,
         textAlign: 'center',
     },
     subtitle: {
         marginTop: 4,
         fontFamily: 'Poppins-Regular',
-        fontSize: 10.7,
+        fontSize: 11,
         color: FIGMA.subtitleMuted,
         textAlign: 'center',
         marginBottom: spacing.xl,
     },
-    progressWrap: {
-        alignSelf: 'stretch',
-        marginBottom: spacing.xl,
-    },
-    progressTrack: {
-        height: 7.3,
-        borderRadius: 1.78,
-        backgroundColor: FIGMA.progressTrack,
-    },
+    progressWrap: { alignSelf: 'stretch', marginBottom: spacing.xl },
+    progressTrack: { height: 7.3, borderRadius: 1.78, backgroundColor: FIGMA.progressTrack },
     progressFill: {
         position: 'absolute',
         left: 0,
@@ -564,23 +760,14 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
         elevation: 3,
     },
-    timesRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 8,
-    },
+    timesRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
     timeText: {
         fontFamily: 'Poppins-Regular',
-        fontSize: 5.3,
+        fontSize: 11,
         letterSpacing: 0.44,
         color: FIGMA.timeLabel,
     },
-    controlsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 20,
-        marginBottom: spacing.lg,
-    },
+    controlsRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: spacing.lg },
     controlButton: {
         width: 33,
         height: 33,
@@ -597,20 +784,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    pauseIconWrap: {
-        flexDirection: 'row',
-        gap: 4,
-    },
-    pauseBar: {
-        width: 3.5,
-        height: 16,
-        borderRadius: 1.5,
-        backgroundColor: FIGMA.playIcon,
-    },
-    secondaryControls: {
-        flexDirection: 'row',
-        gap: spacing.md,
-    },
+    pauseIconWrap: { flexDirection: 'row', gap: 4 },
+    pauseBar: { width: 3.5, height: 16, borderRadius: 1.5, backgroundColor: FIGMA.playIcon },
+    secondaryControls: { flexDirection: 'row', gap: spacing.md },
     secondaryBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -620,69 +796,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         backgroundColor: FIGMA.controlBg,
     },
-    secondaryBtnText: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 12,
-        color: colors.textDark,
-    },
-
-    pickerHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: FIGMA.progressTrack,
-    },
-    pickerTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-    },
-    pickerList: {
-        padding: spacing.md,
-        gap: spacing.sm,
-    },
-    pickerEmpty: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.md,
-    },
-    pickerEmptyText: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 15,
-        color: FIGMA.subtitleMuted,
-    },
-    episodeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: FIGMA.controlBg,
-        borderRadius: 14,
-        padding: spacing.md,
-        gap: spacing.md,
-    },
-    episodeIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: `${colors.accentOrange}20`,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    episodeInfo: { flex: 1 },
-    episodeName: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 14,
-        color: colors.textDark,
-        marginBottom: 3,
-    },
-    episodeDuration: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 12,
-        color: FIGMA.subtitleMuted,
-    },
+    secondaryBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: colors.textDark },
 
     modalOverlay: {
         flex: 1,
@@ -711,11 +825,7 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         marginBottom: spacing.lg,
     },
-    modalBtns: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-        width: '100%',
-    },
+    modalBtns: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
     modalCancelBtn: {
         flex: 1,
         backgroundColor: FIGMA.controlBg,
@@ -723,10 +833,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
     },
-    modalCancelText: {
-        fontFamily: 'Poppins-SemiBold',
-        color: colors.textDark,
-    },
+    modalCancelText: { fontFamily: 'Poppins-SemiBold', color: colors.textDark },
     modalConfirmBtn: {
         flex: 1,
         backgroundColor: colors.accentOrange,
@@ -734,8 +841,5 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
     },
-    modalConfirmText: {
-        fontFamily: 'Poppins-SemiBold',
-        color: colors.white,
-    },
+    modalConfirmText: { fontFamily: 'Poppins-SemiBold', color: colors.white },
 });

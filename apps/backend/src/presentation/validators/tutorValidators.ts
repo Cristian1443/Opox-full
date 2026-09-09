@@ -32,6 +32,14 @@ export const saveProgressBody = z.object({
     positionSecs: z.number().int().min(0),
 });
 
+export const generatePodcastBody = z.object({
+    topicId: z.string().min(1).max(80),
+    topicTitle: z.string().min(1).max(200),
+    oposicion: z.string().min(1).max(80),
+    duracion: z.enum(['corta', 'media']).optional(),
+    velocidad: z.number().optional(),
+});
+
 export const oposicionQuery = z.object({
     oposicion: z.string().min(1).max(80),
 });

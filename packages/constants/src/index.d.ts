@@ -89,6 +89,8 @@ declare const API_ROUTES: {
         readonly EPISODES: string;
         readonly EPISODE: string;
         readonly PODCAST_PROGRESS: string;
+        readonly PODCAST_GENERATE: string;
+        readonly PODCAST_AUDIO: string;
         readonly SUMMARIES: string;
         readonly SUMMARY: string;
     };

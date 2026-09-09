@@ -55,6 +55,28 @@ export interface TutorPodcastProgress {
     updatedAt: string;
 }
 
+// Podcast — generación bajo demanda
+export interface GeneratePodcastRequest {
+    topicId: string;
+    topicTitle: string;
+    oposicion: string;
+    /** 'corta' (5 min) | 'media' (10 min). Default: 'media'. */
+    duracion?: 'corta' | 'media';
+    /** 0.5 | 1.0 | 1.5 | 2.0. Default: 1.0. */
+    velocidad?: number;
+}
+
+export interface GeneratePodcastResponse {
+    /** ID sintético `motor-{filename}` — no vive en tutor_podcast_episodes. */
+    episodeId: string;
+    title: string;
+    /** Nombre del archivo mp3 (podcast-xxxxx.mp3). El mobile construye la URL final
+     *  concatenando `${API_BASE_URL}/tutor/podcast/audio/{filename}` que apunta al
+     *  proxy del backend (necesario porque el mp3 del Motor requiere X-API-Key). */
+    filename: string;
+    totalSeconds: number;
+}
+
 // Resúmenes
 export interface TutorSummarySection {
     id: string;

@@ -8,6 +8,7 @@ import {
     generateDeckBody,
     submitReviewBody,
     saveProgressBody,
+    generatePodcastBody,
     oposicionQuery,
     summaryQuery,
 } from '../validators/tutorValidators';
@@ -39,6 +40,11 @@ export function createTutorRouter(
     r.get(T.EPISODE, authMiddleware, controller.getEpisode);
     r.get(T.PODCAST_PROGRESS, authMiddleware, controller.getProgress);
     r.post(T.PODCAST_PROGRESS, authMiddleware, validateBody(saveProgressBody), controller.saveProgress);
+    r.post(T.PODCAST_GENERATE, authMiddleware, validateBody(generatePodcastBody), controller.generatePodcast);
+    // Ruta pública — el filename es un hash aleatorio del Motor y actúa como
+    // secreto compartido. Sin auth para que <audio src=".."> o Linking.openURL
+    // desde el mobile puedan reproducirlo sin cabeceras adicionales.
+    r.get(T.PODCAST_AUDIO, controller.proxyPodcastAudio);
 
     // ── Resúmenes ─────────────────────────────────────────────────────────────
     r.get(T.SUMMARIES, authMiddleware, validateQuery(oposicionQuery), controller.listSummaries);

@@ -5,6 +5,115 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-09 (tarde) — Bloque 8 · Aula Virtual gaps del APK + curso Policía Galicia completo
+
+Rama: `feat/bloque3-ia-backend`.
+
+### Gap 1 · Chat siempre respondía "Estoy consultando el temario…"
+
+**Causa**: `MotorTutorClient` tenía timeout de 15 s. El Motor RAG tarda 20-40 s en
+respuestas largas del tutor (búsqueda en temario + composición). Cada llamada
+abortaba antes de que respondiera → catch → stub genérico "Estoy consultando el
+temario…". El Motor sí funcionaba, pero el backend no llegaba a leer la respuesta.
+
+**Fix**: subir default timeout `MotorTutorClient` a **60 s** (constructor + container).
+
+### Gap 2 · Resúmenes: "No hay resúmenes disponibles"
+
+**Causa**: `tutor_summaries` en Supabase está vacío (nunca se pre-generaron). El
+picker consultaba esta tabla → 0 filas → empty state.
+
+**Fix**: `ListSummariesUseCase` recibe `IBoeRepository` opcional. Si `tutor_summaries`
+está vacío, cae a `boeRepo.listTopics(oposicion)` y devuelve los temas del curso como
+"resúmenes pendientes". Al seleccionar uno, `GetSummaryUseCase` llama al Motor bajo
+demanda (ya funcionaba).
+
+### Gap 3 · Podcasts: "No hay episodios disponibles" + generación real + player Figma
+
+**Causa doble**:
+1. `tutor_podcast_episodes` está vacío — el picker devolvía 0.
+2. No existía endpoint para disparar la generación del Motor.
+
+**Fix — pipeline completo (varias iteraciones tras testing local)**:
+- `MotorTutorClient.generatePodcast()` — dispara job del Motor, hace polling
+  cada 3 s durante 2 min hasta `estado='done'`, devuelve `{filename, mp3Url, estimatedSeconds}`.
+- **URL correcta del Motor**: `POST /v1/classroom/podcast` (sin `/generate`, devolvía 405).
+- **Todos los endpoints del Motor exigen `X-OpenAI-Key` además de `X-API-Key`** (BYOK):
+  `MotorTutorClient` constructor recibe ahora `openAiKey` (reusa `env.AI_API_KEY`) e inyecta
+  la cabecera en cada request. Sin ella los jobs mueren con `falta_openai_key`.
+- **`user_id` es obligatorio** en el body del podcast (el Motor devolvía 422):
+  `GeneratePodcastUseCase` recibe `userId` y `MotorTutorClient` lo añade al body.
+- `POST /tutor/podcast/generate` — endpoint auth con body `{topicId, topicTitle, oposicion, duracion, velocidad}`.
+- **Proxy audio**: `GET /tutor/podcast/audio/:filename` (ruta pública, valida
+  patrón `podcast-[a-f0-9]{8,64}.mp3` para evitar path traversal) — hace stream
+  del mp3 del Motor con X-API-Key hacia el cliente. Necesario porque el mp3 del
+  Motor requiere auth y las URLs abiertas por `Linking` no envían headers.
+- `ListEpisodesUseCase` fallback a `listTopics` (igual que resúmenes).
+
+**Mobile `TutorPodcastScreen` — reescrito en 3 fases**:
+1. `EpisodePicker` — lista de temas del curso.
+2. `PodcastConfig` — selectores Duración (Corta/Media) + Velocidad (0.5/1/1.5/2x)
+   + botón "Generar podcast con IA" + estado de loading (30 s–2 min).
+3. `PodcastPlayer` — **player Figma original** con `expo-audio`
+   (`useAudioPlayer` + `useAudioPlayerStatus`): waveform animado, barra de progreso
+   real (avanza con el audio), play/pause, skip ±15 s, temporizador de sueño,
+   modal "¿Salir del podcast?". La primera implementación con `Linking.openURL`
+   abría el navegador — se sustituyó por reproducción in-app.
+
+**Dependencia nueva**: `expo-audio ~57.0.4` (versión alineada con Expo SDK 57).
+`pnpm install expo-audio@latest` resolvió 1.0.16 que era INCOMPATIBLE con el módulo
+nativo de Expo Go SDK 57 (constructor esperaba 4 args, recibía 3). La versión
+correcta se instala con `npx expo install expo-audio` (respeta el SDK activo).
+Plugin añadido en `app.json` con `microphonePermission: false`.
+
+### Gap 4 · Flashcards: siempre las mismas 5
+
+**Causa**: Motor es determinista y devuelve las mismas 5 tarjetas para el mismo
+tema. Se pedían `n=10` pero solo devolvía 5. Además el mobile navegaba a
+`TutorFlashcardsLoading` con `topicId='constitucion'` (slug del curso viejo)
+que el nuevo curso no reconoce → 404 `tema_no_encontrado`.
+
+**Fix**:
+- Motor: pedir `n=15` (más variedad visible).
+- Mobile: `TutorFlashcardsScreen` incluye ahora `TopicPicker` — cuando el usuario
+  entra desde el hub sin params, elige tema antes de generar.
+- `TutorChatScreen` acción "Crear flashcards" → navega al picker (no directo a Loading).
+- Fallback hardcoded de `TutorFlashcardsLoadingScreen`: `'cb93fdfcc3944529'`
+  (Tema 1 hex del curso nuevo) en vez de `'constitucion'`.
+
+### Mapeo "Tema N" en backend (aplica a Bloques 4, 6, 8, 10)
+
+**Petición del usuario**: mostrar los temas como `Tema 1, Tema 2, ..., Tema 40` en
+orden, no los títulos largos e inconsistentes del Motor (unos completos, otros
+truncados a "Tema 13" o "Vida").
+
+**Fix (1 sitio → 4 bloques)**:
+- `ListTopicsUseCase.execute` (`application/boe/BoeUseCases.ts`) — reescribe
+  `label = 'Tema ${i+1}'` según el orden del temario (`sort_order` ASC).
+  El `topicId` se mantiene intacto — la IA sigue recibiendo el ID hex real.
+- Cobertura: Bloque 4 (modal test en PlanningToday), Bloque 6 (Generador),
+  Bloque 8 (Aula Virtual), Bloque 10 (pestaña "Mi temario" en BOE).
+- `ListSummariesUseCase` y `ListEpisodesUseCase` del tutor aplican el mismo mapeo
+  en el fallback interno.
+
+### Bonus · Curso Policía de Galicia completo (40 temas, 1784 páginas)
+
+Nuevo curso Motor `672e3a8bad0f45c8` con los 4 bloques completos (40 temas
+sincronizados con la ingesta del 2026-09-09):
+- `training_courses.sql` actualizado — reemplaza `0bed919120024e5f` (parcial) por `672e3a8bad0f45c8`.
+- `bloque6_topics_policia_galicia.sql` — nuevo SQL con los 40 topic_id hex.
+- `.env` NO se toca: `GetCursoIdUseCase` ya resuelve `oposicion → cursoId` desde la
+  tabla `training_courses`. `MOTOR_DEFAULT_CURSO_ID` solo es fallback si la tabla no
+  tiene la fila. Con el SQL actualizado, el mapping viene por DB — evita drift entre
+  entornos y no requiere tocar env vars en Render.
+
+**Pendiente de deploy**:
+1. Correr `training_courses.sql` y `bloque6_topics_policia_galicia.sql` en Supabase.
+2. Deploy backend a Render (nuevas rutas de podcast: `POST /tutor/podcast/generate`, `GET /tutor/podcast/audio/:filename`).
+3. Regenerar APK con los cambios de mobile (incluye `expo-audio`).
+
+---
+
 ## 2026-09-09 — Bloque 3 · Health Connect loop fix · Bloque 4 gap subtítulo · Bloque 5 gestión de clanes
 
 Rama: `feat/bloque3-ia-backend`. 10 archivos modificados (6 mobile, 4 backend/constants).

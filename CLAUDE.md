@@ -306,10 +306,37 @@ con tokens exactos de Figma (`Poppins-*`, border-radius, paleta morada/verde):
 `TutorHomeScreen`, `TutorChatScreen`, `TutorPodcastScreen`, `TutorSummariesScreen`,
 `TutorFlashcardsScreen`, `TutorFlashcardsLoadingScreen`, `FlashcardsSuccessModal`.
 
-**`TutorPodcastScreen` — `EpisodePicker`**: cuando no hay `episodeId` en los params,
-muestra un selector que carga `tutorApi.listEpisodes(oposicion)`. Al seleccionar un
-episodio navega al player. El timer simulado avanza con la velocidad elegida
-(`0.5x / 1x / 1.5x / 2x`) y guarda progreso via `tutorApi.saveProgress` cada 10 s.
+**`TutorPodcastScreen` — 3 fases (revisión 2026-09-09)**: reescrito completamente con
+generación real vía Motor + reproducción in-app con `expo-audio`:
+1. `EpisodePicker` — carga `tutorApi.listEpisodes(oposicion)` (fallback a `listTopics`
+   cuando la tabla `tutor_podcast_episodes` está vacía).
+2. `PodcastConfig` — selectores de Duración (Corta≈5min / Media≈10min) + Velocidad
+   (0.5/1/1.5/2x) + botón "Generar podcast con IA" que llama `tutorApi.generatePodcast()`
+   con timeout de 150 s (backend hace polling del job del Motor).
+3. `PodcastPlayer` — player Figma original con `useAudioPlayer` + `useAudioPlayerStatus`
+   de `expo-audio ~57.0.4`: waveform animado, barra de progreso real, play/pause,
+   skip ±15 s, temporizador de sueño, modal de salida.
+
+**Podcast — pipeline backend**:
+- `POST /tutor/podcast/generate` (auth) → `GeneratePodcastUseCase` → `MotorTutorClient.generatePodcast(userId, cursoId, topicId, duracion, velocidad)`
+  → `POST /v1/classroom/podcast` al Motor (**sin `/generate`** — el sufijo devolvía 405)
+  → polling `GET /v1/jobs/{id}` cada 3 s hasta 2 min → devuelve `{filename, mp3Url, estimatedSeconds}`.
+- **`user_id` obligatorio en el body** del Motor (o 422 `Field required`).
+- **Auth dual `X-API-Key` + `X-OpenAI-Key`** (BYOK) — sin la segunda, cualquier
+  endpoint del Motor devuelve `falta_openai_key`.
+- `GET /tutor/podcast/audio/:filename` — **ruta pública** que hace stream del mp3
+  del Motor con X-API-Key hacia el cliente. Necesario porque `expo-audio` /
+  `<audio>` no envían headers custom. Valida el patrón `podcast-[a-f0-9]{8,64}.mp3`
+  para evitar path traversal (el filename actúa como secreto compartido — solo lo
+  conoce quien acaba de generar el podcast).
+- Ruta constante: `API_ROUTES.TUTOR.PODCAST_GENERATE`, `PODCAST_AUDIO`.
+
+**Resúmenes y podcast — fallback a listTopics (revisión 2026-09-09)**:
+`ListSummariesUseCase` y `ListEpisodesUseCase` reciben `IBoeRepository` opcional.
+Si la tabla de caché (`tutor_summaries` / `tutor_podcast_episodes`) está vacía,
+caen a `boeRepo.listTopics(oposicion)` y devuelven los temas del temario como
+placeholders. El picker del mobile los muestra; al seleccionar uno, la generación
+se dispara bajo demanda vía Motor.
 
 **`TutorSummariesScreen` — `TopicPicker`**: cuando no hay `topicId` en los params,
 muestra un selector que carga `tutorApi.listSummaries(oposicion)`. Una vez elegido
@@ -321,6 +348,18 @@ el tema, la pantalla muestra el resumen con un selector de 3 pills de profundida
 (`paramCards.length === 0`), muestra pantalla de error en lugar de intentar renderizar
 una tarjeta undefined. La función `handleReviewFailed` fue eliminada (bug: `cards`
 no tiene setter).
+
+**`TutorFlashcardsScreen` — TopicPicker (revisión 2026-09-09)**: cuando el usuario
+entra desde el hub sin params (`!paramCards && !topicId`), muestra picker de temas
+(reutiliza `tutorApi.listSummaries` que devuelve `topicId`+`topicTitle`). Al elegir
+tema navega a `TutorFlashcardsLoading` con params reales. Antes se iba directo con
+`topicId='constitucion'` (slug del curso viejo) y el Motor devolvía 404
+`tema_no_encontrado`. `TutorChatScreen` acción "Crear flashcards" también fue
+actualizada para navegar al picker (antes iba directo a Loading).
+
+**Motor — `n=15` en flashcards**: `MotorTutorClient.generateFlashcards` pide 15
+tarjetas por defecto (antes 10). El Motor es determinista y tiende a repetir las
+mismas 5 primeras; pedir más da más variedad visible al usuario.
 
 ### Factoría de Apuntes (Bloque 9) — endpoints propios
 
@@ -477,9 +516,21 @@ desplegado para detectar cambios en el BOE oficial. Integrado en:
 - `TrainingController` y `TutorController`: llaman `getCursoId.execute(oposicion)` antes
   de cada llamada al Motor. `TrainingController` lee `body.oposicion`;
   `TutorController` lee `req.authUser!.oposicion`.
-- `bloque6_topics.sql`: `policia-local-galicia` usa IDs hex del Motor
-  (`3b6f62d89ac74a78`, `ebc2cc44282048f1`, etc.); `justicia-tramitacion` mantiene slugs semánticos.
-  Ambos formatos son válidos — el Motor acepta cualquiera como `tema_id`.
+- `bloque6_topics.sql`: `justicia-tramitacion` mantiene slugs semánticos
+  (`constitucion`, `ley-39`, etc.). `policia-local-galicia` usa IDs hex del Motor.
+  Desde 2026-09-09 el curso activo es `672e3a8bad0f45c8` con 40 temas
+  (SQL: `bloque6_topics_policia_galicia.sql`). Ambos formatos son válidos — el
+  Motor acepta cualquiera como `tema_id`.
+
+**`ListTopicsUseCase` — mapeo `label = 'Tema N'` (revisión 2026-09-09)**:
+Los títulos que devuelve el Motor son inconsistentes (unos completos, otros truncados
+a "Tema 13" o "Vida"). Para uniformar la UI de todos los pickers del temario, el
+use case reetiqueta `label` a `"Tema ${i+1}"` según el orden (`sort_order` ASC).
+`topicId` intacto (la IA recibe el ID hex real). Afecta a 4 bloques con 1 solo cambio:
+Bloque 4 (modal test en `PlanningToday`), Bloque 6 (`GeneratorConfigScreen`),
+Bloque 8 (Aula Virtual — chat/resúmenes/podcast/flashcards) y Bloque 10 (pestaña
+"Mi temario" en `BoeHome`). `ListSummariesUseCase` / `ListEpisodesUseCase` aplican
+el mismo mapeo en su fallback interno.
 
 ### Tienda OPOX (Bloque 11) — endpoints propios
 
@@ -833,8 +884,16 @@ Valida formato `ExponentPushToken[...]`. Upsert idempotente por `(user_id, devic
 ### Motor de IA del cliente (ACTIVO — operativo 2026-09-04)
 
 Microservicio RAG del equipo IA. Dominio: `ia.opox.ai`. URL en `.env` (`MOTOR_API_BASE_URL`).
-Auth: `X-API-Key: MOTOR_API_KEY`. `isMotorConfigured = Boolean(MOTOR_API_BASE_URL && MOTOR_API_KEY)`.
-Curso activo: `MOTOR_DEFAULT_CURSO_ID=0bed919120024e5f` (Bloque 1, 266 páginas, 11 temas).
+**Auth doble**: `X-API-Key: MOTOR_API_KEY` (autenticación) + `X-OpenAI-Key: AI_API_KEY` (BYOK
+— el Motor no lleva clave de OpenAI propia). **Sin `X-OpenAI-Key` cualquier endpoint de
+generación (chat, flashcards, summary, podcast, tests) muere con `falta_openai_key`.**
+`isMotorConfigured = Boolean(MOTOR_API_BASE_URL && MOTOR_API_KEY)`.
+
+**Curso activo (revisión 2026-09-09)**: `672e3a8bad0f45c8` — Policía de Galicia completo
+(40 temas, 4 bloques, 1784 páginas). Reemplaza el curso parcial `0bed919120024e5f` (Bloque 1,
+266 páginas). El mapping vive en la tabla Supabase `training_courses`, no en el `.env`:
+`GetCursoIdUseCase.execute(oposicion)` consulta la tabla; `MOTOR_DEFAULT_CURSO_ID` es solo
+fallback. Actualizar el curso = ejecutar `training_courses.sql` en Supabase, sin tocar env vars.
 
 **Endpoints reales en uso (2026-09-04)** — alineados con OpenAPI `ia.opox.ai`:
 - `/v1/classroom/tutor` — chat Tutor IA con historial y tono (Bloque 8).
@@ -915,7 +974,7 @@ pnpm lint                       # lint completo
 | 5 | Motivación | Frontend + backend completo |
 | 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **activo** vía workaround banco (2026-09-04): job IDs coinciden con banco → `correcta_idx` resuelto por id-cruce → ~5.6 s, `articleRef` presente. INC-04 pendiente en el Motor (job result sin `correcta_idx` directo). |
 | 7 | Sesión de test activa | Frontend + backend + IA completo. Pista IA vía `/v1/modes/hint` del Motor (requiere `pregunta_id` real del banco). Fallback a OpenAI directo. |
-| 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma (2026-08-26). Motor IA operativo (2026-09-04): chat → `/v1/classroom/tutor`, flashcards → `/v1/classroom/flashcards/generate`, summary → `/v1/classroom/summary`. `cursoId` propagado desde container. Stubs como fallback. |
+| 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma (2026-08-26). Motor IA operativo (2026-09-04). Revisión 2026-09-09: (a) chat timeout 15→60s; (b) resúmenes/podcast fallback a `listTopics` cuando la caché está vacía; (c) podcast pipeline completo con `expo-audio` player Figma — `POST /v1/classroom/podcast` (Motor) + polling job + proxy `/tutor/podcast/audio/:filename` (Motor requiere `X-API-Key` que expo-audio no envía); (d) `X-OpenAI-Key` obligatorio en todos los endpoints Motor; (e) `TopicPicker` en flashcards y navegación desde chat; (f) mapeo `label='Tema N'` global. Curso activo `672e3a8bad0f45c8` (40 temas). |
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
 | 10 | Monitor BOE | Frontend + backend completo. Revisión 2026-09-05: mini-test con Motor real operativo — `GET /boe/changes/:id/mini-test` → sesión Motor idempotente, `POST /boe/changes/:id/mini-test/answer` → corrección + evidencia verbatim. Path stub (sesionId null) como fallback. 409 `mini_test_no_disponible` manejado. E2E 16/17 PASS. Fix API key `.env` (# como comentario). Revisión 2026-08-27: fallback catálogo, UPSERT idempotente, campo resumen, modal "Añadir norma", cross-bloque. |
 | 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-28: motor earn automático por tests (1 O/acierto × multiplicador, cap 100 O/día), mini-test BOE hasta 5 O, `getTodayTestEarnings` en repo. Revisión 2026-08-27: puente earn→ledger, `POST /store/discounts/:id/redeem`, 8 pantallas sin mocks, canje por `redeemType`, fixes tabs UI. |

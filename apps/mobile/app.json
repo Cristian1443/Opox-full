@@ -68,7 +68,13 @@
       ],
       "expo-secure-store",
       "expo-splash-screen",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false
+        }
+      ]
     ],
     "ios": {
       "bundleIdentifier": "com.opox.app",

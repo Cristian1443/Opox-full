@@ -62,6 +62,11 @@ export const tutorApi = {
             { auth: true },
         ),
 
+    // Genera un podcast del tema vía Motor (async, ~30-90 s en el backend).
+    // Devuelve { episodeId, title, mp3Url, totalSeconds }.
+    generatePodcast: (topicId, topicTitle, oposicion, duracion = 'media', velocidad = 1.0) =>
+        api.post(T.PODCAST_GENERATE, { topicId, topicTitle, oposicion, duracion, velocidad }, { auth: true, timeoutMs: 150_000 }),
+
     // ── Resúmenes ─────────────────────────────────────────────────────────────
     listSummaries: (oposicion) =>
         api.get(`${T.SUMMARIES}?oposicion=${encodeURIComponent(oposicion)}`, { auth: true }),
