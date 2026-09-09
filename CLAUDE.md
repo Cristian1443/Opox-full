@@ -670,6 +670,63 @@ al payload enviado al Motor y al fallback local `buildFatigueLocally` — mobile
 tenía el dato de HealthKit pero no lo enviaba. `healthApi.analyzeFatigue` acepta
 y envía `spo2` desde `FatigueEngineScreen` (llega vía `route.params.metrics`).
 
+**IA directa para Salud (revisión 2026-09-09)** — 3 nuevos endpoints sin Motor ni RAG:
+
+- `POST /health/menus` — genera 1 menú diario personalizado (objetivo + fatiga + restricciones).
+- `POST /health/meditation` — genera guión de sesión con fases que suman exactamente `duracion×60 s`.
+- `POST /health/study-technique` — recomienda la técnica de estudio adecuada para el día.
+
+**`HealthAiClient`** (`infrastructure/clients/HealthAiClient.ts`) — clase con soporte dual:
+- Provider `'gemini'`: `POST /v1beta/models/gemini-3.6-flash:generateContent?key={apiKey}`.
+  `systemInstruction` + `contents` + `generationConfig.responseMimeType: 'application/json'`.
+  3 intentos con retry: 5xx (4 s), truncación `rawLen<20` (2 s), JSON parse fail (inmediato).
+  Stripping de bloques markdown + extracción del objeto `{...}` más externo.
+- Provider `'openai'`: `POST /chat/completions`, `json_object`, `temperature: 0.3`, reintentar 1×.
+- `maxOutputTokens`: menus=2500, meditation=2000, study=1000.
+
+**Instanciación en `container.ts`**:
+```ts
+// Gemini tiene prioridad; fallback a OpenAI; undefined si ninguno configurado.
+const healthAiClient = env.HEALTH_GEMINI_API_KEY
+    ? new HealthAiClient({ baseUrl: 'https://generativelanguage.googleapis.com/v1beta', apiKey: env.HEALTH_GEMINI_API_KEY, provider: 'gemini' })
+    : (env.AI_API_BASE_URL && env.AI_API_KEY)
+        ? new HealthAiClient({ baseUrl: env.AI_API_BASE_URL, apiKey: env.AI_API_KEY, provider: 'openai' })
+        : undefined;
+```
+
+**Variable de entorno**: `HEALTH_GEMINI_API_KEY` en `apps/backend/.env` y en schema Zod.
+Para Render: añadir en el dashboard de entorno antes del deploy — sin ella los 3 endpoints
+devuelven 500.
+
+**Rutas** en `packages/constants`: `HEALTH_MENUS`, `HEALTH_MEDITATION`, `HEALTH_STUDY_TECHNIQUE`.
+Registradas en `healthRoutes.ts` con `authMiddleware`.
+
+**`FatigueEngineScreen.js`**: exporta `FATIGUE_LEVEL_KEY = 'opox.health.fatigueLevel'` y persiste
+el nivel (`'bajo'/'medio'/'alto'`) en AsyncStorage al terminar el análisis de fatiga.
+
+**`MenusScreen.js`**: botón "✦ Generar menú con IA" → modal con objetivo + restricciones → llama
+`healthApi.generateMenus`. Menú IA aparece al inicio de la lista con badge "AI" y borde verde.
+Los menús estáticos "Dietista" permanecen como base curada — son complementarios.
+
+**`MeditationListScreen.js`**: card "Sesión personalizada" con selector tipo + duración → llama
+`healthApi.generateMeditation` → navega a `MeditationPlayer` con `phases: [{ nombre, texto, segundos }]`.
+
+**`MeditationPlayerScreen.js`**: muestra `activePhase.nombre` + `activePhase.texto` debajo del
+moonCircle cuando la sesión tiene fases IA (calculadas por tiempo transcurrido). Sin fases:
+comportamiento original intacto. Moonircle reducido de 249→172px; layout `space-evenly` para que
+los controles (play/pause, skip) queden siempre visibles.
+
+**`StudyTipsScreen.js`**: carga `recommendStudyTechnique` al montar; muestra card morada
+"TÉCNICA RECOMENDADA HOY" con `tecnica`, `porque`, `adaptacion`. Si falla: card sutil de error.
+Las 4 técnicas estáticas permanecen debajo.
+
+**Regla de arquitectura de contenido**: estático (siempre visible, funciona offline) + IA
+(personalización diaria encima). No se persiste en DB el contenido generado — es efímero por diseño.
+
+**Config mobile para APK**: `apps/mobile/.env` tiene `EXPO_PUBLIC_API_URL` comentado para dev
+local (usa `hostUri` de Metro → IP LAN del PC). Para generar APK: descomentar y apuntar al
+backend en Render + asegurarse de que Render tiene `HEALTH_GEMINI_API_KEY`.
+
 **Permisos de notificaciones** (`PermissionsScreen.js`):
 - "¡A por más!" → `Notifications.requestPermissionsAsync()` real (lazy require).
 - Si denegado: `DeniedState` con texto correcto + "Ir a Ajustes" (`Linking.openSettings()`).
@@ -792,7 +849,7 @@ pnpm lint                       # lint completo
 |---|---|---|
 | 1 | Acceso (Auth/Onboarding) | Frontend cerrado + Bloque 0 revisado: onboarding no repetido, test real de 20 preguntas, inicialización de intensidad del plan. Revisión 2026-09-04: `MotorOnboardingClient` usa banco `/v1/courses/{id}/questions` (tiene `correcta_idx`); timeout 5 s → estáticas si el Motor tarda. |
 | 2 | Dashboard | Frontend + backend completo |
-| 3 | Salud | Frontend cerrado. `HealthController.analyzeFatigue` llama `MotorFatigueClient` → `/v1/fatigue/biometrics` con mapeo de campos y `userId` real del usuario. Envía HRV, FC reposo, SpO₂ y horas de sueño. Try/catch → `buildFatigueLocally` si el Motor falla. Siempre devuelve 200. |
+| 3 | Salud | Frontend + backend completo. Fatiga: `HealthController.analyzeFatigue` → `MotorFatigueClient` `/v1/fatigue/biometrics`, try/catch → `buildFatigueLocally`. Siempre devuelve 200. IA directa (2026-09-09): `HealthAiClient` con Gemini (`gemini-3.6-flash`, 3 reintentos) para `POST /health/menus`, `/health/meditation`, `/health/study-technique`. Smoke test 3/3 PASS. Pendiente deploy a Render + `HEALTH_GEMINI_API_KEY` en env vars de Render. |
 | 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |
 | 5 | Motivación | Frontend + backend completo |
 | 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **activo** vía workaround banco (2026-09-04): job IDs coinciden con banco → `correcta_idx` resuelto por id-cruce → ~5.6 s, `articleRef` presente. INC-04 pendiente en el Motor (job result sin `correcta_idx` directo). |

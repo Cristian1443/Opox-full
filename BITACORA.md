@@ -5,6 +5,94 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-09 — Bloque 3 · IA directa para Menús, Meditación y Técnica de estudio
+
+Rama: `feat/bloque3-ia-backend`. 12 archivos modificados (6 backend, 6 mobile).
+Smoke test **3/3 PASS** con Gemini (`gemini-3.6-flash`). Prueba sobre APK real.
+
+### Nuevo cliente `HealthAiClient` (backend)
+
+`apps/backend/src/infrastructure/clients/HealthAiClient.ts` — clase con soporte dual
+OpenAI / Gemini seleccionado por `provider`. En producción usa **Gemini** vía
+`HEALTH_GEMINI_API_KEY` (prioridad sobre `AI_API_KEY` para estos 3 endpoints).
+
+- Modelo: `gemini-3.6-flash` (el 2.5-flash ya no está disponible para nuevas claves).
+- 3 intentos con retry: 5xx transitorio (4 s delay), respuesta truncada (`rawLen < 20`,
+  2 s delay), fallo de JSON parse (retry inmediato).
+- Extracción robusta de JSON: stripping de bloques markdown ` ```json ``` ` + búsqueda
+  del objeto más externo `{...}`.
+- `maxOutputTokens`: menus=2500, meditation=2000, study-technique=1000.
+- Provider `openai` como fallback si `HEALTH_GEMINI_API_KEY` no existe pero sí
+  `AI_API_BASE_URL + AI_API_KEY`.
+
+### Tres nuevos endpoints de backend
+
+Rutas en `packages/constants/src/routes.js` + declaraciones TS en `index.d.ts`:
+- `POST /health/menus` — menú diario personalizado.
+- `POST /health/meditation` — guión de sesión de meditación con fases.
+- `POST /health/study-technique` — técnica de estudio recomendada según fatiga.
+
+Registradas en `healthRoutes.ts` con `authMiddleware`. Controladores en
+`HealthController.ts` (`generateMenus`, `generateMeditation`, `recommendStudyTechnique`).
+`HealthAiClient` instanciado en `container.ts`:
+Gemini si `HEALTH_GEMINI_API_KEY` → OpenAI si `AI_API_KEY` → `undefined` (endpoints responden 500).
+
+### Variable de entorno nueva
+
+`HEALTH_GEMINI_API_KEY` en `apps/backend/.env` y en el schema Zod de `env.ts`.
+**Para despliegue en Render**: añadir esta variable en el dashboard de entorno antes
+de hacer el deploy. Sin ella el cliente Gemini no se instancia y los 3 endpoints fallan.
+
+### Integración mobile (6 archivos)
+
+- **`healthApi`** (`apps/mobile/src/api/health.js`): 3 métodos nuevos — `generateMenus`,
+  `generateMeditation`, `recommendStudyTechnique`.
+- **`FatigueEngineScreen.js`**: exporta `FATIGUE_LEVEL_KEY = 'opox.health.fatigueLevel'`
+  y persiste el nivel en AsyncStorage al terminar el análisis de fatiga.
+- **`MenusScreen.js`**: botón "✦ Generar menú con IA" → modal con selector de objetivo
+  (Concentración / Energía / Examen / Recuperación) y restricciones (Vegetariano / Sin
+  gluten / Sin lactosa). Al generar: menú IA aparece en la lista con badge "AI" y borde
+  verde. Los menús "Dietista" estáticos permanecen — son complementarios, no reemplazados.
+- **`MeditationListScreen.js`**: card "Sesión personalizada" con selector tipo y duración.
+  Al generar: navega a `MeditationPlayer` con `phases` (array de fases IA).
+- **`MeditationPlayerScreen.js`**: muestra `activePhase.nombre` + `activePhase.texto`
+  debajo del moonCircle cuando la sesión tiene fases IA. Sin fases: comportamiento
+  original intacto. Fix de layout (2026-09-09): moonCircle reducido de 249→172px e icono
+  100→70px; layout cambiado a `justifyContent: 'space-evenly'` para que los controles
+  (play/pause, skip, shuffle) sean siempre visibles en cualquier pantalla.
+- **`StudyTipsScreen.js`**: llama `recommendStudyTechnique` al montar. Muestra card morada
+  "TÉCNICA RECOMENDADA HOY" con `tecnica`, `porque`, `adaptacion`. Si falla: card sutil
+  "No disponible sin conexión al servidor".
+
+### Arquitectura de contenido: estático + IA es la decisión correcta
+
+El contenido hardcodeado (menús "Dietista", sesiones de meditación, 4 técnicas de
+estudio) permanece como base siempre visible. La IA añade personalización encima.
+Esto garantiza que el bloque funcione offline, ante fallos de IA o rate limits, y
+que el usuario vea contenido útil al instante sin esperar una llamada de red.
+
+### Feedback de error en botones IA
+
+Antes de este fix: al fallar la red (backend no alcanzable), los botones "Generar menú"
+y "Crear sesión" no mostraban ningún cambio visual (React Native bateaba los dos
+setState True→False antes de renderizar). Ahora: `Alert.alert` con el mensaje del
+error del servidor (o genérico si es un error de red).
+
+### Decisión: no persistir en DB el contenido IA generado
+
+El contenido (menú del día, guión de meditación, técnica del día) es efímero y
+cambia según la fatiga del usuario. Guardarlo requeriría tabla nueva + lógica de
+caducidad sin beneficio claro en MVP. La historia "sesiones recientes" queda para
+Fase 2.
+
+### Config mobile para deploy
+
+`apps/mobile/.env` tiene `EXPO_PUBLIC_API_URL` comentado para desarrollo local —
+`config.js` usa `hostUri` de Metro automáticamente (IP LAN del PC). Para producción:
+descomentar la línea y apuntar al backend desplegado en Render antes de generar el APK.
+
+---
+
 ## 2026-09-08 — Bloque 3 · Bloque 8 · Training: bugfixes APK (Health Connect, Tutor IA, navegación)
 
 Rama: `fix/revision-bloques-bugfixes`. Auditoría contra APK real con Health Connect instalado.
