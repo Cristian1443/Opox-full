@@ -87,7 +87,7 @@ function StepSlider({ labels, index, onChange }) {
     return (
         <View style={{ marginTop: 18 }}>
             <View
-                style={styles.trackWrapper}
+                style={[styles.trackWrapper, { width: '100%' }]}
                 onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
                 {...responder.panHandlers}
             >

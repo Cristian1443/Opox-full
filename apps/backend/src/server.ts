@@ -31,6 +31,17 @@ export function createServer(): Express {
     // (Foto-Test del Bloque 6 sigue funcionando por el mismo límite).
     app.use(express.json({ limit: '25mb' }));
 
+    // Toda la API es dinámica y por-usuario — sin esto, un GET (ej. temario,
+    // dashboard) puede quedar cacheado por el navegador/cliente HTTP y servir
+    // datos viejos después de un cambio en la base de datos (bug real: el
+    // temario mostraba 10 temas del curso anterior aun después de migrar a 40).
+    // Los pocos endpoints que sí quieren cachear (ej. audio de podcast) ya
+    // sobreescriben Cache-Control explícitamente antes de responder.
+    app.use((_req, res, next) => {
+        res.setHeader('Cache-Control', 'no-store');
+        next();
+    });
+
     // Rutas
     app.use(createHealthRouter(container.controllers.health, container.middleware.auth));
     app.use(createAuthRouter(container.controllers.auth, container.middleware.auth));

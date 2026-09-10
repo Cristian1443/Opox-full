@@ -1,13 +1,19 @@
 /**
  * Config plugin custom para Health Connect en Android 14+.
  *
- * El plugin oficial de `react-native-health-connect` solo añade el
- * `intent-filter` de `androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE`.
- * Pero eso NO es suficiente para que la app aparezca en el listado de
- * Health Connect: se necesita también un bloque `<queries>` en el manifest
- * que declara la visibilidad del paquete `com.google.android.apps.healthdata`
- * (Android 11+ package visibility). Sin `<queries>`, Health Connect esconde
- * la app aunque tenga los permisos declarados.
+ * El plugin oficial de `react-native-health-connect` (app.plugin.js) SOLO
+ * añade el `intent-filter` de `androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE`
+ * — y lo hace incondicionalmente, sin comprobar si ya existe. Este plugin
+ * custom se limita a lo que el oficial NO hace: el bloque `<queries>` que
+ * declara la visibilidad del paquete `com.google.android.apps.healthdata`
+ * (Android 11+ package visibility, sin esto Health Connect no reconoce la
+ * app) y los `<uses-permission>` de salud como red de seguridad si
+ * `healthConnectPermissions` no se propaga por algún motivo.
+ *
+ * NO se toca aquí el intent-filter de la rationale — el plugin oficial ya
+ * lo añade siempre; duplicarlo (aunque con des-duplicación propia) termina
+ * generando dos <intent-filter> idénticos en el manifest final porque el
+ * oficial nunca comprueba si el nuestro ya lo puso.
  *
  * Ver: https://developer.android.com/health-connect/develop/get-started#declare-permissions
  * y https://developer.android.com/training/basics/intents/package-visibility
@@ -16,7 +22,6 @@
 const { withAndroidManifest } = require('@expo/config-plugins');
 
 const HEALTH_CONNECT_PACKAGE = 'com.google.android.apps.healthdata';
-const RATIONALE_ACTION = 'androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE';
 
 const HEALTH_PERMISSIONS = [
     'android.permission.health.READ_HEART_RATE',
@@ -57,31 +62,11 @@ function ensureUsesPermissions(manifest) {
     }
 }
 
-function ensureRationaleIntentFilter(manifest) {
-    const activity = manifest.application?.[0]?.activity?.[0];
-    if (!activity) return;
-    if (!Array.isArray(activity['intent-filter'])) {
-        activity['intent-filter'] = [];
-    }
-
-    // Ya existe? (el plugin de react-native-health-connect puede haberlo puesto)
-    const already = activity['intent-filter'].some((f) =>
-        Array.isArray(f.action) &&
-        f.action.some((a) => a.$?.['android:name'] === RATIONALE_ACTION),
-    );
-    if (already) return;
-
-    activity['intent-filter'].push({
-        action: [{ $: { 'android:name': RATIONALE_ACTION } }],
-    });
-}
-
 const withHealthConnect = (config) => {
     return withAndroidManifest(config, (config) => {
         const manifest = config.modResults.manifest;
         ensureQueriesForHealthConnect(manifest);
         ensureUsesPermissions(manifest);
-        ensureRationaleIntentFilter(manifest);
         return config;
     });
 };
