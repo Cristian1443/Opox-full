@@ -221,7 +221,10 @@ export default function TutorChatScreen({ navigation, route }) {
 
     const handleAction = useCallback((label) => {
         if (label === 'Crear flashcards') {
-            navigation.navigate('TutorFlashcardsLoading');
+            // Ir al picker de temas — antes iba directo a Loading con topicId por
+            // defecto ('constitucion'), que en el curso nuevo no existe y el Motor
+            // devolvía tema_no_encontrado. Ahora el usuario elige el tema.
+            navigation.navigate('TutorFlashcards');
             return;
         }
         if (label === 'Lanzar test') {

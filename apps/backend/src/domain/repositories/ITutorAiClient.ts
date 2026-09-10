@@ -36,4 +36,21 @@ export interface ITutorAiClient {
         /** 0=esquema, 1=medio, 2=profundo. Default: 1. */
         detailLevel?: number;
     }): Promise<Array<{ title: string; content: string }>>;
+
+    /** Genera un podcast del tema vía Motor async (dispara job, hace polling y devuelve URL del mp3). */
+    generatePodcast?(params: {
+        topicId: string;
+        /** user_id — el Motor lo exige en el body para tracking del job. */
+        userId: string;
+        cursoId?: string;
+        /** 'corta' (5 min) | 'media' (10 min). Default: 'media'. */
+        duracion?: 'corta' | 'media';
+        /** 0.5 | 1.0 | 1.5 | 2.0. Default: 1.0. */
+        velocidad?: number;
+    }): Promise<{
+        filename: string;
+        /** URL completa del mp3 (baseUrl + path del Motor). */
+        mp3Url: string;
+        estimatedSeconds: number;
+    }>;
 }

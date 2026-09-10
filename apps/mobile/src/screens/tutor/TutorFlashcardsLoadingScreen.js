@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import FlashcardsSuccessModal from '../../components/FlashcardsSuccessModal';
-import { tutorApi } from '../../api';
+import { tutorApi, api } from '../../api';
 
 // Colores confirmados contra Figma (frame GENERANDO FLASHCARDS, Bloque 8)
 // sin equivalente exacto en theme.js. Mismo patrón de overlay + tarjeta
@@ -62,9 +62,22 @@ function SparklesIcon({ width = 81, height = 76, color = colors.accentOrange }) 
 
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 export default function TutorFlashcardsLoadingScreen({ navigation, route }) {
-    const topicId    = route?.params?.topicId    ?? 'constitucion';
-    const topicTitle = route?.params?.topicTitle ?? 'Tema de estudio';
-    const oposicion  = route?.params?.oposicion  ?? 'justicia-tramitacion';
+    // Tema 1 hex real del curso Policía de Galicia como fallback — si por alguna
+    // navegación externa no llega topicId, evitamos mandar 'constitucion' (slug del
+    // curso viejo) que el Motor no reconoce y devuelve tema_no_encontrado.
+    const topicId    = route?.params?.topicId    ?? 'cb93fdfcc3944529';
+    const topicTitle = route?.params?.topicTitle ?? 'Tema 1';
+    // Si no llega desde el picker, cargar de la sesión guardada para respetar la oposición
+    // real del usuario. 'policia-local-galicia' como fallback final (default único).
+    const [oposicion, setOposicion] = useState(route?.params?.oposicion ?? 'policia-local-galicia');
+    useEffect(() => {
+        if (route?.params?.oposicion) return;
+        api.loadSession().then((session) => {
+            const s = session?.user?.oposicion ?? session?.user?.user_metadata?.oposicion;
+            if (s) setOposicion(s);
+        }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const progressAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim    = useRef(new Animated.Value(0.35)).current;

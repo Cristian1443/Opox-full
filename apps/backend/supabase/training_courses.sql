@@ -22,9 +22,11 @@ DROP POLICY IF EXISTS "training_courses_read_authenticated" ON training_courses;
 CREATE POLICY "training_courses_read_authenticated" ON training_courses
     FOR SELECT USING (auth.role() = 'authenticated');
 
--- ── Seed: único curso activo — Policía Local de Galicia ──────────────────────
+-- ── Seed: único curso activo — Policía de Galicia (temario completo) ─────────
+-- 2026-09-09: curso completo con los 4 bloques (40 temas, 1784 páginas).
+-- Reemplaza el curso previo 0bed919120024e5f (parcial, solo Tema 1) por 672e3a8bad0f45c8.
 INSERT INTO training_courses (oposicion, motor_curso_id, label, is_default) VALUES
-('policia-local-galicia', '0bed919120024e5f', 'Policía Local de Galicia', true)
+('policia-local-galicia', '672e3a8bad0f45c8', 'Policía de Galicia', true)
 ON CONFLICT (oposicion) DO UPDATE
     SET motor_curso_id = EXCLUDED.motor_curso_id,
         label          = EXCLUDED.label,
@@ -33,7 +35,7 @@ ON CONFLICT (oposicion) DO UPDATE
 -- Mantener justicia-tramitacion apuntando al mismo curso mientras no haya
 -- contenido separado. Eliminar este registro cuando exista un curso propio.
 INSERT INTO training_courses (oposicion, motor_curso_id, label, is_default) VALUES
-('justicia-tramitacion', '0bed919120024e5f', 'Justicia · Tramitación Procesal', false)
+('justicia-tramitacion', '672e3a8bad0f45c8', 'Justicia · Tramitación Procesal', false)
 ON CONFLICT (oposicion) DO UPDATE
     SET motor_curso_id = EXCLUDED.motor_curso_id,
         label          = EXCLUDED.label;

@@ -28,6 +28,8 @@ import type {
     ListSummariesUseCase,
     GetSummaryUseCase,
     GetCursoIdUseCase,
+    GeneratePodcastUseCase,
+    ProxyPodcastAudioUseCase,
 } from '../../application';
 import type {
     TutorConversation,
@@ -63,6 +65,8 @@ export class TutorController {
             listSummaries: ListSummariesUseCase;
             getSummary: GetSummaryUseCase;
             getCursoId: GetCursoIdUseCase;
+            generatePodcast: GeneratePodcastUseCase;
+            proxyPodcastAudio?: ProxyPodcastAudioUseCase;
         },
     ) {}
 
@@ -211,6 +215,66 @@ export class TutorController {
             const { positionSecs } = req.body as { positionSecs: number };
             const progress = await this.deps.saveProgress.execute({ userId: req.authUser!.id, episodeId: (req.params.episodeId as string), positionSecs });
             ok(res, 200, this.serializeProgress(progress));
+        } catch (err) { next(err); }
+    };
+
+    // Proxy stream del mp3 del Motor. Ruta pública — el filename es un hash aleatorio
+    // (podcast-[a-f0-9]{16,32}.mp3) que actúa como secreto compartido: solo lo conoce
+    // quien acaba de generar el podcast. Validamos el patrón para evitar path traversal
+    // y llamadas al Motor con paths arbitrarios.
+    proxyPodcastAudio = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.proxyPodcastAudio) {
+                res.status(503).json({ ok: false, error: { code: 'motor-not-configured', message: 'Motor IA no configurado' } });
+                return;
+            }
+            const filename = (req.params.filename as string);
+            if (!/^podcast-[a-f0-9]{8,64}\.mp3$/.test(filename)) {
+                res.status(400).json({ ok: false, error: { code: 'invalid-filename', message: 'Filename inválido' } });
+                return;
+            }
+            const upstream = await this.deps.proxyPodcastAudio.execute(filename);
+            if (upstream.status !== 200 || !upstream.body) {
+                res.status(upstream.status).end();
+                return;
+            }
+            res.setHeader('Content-Type', upstream.contentType);
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+            // Stream chunks del web-standard ReadableStream a Express (Node stream).
+            const reader = upstream.body.getReader();
+            const pump = async (): Promise<void> => {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    if (value) res.write(Buffer.from(value));
+                }
+                res.end();
+            };
+            await pump();
+        } catch (err) { next(err); }
+    };
+
+    generatePodcast = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { topicId, topicTitle, oposicion, duracion, velocidad } = req.body as {
+                topicId: string;
+                topicTitle: string;
+                oposicion: string;
+                duracion?: 'corta' | 'media';
+                velocidad?: number;
+            };
+            const cursoId = await this.deps.getCursoId.execute(oposicion);
+            const r = await this.deps.generatePodcast.execute({
+                topicId,
+                topicTitle,
+                userId: req.authUser!.id,
+                cursoId,
+                duracion,
+                velocidad,
+            });
+            // Devolvemos filename al mobile — el mobile construye la URL final
+            // `${API_BASE_URL}/tutor/podcast/audio/{filename}` que hace stream vía proxy.
+            ok(res, 200, r);
         } catch (err) { next(err); }
     };
 

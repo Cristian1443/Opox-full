@@ -307,7 +307,13 @@ export class ListTopicsUseCase {
     constructor(private readonly repo: IBoeRepository) {}
 
     async execute(oposicion: string): Promise<TrainingTopic[]> {
-        return this.repo.listTopics(oposicion);
+        const topics = await this.repo.listTopics(oposicion);
+        // Reetiquetar como "Tema 1", "Tema 2"… según el orden del temario.
+        // Los títulos originales del Motor son incoherentes (unos completos, otros
+        // truncados a "Tema 13" o "Vida"); mostrar la posición del temario es
+        // uniforme y evita nombres inservibles en los pickers de Bloques 4, 6, 8 y 10.
+        // El topicId se mantiene intacto — la IA sigue recibiendo el ID hex real.
+        return topics.map((t, i) => ({ ...t, label: `Tema ${i + 1}` }));
     }
 }
 

@@ -82,6 +82,8 @@ import {
     GetEpisodeUseCase,
     GetProgressUseCase,
     SaveProgressUseCase,
+    GeneratePodcastUseCase,
+    ProxyPodcastAudioUseCase,
     ListSummariesUseCase,
     GetSummaryUseCase,
     // Bloque 9 · Factoría de Apuntes
@@ -339,8 +341,19 @@ export function buildContainer() {
         return undefined;
     })();
 
+    // 60 s: el chat del Motor RAG tarda 20-40 s en respuestas largas.
+    // Con 15 s caía en timeout aunque el Motor sí respondiera y el usuario
+    // veía el stub "Estoy consultando el temario…" en el APK.
+    // Todos los endpoints del Motor exigen también X-OpenAI-Key (BYOK): reusamos
+    // AI_API_KEY. Sin ella, cualquier llamada de generación falla con `falta_openai_key`.
     const motorTutor = isMotorConfigured
-        ? new MotorTutorClient(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!, 15_000, env.MOTOR_DEFAULT_CURSO_ID ?? '')
+        ? new MotorTutorClient(
+            env.MOTOR_API_BASE_URL!,
+            env.MOTOR_API_KEY!,
+            env.AI_API_KEY ?? '',
+            60_000,
+            env.MOTOR_DEFAULT_CURSO_ID ?? '',
+          )
         : undefined;
 
     // Timeout corto (5 s) — el onboarding cae a preguntas estáticas si el Motor tarda
@@ -443,11 +456,15 @@ export function buildContainer() {
         generateDeck: new GenerateDeckUseCase(tutorRepo, motorTutor),
         deleteDeck: new DeleteDeckUseCase(tutorRepo),
         submitReview: new SubmitReviewUseCase(tutorRepo),
-        listEpisodes: new ListEpisodesUseCase(tutorRepo),
+        listEpisodes: new ListEpisodesUseCase(tutorRepo, boeRepo),
         getEpisode: new GetEpisodeUseCase(tutorRepo),
         getProgress: new GetProgressUseCase(tutorRepo),
         saveProgress: new SaveProgressUseCase(tutorRepo),
-        listSummaries: new ListSummariesUseCase(tutorRepo),
+        generatePodcast: new GeneratePodcastUseCase(motorTutor),
+        proxyPodcastAudio: isMotorConfigured
+            ? new ProxyPodcastAudioUseCase(env.MOTOR_API_BASE_URL!, env.MOTOR_API_KEY!)
+            : undefined,
+        listSummaries: new ListSummariesUseCase(tutorRepo, boeRepo),
         getSummary: new GetSummaryUseCase(tutorRepo, motorTutor),
 
         // Bloque 9 · Factoría de Apuntes
@@ -624,6 +641,8 @@ export function buildContainer() {
         listSummaries: useCases.listSummaries,
         getSummary: useCases.getSummary,
         getCursoId: useCases.getCursoId,
+        generatePodcast: useCases.generatePodcast,
+        proxyPodcastAudio: useCases.proxyPodcastAudio,
     });
 
     const healthController = new HealthController({

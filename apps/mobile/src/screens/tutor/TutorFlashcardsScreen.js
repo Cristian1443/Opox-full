@@ -1,17 +1,19 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
     Animated,
+    FlatList,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
-import { tutorApi } from '../../api';
+import { tutorApi, api } from '../../api';
 
 // Colores confirmados contra Figma (pop-up MAZO COMPLETADO, Bloque 8) sin
 // equivalente exacto en theme.js. Mismo patrón de overlay + tarjeta que el
@@ -110,6 +112,68 @@ function DeckCompleted({ knownCount, failedCount, onEmpezarTest, onVolverAlAula 
     );
 }
 
+// ─── Selector de temas — se muestra cuando el usuario entra desde el hub ─────
+function TopicPicker({ oposicion, onSelect, onBack }) {
+    const [topics, setTopics]   = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // Reutilizamos listSummaries porque devuelve la misma lista de temas del
+        // temario (con topicId + topicTitle). Alternativa: /training/topics.
+        tutorApi.listSummaries(oposicion)
+            .then((res) => {
+                if (!res?.error && Array.isArray(res?.data)) setTopics(res.data);
+            })
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, [oposicion]);
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Flashcards</Text>
+                <View style={{ width: 24 }} />
+            </View>
+
+            {loading ? (
+                <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} />
+            ) : topics.length === 0 ? (
+                <View style={styles.pickerEmpty}>
+                    <Ionicons name="layers-outline" size={44} color={colors.textDark} />
+                    <Text style={styles.pickerEmptyText}>
+                        Aún no hay temas para tu oposición.
+                    </Text>
+                </View>
+            ) : (
+                <FlatList
+                    data={topics}
+                    keyExtractor={(t) => t.topicId ?? t.id}
+                    ListHeaderComponent={
+                        <Text style={styles.pickerHint}>Elige un tema para generar el mazo con la IA.</Text>
+                    }
+                    contentContainerStyle={styles.pickerList}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={styles.topicRow}
+                            onPress={() => onSelect(item)}
+                            activeOpacity={0.75}
+                        >
+                            <View style={styles.topicIcon}>
+                                <Ionicons name="layers-outline" size={20} color={colors.purple} />
+                            </View>
+                            <Text style={styles.topicName} numberOfLines={3}>{item.topicTitle}</Text>
+                            <Ionicons name="chevron-forward" size={18} color="rgba(65,41,80,0.5)" />
+                        </TouchableOpacity>
+                    )}
+                />
+            )}
+        </SafeAreaView>
+    );
+}
+
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 export default function TutorFlashcardsScreen({ navigation, route }) {
     const paramCards   = route?.params?.cards;
@@ -119,6 +183,32 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
     const deckId       = route?.params?.deckId ?? null;
     const topicId      = route?.params?.topicId ?? null;
     const insets = useSafeAreaInsets();
+
+    // Si el usuario entra desde el hub sin params, mostrar picker de temas primero.
+    const [oposicion, setOposicion] = useState(route?.params?.oposicion ?? 'policia-local-galicia');
+    useEffect(() => {
+        if (route?.params?.oposicion) return;
+        api.loadSession().then((session) => {
+            const s = session?.user?.oposicion ?? session?.user?.user_metadata?.oposicion;
+            if (s) setOposicion(s);
+        }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const showPicker = !paramCards && !topicId;
+    if (showPicker) {
+        return (
+            <TopicPicker
+                oposicion={oposicion}
+                onSelect={(t) => navigation.replace('TutorFlashcardsLoading', {
+                    topicId: t.topicId,
+                    topicTitle: t.topicTitle,
+                    oposicion,
+                })}
+                onBack={() => navigation.goBack()}
+            />
+        );
+    }
 
     const [cards] = useState(initialCards);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -545,6 +635,67 @@ const styles = StyleSheet.create({
     doneSecondaryButtonText: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
+        color: colors.textDark,
+    },
+
+    // ── Picker ─────────────────────────────────────────────────────────────
+    pickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#D9D9D9',
+    },
+    pickerTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 21.3,
+        color: colors.textDark,
+    },
+    pickerHint: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: 'rgba(65,41,80,0.5)',
+        marginBottom: spacing.md,
+    },
+    pickerList: {
+        padding: spacing.md,
+        gap: spacing.sm,
+    },
+    pickerEmpty: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.md,
+        padding: spacing.xl,
+    },
+    pickerEmptyText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: 'rgba(65,41,80,0.5)',
+        textAlign: 'center',
+    },
+    topicRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EDEDED',
+        borderRadius: 14,
+        padding: spacing.md,
+        gap: spacing.md,
+    },
+    topicIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: `${colors.purple}18`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    topicName: {
+        flex: 1,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
         color: colors.textDark,
     },
 });

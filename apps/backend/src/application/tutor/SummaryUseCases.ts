@@ -1,15 +1,44 @@
 import { logger } from '@opox/utils';
-import type { ITutorRepository } from '../../domain';
+import type { ITutorRepository, IBoeRepository } from '../../domain';
 import { SummaryNotFoundError } from '../../domain';
 import type { ITutorAiClient } from '../../domain/repositories/ITutorAiClient';
 import type { TutorSummary } from '../../domain/entities';
 
 // ─── Listar resúmenes disponibles para una oposición ─────────────────────────
+// La tabla `tutor_summaries` está vacía en producción (solo se poblaría si algún día
+// pre-generamos resúmenes). Si viene vacía, caemos a `listTopics` del temario para
+// que el TopicPicker del mobile muestre los temas del curso; al seleccionar uno,
+// el GetSummaryUseCase pedirá al Motor el resumen bajo demanda.
 export class ListSummariesUseCase {
-    constructor(private readonly tutorRepo: ITutorRepository) {}
+    constructor(
+        private readonly tutorRepo: ITutorRepository,
+        private readonly boeRepo?: IBoeRepository,
+    ) {}
 
     async execute(oposicion: string): Promise<TutorSummary[]> {
-        return this.tutorRepo.listSummaries(oposicion);
+        const cached = await this.tutorRepo.listSummaries(oposicion);
+        if (cached.length > 0) return cached;
+
+        if (!this.boeRepo) return [];
+
+        try {
+            const topics = await this.boeRepo.listTopics(oposicion);
+            const now = new Date();
+            // En el Aula Virtual mostramos los temas como "Tema 1", "Tema 2"… (posición
+            // en el temario, según sort_order que ya trae listTopics). El título largo
+            // sirve poco en la UI del picker y no cabe legible en el player.
+            return topics.map((t, i) => ({
+                id: `topic-${t.topicId}`,
+                topicId: t.topicId,
+                topicTitle: `Tema ${i + 1}`,
+                oposicion,
+                sections: [],
+                updatedAt: now,
+            }));
+        } catch (err) {
+            logger.warn('[ListSummaries] fallback a listTopics falló', { err: String(err) });
+            return [];
+        }
     }
 }
 

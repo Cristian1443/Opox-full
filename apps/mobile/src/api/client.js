@@ -23,7 +23,7 @@ async function loadSession() {
     return raw ? JSON.parse(raw) : null;
 }
 
-async function request(path, { method = 'GET', body, auth = false } = {}) {
+async function request(path, { method = 'GET', body, auth = false, timeoutMs } = {}) {
     const headers = { 'Content-Type': 'application/json' };
 
     if (auth) {
@@ -33,14 +33,23 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
         }
     }
 
+    // Abort controller opcional — endpoints largos (podcast generate) pasan un timeout mayor.
+    const ctrl = new AbortController();
+    let timer = null;
+    if (timeoutMs) {
+        timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    }
+
     let response;
     try {
         response = await fetch(`${API_BASE_URL}${path}`, {
             method,
             headers,
             body: body ? JSON.stringify(body) : undefined,
+            signal: timeoutMs ? ctrl.signal : undefined,
         });
     } catch (networkErr) {
+        if (timer) clearTimeout(timer);
         return {
             data: null,
             error: {
@@ -48,6 +57,8 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
                 message: 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
             },
         };
+    } finally {
+        if (timer) clearTimeout(timer);
     }
 
     let payload = null;
