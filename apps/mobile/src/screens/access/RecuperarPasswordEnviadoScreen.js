@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
-    Text,
     View,
     TouchableOpacity,
     Linking,
     Alert,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -39,14 +39,12 @@ export default function RecuperarPasswordEnviadoScreen({ route, navigation }) {
     }, [contador]);
 
     const handleAbrirCorreo = async () => {
-        const url = `mailto:${email}`;
+        // `Linking.canOpenURL('mailto:...')` da falso negativo en Android 11+
+        // (restricción de visibilidad de paquetes: la app no declara <queries>
+        // para el esquema mailto) aunque sí haya una app de correo instalada.
+        // Se omite el chequeo previo y se intenta abrir directamente.
         try {
-            const supported = await Linking.canOpenURL(url);
-            if (supported) {
-                await Linking.openURL(url);
-            } else {
-                Alert.alert('Error', 'No se pudo abrir la app de correo.');
-            }
+            await Linking.openURL(`mailto:${email}`);
         } catch {
             Alert.alert('Error', 'No se pudo abrir la app de correo.');
         }

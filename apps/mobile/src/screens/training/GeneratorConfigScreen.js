@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    View, Text, TouchableOpacity, StyleSheet,
-    StatusBar, ScrollView, PanResponder, Animated, ActivityIndicator, Alert,
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    StatusBar,
+    ScrollView,
+    PanResponder,
+    Animated,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -39,6 +47,10 @@ const TRACK_H = 6;
 const DEFAULTS = { difficulty: 'medium', count: 30, timed: true };
 
 // ─── Slider de pasos (Nivel de dificultad) ───────────────────────────────────
+// El área de arrastre cubre toda la barra (no solo el thumb) y tocar en
+// cualquier punto salta directo ahí — antes solo se podía arrastrar agarrando
+// el círculo exacto del thumb, muy difícil de acertar cuando estaba lejos del
+// valor deseado.
 function StepSlider({ labels, index, onChange }) {
     const [width, setWidth] = useState(0);
     const usable = Math.max(width - THUMB, 1);
@@ -52,7 +64,12 @@ function StepSlider({ labels, index, onChange }) {
     const responder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
-            onPanResponderGrant: () => { startX.current = pos; },
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: (e) => {
+                const next = Math.max(0, Math.min(usable, e.nativeEvent.locationX - THUMB / 2));
+                startX.current = next;
+                setPos(next);
+            },
             onPanResponderMove: (_, g) => {
                 const next = Math.max(0, Math.min(usable, startX.current + g.dx));
                 setPos(next);
@@ -69,10 +86,14 @@ function StepSlider({ labels, index, onChange }) {
 
     return (
         <View style={{ marginTop: 18 }}>
-            <View style={styles.trackWrapper} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+            <View
+                style={styles.trackWrapper}
+                onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+                {...responder.panHandlers}
+            >
                 <View style={styles.trackBg} />
                 <View style={[styles.trackFill, { width: fillWidth }]} />
-                <View {...responder.panHandlers} style={[styles.thumb, { left: pos }]} />
+                <View style={[styles.thumb, { left: pos }]} />
             </View>
 
             <View style={styles.stepLabelsRow}>
@@ -87,6 +108,8 @@ function StepSlider({ labels, index, onChange }) {
 }
 
 // ─── Slider numérico (Número de preguntas) ───────────────────────────────────
+// Mismo fix que StepSlider: área de arrastre en toda la barra + salto directo
+// al punto tocado, en vez de solo poder agarrar el thumb exacto.
 function RangeSlider({ min, max, step, value, onChange }) {
     const [width, setWidth] = useState(0);
     const usable = Math.max(width - THUMB, 1);
@@ -104,7 +127,12 @@ function RangeSlider({ min, max, step, value, onChange }) {
     const responder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
-            onPanResponderGrant: () => { startX.current = pos; },
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: (e) => {
+                const next = Math.max(0, Math.min(usable, e.nativeEvent.locationX - THUMB / 2));
+                startX.current = next;
+                setPos(next);
+            },
             onPanResponderMove: (_, g) => {
                 const next = Math.max(0, Math.min(usable, startX.current + g.dx));
                 setPos(next);
@@ -120,10 +148,14 @@ function RangeSlider({ min, max, step, value, onChange }) {
 
     return (
         <View style={styles.rangeRow}>
-            <View style={[styles.trackWrapper, { flex: 1 }]} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+            <View
+                style={[styles.trackWrapper, { flex: 1 }]}
+                onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+                {...responder.panHandlers}
+            >
                 <View style={styles.trackBg} />
                 <View style={[styles.trackFill, { width: fillWidth }]} />
-                <View {...responder.panHandlers} style={[styles.thumb, { left: pos }]} />
+                <View style={[styles.thumb, { left: pos }]} />
             </View>
 
             <View style={styles.badge}>

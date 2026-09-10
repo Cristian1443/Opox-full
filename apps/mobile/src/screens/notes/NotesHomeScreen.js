@@ -2,16 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
-    Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
     RefreshControl,
     ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Rect } from 'react-native-svg';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { notesApi } from '../../api';
 
@@ -24,23 +24,25 @@ const FIGMA = {
     textNoteMuted: 'rgba(52,58,61,0.5)',
 };
 
-// Ícono de documento (ver nota: en Figma este contenedor está nombrado
-// "Modo_de_aislamiento", un nombre genérico heredado — el contenido visual
-// es correcto).
-function DocumentIcon({ width = 32, height = 42, color = colors.accentOrange }) {
+// Icono exacto exportado de Figma — documento con esquina doblada + líneas.
+function DocumentIcon({ width = 55, height = 72, color = colors.accentOrange }) {
     return (
-        <Svg width={width} height={height} viewBox="0 0 32 42">
-            <Path
-                d="M4 2H20L28 10V38C28 39.1 27.1 40 26 40H4C2.9 40 2 39.1 2 38V4C2 2.9 2.9 2 4 2Z"
-                fill="none"
-                stroke={color}
-                strokeWidth={2.2}
-                strokeLinejoin="round"
-            />
-            <Path d="M20 2V10H28" fill="none" stroke={color} strokeWidth={2.2} strokeLinejoin="round" />
-            <Rect x={8} y={20} width={16} height={2.2} rx={1.1} fill={color} />
-            <Rect x={8} y={26} width={16} height={2.2} rx={1.1} fill={color} />
-            <Rect x={8} y={32} width={10} height={2.2} rx={1.1} fill={color} />
+        <Svg width={width} height={height} viewBox="0 0 72 94" fill="none">
+            <Path d="M40.0012 93.9998H2.00193H0V91.9985V12.0286V10.0327H2.00193H61.9957H63.9976V12.0286V68.0102H59.9991V14.0299H3.99852V90.0026H40.0012V93.9998Z" fill={color} />
+            <Path d="M42.0566 88.8608V70.0063H64.1793L61.0883 73.3578L45.5266 90.1896L42.0566 93.9253V88.8181V88.8608ZM46.0552 74.0088V83.7536L55.0558 74.0088H46.0552Z" fill={color} />
+            <Path d="M50.0002 23.0063H12.001V27.0035H50.0002V23.0063Z" fill={color} />
+            <Path d="M50.0002 39.0005H12.001V42.9976H50.0002V39.0005Z" fill={color} />
+            <Path d="M50.0002 54.9995H12.001V58.9967H50.0002V54.9995Z" fill={color} />
+            <Path d="M7.99707 5.99841V2.00125V0H9.999H69.9981H72V2.00125V52.0165H67.9962V3.99716H12.0009V5.99841H7.99707Z" fill={color} />
+        </Svg>
+    );
+}
+
+// Icono exacto exportado de Figma para el botón "+" de subir apuntes.
+function PlusIcon({ size = 22, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 49 49" fill="none">
+            <Path d="M48.96 26.4H26.496V48.96H22.368V26.4H2.36034e-05V22.56H22.368V-2.47955e-05H26.496V22.56H48.96V26.4Z" fill={color} />
         </Svg>
     );
 }
@@ -202,20 +204,20 @@ export default function NotesHomeScreen({ navigation, route }) {
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.iconBtn}
+                    style={styles.backBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Volver"
                 >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                    <Feather name="chevron-left" size={22} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Mis apuntes</Text>
                 <TouchableOpacity
                     onPress={goUpload}
-                    style={styles.iconBtn}
+                    style={styles.addBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Subir apuntes"
                 >
-                    <Text style={styles.addGlyph}>+</Text>
+                    <PlusIcon />
                 </TouchableOpacity>
             </View>
 
@@ -285,18 +287,26 @@ const styles = StyleSheet.create({
         paddingTop: spacing.sm,
         paddingBottom: spacing.md,
     },
-    iconBtn: { width: 32, alignItems: 'center' },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    addBtn: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     headerTitle: {
         flex: 1,
         fontFamily: 'Poppins-SemiBold',
         fontSize: 21.3,
         color: colors.textDark,
         textAlign: 'center',
-    },
-    addGlyph: {
-        fontFamily: 'Poppins-Light',
-        fontSize: 30,
-        color: colors.accentOrange,
     },
 
     scroll: { flex: 1 },

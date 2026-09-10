@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import Text from './AppText';
 import { colors } from '../theme';
 
 /** Topbar estándar OPOX: chevron + título (+ subtítulo opcional) + slot derecho. */

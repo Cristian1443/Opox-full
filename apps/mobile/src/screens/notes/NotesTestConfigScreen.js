@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
     ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import AccentSlider from '../../components/AccentSlider';
 import { notesApi } from '../../api';
@@ -69,8 +69,6 @@ export default function NotesTestConfigScreen({ navigation, route }) {
 
     const [dificultadIdx, setDificultadIdx] = useState(1); // 0=Fácil, 1=Medio, 2=Difícil
     const [stepIdx, setStepIdx] = useState(DEFAULT_STEP_IDX);
-    // Consistente con el Generador Infinito del Bloque 6 (aunque no está en el mockup).
-    const [timed, setTimed] = useState(false);
     const [starting, setStarting] = useState(false);
     const [onlyTaggedTopics, setOnlyTaggedTopics] = useState(true);
 
@@ -88,7 +86,7 @@ export default function NotesTestConfigScreen({ navigation, route }) {
         const topics = onlyTaggedTopics ? note.tags : [];
         const difficulty = ['easy', 'medium', 'hard'][dificultadIdx];
         try {
-            const res = await notesApi.generateTest(note.id, { questionCount, topics, difficulty, timed });
+            const res = await notesApi.generateTest(note.id, { questionCount, topics, difficulty });
             const questions = adaptGeneratedQuestions(res?.data?.questions ?? []);
             navigation.replace('TrainingSession', {
                 source: 'notes',
@@ -97,8 +95,6 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                 questionCount,
                 topics,
                 examTitle: `Apuntes: ${note.title}`,
-                timedMode: timed,
-                secondsPerQuestion: 30,
             });
         } catch {
             navigation.replace('TrainingSession', {
@@ -108,8 +104,6 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                 questionCount,
                 topics,
                 examTitle: `Apuntes: ${note.title}`,
-                timedMode: timed,
-                secondsPerQuestion: 30,
             });
         } finally {
             setStarting(false);
@@ -121,14 +115,14 @@ export default function NotesTestConfigScreen({ navigation, route }) {
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.iconBtn}
+                    style={styles.backBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Volver"
                 >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                    <Feather name="chevron-left" size={22} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Test de mis apuntes</Text>
-                <View style={styles.iconBtn} />
+                <View style={styles.headerPlaceholder} />
             </View>
 
             <ScrollView
@@ -153,8 +147,13 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                     trackColor={FIGMA.accentOrangeTrack}
                 />
                 <View style={styles.sliderLabelsRow}>
-                    {DIFFICULTY_LABELS.map((label) => (
-                        <Text key={label} style={styles.sliderLabel}>{label}</Text>
+                    {DIFFICULTY_LABELS.map((label, i) => (
+                        <Text
+                            key={label}
+                            style={[styles.sliderLabel, i === dificultadIdx && styles.sliderLabelActive]}
+                        >
+                            {label}
+                        </Text>
                     ))}
                 </View>
 
@@ -180,19 +179,7 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                         : 'Selecciona cuántas preguntas quieres generar de tus apuntes.'}
                 </Text>
 
-                {/* Modo contrarreloj — real, sin dato de Figma; reutiliza el mismo
-                    interruptor visual confirmado para "Solo temas etiquetados". */}
                 <View style={[styles.toggleRow, styles.sectionSpacing]}>
-                    <View style={styles.toggleTextWrap}>
-                        <Text style={styles.toggleTitle}>Modo contrarreloj</Text>
-                        <Text style={styles.toggleSubtitle}>30 segundos por pregunta. Sin pausa.</Text>
-                    </View>
-                    <ToggleSwitch value={timed} onValueChange={setTimed} />
-                </View>
-
-                <View style={styles.separator} />
-
-                <View style={styles.toggleRow}>
                     <View style={styles.toggleTextWrap}>
                         <Text style={styles.toggleTitle}>Solo temas etiquetados</Text>
                         <Text style={styles.toggleSubtitle}>{note.tags.join(' · ')}</Text>
@@ -230,6 +217,15 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.md,
     },
     iconBtn: { width: 32, alignItems: 'center' },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerPlaceholder: { width: 44, height: 44 },
     headerTitle: {
         flex: 1,
         fontFamily: 'Poppins-SemiBold',
@@ -294,8 +290,12 @@ const styles = StyleSheet.create({
     },
     sliderLabel: {
         fontFamily: 'Poppins-Regular',
-        fontSize: 9.8,
-        color: FIGMA.textMuted,
+        fontSize: 14,
+        color: colors.textDark,
+    },
+    sliderLabelActive: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
     },
 
     sliderRow: {
@@ -315,15 +315,9 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     valueBoxText: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 16,
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 20,
         color: FIGMA.valueBoxText,
-    },
-
-    separator: {
-        height: 0.44,
-        backgroundColor: FIGMA.cardBorder,
-        marginVertical: spacing.lg,
     },
 
     toggleRow: {

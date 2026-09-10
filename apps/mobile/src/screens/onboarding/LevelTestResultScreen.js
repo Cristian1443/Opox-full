@@ -1,12 +1,12 @@
 import React from 'react';
 import {
     View,
-    Text,
     TouchableOpacity,
     StyleSheet,
     StatusBar,
     ScrollView,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, spacing } from '../../theme';

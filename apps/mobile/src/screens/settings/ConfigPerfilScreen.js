@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
-  Switch, Modal, TextInput, Alert, ActivityIndicator,
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    ScrollView,
+    StatusBar,
+    Switch,
+    Modal,
+    TextInput,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { authApi } from '../../api';

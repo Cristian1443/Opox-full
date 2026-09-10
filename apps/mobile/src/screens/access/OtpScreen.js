@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
-    Text,
     View,
     TextInput,
     TouchableOpacity,
@@ -9,6 +8,7 @@ import {
     Keyboard,
     ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';

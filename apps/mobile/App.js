@@ -20,6 +20,7 @@ import useNetworkWatcher from './src/hooks/useNetworkWatcher';
 import { pushApi } from './src/api';
 import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 import { supabase } from './src/lib/supabase';
+import { AccessibilityProvider } from './src/contexts/AccessibilityContext';
 
 // Tipografía de marca OPOX
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -36,8 +37,13 @@ if (!IS_EXPO_GO) {
   try {
     Notifications = require('expo-notifications');
     Notifications.setNotificationHandler({
+      // `shouldShowAlert` quedó deprecado en esta versión de expo-notifications
+      // a favor de shouldShowBanner/shouldShowList — sin declararlos, Android
+      // no muestra nada en la bandeja del sistema mientras la app está abierta
+      // (solo se veía el banner interno de InAppNotificationBanner).
       handleNotification: async () => ({
-        shouldShowAlert: false, // InAppNotificationBanner lo gestiona
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: false,
         shouldSetBadge: true,
       }),
@@ -197,26 +203,28 @@ export default function App() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider onLayout={onLayoutRootView}>
-      <NavigationContainer ref={navigationRef} linking={linking}>
-        <NetworkWatcher />
-        <PushNotificationHandler onForegroundNotification={setBanner} />
-        <BoeRealtimeWatcher onNewChange={setBanner} />
-        <OnboardingNavigator />
-      </NavigationContainer>
-      <InAppNotificationBanner
-        visible={!!banner}
-        title={banner?.title ?? ''}
-        body={banner?.body ?? ''}
-        type={banner?.type ?? 'daily_reminder'}
-        onPress={() => {
-          if (banner?.data?.screen && navigationRef.isReady()) {
-            navigationRef.navigate(banner.data.screen, banner.data.params ?? {});
-          }
-          setBanner(null);
-        }}
-        onDismiss={() => setBanner(null)}
-      />
-    </SafeAreaProvider>
+    <AccessibilityProvider>
+      <SafeAreaProvider onLayout={onLayoutRootView}>
+        <NavigationContainer ref={navigationRef} linking={linking}>
+          <NetworkWatcher />
+          <PushNotificationHandler onForegroundNotification={setBanner} />
+          <BoeRealtimeWatcher onNewChange={setBanner} />
+          <OnboardingNavigator />
+        </NavigationContainer>
+        <InAppNotificationBanner
+          visible={!!banner}
+          title={banner?.title ?? ''}
+          body={banner?.body ?? ''}
+          type={banner?.type ?? 'daily_reminder'}
+          onPress={() => {
+            if (banner?.data?.screen && navigationRef.isReady()) {
+              navigationRef.navigate(banner.data.screen, banner.data.params ?? {});
+            }
+            setBanner(null);
+          }}
+          onDismiss={() => setBanner(null)}
+        />
+      </SafeAreaProvider>
+    </AccessibilityProvider>
   );
 }

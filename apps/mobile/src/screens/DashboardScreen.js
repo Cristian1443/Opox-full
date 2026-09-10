@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
-    Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     StatusBar,
     ScrollView,
     Alert,
 } from 'react-native';
+import Text from '../components/AppText';
 import Svg, { Path, Circle, G } from 'react-native-svg';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import NudgeModal from '../components/NudgeModal';
 import BoeAlertBanner from '../components/BoeAlertBanner';
@@ -467,12 +466,14 @@ const NUDGES = {
 
 // Ícono confirmado en Figma para el pop-up "TEMARIO DESACTUALIZADO" (10.1) —
 // círculo + barra de aviso en naranja, sin círculo de fondo detrás.
-function StaleLawsWarningIcon({ size = 48, color = colors.accentOrange }) {
+// Icono exacto exportado de Figma (círculo + exclamación), gris — mismo
+// path que IconAlertCircleGray de ConfirmExitModal.js.
+function StaleLawsWarningIcon({ size = 80, color = '#E8E8E8' }) {
     return (
-        <Svg width={size} height={size} viewBox="0 0 48 48">
-            <Circle cx={24} cy={24} r={22} stroke={color} strokeWidth={3} fill="none" />
-            <Path d="M24 14V27" stroke={color} strokeWidth={3.2} strokeLinecap="round" />
-            <Circle cx={24} cy={34} r={1.8} fill={color} />
+        <Svg width={size} height={size} viewBox="0 0 185 185" fill="none">
+            <Path d="M92.4995 175C138.063 175 175 138.063 175 92.5C175 46.9365 138.063 10 92.4995 10C46.936 10 9.99951 46.9365 9.99951 92.5C9.99951 138.063 46.936 175 92.4995 175Z" stroke={color} strokeWidth={15.32} strokeMiterlimit={10} />
+            <Path d="M75.9995 42L84.2495 115H100.75L109 42H75.9995Z" fill={color} />
+            <Path d="M106 138.5C106 131.044 99.9554 125 92.4995 125C85.0437 125 78.9995 131.044 78.9995 138.5C78.9995 145.956 85.0437 152 92.4995 152C99.9554 152 106 145.956 106 138.5Z" fill={color} />
         </Svg>
     );
 }
@@ -769,27 +770,6 @@ export default function DashboardScreen({ navigation }) {
                     </View>
                     <Text style={styles.tutorText}>Canjea tus Opopoints por recompensas virtuales y reales.</Text>
                 </TouchableOpacity>
-
-                {/* Vista previa temporal de los nudges — quitar cuando cada motor real
-                    (fatiga, estadísticas, monitor BOE) dispare el suyo */}
-                <Text style={styles.demoLabel}>VISTA PREVIA · NUDGES</Text>
-                <View style={styles.demoRow}>
-                    <TouchableOpacity style={styles.demoPill} onPress={() => setActiveNudge('fatigue')}>
-                        <Text style={styles.demoPillText}>Fatiga</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.demoPill} onPress={() => setActiveNudge('academic')}>
-                        <Text style={styles.demoPillText}>Tema flojo</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.demoPill} onPress={() => setActiveNudge('boe')}>
-                        <Text style={styles.demoPillText}>Nudge BOE</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.demoPill} onPress={() => setBoeBannerVisible(true)}>
-                        <Text style={styles.demoPillText}>Push BOE</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.demoPill} onPress={() => setStaleAlertVisible(true)}>
-                        <Text style={styles.demoPillText}>Temario desact.</Text>
-                    </TouchableOpacity>
-                </View>
 
                 <View style={{ height: 70 + insets.bottom }} />
             </ScrollView>
@@ -1189,32 +1169,6 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-Regular',
     },
 
-    // ── Vista previa nudges (temporal) ───────────
-    demoLabel: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#5A6373',
-        marginTop: 18,
-        marginBottom: 9,
-    },
-    demoRow: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    demoPill: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1.5,
-        borderColor: '#D4DAE6',
-        borderRadius: 12,
-        paddingVertical: 10,
-        alignItems: 'center',
-    },
-    demoPillText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#1B2A4A',
-    },
 
     // ── FAB (+) ──────────────────────────────────
     fab: {

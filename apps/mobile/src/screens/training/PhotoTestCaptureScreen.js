@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
     View,
-    Text,
     TouchableOpacity,
     StyleSheet,
     Dimensions,
     StatusBar,
     ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';

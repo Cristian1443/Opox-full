@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { colors } from '../theme';
 import AlertCardModal from './AlertCardModal';
 
@@ -9,14 +9,14 @@ import AlertCardModal from './AlertCardModal';
 
 const MUTED_ICON = '#E8E8E8';
 
-// Ícono confirmado en Figma: círculo + exclamación, en gris neutro (no rojo
-// como el resto de la app suele usar para errores) — sin círculo de fondo.
-function UnsupportedFormatIcon({ size = 42, color = MUTED_ICON }) {
+// Icono exacto exportado de Figma (círculo + exclamación), gris — mismo
+// path que IconAlertCircleGray de ConfirmExitModal.js.
+function UnsupportedFormatIcon({ size = 76, color = MUTED_ICON }) {
     return (
-        <Svg width={size} height={size} viewBox="0 0 42 42">
-            <Circle cx={21} cy={21} r={19} stroke={color} strokeWidth={2.4} fill="none" />
-            <Path d="M21 12V24" stroke={color} strokeWidth={2.6} strokeLinecap="round" />
-            <Circle cx={21} cy={30} r={1.6} fill={color} />
+        <Svg width={size} height={size} viewBox="0 0 185 185" fill="none">
+            <Path d="M92.4995 175C138.063 175 175 138.063 175 92.5C175 46.9365 138.063 10 92.4995 10C46.936 10 9.99951 46.9365 9.99951 92.5C9.99951 138.063 46.936 175 92.4995 175Z" stroke={color} strokeWidth={15.32} strokeMiterlimit={10} />
+            <Path d="M75.9995 42L84.2495 115H100.75L109 42H75.9995Z" fill={color} />
+            <Path d="M106 138.5C106 131.044 99.9554 125 92.4995 125C85.0437 125 78.9995 131.044 78.9995 138.5C78.9995 145.956 85.0437 152 92.4995 152C99.9554 152 106 145.956 106 138.5Z" fill={color} />
         </Svg>
     );
 }

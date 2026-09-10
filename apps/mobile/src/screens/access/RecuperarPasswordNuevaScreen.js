@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
     StyleSheet,
-    Text,
     View,
     TextInput,
     TouchableOpacity,
@@ -11,6 +10,7 @@ import {
     ScrollView,
     ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';

@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
@@ -10,9 +9,10 @@ import {
     Modal,
     Pressable,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Rect } from 'react-native-svg';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import NotesDeleteConfirmModal from '../../components/NotesDeleteConfirmModal';
 import NotesTagsEditorModal from '../../components/NotesTagsEditorModal';
@@ -34,35 +34,27 @@ const WARNING_COLOR = '#F59E0B';
 // resto de la app para cuando haya más de 2 etiquetas.
 const TAG_PALETTE = [colors.ctaGreen, colors.selectionBorder, colors.accentOrange, colors.purple];
 
-function DocumentIcon({ width = 32, height = 42, color = colors.accentOrange }) {
+// Icono exacto exportado de Figma — mismo documento que NotesHomeScreen.
+function DocumentIcon({ width = 55, height = 72, color = colors.accentOrange }) {
     return (
-        <Svg width={width} height={height} viewBox="0 0 32 42">
-            <Path
-                d="M4 2H20L28 10V38C28 39.1 27.1 40 26 40H4C2.9 40 2 39.1 2 38V4C2 2.9 2.9 2 4 2Z"
-                fill="none"
-                stroke={color}
-                strokeWidth={2.2}
-                strokeLinejoin="round"
-            />
-            <Path d="M20 2V10H28" fill="none" stroke={color} strokeWidth={2.2} strokeLinejoin="round" />
-            <Rect x={8} y={20} width={16} height={2.2} rx={1.1} fill={color} />
-            <Rect x={8} y={26} width={16} height={2.2} rx={1.1} fill={color} />
-            <Rect x={8} y={32} width={10} height={2.2} rx={1.1} fill={color} />
+        <Svg width={width} height={height} viewBox="0 0 72 94" fill="none">
+            <Path d="M40.0012 93.9998H2.00193H0V91.9985V12.0286V10.0327H2.00193H61.9957H63.9976V12.0286V68.0102H59.9991V14.0299H3.99852V90.0026H40.0012V93.9998Z" fill={color} />
+            <Path d="M42.0564 88.8608V70.0063H64.179L61.0881 73.3578L45.5264 90.1896L42.0564 93.9253V88.8181V88.8608ZM46.0549 74.0088V83.7536L55.0556 74.0088H46.0549Z" fill={color} />
+            <Path d="M50.0002 23.0063H12.001V27.0035H50.0002V23.0063Z" fill={color} />
+            <Path d="M50.0002 39.0005H12.001V42.9976H50.0002V39.0005Z" fill={color} />
+            <Path d="M50.0002 54.9995H12.001V58.9967H50.0002V54.9995Z" fill={color} />
+            <Path d="M7.99707 5.99841V2.00125V0H9.999H69.9981H72V2.00125V52.0165H67.9962V3.99716H12.0009V5.99841H7.99707Z" fill={color} />
         </Svg>
     );
 }
 
-function PageThumbnailIcon({ size = 24, color = colors.textDark }) {
+// Icono exacto exportado de Figma para las miniaturas de página sin thumbnail
+// (documento morado al 30% de opacidad, tono placeholder).
+function PageThumbnailIcon({ height = 40, color = colors.textDark }) {
     return (
-        <Svg width={size} height={size * 1.2} viewBox="0 0 24 29">
-            <Path
-                d="M3 2H16L21 7V26C21 26.6 20.6 27 20 27H3C2.4 27 2 26.6 2 26V3C2 2.4 2.4 2 3 2Z"
-                fill="none"
-                stroke={color}
-                strokeWidth={1.4}
-                strokeLinejoin="round"
-            />
-            <Path d="M16 2V7H21" fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+        <Svg width={(height * 74) / 96} height={height} viewBox="0 0 74 96" fill="none">
+            <Path d="M46.1161 96H2.30827H0V93.7181V2.28804V0H2.30827H71.4824H73.7907V2.28804V66.286H69.1803V4.56998H4.61038V91.43H46.1161V96Z" fill={color} fillOpacity={0.3} />
+            <Path d="M48.4922 90.1245V68.5742H74.0001L70.4361 72.4059L52.4932 91.6682L48.4922 95.9392V90.1001V90.1245ZM53.1026 73.1442V84.2854L63.4805 73.1442H53.1026Z" fill={color} fillOpacity={0.3} />
         </Svg>
     );
 }
@@ -236,11 +228,11 @@ export default function NoteDetailScreen({ navigation, route }) {
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.iconBtn}
+                    style={styles.backBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Volver"
                 >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                    <Feather name="chevron-left" size={22} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle} numberOfLines={1}>{note.title}</Text>
                 <TouchableOpacity
@@ -360,6 +352,14 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.md,
     },
     iconBtn: { width: 32, alignItems: 'center' },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     headerTitle: {
         flex: 1,
         fontFamily: 'Poppins-SemiBold',

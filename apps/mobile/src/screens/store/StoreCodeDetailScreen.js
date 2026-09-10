@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  Share,
-  Linking,
+    View,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    StatusBar,
+    Share,
+    Linking,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Rect } from 'react-native-svg';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import Svg, { Rect } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 
 // ─── 11.4 · Tu código ───────────────────────────────────────────────────────
@@ -34,18 +34,10 @@ const FALLBACK = {
   subtitle: 'Suscripción Uber One durante 30 días sin coste',
   code: 'OPOX-UE-30',
   expiryDate: '24 jul 2026',
-  color: '#000000',
+  color: '#06C167',
   icon: 'restaurant-outline',
   deepLink: 'https://www.ubereats.com',
 };
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 /** Patrón geométrico decorativo que simula un código QR (sin datos reales). */
 function QrPlaceholder({ size = 180 }) {
@@ -108,15 +100,15 @@ export default function StoreCodeDetailScreen({ navigation, route }) {
       {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.iconButton}
+          style={styles.backBtn}
           activeOpacity={0.7}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
         >
-          <ChevronLeftIcon />
+          <Feather name="chevron-left" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Tu código</Text>
-        <View style={styles.iconButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -126,7 +118,7 @@ export default function StoreCodeDetailScreen({ navigation, route }) {
         {/* ── Marca + oferta ──────────────────────────────────────────── */}
         <View style={styles.brandBlock}>
           <View style={[styles.brandIcon, { backgroundColor: codeData.color ?? colors.purple }]}>
-            <Ionicons name={codeData.icon ?? 'gift-outline'} size={30} color={colors.white} />
+            <Ionicons name={codeData.icon ?? 'gift-outline'} size={40} color={colors.white} />
           </View>
           <Text style={styles.offerLabel}>{codeData.partner} · {codeData.title}</Text>
           {codeData.subtitle ? <Text style={styles.offerSubtitle}>{codeData.subtitle}</Text> : null}
@@ -181,11 +173,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(65, 41, 80, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: 44,
+    height: 44,
   },
   headerTitle: {
     flex: 1,
@@ -202,21 +200,21 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     alignItems: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.xl,
   },
   brandIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 14,
+    width: 96,
+    height: 96,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   offerLabel: {
     fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
+    fontSize: 19,
     color: colors.textDark,
-    marginTop: 10,
+    marginTop: spacing.md,
     textAlign: 'center',
   },
   offerSubtitle: {

@@ -3,7 +3,13 @@
 // (bottom-sheet, compartido con Dashboard/Motivación) — Figma confirma un
 // patrón propio: overlay a pantalla completa + tarjeta blanca centrada.
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import {
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    Modal,
+} from 'react-native';
+import Text from './AppText';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../theme';
 

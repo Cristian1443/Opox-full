@@ -1,16 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  StatusBar,
-  Alert,
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    FlatList,
+    StatusBar,
+    Alert,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import Svg, { Path, Polygon } from 'react-native-svg';
+import { Feather } from '@expo/vector-icons';
+import Svg, { Polygon } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { storeApi } from '../../api/store';
 
@@ -23,6 +24,7 @@ import { storeApi } from '../../api/store';
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   separator: 'rgba(65, 41, 80, 0.12)',
+  cardBorder: 'rgba(65, 41, 80, 0.3)',
 };
 
 const FILTERS = [
@@ -30,14 +32,6 @@ const FILTERS = [
   { key: 'free', label: 'Gratis' },
   { key: 'paid', label: 'Premium' },
 ];
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 function StarIcon({ size = 11, color = '#F9BB00' }) {
   return (
@@ -50,10 +44,10 @@ function StarIcon({ size = 11, color = '#F9BB00' }) {
   );
 }
 
-function TestRow({ item, index, onPress, onObtain }) {
+function TestRow({ item, onPress, onObtain }) {
   return (
     <TouchableOpacity
-      style={[styles.row, index === 0 && styles.rowFirst]}
+      style={styles.row}
       activeOpacity={0.7}
       onPress={onPress}
       accessibilityLabel={`Test: ${item.title}, ${item.isFree ? 'Gratis' : item.price + ' Opopoints'}`}
@@ -136,18 +130,18 @@ export default function StoreMarketplaceScreen({ navigation }) {
       {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.iconButton}
+          style={styles.backBtn}
           activeOpacity={0.7}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
         >
-          <ChevronLeftIcon />
+          <Feather name="chevron-left" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <View style={styles.headerTitles}>
           <Text style={styles.headerTitle}>Tests de la comunidad</Text>
           <Text style={styles.headerSubtitle}>Tests creados por otros opositores. Valóralos tras hacerlos.</Text>
         </View>
-        <View style={styles.iconButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       {/* Filtros — real, sin equivalente en Figma */}
@@ -175,16 +169,18 @@ export default function StoreMarketplaceScreen({ navigation }) {
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <TestRow
             item={item}
-            index={index}
             onPress={() => navigation.navigate('StoreTestDetail', { test: item })}
             onObtain={() => handleObtain(item)}
           />
         )}
         ListEmptyComponent={
           <Text style={styles.emptyText}>No hay tests en esta categoría.</Text>
+        }
+        ListFooterComponent={
+          filteredTests.length > 0 ? <View style={styles.listClosingDivider} /> : null
         }
       />
 
@@ -216,11 +212,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(65, 41, 80, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: 44,
+    height: 44,
   },
   headerTitles: {
     flex: 1,
@@ -277,8 +279,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: FIGMA.separator,
   },
-  rowFirst: {
-    borderTopWidth: 0,
+  listClosingDivider: {
+    height: 1,
+    backgroundColor: FIGMA.separator,
   },
   rowTextWrap: {
     flex: 1,
@@ -314,6 +317,8 @@ const styles = StyleSheet.create({
   },
   obtenerPill: {
     backgroundColor: `${colors.ctaGreen}1A`,
+    borderWidth: 1,
+    borderColor: colors.ctaGreen,
     borderRadius: 14,
     paddingVertical: 6,
     paddingHorizontal: 14,
@@ -339,13 +344,14 @@ const styles = StyleSheet.create({
   publishButton: {
     height: 61.3,
     borderRadius: 14.2,
-    backgroundColor: colors.textDark,
+    borderWidth: 1,
+    borderColor: FIGMA.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   publishButtonText: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    color: colors.white,
+    color: colors.textDark,
   },
 });

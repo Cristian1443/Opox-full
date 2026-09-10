@@ -1,5 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import {
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    Modal,
+} from 'react-native';
+import Text from './AppText';
 import { colors } from '../theme';
 
 // Tokens confirmados contra Figma (frames NUDGE FATIGA / TEMA FLOJO / ALERTA

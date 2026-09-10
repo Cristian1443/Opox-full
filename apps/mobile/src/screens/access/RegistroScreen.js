@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
     StyleSheet,
-    Text,
     View,
     TextInput,
     TouchableOpacity,
@@ -12,6 +11,7 @@ import {
     ActivityIndicator,
     Image,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 import { authApi } from '../../api';

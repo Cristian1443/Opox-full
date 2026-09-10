@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
     View,
-    Text,
     TouchableOpacity,
     StyleSheet,
     StatusBar,
     ScrollView,
 } from 'react-native';
+import Text from '../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, G, Circle } from 'react-native-svg';
 import { dashboardApi } from '../api';

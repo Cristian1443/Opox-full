@@ -1,5 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated } from 'react-native';
+import {
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    Modal,
+    Animated,
+} from 'react-native';
+import Text from './AppText';
 import { colors } from '../theme';
 
 // ─── Alert card centrada (bloque 6: ERROR FOTO BORROSA, SALIR GENERAR TEST) ──

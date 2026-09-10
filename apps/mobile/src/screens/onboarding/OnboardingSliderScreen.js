@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
     View,
-    Text,
     Image,
     StyleSheet,
     TouchableOpacity,
@@ -9,6 +8,7 @@ import {
     StatusBar,
     Animated,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SW, height: SH } = Dimensions.get('window');

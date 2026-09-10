@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     ScrollView,
     FlatList,
     TouchableOpacity,
     ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
 
@@ -86,16 +86,39 @@ function DepthSelector({ value, onChange }) {
 }
 
 // ─── Subcomponentes ───────────────────────────────────────────────────────────
+// content llega como fragmentos sueltos ("Igualdad ante la ley") o como
+// oraciones completas ya puntuadas ("Suele caer en examen."). Los fragmentos
+// se combinan en una sola oración con comas + "y"; las oraciones completas
+// se concatenan tal cual, cada una en su propia frase.
+function joinContent(items) {
+    const endsWithPunct = (s) => /[.!?]$/.test(s.trim());
+    let result = '';
+    items.forEach((raw, idx) => {
+        const s = raw.trim();
+        if (idx === 0) {
+            result = s;
+            return;
+        }
+        const prevIsSentence = endsWithPunct(items[idx - 1].trim());
+        const isLast = idx === items.length - 1;
+        if (prevIsSentence) {
+            result += ` ${s}`;
+        } else {
+            const lowered = s.charAt(0).toLowerCase() + s.slice(1);
+            result += isLast ? ` y ${lowered}` : `, ${lowered}`;
+        }
+    });
+    return endsWithPunct(result) ? result : `${result}.`;
+}
+
 function SectionBlock({ section }) {
     return (
         <View style={styles.section}>
-            <Text style={styles.sectionHeading}>{section.title}</Text>
-            {section.content.map((item, idx) => (
-                <View key={idx} style={styles.bulletRow}>
-                    <View style={styles.bullet} />
-                    <Text style={styles.bulletText}>{item}</Text>
-                </View>
-            ))}
+            <View style={styles.headingRow}>
+                <View style={styles.bullet} />
+                <Text style={styles.sectionHeading}>{section.title}</Text>
+            </View>
+            <Text style={styles.bulletText}>{joinContent(section.content)}</Text>
         </View>
     );
 }
@@ -117,11 +140,11 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Feather name="chevron-left" size={22} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.pickerTitle}>Resúmenes</Text>
-                <View style={{ width: 24 }} />
+                <View style={styles.headerPlaceholder} />
             </View>
 
             {loading ? (
@@ -216,16 +239,16 @@ export default function TutorSummariesScreen({ navigation, route }) {
         <View style={styles.header}>
             <TouchableOpacity
                 onPress={() => navigation.goBack()}
-                style={styles.iconBtn}
+                style={styles.backBtn}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-                <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                <Feather name="chevron-left" size={22} color={colors.textDark} />
             </TouchableOpacity>
             <View style={styles.headerTextWrap}>
                 <Text style={styles.headerTitle}>Resumen</Text>
                 {!isLoading && <Text style={styles.headerSubtitle}>{displayTitle}</Text>}
             </View>
-            <View style={styles.iconBtn} />
+            <View style={styles.headerPlaceholder} />
         </View>
     );
 
@@ -290,6 +313,15 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.md,
     },
     iconBtn: { width: 32, padding: 4 },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerPlaceholder: { width: 44, height: 44 },
     headerTextWrap: { flex: 1, alignItems: 'center' },
     headerTitle: {
         fontFamily: 'Poppins-SemiBold',
@@ -362,16 +394,15 @@ const styles = StyleSheet.create({
     section: {
         marginBottom: 24,
     },
+    headingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
     sectionHeading: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
         color: colors.textDark,
-        marginBottom: 8,
-    },
-    bulletRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 8,
     },
     bullet: {
         width: 6.2,
@@ -380,12 +411,10 @@ const styles = StyleSheet.create({
         backgroundColor: colors.accentOrange,
         borderWidth: 0.44,
         borderColor: FIGMA.bulletStroke,
-        marginTop: 6,
         marginRight: 10,
         flexShrink: 0,
     },
     bulletText: {
-        flex: 1,
         fontFamily: 'Poppins-Light',
         fontSize: 16,
         lineHeight: 22.4,

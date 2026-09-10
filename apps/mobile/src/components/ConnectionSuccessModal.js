@@ -1,6 +1,12 @@
 // Bloque 3 · Salud — Pop-up "Conectado correctamente" (estado 3.3 · ok)
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+    Modal,
+    View,
+    TouchableOpacity,
+    StyleSheet,
+} from 'react-native';
+import Text from './AppText';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../theme';
 

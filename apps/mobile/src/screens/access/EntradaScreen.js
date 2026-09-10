@@ -1,13 +1,13 @@
 import React from 'react';
 import {
     View,
-    Text,
     TouchableOpacity,
     StyleSheet,
     StatusBar,
     Image,
     Dimensions,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 // Lockups vectorizados reales exportados desde Figma (mismo origen que

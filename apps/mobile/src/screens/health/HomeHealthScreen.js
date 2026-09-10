@@ -2,7 +2,6 @@
 import React, { useState, useCallback } from 'react';
 import {
     View,
-    Text,
     ScrollView,
     StyleSheet,
     TouchableOpacity,
@@ -10,6 +9,7 @@ import {
     ActivityIndicator,
     Linking,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';

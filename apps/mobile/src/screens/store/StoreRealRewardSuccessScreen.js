@@ -1,12 +1,12 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  StatusBar,
-  Share,
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    StatusBar,
+    Share,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
