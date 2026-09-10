@@ -263,7 +263,7 @@ async function _readAppleMetrics(startDate, endDate) {
 // ─── Lectura Android Health Connect ─────────────────────────────────────────
 
 async function _readAndroidMetrics(startTime, endTime) {
-    await HealthConnect.initialize();
+    // v3: initialize() fue eliminado — llamarlo causa crash nativo en Activity de Expo.
     const filter = { timeRangeFilter: { operator: 'between', startTime, endTime } };
 
     const [hrRes, restHrRes, hrvRes, spo2Res, sleepRes, stepsRes] = await Promise.allSettled([
