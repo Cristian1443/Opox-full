@@ -13,7 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
 import PlanningPopupModal, { CheckBadgeIcon } from '../../components/PlanningPopupModal';
-import { planningApi, boeApi } from '../../api';
+import { api, planningApi, boeApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
 // Colores confirmados contra Figma (frame HOY, Bloque 4) sin equivalente
@@ -126,13 +126,22 @@ export default function PlanningTodayScreen({ navigation }) {
         setAddVisible(true);
         if (topics.length === 0) {
             setTopicsError(false);
-            boeApi.listTopics('justicia-tramitacion').then((res) => {
-                if (res.data && res.data.length > 0) {
+            (async () => {
+                const session = await api.loadSession();
+                const oposicion =
+                    session?.user?.oposicion ??
+                    session?.user?.user_metadata?.oposicion ??
+                    'justicia-tramitacion';
+                let res = await boeApi.listTopics(oposicion);
+                if (!res?.data?.length && oposicion !== 'justicia-tramitacion') {
+                    res = await boeApi.listTopics('justicia-tramitacion');
+                }
+                if (res?.data?.length) {
                     setTopics(res.data);
                 } else {
                     setTopicsError(true);
                 }
-            });
+            })();
         }
     }, [topics.length]);
 

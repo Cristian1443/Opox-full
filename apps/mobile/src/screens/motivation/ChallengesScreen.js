@@ -13,7 +13,7 @@ import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RetoRecibidoModal } from '../../components/MotivationModals';
-import { motivationApi, boeApi } from '../../api';
+import { api, motivationApi, boeApi } from '../../api';
 import { colors, spacing } from '../../theme';
 
 function hoursLeft(expiresAt) {
@@ -120,8 +120,16 @@ export default function ChallengesScreen({ navigation, route }) {
         setForm({ title: '', questionCount: 20, rewardPoints: 50 });
         setWizardVisible(true);
         setTopicsLoading(true);
-        const { data } = await boeApi.listTopics('justicia-tramitacion');
-        setTopics(data ?? []);
+        const session = await api.loadSession();
+        const oposicion =
+            session?.user?.oposicion ??
+            session?.user?.user_metadata?.oposicion ??
+            'justicia-tramitacion';
+        let res = await boeApi.listTopics(oposicion);
+        if (!res?.data?.length && oposicion !== 'justicia-tramitacion') {
+            res = await boeApi.listTopics('justicia-tramitacion');
+        }
+        setTopics(res?.data ?? []);
         setTopicsLoading(false);
     };
 

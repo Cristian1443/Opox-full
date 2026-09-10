@@ -62,21 +62,19 @@ ON CONFLICT (oposicion, topic_id) DO UPDATE
     SET label = EXCLUDED.label,
         sort_order = EXCLUDED.sort_order;
 
--- ── Limpieza opcional: elimina los temas del curso anterior (0bed919120024e5f)
--- Los 11 temas viejos ya no existen en el Motor. Descomentar solo si se ha
--- verificado el nuevo curso y ya no se necesitan los antiguos.
---
--- DELETE FROM training_topics
---   WHERE oposicion = 'policia-local-galicia'
---     AND topic_id NOT IN (
---         'cb93fdfcc3944529','23116c4c10d3465a','fa3a03ab5d054ccf','2d5444ec8ac44973',
---         'f8d9c23505e549e3','78583f6543a24bf7','1de17f91b7574587','d9c96b02a7234508',
---         'cd7be272b4dd4344','613bcd905125486e','85959328c58f4414','c8ae486837294471',
---         'af11eaf666c74d33','936c1be1e9fe4690','b80391d2ee12496d','b105472828b54a36',
---         '89423af80150418c','e5293c95ba3e41f5','148f53eb0fb14da5','9e9fd662803e47ca',
---         'b9f4ba79087e414e','28113e0da5324264','a52012c749d94ac4','add76b3b8ff44e6b',
---         'd51c970f63c84c60','bdd3036b9df84c8a','d53db9b849cf4ae7','da0efff3629e4ff8',
---         'eaba2b423d2248a9','7261143debbe4dfc','fe30f1e9fe7440ab','044a773afb094ea8',
---         '6bc0d4020cb448b1','2dc2453c54854a25','603551c5dc304b90','84ee3dd7c65147ec',
---         '87cbdf0889004d00','30af6e6667e54b56','d19c0e0a25044315','e1fa8817fa8a45ed'
---     );
+-- Elimina los temas del curso anterior (0bed919120024e5f) — curso verificado 2026-09-10.
+-- Ejecutar en Supabase SQL Editor para que el generador/tutor muestren 40 temas exactos.
+DELETE FROM training_topics
+  WHERE oposicion = 'policia-local-galicia'
+    AND topic_id NOT IN (
+        'cb93fdfcc3944529','23116c4c10d3465a','fa3a03ab5d054ccf','2d5444ec8ac44973',
+        'f8d9c23505e549e3','78583f6543a24bf7','1de17f91b7574587','d9c96b02a7234508',
+        'cd7be272b4dd4344','613bcd905125486e','85959328c58f4414','c8ae486837294471',
+        'af11eaf666c74d33','936c1be1e9fe4690','b80391d2ee12496d','b105472828b54a36',
+        '89423af80150418c','e5293c95ba3e41f5','148f53eb0fb14da5','9e9fd662803e47ca',
+        'b9f4ba79087e414e','28113e0da5324264','a52012c749d94ac4','add76b3b8ff44e6b',
+        'd51c970f63c84c60','bdd3036b9df84c8a','d53db9b849cf4ae7','da0efff3629e4ff8',
+        'eaba2b423d2248a9','7261143debbe4dfc','fe30f1e9fe7440ab','044a773afb094ea8',
+        '6bc0d4020cb448b1','2dc2453c54854a25','603551c5dc304b90','84ee3dd7c65147ec',
+        '87cbdf0889004d00','30af6e6667e54b56','d19c0e0a25044315','e1fa8817fa8a45ed'
+    );
