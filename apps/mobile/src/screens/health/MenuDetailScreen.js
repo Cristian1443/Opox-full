@@ -5,14 +5,15 @@ import {
     ScrollView,
     StyleSheet,
     TouchableOpacity,
-    Alert,
     Share,
     ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import { planningApi } from '../../api';
+import AlertCardModal from '../../components/AlertCardModal';
 
 // Colores confirmados contra Figma (frame DETALLE MENÚ/RECETA, Bloque 3)
 // sin equivalente exacto en theme.js.
@@ -52,6 +53,7 @@ export default function MenuDetailScreen({ navigation, route }) {
     const data = hasDetail ? paramsMenu : MENU_DETAIL;
 
     const [addingToPlan, setAddingToPlan] = useState(false);
+    const [feedback, setFeedback] = useState(null); // 'success' | 'error' | null
 
     const handleAddToCart = async () => {
         // Genera la lista de ingredientes/comidas y la comparte vía Share nativo.
@@ -77,9 +79,9 @@ export default function MenuDetailScreen({ navigation, route }) {
                 kind: 'other',
             });
             if (res?.error) throw new Error(res.error);
-            Alert.alert('¡Añadido!', 'El menú está en tu plan de hoy.');
+            setFeedback('success');
         } catch {
-            Alert.alert('Error', 'No se pudo añadir al plan. Inténtalo de nuevo.');
+            setFeedback('error');
         } finally {
             setAddingToPlan(false);
         }
@@ -138,6 +140,29 @@ export default function MenuDetailScreen({ navigation, route }) {
                     }
                 </TouchableOpacity>
             </View>
+
+            <AlertCardModal
+                visible={feedback === 'success'}
+                iconBg="transparent"
+                iconSize={64}
+                icon={<Ionicons name="checkmark-circle" size={56} color={colors.ctaGreen} />}
+                title="¡Añadido!"
+                description="El menú está en tu plan de hoy."
+                primaryLabel="OK"
+                primaryColor={colors.ctaGreen}
+                onPrimaryPress={() => setFeedback(null)}
+            />
+            <AlertCardModal
+                visible={feedback === 'error'}
+                iconBg="transparent"
+                iconSize={64}
+                icon={<Ionicons name="close-circle" size={56} color={colors.statRed} />}
+                title="Error"
+                description="No se pudo añadir al plan. Inténtalo de nuevo."
+                primaryLabel="OK"
+                primaryColor={colors.statRed}
+                onPrimaryPress={() => setFeedback(null)}
+            />
         </SafeAreaView>
     );
 }

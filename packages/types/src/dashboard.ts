@@ -38,6 +38,27 @@ export interface UnavailableWidgetDTO {
     available: false;
 }
 
+/** "Continúa donde lo dejaste" (2.2) — cada campo es independientemente null si el usuario aún no tiene ese dato. */
+export interface QuickAccessDTO {
+    available: true;
+    lastLaw: {
+        law: string;
+        article: string | null;
+        articleTitle: string | null;
+        topicId: string | null;
+    } | null;
+    lastError: {
+        topicId: string;
+        topic: string;
+        failRate: number;
+    } | null;
+    mockInProgress: {
+        mockExamId: string;
+        examTitle: string;
+        percent: number;
+    } | null;
+}
+
 export interface DashboardSummaryDTO {
     profile: {
         displayName: string | null;
@@ -53,8 +74,8 @@ export interface DashboardSummaryDTO {
     health: UnavailableWidgetDTO;
     /** Bloque 4 · Planificación — pendiente */
     plan: UnavailableWidgetDTO;
-    /** Última ley / último error / simulacro en curso (Bloque 10 y motor de exámenes) — pendiente */
-    quickAccess: UnavailableWidgetDTO;
+    /** Última ley / último error / simulacro en curso */
+    quickAccess: QuickAccessDTO;
 }
 
 // ─── Requests ────────────────────────────────────

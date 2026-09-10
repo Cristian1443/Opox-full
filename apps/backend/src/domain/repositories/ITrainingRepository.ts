@@ -1,5 +1,5 @@
 import type { GeneratedQuestion } from '@opox/types';
-import type { MockExam, MockExamWithStatus, ErrorPattern } from '../entities/MockExam';
+import type { MockExam, MockExamWithStatus, ErrorPattern, MockExamProgress, LawView } from '../entities/MockExam';
 import type { TrainingAttempt, TrainingSource, TrainingDifficulty } from '../entities/TrainingAttempt';
 import type { TrainingBookmark } from '../entities/TrainingBookmark';
 
@@ -58,4 +58,43 @@ export interface ITrainingRepository {
         relatedTopicId?: string;
     }): Promise<TrainingBookmark>;
     deleteBookmark(input: { userId: string; bookmarkId: string }): Promise<void>;
+
+    // ─── Reportes y valoraciones de preguntas ─────
+    reportQuestion(input: {
+        userId: string;
+        questionId: string;
+        reason: string;
+        details?: string;
+    }): Promise<void>;
+    /** Upsert por (userId, questionId) — recalificar sobreescribe la valoración anterior. */
+    rateQuestion(input: {
+        userId: string;
+        questionId: string;
+        rating: number;
+    }): Promise<{ questionId: string; rating: number }>;
+
+    // ─── Progreso de simulacro (resume) ───────────
+    /** Upsert — solo puede haber un simulacro en curso por usuario. */
+    saveMockProgress(input: {
+        userId: string;
+        mockExamId: string;
+        examTitle: string;
+        currentIndex: number;
+        questionCount: number;
+        answers: unknown[];
+    }): Promise<void>;
+    getMockProgress(userId: string): Promise<MockExamProgress | null>;
+    clearMockProgress(userId: string): Promise<void>;
+
+    // ─── Última ley consultada ─────────────────────
+    /** Upsert — solo se guarda la más reciente por usuario. */
+    saveLawView(input: {
+        userId: string;
+        law: string;
+        article?: string;
+        articleTitle?: string;
+        boeUrl?: string;
+        topicId?: string;
+    }): Promise<void>;
+    getLastLawView(userId: string): Promise<LawView | null>;
 }

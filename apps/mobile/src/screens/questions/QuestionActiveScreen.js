@@ -161,6 +161,12 @@ export default function QuestionActiveScreen({ navigation, route }) {
     challengeId = null,
     clanId = null,
     taskId = null,
+    // Simulacros oficiales: identifica el examen para autoguardar el progreso
+    // y poder retomarlo luego desde "¿Seguimos con el simulacro?" (dashboard).
+    mockExamId = null,
+    // Respuestas ya dadas al retomar un simulacro — se restauran tal cual,
+    // alineadas por índice con `questions` (mismo formato que produce este runner).
+    resumeAnswers = null,
   } = route?.params ?? {};
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
@@ -168,7 +174,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [timeLeft, setTimeLeft] = useState(secondsPerQuestion);
-  const [answers, setAnswers] = useState([]);
+  const [answers, setAnswers] = useState(resumeAnswers ?? []);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [showTimeUpModal, setShowTimeUpModal] = useState(false);
   const [toast, setToast] = useState(null);
@@ -176,6 +182,8 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const [showLawSheet, setShowLawSheet] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [isReported, setIsReported] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [isRatingLoading, setIsRatingLoading] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -285,14 +293,33 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const handleNext = () => {
     const isLast = currentIndex + 1 >= total;
     if (isLast) {
-      navigation.replace('TrainingResult', { source, answers, questions, elapsedSeconds, challengeId, clanId, taskId });
+      // Simulacro terminado — ya no está "en curso", limpiamos el progreso
+      // guardado (red de seguridad; el backend también lo limpia al guardar
+      // el intento, pero esto evita un parpadeo de "reanudar" si tarda).
+      if (source === 'official' && mockExamId) {
+        trainingApi.clearMockProgress().catch(() => {});
+      }
+      navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId });
       return;
+    }
+    // Autoguardado del progreso de simulacros oficiales — permite retomar
+    // exactamente en esta pregunta desde la tarjeta "¿Seguimos con el
+    // simulacro?" del dashboard. Fire-and-forget: no bloquea la navegación.
+    if (source === 'official' && mockExamId) {
+      trainingApi.saveMockProgress({
+        mockExamId,
+        examTitle,
+        currentIndex: currentIndex + 1,
+        questionCount: total,
+        answers,
+      }).catch(() => {});
     }
     setCurrentIndex(prev => prev + 1);
     setSelectedOption(null);
     setIsSubmitted(false);
     setIsBookmarked(false);
     setIsReported(false);
+    setUserRating(0);
     feedbackAnim.setValue(0);
   };
 
@@ -537,7 +564,28 @@ export default function QuestionActiveScreen({ navigation, route }) {
             <View style={styles.toolItem}>
               <View style={styles.starsRow}>
                 {[1, 2, 3, 4, 5].map(i => (
-                  <IconStar key={i} size={14} filled={i <= (question.difficulty ?? 3)} />
+                  <TouchableOpacity
+                    key={i}
+                    disabled={isRatingLoading}
+                    hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+                    onPress={async () => {
+                      const previous = userRating;
+                      setUserRating(i);
+                      setIsRatingLoading(true);
+                      try {
+                        await trainingApi.rateQuestion(question.id, i);
+                        setToast({ message: 'Gracias por tu valoración', type: 'success' });
+                      } catch (_err) {
+                        setUserRating(previous);
+                        setToast({ message: 'No se pudo enviar la valoración', type: 'info' });
+                      } finally {
+                        setIsRatingLoading(false);
+                      }
+                    }}
+                    accessibilityLabel={`Valorar pregunta con ${i} estrella${i > 1 ? 's' : ''}`}
+                  >
+                    <IconStar size={14} filled={i <= userRating} />
+                  </TouchableOpacity>
                 ))}
               </View>
               <Text style={styles.toolLabel}>Evalúa esta pregunta</Text>
@@ -620,7 +668,18 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
             <TouchableOpacity
               style={styles.toolItem}
-              onPress={() => setShowLawSheet(true)}
+              onPress={() => {
+                setShowLawSheet(true);
+                if (question?.law) {
+                  trainingApi.saveLawView({
+                    law: question.law,
+                    article: question.articleRef?.article,
+                    articleTitle: question.articleRef?.title,
+                    boeUrl: question.articleRef?.boeUrl,
+                    topicId: question.topicId ?? undefined,
+                  }).catch(() => {});
+                }
+              }}
               accessibilityLabel="Ver ley relacionada"
             >
               <IconGavelLaw size={22} color={colors.textDark} />
@@ -646,7 +705,10 @@ export default function QuestionActiveScreen({ navigation, route }) {
         visible={showTimeUpModal}
         onContinue={() => {
           setShowTimeUpModal(false);
-          navigation.replace('TrainingResult', { source, answers, questions, elapsedSeconds, challengeId, clanId, taskId });
+          if (source === 'official' && mockExamId) {
+            trainingApi.clearMockProgress().catch(() => {});
+          }
+          navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId });
         }}
       />
 

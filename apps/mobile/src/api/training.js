@@ -48,6 +48,25 @@ export const trainingApi = {
             { auth: true },
         ),
 
+    rateQuestion: (questionId, rating) =>
+        api.post(
+            API_ROUTES.TRAINING.QUESTION_RATE.replace(':id', questionId),
+            { rating },
+            { auth: true },
+        ),
+
+    getMockProgress: () =>
+        api.get(API_ROUTES.TRAINING.MOCK_PROGRESS, { auth: true }),
+
+    saveMockProgress: (body) =>
+        api.put(API_ROUTES.TRAINING.MOCK_PROGRESS, body, { auth: true }),
+
+    clearMockProgress: () =>
+        api.delete(API_ROUTES.TRAINING.MOCK_PROGRESS, { auth: true }),
+
+    saveLawView: (body) =>
+        api.post(API_ROUTES.TRAINING.LAW_VIEW, body, { auth: true }),
+
     listTopics: () => api.get(API_ROUTES.TRAINING.TOPICS, { auth: true }),
 
     // Ruta pública — no requiere sesión — para el test de nivel en onboarding

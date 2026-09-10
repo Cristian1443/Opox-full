@@ -1,6 +1,6 @@
 import type { ITrainingRepository, IDashboardRepository, IStoreRepository, SaveAttemptInput } from '../../domain';
 import type { TrainingAttempt, TrainingSource, TrainingDifficulty } from '../../domain/entities/TrainingAttempt';
-import type { ErrorPattern } from '../../domain/entities/MockExam';
+import type { ErrorPattern, MockExamProgress, LawView } from '../../domain/entities/MockExam';
 
 export interface SaveAttemptInput2 {
     userId: string;
@@ -81,6 +81,15 @@ export class SaveAttemptUseCase {
             }),
         ]);
 
+        // Un simulacro terminado ya no está "en curso" — limpiamos el progreso
+        // guardado para la tarjeta "¿Seguimos con el simulacro?" del dashboard.
+        // Red de seguridad además del clear fire-and-forget que hace el mobile.
+        if (input.source === 'official' && input.mockExamId) {
+            this.trainingRepo.clearMockProgress(input.userId).catch(() => {
+                /* no bloqueamos el guardado del intento si esto falla */
+            });
+        }
+
         return attempt;
     }
 }
@@ -90,5 +99,59 @@ export class ListErrorPatternsUseCase {
 
     execute(userId: string): Promise<ErrorPattern[]> {
         return this.trainingRepo.listErrorPatterns(userId);
+    }
+}
+
+export class SaveMockProgressUseCase {
+    constructor(private readonly trainingRepo: ITrainingRepository) { }
+
+    execute(input: {
+        userId: string;
+        mockExamId: string;
+        examTitle: string;
+        currentIndex: number;
+        questionCount: number;
+        answers: unknown[];
+    }): Promise<void> {
+        return this.trainingRepo.saveMockProgress(input);
+    }
+}
+
+export class GetMockProgressUseCase {
+    constructor(private readonly trainingRepo: ITrainingRepository) { }
+
+    execute(userId: string): Promise<MockExamProgress | null> {
+        return this.trainingRepo.getMockProgress(userId);
+    }
+}
+
+export class ClearMockProgressUseCase {
+    constructor(private readonly trainingRepo: ITrainingRepository) { }
+
+    execute(userId: string): Promise<void> {
+        return this.trainingRepo.clearMockProgress(userId);
+    }
+}
+
+export class SaveLawViewUseCase {
+    constructor(private readonly trainingRepo: ITrainingRepository) { }
+
+    execute(input: {
+        userId: string;
+        law: string;
+        article?: string;
+        articleTitle?: string;
+        boeUrl?: string;
+        topicId?: string;
+    }): Promise<void> {
+        return this.trainingRepo.saveLawView(input);
+    }
+}
+
+export class GetLastLawViewUseCase {
+    constructor(private readonly trainingRepo: ITrainingRepository) { }
+
+    execute(userId: string): Promise<LawView | null> {
+        return this.trainingRepo.getLastLawView(userId);
     }
 }

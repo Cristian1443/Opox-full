@@ -17,6 +17,11 @@ import type {
     SaveBookmarkRequest,
     HintRequest,
     ReportQuestionRequest,
+    RateQuestionRequest,
+    RateQuestionResponse,
+    SaveMockProgressRequest,
+    MockProgressDTO,
+    SaveLawViewRequest,
 } from '@opox/types';
 import type {
     ListMockExamsUseCase,
@@ -31,9 +36,15 @@ import type {
     DeleteBookmarkUseCase,
     GenerateHintUseCase,
     ReportQuestionUseCase,
+    RateQuestionUseCase,
+    SaveMockProgressUseCase,
+    GetMockProgressUseCase,
+    ClearMockProgressUseCase,
+    SaveLawViewUseCase,
     ListTopicsUseCase,
     GetCursoIdUseCase,
 } from '../../application';
+import type { MockExamProgress } from '../../domain/entities/MockExam';
 import type { MockExamWithStatus } from '../../domain/entities/MockExam';
 import type { TrainingAttempt } from '../../domain/entities/TrainingAttempt';
 import type { TrainingBookmark } from '../../domain/entities/TrainingBookmark';
@@ -81,6 +92,11 @@ export class TrainingController {
             deleteBookmark: DeleteBookmarkUseCase;
             generateHint: GenerateHintUseCase;
             reportQuestion: ReportQuestionUseCase;
+            rateQuestion: RateQuestionUseCase;
+            saveMockProgress: SaveMockProgressUseCase;
+            getMockProgress: GetMockProgressUseCase;
+            clearMockProgress: ClearMockProgressUseCase;
+            saveLawView: SaveLawViewUseCase;
             listTopics: ListTopicsUseCase;
             getCursoId: GetCursoIdUseCase;
             motorOnboarding?: MotorOnboardingClient;
@@ -140,6 +156,17 @@ export class TrainingController {
             answer: b.answer,
             relatedTopicId: b.relatedTopicId,
             createdAt: b.createdAt.toISOString(),
+        };
+    }
+
+    private serializeMockProgress(p: MockExamProgress): MockProgressDTO {
+        return {
+            mockExamId: p.mockExamId,
+            examTitle: p.examTitle,
+            currentIndex: p.currentIndex,
+            questionCount: p.questionCount,
+            answers: p.answers,
+            updatedAt: p.updatedAt.toISOString(),
         };
     }
 
@@ -292,6 +319,62 @@ export class TrainingController {
                 questionId: req.params['id'] as string,
                 reason: body.reason,
                 details: body.details,
+            });
+            res.status(204).end();
+        } catch (err) { next(err); }
+    };
+
+    rateQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const body = req.body as RateQuestionRequest;
+            const result = await this.deps.rateQuestion.execute({
+                userId: req.authUser!.id,
+                questionId: req.params['id'] as string,
+                rating: body.rating,
+            });
+            this.ok<RateQuestionResponse>(res, 200, result);
+        } catch (err) { next(err); }
+    };
+
+    saveMockProgress = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const body = req.body as SaveMockProgressRequest;
+            await this.deps.saveMockProgress.execute({
+                userId: req.authUser!.id,
+                mockExamId: body.mockExamId,
+                examTitle: body.examTitle,
+                currentIndex: body.currentIndex,
+                questionCount: body.questionCount,
+                answers: body.answers,
+            });
+            res.status(204).end();
+        } catch (err) { next(err); }
+    };
+
+    getMockProgress = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const progress = await this.deps.getMockProgress.execute(req.authUser!.id);
+            this.ok<MockProgressDTO | null>(res, 200, progress ? this.serializeMockProgress(progress) : null);
+        } catch (err) { next(err); }
+    };
+
+    clearMockProgress = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            await this.deps.clearMockProgress.execute(req.authUser!.id);
+            res.status(204).end();
+        } catch (err) { next(err); }
+    };
+
+    saveLawView = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const body = req.body as SaveLawViewRequest;
+            await this.deps.saveLawView.execute({
+                userId: req.authUser!.id,
+                law: body.law,
+                article: body.article,
+                articleTitle: body.articleTitle,
+                boeUrl: body.boeUrl,
+                topicId: body.topicId,
             });
             res.status(204).end();
         } catch (err) { next(err); }

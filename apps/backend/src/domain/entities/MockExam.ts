@@ -57,3 +57,28 @@ export interface ErrorPattern {
     /** Porcentaje de fallo 0–100 */
     failRate: number;
 }
+
+/**
+ * Progreso guardado de un simulacro oficial en curso — permite retomarlo
+ * exactamente donde se dejó (2.2 "¿Seguimos con el simulacro?"). Una sola
+ * fila por usuario: solo puede haber un simulacro activo a la vez.
+ */
+export interface MockExamProgress {
+    mockExamId: string;
+    examTitle: string;
+    currentIndex: number;
+    questionCount: number;
+    /** Respuestas ya dadas, en el mismo formato que maneja QuestionActiveScreen — opaco para el backend. */
+    answers: unknown[];
+    updatedAt: Date;
+}
+
+/** Última ley/artículo que el usuario consultó (2.2 "Última ley consultada"). */
+export interface LawView {
+    law: string;
+    article: string | null;
+    articleTitle: string | null;
+    boeUrl: string | null;
+    topicId: string | null;
+    viewedAt: Date;
+}

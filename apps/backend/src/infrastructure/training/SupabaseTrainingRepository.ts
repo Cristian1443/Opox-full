@@ -5,6 +5,8 @@ import {
     MockExam,
     type MockExamWithStatus,
     type ErrorPattern,
+    type MockExamProgress,
+    type LawView,
     TrainingAttempt,
     TrainingBookmark,
     BookmarkNotFoundError,
@@ -348,5 +350,144 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
             .maybeSingle();
         if (error) throw new Error(`deleteBookmark: ${error.message}`);
         if (!data) throw new BookmarkNotFoundError();
+    }
+
+    // ─── Reportes y valoraciones de preguntas ─────
+
+    async reportQuestion(input: {
+        userId: string;
+        questionId: string;
+        reason: string;
+        details?: string;
+    }): Promise<void> {
+        const { error } = await this.supabaseAdmin
+            .from('question_reports')
+            .insert({
+                user_id: input.userId,
+                question_id: input.questionId,
+                reason: input.reason,
+                details: input.details ?? null,
+            });
+        if (error) throw new Error(`reportQuestion: ${error.message}`);
+    }
+
+    async rateQuestion(input: {
+        userId: string;
+        questionId: string;
+        rating: number;
+    }): Promise<{ questionId: string; rating: number }> {
+        const { data, error } = await this.supabaseAdmin
+            .from('question_ratings')
+            .upsert(
+                {
+                    user_id: input.userId,
+                    question_id: input.questionId,
+                    rating: input.rating,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'user_id,question_id' },
+            )
+            .select('question_id, rating')
+            .single();
+        if (error || !data) throw new Error(`rateQuestion: ${error?.message}`);
+        return { questionId: data.question_id as string, rating: data.rating as number };
+    }
+
+    // ─── Progreso de simulacro (resume) ───────────
+
+    async saveMockProgress(input: {
+        userId: string;
+        mockExamId: string;
+        examTitle: string;
+        currentIndex: number;
+        questionCount: number;
+        answers: unknown[];
+    }): Promise<void> {
+        const { error } = await this.supabaseAdmin
+            .from('mock_exam_progress')
+            .upsert(
+                {
+                    user_id: input.userId,
+                    mock_exam_id: input.mockExamId,
+                    exam_title: input.examTitle,
+                    current_index: input.currentIndex,
+                    question_count: input.questionCount,
+                    answers_snapshot: input.answers,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'user_id' },
+            );
+        if (error) throw new Error(`saveMockProgress: ${error.message}`);
+    }
+
+    async getMockProgress(userId: string): Promise<MockExamProgress | null> {
+        const { data, error } = await this.supabaseAdmin
+            .from('mock_exam_progress')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (error) throw new Error(`getMockProgress: ${error.message}`);
+        if (!data) return null;
+        return {
+            mockExamId: data.mock_exam_id as string,
+            examTitle: data.exam_title as string,
+            currentIndex: data.current_index as number,
+            questionCount: data.question_count as number,
+            answers: (data.answers_snapshot as unknown[]) ?? [],
+            updatedAt: new Date(data.updated_at as string),
+        };
+    }
+
+    async clearMockProgress(userId: string): Promise<void> {
+        const { error } = await this.supabaseAdmin
+            .from('mock_exam_progress')
+            .delete()
+            .eq('user_id', userId);
+        if (error) throw new Error(`clearMockProgress: ${error.message}`);
+    }
+
+    // ─── Última ley consultada ─────────────────────
+
+    async saveLawView(input: {
+        userId: string;
+        law: string;
+        article?: string;
+        articleTitle?: string;
+        boeUrl?: string;
+        topicId?: string;
+    }): Promise<void> {
+        const { error } = await this.supabaseAdmin
+            .from('user_law_views')
+            .upsert(
+                {
+                    user_id: input.userId,
+                    law: input.law,
+                    article: input.article ?? null,
+                    article_title: input.articleTitle ?? null,
+                    boe_url: input.boeUrl ?? null,
+                    topic_id: input.topicId ?? null,
+                    viewed_at: new Date().toISOString(),
+                },
+                { onConflict: 'user_id' },
+            );
+        if (error) throw new Error(`saveLawView: ${error.message}`);
+    }
+
+    async getLastLawView(userId: string): Promise<LawView | null> {
+        const { data, error } = await this.supabaseAdmin
+            .from('user_law_views')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (error) throw new Error(`getLastLawView: ${error.message}`);
+        if (!data) return null;
+        return {
+            law: data.law as string,
+            article: (data.article as string | null) ?? null,
+            articleTitle: (data.article_title as string | null) ?? null,
+            boeUrl: (data.boe_url as string | null) ?? null,
+            topicId: (data.topic_id as string | null) ?? null,
+            viewedAt: new Date(data.viewed_at as string),
+        };
     }
 }

@@ -310,7 +310,7 @@ export default function TutorChatScreen({ navigation, route }) {
 
             <KeyboardAvoidingView
                 style={styles.flex}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
                 <View style={styles.flex}>
                     <ScrollView

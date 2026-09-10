@@ -127,3 +127,42 @@ export interface ReportQuestionRequest {
     reason: ReportReason;
     details?: string;
 }
+
+export interface RateQuestionRequest {
+    rating: number;
+}
+
+// ─── Progreso de simulacro (resume) ────────────────────────────────────────────
+
+export interface SaveMockProgressRequest {
+    mockExamId: string;
+    examTitle: string;
+    currentIndex: number;
+    questionCount: number;
+    /** Mismo formato que maneja QuestionActiveScreen — opaco para el backend. */
+    answers: unknown[];
+}
+
+export interface MockProgressDTO {
+    mockExamId: string;
+    examTitle: string;
+    currentIndex: number;
+    questionCount: number;
+    answers: unknown[];
+    updatedAt: string;
+}
+
+// ─── Última ley consultada ──────────────────────────────────────────────────────
+
+export interface SaveLawViewRequest {
+    law: string;
+    article?: string;
+    articleTitle?: string;
+    boeUrl?: string;
+    topicId?: string;
+}
+
+export interface RateQuestionResponse {
+    questionId: string;
+    rating: number;
+}

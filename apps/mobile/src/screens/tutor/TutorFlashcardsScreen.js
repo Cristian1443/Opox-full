@@ -316,9 +316,9 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
                     onEmpezarTest={() => (
                         topicId
                             ? navigation.navigate('GeneratorConfig', { topicId, questionCount: 20 })
-                            : navigation.navigate('AITutor')
+                            : navigation.popTo('AITutor')
                     )}
-                    onVolverAlAula={() => navigation.navigate('AITutor')}
+                    onVolverAlAula={() => navigation.popTo('AITutor')}
                 />
             </SafeAreaView>
         );

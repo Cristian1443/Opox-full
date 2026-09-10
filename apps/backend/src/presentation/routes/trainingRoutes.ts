@@ -11,6 +11,9 @@ import {
     saveBookmarkSchema,
     hintSchema,
     reportQuestionSchema,
+    rateQuestionSchema,
+    saveMockProgressSchema,
+    saveLawViewSchema,
 } from '../validators';
 
 /** La mayoría de rutas del Bloque 6 requieren sesión. LEVEL_TEST es pública (onboarding). */
@@ -34,6 +37,27 @@ export function createTrainingRouter(
         API_ROUTES.TRAINING.MOCK_QUESTIONS,
         authMiddleware,
         controller.getMockQuestions,
+    );
+
+    // Rutas literales de progreso — DEBEN ir antes de MOCK_DETAIL
+    // ('/training/mocks/:id'), o Express las confunde con id="progress".
+    r.get(
+        API_ROUTES.TRAINING.MOCK_PROGRESS,
+        authMiddleware,
+        controller.getMockProgress,
+    );
+
+    r.put(
+        API_ROUTES.TRAINING.MOCK_PROGRESS,
+        authMiddleware,
+        validateBody(saveMockProgressSchema),
+        controller.saveMockProgress,
+    );
+
+    r.delete(
+        API_ROUTES.TRAINING.MOCK_PROGRESS,
+        authMiddleware,
+        controller.clearMockProgress,
     );
 
     r.get(
@@ -109,10 +133,24 @@ export function createTrainingRouter(
         controller.reportQuestion,
     );
 
+    r.post(
+        API_ROUTES.TRAINING.QUESTION_RATE,
+        authMiddleware,
+        validateBody(rateQuestionSchema),
+        controller.rateQuestion,
+    );
+
     r.get(
         API_ROUTES.TRAINING.TOPICS,
         authMiddleware,
         controller.listTopics,
+    );
+
+    r.post(
+        API_ROUTES.TRAINING.LAW_VIEW,
+        authMiddleware,
+        validateBody(saveLawViewSchema),
+        controller.saveLawView,
     );
 
     return r;

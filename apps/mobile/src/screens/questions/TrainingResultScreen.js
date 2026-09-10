@@ -157,6 +157,7 @@ export default function TrainingResultScreen({ navigation, route }) {
     answers = MOCK_DATA.answers,
     questions = MOCK_DATA.questions,
     source = MOCK_DATA.source,
+    mockExamId = null,
     elapsedSeconds = MOCK_DATA.elapsedSeconds,
     challengeId = null,
     clanId = null,
@@ -191,6 +192,7 @@ export default function TrainingResultScreen({ navigation, route }) {
     trainingApi
       .saveAttempt({
         source: backendSource,
+        mockExamId: mockExamId ?? undefined,
         durationSecs: elapsedSeconds,
         responses,
       })

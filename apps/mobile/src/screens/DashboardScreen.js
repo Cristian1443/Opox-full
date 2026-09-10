@@ -14,9 +14,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import NudgeModal from '../components/NudgeModal';
 import BoeAlertBanner from '../components/BoeAlertBanner';
 import AlertCardModal from '../components/AlertCardModal';
-import { dashboardApi, planningApi, boeApi } from '../api';
+import { dashboardApi, planningApi, boeApi, trainingApi } from '../api';
 import { colors } from '../theme';
 import { getHealthMetrics, isHealthAvailable } from '../services/HealthService';
+import { adaptGeneratedQuestions } from '../utils/questionAdapter';
 
 // Heurística de energía: HRV (principal) + sueño + FC reposo — misma
 // fórmula que HomeHealthScreen para que el % del dashboard coincida.
@@ -491,6 +492,7 @@ export default function DashboardScreen({ navigation }) {
     const [planSummary, setPlanSummary] = useState(null);
     const [healthMetrics, setHealthMetrics] = useState(null);
     const [realNudgeVisible, setRealNudgeVisible] = useState(false);
+    const [isResumingMock, setIsResumingMock] = useState(false);
     const nudgeShownRef = useRef(false);
 
     const loadData = useCallback(() => {
@@ -525,6 +527,44 @@ export default function DashboardScreen({ navigation }) {
     }, []);
 
     useFocusEffect(loadData);
+
+    // Retoma un simulacro oficial exactamente en la pregunta donde se dejó —
+    // vuelve a pedir las preguntas (mismo orden que la primera vez) y las
+    // respuestas ya dadas, guardadas por QuestionActiveScreen en cada pregunta.
+    const handleResumeMock = async () => {
+        const mockInProgress = summary?.quickAccess?.mockInProgress;
+        if (!mockInProgress || isResumingMock) return;
+        setIsResumingMock(true);
+        try {
+            const [progressRes, examRes, questionsRes] = await Promise.all([
+                trainingApi.getMockProgress(),
+                trainingApi.getMock(mockInProgress.mockExamId),
+                trainingApi.getMockQuestions(mockInProgress.mockExamId),
+            ]);
+            const progress = progressRes?.data;
+            const exam = examRes?.data;
+            const questions = questionsRes?.data;
+            if (!progress || !exam || !Array.isArray(questions) || questions.length === 0) {
+                Alert.alert('No se pudo retomar', 'Inténtalo de nuevo más tarde.');
+                return;
+            }
+            const secondsPerQuestion = Math.max(30, Math.round((exam.durationMinutes * 60) / questions.length));
+            navigation.navigate('TrainingSession', {
+                source: 'official',
+                mockExamId: mockInProgress.mockExamId,
+                questions: adaptGeneratedQuestions(questions),
+                examTitle: exam.title,
+                timedMode: true,
+                secondsPerQuestion,
+                startIndex: progress.currentIndex,
+                resumeAnswers: progress.answers,
+            });
+        } catch {
+            Alert.alert('No se pudo retomar', 'Inténtalo de nuevo más tarde.');
+        } finally {
+            setIsResumingMock(false);
+        }
+    };
 
     const displayName = summary?.profile.displayName || 'Opositor';
     const oposicionLine = summary?.profile.oposicion && summary?.profile.especialidad
@@ -671,21 +711,25 @@ export default function DashboardScreen({ navigation }) {
                     <Text style={styles.tutorText}>Pregúntale al Tutor o escucha en modo podcast.</Text>
                 </TouchableOpacity>
 
-                {/* ── 2.2 Módulo Acceso rápido ── */}
+                {/* ── 2.2 Módulo Acceso rápido — datos reales de quickAccess ── */}
                 <Text style={styles.quickLabel}>CONTINÚA DONDE LO DEJASTE</Text>
 
                 <View style={styles.quickListDivider} />
                 <TouchableOpacity
                     style={styles.quickRow}
                     activeOpacity={0.7}
-                    onPress={() => navigation.navigate('AITutor')}
+                    onPress={() => navigation.navigate('BoeHome')}
                 >
                     <View style={styles.quickIconSlot}>
                         <IconLaw size={26} />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.quickTitle}>Última ley consultada</Text>
-                        <Text style={styles.quickSubtitle}>Ley 39/2015 · art. 21</Text>
+                        <Text style={styles.quickSubtitle}>
+                            {summary?.quickAccess?.lastLaw
+                                ? [summary.quickAccess.lastLaw.law, summary.quickAccess.lastLaw.article].filter(Boolean).join(' · ')
+                                : 'Aún no has consultado ninguna ley'}
+                        </Text>
                     </View>
                     <IconChevronRight size={13} />
                 </TouchableOpacity>
@@ -700,25 +744,34 @@ export default function DashboardScreen({ navigation }) {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.quickTitle}>Último error</Text>
-                        <Text style={styles.quickSubtitle}>Derecho Administrativo · repasar</Text>
+                        <Text style={styles.quickSubtitle}>
+                            {summary?.quickAccess?.lastError
+                                ? `${summary.quickAccess.lastError.topic} · falla el ${summary.quickAccess.lastError.failRate}%`
+                                : 'Aún no tienes suficientes datos'}
+                        </Text>
                     </View>
                     <IconChevronRight size={13} />
                 </TouchableOpacity>
                 <View style={styles.quickListDivider} />
 
-                <View style={styles.resumeCard}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.resumeTitle}>¿Seguimos con el simulacro?</Text>
-                        <Text style={styles.resumeSubtitle}>Examen 2022 · 28% completado</Text>
+                {summary?.quickAccess?.mockInProgress && (
+                    <View style={styles.resumeCard}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.resumeTitle}>¿Seguimos con el simulacro?</Text>
+                            <Text style={styles.resumeSubtitle}>
+                                {summary.quickAccess.mockInProgress.examTitle} · {summary.quickAccess.mockInProgress.percent}% completado
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.resumeBtn}
+                            activeOpacity={0.85}
+                            onPress={handleResumeMock}
+                            disabled={isResumingMock}
+                        >
+                            <Text style={styles.resumeBtnText}>{isResumingMock ? 'Cargando…' : 'Reanudar'}</Text>
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                        style={styles.resumeBtn}
-                        activeOpacity={0.85}
-                        onPress={() => navigation.navigate('OfficialMocks')}
-                    >
-                        <Text style={styles.resumeBtnText}>Reanudar</Text>
-                    </TouchableOpacity>
-                </View>
+                )}
 
                 {/* Bloque 9 · Factoría de Apuntes — Próximamente */}
                 <TouchableOpacity

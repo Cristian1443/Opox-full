@@ -128,7 +128,11 @@ export default function HintBottomSheet({ visible, hint, isLoading = false, onCl
             },
           ]}
         >
-          <View {...panResponder.panHandlers} style={styles.handleContainer}>
+          <View
+            {...panResponder.panHandlers}
+            style={styles.handleContainer}
+            hitSlop={{ top: 16, bottom: 16, left: 40, right: 40 }}
+          >
             <View style={styles.handle} />
           </View>
 
@@ -197,7 +201,7 @@ const styles = StyleSheet.create({
   handleContainer: {
     alignSelf: 'stretch',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 16,
   },
   handle: {
     width: 38,

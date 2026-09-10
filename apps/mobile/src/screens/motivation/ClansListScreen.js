@@ -7,13 +7,13 @@ import {
     ScrollView,
     Modal,
     TextInput,
-    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { motivationApi } from '../../api';
 import { colors, spacing } from '../../theme';
+import AlertCardModal from '../../components/AlertCardModal';
 
 
 export default function ClansListScreen({ navigation }) {
@@ -21,6 +21,8 @@ export default function ClansListScreen({ navigation }) {
     const [clans, setClans] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [form, setForm] = useState({ name: '', initials: '', description: '' });
+    // Clan al que se intentó unir estando ya en otro — dispara el modal de aviso.
+    const [blockedClan, setBlockedClan] = useState(null);
 
     const load = useCallback(() => {
         motivationApi.getMyClan().then(({ data }) => setMyClan(data));
@@ -31,14 +33,7 @@ export default function ClansListScreen({ navigation }) {
 
     const handleJoin = async (clan) => {
         if (myClan) {
-            Alert.alert(
-                'Ya estás en un clan',
-                `Para unirte a "${clan.name}" debes salir primero de "${myClan.name}".`,
-                [
-                    { text: 'Ir a mi clan', onPress: () => navigation.navigate('ClanDetail', { clanId: myClan.id }) },
-                    { text: 'Cancelar', style: 'cancel' },
-                ],
-            );
+            setBlockedClan(clan);
             return;
         }
         const { error } = await motivationApi.joinClan(clan.id);
@@ -166,6 +161,28 @@ export default function ClansListScreen({ navigation }) {
                     </View>
                 </View>
             </Modal>
+
+            <AlertCardModal
+                visible={!!blockedClan}
+                iconBg="rgba(65,41,80,0.1)"
+                iconSize={64}
+                icon={<Ionicons name="people" size={30} color={colors.purple} />}
+                title="Ya estás en un clan"
+                description={
+                    blockedClan
+                        ? `Para unirte a "${blockedClan.name}" debes salir primero de "${myClan?.name}".`
+                        : ''
+                }
+                primaryLabel="Ir a mi clan"
+                primaryColor={colors.purple}
+                onPrimaryPress={() => {
+                    const clanId = myClan?.id;
+                    setBlockedClan(null);
+                    navigation.navigate('ClanDetail', { clanId });
+                }}
+                secondaryLabel="Cancelar"
+                onSecondaryPress={() => setBlockedClan(null)}
+            />
         </SafeAreaView>
     );
 }

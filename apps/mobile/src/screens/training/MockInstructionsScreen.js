@@ -124,6 +124,7 @@ export default function MockInstructionsScreen({ navigation, route }) {
         );
         navigation.replace('TrainingSession', {
             source: 'official',
+            mockExamId: safeExam.id,
             questions: adaptGeneratedQuestions(data),
             examTitle: safeExam.title,
             timedMode: true,

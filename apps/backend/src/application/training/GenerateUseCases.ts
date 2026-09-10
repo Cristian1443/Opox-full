@@ -127,17 +127,31 @@ export class GenerateHintUseCase {
 }
 
 export class ReportQuestionUseCase {
+    constructor(private readonly trainingRepo: ITrainingRepository) {}
+
     async execute(input: {
         userId: string;
         questionId: string;
         reason: string;
         details?: string;
     }): Promise<void> {
-        // TODO: persistir en tabla question_reports — Supabase insert
+        await this.trainingRepo.reportQuestion(input);
         logger.info('[report] question reported', {
             userId: input.userId,
             questionId: input.questionId,
             reason: input.reason,
         });
+    }
+}
+
+export class RateQuestionUseCase {
+    constructor(private readonly trainingRepo: ITrainingRepository) {}
+
+    async execute(input: {
+        userId: string;
+        questionId: string;
+        rating: number;
+    }): Promise<{ questionId: string; rating: number }> {
+        return this.trainingRepo.rateQuestion(input);
     }
 }

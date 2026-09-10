@@ -59,6 +59,9 @@ declare const API_ROUTES: {
         readonly BOOKMARK_DELETE: string;
         readonly HINT: string;
         readonly QUESTION_REPORT: string;
+        readonly QUESTION_RATE: string;
+        readonly MOCK_PROGRESS: string;
+        readonly LAW_VIEW: string;
         readonly TOPICS: string;
         readonly LEVEL_TEST: string;
     };

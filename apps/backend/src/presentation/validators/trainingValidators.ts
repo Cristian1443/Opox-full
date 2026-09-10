@@ -67,3 +67,23 @@ export const reportQuestionSchema = z.object({
     reason: z.enum(['wrong_answer', 'poor_wording', 'outdated_law', 'other']),
     details: z.string().max(500).optional(),
 });
+
+export const rateQuestionSchema = z.object({
+    rating: z.number().int().min(1).max(5),
+});
+
+export const saveMockProgressSchema = z.object({
+    mockExamId: z.string().uuid(),
+    examTitle: z.string().min(1).max(200),
+    currentIndex: z.number().int().min(0),
+    questionCount: z.number().int().min(1).max(200),
+    answers: z.array(z.unknown()).max(200),
+});
+
+export const saveLawViewSchema = z.object({
+    law: z.string().min(1).max(200),
+    article: z.string().max(200).optional(),
+    articleTitle: z.string().max(300).optional(),
+    boeUrl: z.string().max(500).optional(),
+    topicId: z.string().max(60).optional(),
+});
