@@ -1,38 +1,28 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
+    View,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Text from '../../components/AppText';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import PaymentErrorModal from '../../components/PaymentErrorModal';
 
 // ─── 11.2 · Tienda · Planes ─────────────────────────────────────────────────
-// Fiel al Figma (SuscripcionesScreen.tsx, título confirmado "Planes"). El
-// reference solo captura una comparativa estática de 3 filas con un único
-// CTA "Suscribirme a premium"; la app real ofrece un botón de suscripción
-// por plan (incluye "Anual" con badge de ahorro), prueba social y garantías
-// — todo eso es funcionalidad real de conversión que se conserva, solo se
-// reestiliza con la tipografía/color confirmados.
+// Fiel al Figma (SuscripcionesScreen.tsx, título confirmado "Planes"): 3
+// tarjetas seleccionables (tap para elegir, borde naranja marca la
+// selección) + un único CTA fijo al fondo que suscribe al plan elegido.
+// Sin prueba social ni sección de garantías — no están en el reference.
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   cardBorder: 'rgba(65, 41, 80, 0.3)',
   popularBg: 'rgba(246, 150, 36, 0.15)',
 };
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 function CheckIcon({ size = 14, color = colors.textDark }) {
   return (
@@ -56,23 +46,20 @@ const PLANS = [
     ],
     isPopular: false,
     buttonText: 'Empezar',
-    buttonVariant: 'outline',
   },
   {
     id: 'premium',
     name: 'Premium',
-    price: '9,99€',
+    price: '9,90€',
     period: '/mes',
     desc: 'Tests infinitos sin anuncios',
     features: [
       'Tests infinitos sin anuncios',
       'Tutor IA ilimitado · Foto-Test',
       'Monitor BOE y Estadísticas Pro',
-      'Soporte prioritario',
     ],
     isPopular: true,
-    buttonText: 'Suscribirme a Premium',
-    buttonVariant: 'primary',
+    buttonText: 'Suscribirme a premium',
   },
   {
     id: 'annual',
@@ -88,19 +75,9 @@ const PLANS = [
     ],
     isPopular: false,
     buttonText: 'Suscribirme Anual',
-    buttonVariant: 'secondary',
     savings: '25% OFF',
   },
 ];
-
-const StarRow = () => (
-  <View style={styles.ratingRow}>
-    {[...Array(5)].map((_, i) => (
-      <Ionicons key={i} name="star" size={14} color={colors.accentOrange} />
-    ))}
-    <Text style={styles.ratingText}>4.9 (12k reseñas)</Text>
-  </View>
-);
 
 const FeatureList = ({ features }) => (
   <View style={styles.featuresList}>
@@ -113,8 +90,14 @@ const FeatureList = ({ features }) => (
   </View>
 );
 
-const PlanCard = ({ plan, onSubscribe }) => (
-  <View style={[styles.planCard, plan.isPopular && styles.planCardPopular]}>
+const PlanCard = ({ plan, isSelected, onSelect }) => (
+  <TouchableOpacity
+    style={[styles.planCard, isSelected && styles.planCardSelected]}
+    activeOpacity={0.85}
+    onPress={() => onSelect(plan.id)}
+    accessibilityLabel={`Plan ${plan.name}, ${plan.price}${plan.period}`}
+    accessibilityState={{ selected: isSelected }}
+  >
     {plan.savings && (
       <View style={styles.savingsBadge}>
         <Text style={styles.savingsText}>{plan.savings}</Text>
@@ -141,29 +124,16 @@ const PlanCard = ({ plan, onSubscribe }) => (
     ) : (
       <Text style={styles.planDesc}>{plan.desc}</Text>
     )}
-
-    <TouchableOpacity
-      style={[
-        styles.subscribeButton,
-        plan.buttonVariant === 'outline' && styles.subscribeButtonOutline,
-        plan.buttonVariant === 'secondary' && styles.subscribeButtonSecondary,
-      ]}
-      onPress={() => onSubscribe(plan)}
-      accessibilityLabel={plan.buttonText}
-    >
-      <Text style={[
-        styles.subscribeButtonText,
-        plan.buttonVariant === 'outline' && styles.subscribeButtonTextOutline,
-      ]}>
-        {plan.buttonText}
-      </Text>
-    </TouchableOpacity>
-  </View>
+  </TouchableOpacity>
 );
 
 export default function StoreSubscriptionScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const [selectedId, setSelectedId] = useState('premium');
   const [pendingPlan, setPendingPlan] = useState(null);
   const [showPaymentError, setShowPaymentError] = useState(false);
+
+  const selectedPlan = PLANS.find(p => p.id === selectedId) ?? PLANS[0];
 
   // TODO(revenuecat): reemplazar bloque de setTimeout por RevenueCat.purchasePackage(package)
   // En error: setShowPaymentError(true). En éxito: navigate StoreSubscriptionSuccess.
@@ -191,57 +161,44 @@ export default function StoreSubscriptionScreen({ navigation }) {
       {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.iconButton}
+          style={styles.backBtn}
           activeOpacity={0.7}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
         >
-          <ChevronLeftIcon />
+          <Feather name="chevron-left" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Planes</Text>
-        <View style={styles.iconButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Sección de confianza — real, sin equivalente en Figma */}
-        <View style={styles.trustSection}>
-          <Text style={styles.trustText}>
-            Únete a +10.000 opositores que ya estudian mejor
-          </Text>
-          <StarRow />
-        </View>
-
         <View style={styles.plansContainer}>
           {PLANS.map((plan) => (
             <PlanCard
               key={plan.id}
               plan={plan}
-              onSubscribe={handleSubscribe}
+              isSelected={plan.id === selectedId}
+              onSelect={setSelectedId}
             />
           ))}
         </View>
-
-        {/* Garantías — real, sin equivalente en Figma */}
-        <View style={styles.infoSection}>
-          <View style={styles.infoRow}>
-            <Ionicons name="shield-checkmark-outline" size={18} color={colors.accentOrange} />
-            <Text style={styles.infoText}>Cancelación gratuita en cualquier momento</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="refresh-outline" size={18} color={colors.accentOrange} />
-            <Text style={styles.infoText}>Prueba de 7 días gratis disponible</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.faqLink}
-            accessibilityLabel="Ver preguntas frecuentes sobre suscripciones"
-          >
-            <Text style={styles.faqText}>Ver preguntas frecuentes</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
+
+      {/* ── CTA único fijo al fondo — suscribe al plan seleccionado ────── */}
+      <View style={[styles.footer, { paddingBottom: spacing.sm + insets.bottom }]}>
+        <TouchableOpacity
+          style={styles.subscribeButton}
+          activeOpacity={0.85}
+          onPress={() => handleSubscribe(selectedPlan)}
+          accessibilityLabel={selectedPlan.buttonText}
+        >
+          <Text style={styles.subscribeButtonText}>{selectedPlan.buttonText}</Text>
+        </TouchableOpacity>
+      </View>
 
       <PaymentErrorModal
         visible={showPaymentError}
@@ -269,11 +226,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(65, 41, 80, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: 44,
+    height: 44,
   },
   headerTitle: {
     flex: 1,
@@ -285,32 +248,8 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
-  },
-
-  // ── Confianza ─────────────────────────────────────────────────
-  trustSection: {
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  trustText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginLeft: 4,
   },
 
   // ── Tarjetas de plan ──────────────────────────────────────────
@@ -324,7 +263,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     position: 'relative',
   },
-  planCardPopular: {
+  planCardSelected: {
     borderWidth: 1.5,
     borderColor: colors.accentOrange,
   },
@@ -405,56 +344,21 @@ const styles = StyleSheet.create({
     color: colors.textDark,
   },
 
-  // ── Botón por plan ────────────────────────────────────────────
+  // ── CTA único fijo al fondo ───────────────────────────────────
+  footer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
   subscribeButton: {
-    height: 48,
-    borderRadius: 12,
+    height: 61.3,
+    borderRadius: 14.2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accentOrange,
-    marginTop: spacing.md,
-  },
-  subscribeButtonOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: FIGMA.cardBorder,
-  },
-  subscribeButtonSecondary: {
-    backgroundColor: colors.textDark,
   },
   subscribeButtonText: {
     fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
+    fontSize: 16,
     color: colors.white,
-  },
-  subscribeButtonTextOutline: {
-    color: colors.textDark,
-  },
-
-  // ── Garantías ─────────────────────────────────────────────────
-  infoSection: {
-    marginTop: spacing.xl,
-    paddingHorizontal: 4,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
-  },
-  infoText: {
-    flex: 1,
-    fontFamily: 'Poppins-Regular',
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  faqLink: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  faqText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
-    color: colors.accentOrange,
   },
 });

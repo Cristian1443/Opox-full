@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Image, Animated } from 'react-native';
+import {
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    StatusBar,
+    Image,
+    Animated,
+} from 'react-native';
+import Text from '../../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import PhotoErrorModal from '../../components/PhotoErrorModal';

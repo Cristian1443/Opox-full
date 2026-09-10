@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch,
+  View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
 import AccentSlider from '../../components/AccentSlider';
+import Text from '../../components/AppText';
 import { colors, spacing } from '../../theme';
 import { settingsApi } from '../../api';
+import { AccessibilityContext } from '../../contexts/AccessibilityContext';
 
 // ─── 12.5 · Accesibilidad ───────────────────────────────────────────────────
 // Fiel al Figma (AccesibilidadScreen.tsx). "Modo noche" es un switch binario
@@ -90,13 +92,17 @@ function MoonIcon({ size = 24, color = colors.accentOrange }) {
 
 export default function ConfigAccessibilityScreen({ navigation }) {
   const [prefs, setPrefs] = useState(DEFAULT);
+  const { setFontSize: applyFontSizeGlobally } = useContext(AccessibilityContext);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       // 1. AsyncStorage primero para respuesta instantánea
       const local = await loadA11yLocal();
-      if (!cancelled && local) setPrefs(local);
+      if (!cancelled && local) {
+        setPrefs(local);
+        if (local.fontSize) applyFontSizeGlobally(local.fontSize);
+      }
 
       // 2. Backend como source of truth (theme, fontScale, reduceMotion)
       const res = await settingsApi.getPreferences();
@@ -111,6 +117,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
         };
         setPrefs(merged);
         saveA11yLocal(merged);
+        applyFontSizeGlobally(merged.fontSize);
       }
     }
     load();
@@ -118,6 +125,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
   }, []);
 
   const update = useCallback((patch) => {
+    if (patch.fontSize !== undefined) applyFontSizeGlobally(patch.fontSize);
     setPrefs((prev) => {
       const next = { ...prev, ...patch };
       saveA11yLocal(next);

@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     View,
-    Text,
     ScrollView,
     TouchableOpacity,
     StatusBar,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
 
@@ -84,12 +84,10 @@ function LightbulbIcon({ size = 22, color = colors.white }) {
     );
 }
 
+// Punto sólido — mismo estilo que BulletDot de BoeDetailScreen.js (10.2),
+// consistente en todo el flujo de Monitor BOE.
 function BulletCircle({ color }) {
-    return (
-        <Svg width={10} height={10} viewBox="0 0 10 10">
-            <Circle cx={5} cy={5} r={4} fill="none" stroke={color} strokeWidth={1.4} />
-        </Svg>
-    );
+    return <View style={[styles.bulletDot, { backgroundColor: color }]} />;
 }
 
 // ─── Componente de texto enriquecido inline ───────────────────────────────────
@@ -268,6 +266,11 @@ const styles = StyleSheet.create({
     sectionLabel: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
+    },
+    bulletDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
 
     // ── Cita / texto enriquecido inline ───────────────────────────

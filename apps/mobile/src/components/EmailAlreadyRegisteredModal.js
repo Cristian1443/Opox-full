@@ -1,5 +1,11 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+    Modal,
+    View,
+    TouchableOpacity,
+    StyleSheet,
+} from 'react-native';
+import Text from './AppText';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../theme';
 

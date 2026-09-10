@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
+import {
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    ScrollView,
+    Modal,
+    TextInput,
+    Alert,
+    ActivityIndicator,
+    Platform,
+} from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';

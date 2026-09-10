@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  StatusBar,
-  Alert,
-  Linking,
-  KeyboardAvoidingView,
-  Platform,
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    ScrollView,
+    TextInput,
+    StatusBar,
+    Alert,
+    Linking,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';

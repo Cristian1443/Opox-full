@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  Text,
-  Modal,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Linking,
+    Modal,
+    StyleSheet,
+    TouchableOpacity,
+    Animated,
+    Linking,
 } from 'react-native';
+import Text from '../../components/AppText';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../../theme';
 

@@ -1,7 +1,8 @@
 // Placeholder temporal para AITutor — se sustituye cuando el bloque 4 (Tutor IA) entre.
 // Evita crashes de los CTAs que apuntan a 'AITutor' desde el bloque 3.
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';

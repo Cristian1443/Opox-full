@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import {
     View,
-    Text,
     Image,
     StyleSheet,
     StatusBar,
 } from 'react-native';
+import Text from '../../components/AppText';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OpoxWordmark from '../../../assets/opoxLogo';

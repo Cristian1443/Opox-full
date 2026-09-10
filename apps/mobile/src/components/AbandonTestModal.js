@@ -1,13 +1,13 @@
 import React, { useRef, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Animated,
-  Dimensions,
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    Modal,
+    Animated,
+    Dimensions,
 } from 'react-native';
+import Text from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../theme';
 

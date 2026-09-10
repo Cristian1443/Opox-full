@@ -1,19 +1,24 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     View,
-    Text,
+    Image,
     StyleSheet,
     TouchableOpacity,
     Animated,
     FlatList,
     ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
+
+// Mismo fondo texturizado "cebra" que LoginScreen.js (assets/login/hero_bg.jpg)
+// — el patrón se concentra arriba y se desvanece a gris plano hacia abajo.
+const HERO_BG = require('../../../assets/login/hero_bg.jpg');
 
 // Colores confirmados contra Figma (pop-up MAZO COMPLETADO, Bloque 8) sin
 // equivalente exacto en theme.js. Mismo patrón de overlay + tarjeta que el
@@ -54,18 +59,12 @@ function CheckBadgeIcon({ width = 107, height = 70, color = colors.ctaGreen }) {
     );
 }
 
+// Icono exacto exportado de Figma para "Toca para girar".
 function FlipIcon({ size = 18, color = colors.textDark }) {
     return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path
-                d="M4 12C4 7.58 7.58 4 12 4C15 4 17.6 5.7 19 8.2M20 12C20 16.42 16.42 20 12 20C9 20 6.4 18.3 5 15.8"
-                stroke={color}
-                strokeWidth={2}
-                fill="none"
-                strokeLinecap="round"
-            />
-            <Path d="M19 4V8.2H14.8" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M5 20V15.8H9.2" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <Svg width={size} height={(size * 65) / 61} viewBox="0 0 61 65" fill="none">
+            <Path d="M7.80661 23.9545C10.4201 19.4279 14.4539 15.8899 19.2827 13.889C24.1115 11.8881 29.4655 11.5361 34.5147 12.8875C37.5269 13.6943 40.3506 15.0866 42.8247 16.9848C45.2987 18.883 47.3746 21.2499 48.9338 23.9505C50.493 26.6511 51.5049 29.6323 51.9117 32.724C52.3186 35.8157 52.1125 38.9573 51.3051 41.9693C50.4983 44.9815 49.106 47.8052 47.2078 50.2793C45.3096 52.7533 42.9427 54.8292 40.2421 56.3884C37.5415 57.9476 34.5603 58.9595 31.4686 59.3663C28.3769 59.7732 25.2353 59.5671 22.2233 58.7597L22.8705 56.3444C25.5653 57.0675 28.3762 57.2524 31.1426 56.8887C33.9089 56.525 36.5765 55.6197 38.9929 54.2247C41.4092 52.8296 43.527 50.972 45.2251 48.7581C46.9233 46.5443 48.1686 44.0175 48.8898 41.3221C49.6129 38.6273 49.7978 35.8164 49.4341 33.05C49.0704 30.2837 48.1651 27.6161 46.7701 25.1997C45.375 22.7834 43.5174 20.6656 41.3035 18.9675C39.0897 17.2693 36.5629 16.024 33.8675 15.3028C29.3504 14.09 24.5591 14.4024 20.2378 16.1918C15.9164 17.9811 12.3068 21.1471 9.96924 25.1983L7.80661 23.9545Z" fill={color} />
+            <Path d="M8.1383 16.4358L9.70253 23.522L16.728 22.7132L17.0154 25.186L8.86915 26.1219L7.74712 26.2535L7.50348 25.1576L5.70017 16.9767L8.1383 16.4358Z" fill={color} />
         </Svg>
     );
 }
@@ -329,17 +328,27 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            {/* hero_bg.jpg concentra el patrón arriba y se desvanece a gris plano
+                hacia abajo (mismo asset que LoginScreen). Aquí necesitamos la
+                cebra en TODA la pantalla, así que ponemos una copia normal
+                arriba y otra girada 180° abajo — la tarjeta blanca opaca tapa
+                la unión en el centro. */}
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <Image source={HERO_BG} style={styles.heroBgTop} resizeMode="cover" />
+                <Image source={HERO_BG} style={styles.heroBgBottom} resizeMode="cover" />
+            </View>
+
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.iconBtn}
+                    style={styles.backBtn}
                     accessibilityLabel="Volver"
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                    <Feather name="chevron-left" size={22} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Flashcards</Text>
-                <View style={styles.iconBtn} />
+                <View style={styles.headerPlaceholder} />
             </View>
 
             {/* Área de tarjeta — toca en cualquier punto para girar */}
@@ -382,40 +391,30 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
                 </Animated.View>
             </TouchableOpacity>
 
-            {/* Zona inferior — Figma solo confirma los 2 botones de autoevaluación;
-                el CTA "Ver respuesta" previo al flip no está en el frame pero es
-                necesario (no se puede autoevaluar sin ver antes la respuesta). */}
+            {/* Figma muestra los 2 botones de autoevaluación siempre visibles,
+                tanto en la pregunta como en la respuesta — no hay CTA
+                intermedio de "Ver respuesta". El usuario puede girar la
+                tarjeta tocándola en cualquier momento antes de autoevaluarse. */}
             <View style={[styles.bottomZone, { paddingBottom: spacing.md + insets.bottom }]}>
-                {isFlipped ? (
-                    <View style={styles.actionRow}>
-                        <TouchableOpacity
-                            style={styles.secondaryButton}
-                            onPress={() => handleAnswer(false)}
-                            activeOpacity={0.7}
-                            accessibilityLabel="No la sabía"
-                        >
-                            <Text style={styles.secondaryButtonText}>No la sabía</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.primaryButton}
-                            onPress={() => handleAnswer(true)}
-                            activeOpacity={0.85}
-                            accessibilityLabel="La sabía"
-                        >
-                            <Text style={styles.primaryButtonText}>La sabía</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
+                <View style={styles.actionRow}>
                     <TouchableOpacity
-                        style={styles.revealButton}
-                        onPress={handleFlip}
-                        activeOpacity={0.85}
-                        accessibilityLabel="Ver respuesta"
+                        style={styles.secondaryButton}
+                        onPress={() => handleAnswer(false)}
+                        activeOpacity={0.7}
+                        accessibilityLabel="No la sabía"
                     >
-                        <Text style={styles.revealButtonText}>Ver respuesta</Text>
+                        <Text style={styles.secondaryButtonText}>No la sabía</Text>
                     </TouchableOpacity>
-                )}
+
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={() => handleAnswer(true)}
+                        activeOpacity={0.85}
+                        accessibilityLabel="La sabía"
+                    >
+                        <Text style={styles.primaryButtonText}>La sabía</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </SafeAreaView>
     );
@@ -425,7 +424,24 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: '#F5F5F6',
+    },
+    heroBgTop: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '55%',
+        opacity: 0.8,
+    },
+    heroBgBottom: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '55%',
+        opacity: 0.8,
+        transform: [{ rotate: '180deg' }],
     },
 
     emptyClose: {
@@ -479,6 +495,15 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.md,
     },
     iconBtn: { width: 32, padding: 4 },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerPlaceholder: { width: 44, height: 44 },
     headerTitle: {
         flex: 1,
         fontFamily: 'Poppins-SemiBold',
@@ -570,19 +595,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: colors.white,
     },
-    revealButton: {
-        height: 61,
-        borderRadius: 14.2,
-        backgroundColor: colors.accentOrange,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    revealButtonText: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 16,
-        color: colors.white,
-    },
-
     // ── Pop-up · Mazo completado (mismo patrón overlay + tarjeta que el
     // resto de la app) ─────────────────────────────────────────────────────
     doneOverlay: {

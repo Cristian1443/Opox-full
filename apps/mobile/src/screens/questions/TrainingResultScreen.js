@@ -1,11 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    ScrollView,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';

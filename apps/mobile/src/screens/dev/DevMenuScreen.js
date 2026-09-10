@@ -2,11 +2,11 @@ import React from 'react';
 import {
     ScrollView,
     StyleSheet,
-    Text,
     TouchableOpacity,
     View,
     StatusBar,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';

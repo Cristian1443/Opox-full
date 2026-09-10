@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import {
     View,
-    Text,
     ScrollView,
     StyleSheet,
     TouchableOpacity,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle } from 'react-native-svg';

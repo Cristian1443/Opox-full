@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView } from 'react-native';
+import {
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    StatusBar,
+    ScrollView,
+} from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ScreenHeader from '../../components/ScreenHeader';
 import { motivationApi } from '../../api';

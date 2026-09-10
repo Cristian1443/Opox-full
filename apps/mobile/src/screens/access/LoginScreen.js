@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     StyleSheet,
-    Text,
     View,
     TextInput,
     TouchableOpacity,
@@ -10,7 +9,9 @@ import {
     ScrollView,
     Modal,
     Image,
+    ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,6 +49,10 @@ export default function LoginScreen({ navigation, route }) {
     const [failedAttempts, setFailedAttempts] = useState(0);
     const [blockUntil, setBlockUntil] = useState(null);
     const [now, setNow] = useState(Date.now());
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
+    // Permite cerrar el modal de "cuenta bloqueada" con "Entendido" sin
+    // levantar el bloqueo — se reactiva automáticamente en cada bloqueo nuevo.
+    const [blockModalDismissed, setBlockModalDismissed] = useState(false);
 
     const isBlocked = blockUntil !== null && now < blockUntil;
     const timeRemaining = isBlocked ? Math.ceil((blockUntil - now) / 1000) : 0;
@@ -59,6 +64,10 @@ export default function LoginScreen({ navigation, route }) {
         const interval = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(interval);
     }, [isBlocked]);
+
+    useEffect(() => {
+        if (blockUntil !== null) setBlockModalDismissed(false);
+    }, [blockUntil]);
 
     useEffect(() => {
         if (blockUntil !== null && now >= blockUntil) {
@@ -74,7 +83,7 @@ export default function LoginScreen({ navigation, route }) {
     };
 
     const handleLogin = async () => {
-        if (isBlocked) return;
+        if (isBlocked || isLoggingIn) return;
         setError(null);
 
         if (!email || !password) {
@@ -82,40 +91,48 @@ export default function LoginScreen({ navigation, route }) {
             return;
         }
 
-        const { data, error: apiError } = await authApi.login({ email, password });
+        setIsLoggingIn(true);
+        // El backend (Render, plan free) puede tardar 20-50s en despertar tras
+        // inactividad — el spinner evita que el cold-start se sienta como que
+        // la app está congelada.
+        try {
+            const { data, error: apiError } = await authApi.login({ email, password });
 
-        if (data?.accessToken) {
-            setFailedAttempts(0);
-            navigation.replace('SesionIniciada', { email });
-            return;
-        }
+            if (data?.accessToken) {
+                setFailedAttempts(0);
+                navigation.replace('SesionIniciada', { email });
+                return;
+            }
 
-        // Mapeo de códigos backend → UI del bloque 1
-        if (apiError?.code === 'common/network-error') {
-            setError({ type: 'offline', message: apiError.message });
-            return;
-        }
-        if (apiError?.code === 'auth/account-locked') {
-            setBlockUntil(Date.now() + BLOCK_DURATION_MS);
-            setNow(Date.now());
-            setPassword('');
-            return;
-        }
+            // Mapeo de códigos backend → UI del bloque 1
+            if (apiError?.code === 'common/network-error') {
+                setError({ type: 'offline', message: apiError.message });
+                return;
+            }
+            if (apiError?.code === 'auth/account-locked') {
+                setBlockUntil(Date.now() + BLOCK_DURATION_MS);
+                setNow(Date.now());
+                setPassword('');
+                return;
+            }
 
-        // auth/invalid-credentials u otro fallo: contamos intento y decidimos bloqueo local
-        const nextAttempts = failedAttempts + 1;
-        setFailedAttempts(nextAttempts);
+            // auth/invalid-credentials u otro fallo: contamos intento y decidimos bloqueo local
+            const nextAttempts = failedAttempts + 1;
+            setFailedAttempts(nextAttempts);
 
-        if (nextAttempts >= MAX_ATTEMPTS) {
-            setBlockUntil(Date.now() + BLOCK_DURATION_MS);
-            setNow(Date.now());
-            setPassword('');
-        } else {
-            setError({
-                type: 'auth',
-                // 1.3 · err "ERROR CONTRASEÑA" (Figma node 2349:733): copy exacta.
-                message: apiError?.message || 'Email o contraseña incorrectos.',
-            });
+            if (nextAttempts >= MAX_ATTEMPTS) {
+                setBlockUntil(Date.now() + BLOCK_DURATION_MS);
+                setNow(Date.now());
+                setPassword('');
+            } else {
+                setError({
+                    type: 'auth',
+                    // 1.3 · err "ERROR CONTRASEÑA" (Figma node 2349:733): copy exacta.
+                    message: apiError?.message || 'Email o contraseña incorrectos.',
+                });
+            }
+        } finally {
+            setIsLoggingIn(false);
         }
     };
 
@@ -155,7 +172,7 @@ export default function LoginScreen({ navigation, route }) {
         setError({ type: 'auth', message: bioError || 'No te hemos reconocido.' });
     };
 
-    const isDisabled = !email || !password || isBlocked;
+    const isDisabled = !email || !password || isBlocked || isLoggingIn;
     // 1.3 · err: cuando hay error de login, el formulario colapsa a la variante
     // "ERROR CONTRASEÑA" (Figma node 2349:733) — desaparecen "recordar mis
     // datos" / "olvidé contraseña" / FaceID y el botón sube justo debajo del
@@ -264,10 +281,15 @@ export default function LoginScreen({ navigation, route }) {
                             onPress={handleLogin}
                             activeOpacity={0.85}
                             disabled={isDisabled}
+                            accessibilityLabel={isLoggingIn ? 'Accediendo' : (isBlocked ? 'Cuenta bloqueada' : 'Acceder')}
                         >
-                            <Text style={s.primaryButtonText}>
-                                {isBlocked ? 'Cuenta bloqueada' : 'Acceder'}
-                            </Text>
+                            {isLoggingIn ? (
+                                <ActivityIndicator size="small" color={colors.white} />
+                            ) : (
+                                <Text style={s.primaryButtonText}>
+                                    {isBlocked ? 'Cuenta bloqueada' : 'Acceder'}
+                                </Text>
+                            )}
                         </TouchableOpacity>
                     </View>
 
@@ -318,7 +340,7 @@ export default function LoginScreen({ navigation, route }) {
             {/* 1.3 · err — Cuenta bloqueada (modal) */}
             <Modal
                 transparent
-                visible={isBlocked}
+                visible={isBlocked && !blockModalDismissed}
                 animationType="fade"
                 statusBarTranslucent
                 onRequestClose={() => { }}
@@ -345,7 +367,7 @@ export default function LoginScreen({ navigation, route }) {
 
                         <TouchableOpacity
                             style={s.modalSecondary}
-                            onPress={() => { /* seguir bloqueado hasta timer */ }}
+                            onPress={() => setBlockModalDismissed(true)}
                             activeOpacity={0.7}
                         >
                             <Text style={s.modalSecondaryText}>Entendido</Text>

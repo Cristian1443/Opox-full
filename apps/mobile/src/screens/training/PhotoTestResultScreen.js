@@ -1,5 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, Animated, ActivityIndicator, Alert } from 'react-native';
+import {
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    StatusBar,
+    ScrollView,
+    Animated,
+    ActivityIndicator,
+    Alert,
+} from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';

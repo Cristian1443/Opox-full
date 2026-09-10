@@ -1,5 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import {
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    ScrollView,
+} from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -222,7 +228,7 @@ export default function PlanningHomeScreen({ navigation }) {
                         <View style={styles.sliderLabelsRow}>
                             <Text style={[styles.sliderLabel, { left: `${Math.round(progressFraction * 100)}%` }]}>HOY</Text>
                             <View style={styles.sliderEndLabel}>
-                                <Text style={styles.sliderLabel}>{examMonthLabel}</Text>
+                                <Text style={styles.sliderEndMonth}>{examMonthLabel}</Text>
                                 <Text style={styles.sliderEndCaption}>examen</Text>
                             </View>
                         </View>
@@ -420,6 +426,11 @@ const styles = StyleSheet.create({
         position: 'absolute',
         right: 0,
         alignItems: 'flex-end',
+    },
+    sliderEndMonth: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
     },
     sliderEndCaption: {
         fontFamily: 'Poppins-Regular',

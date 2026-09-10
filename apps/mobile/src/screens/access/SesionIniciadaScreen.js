@@ -1,10 +1,6 @@
 import React, { useEffect } from 'react';
-import {
-    StyleSheet,
-    Text,
-    View,
-    StatusBar,
-} from 'react-native';
+import { StyleSheet, View, StatusBar } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme';

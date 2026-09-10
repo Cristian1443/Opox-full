@@ -4,13 +4,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     TouchableOpacity,
     Animated,
     Easing,
     Linking,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Rect, Line, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';

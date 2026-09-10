@@ -1,8 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
-  Alert, ActivityIndicator,
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    ScrollView,
+    StatusBar,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';

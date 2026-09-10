@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     TouchableOpacity,
     TouchableWithoutFeedback,
     Animated,
     StatusBar,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../../theme';
 

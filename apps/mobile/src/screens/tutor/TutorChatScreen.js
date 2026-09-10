@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     View,
-    Text,
     TextInput,
     TouchableOpacity,
     ScrollView,
@@ -10,14 +9,35 @@ import {
     StyleSheet,
     Alert,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { tutorApi } from '../../api';
 
 const TONE_KEY = 'opox.ai.tone';
 const DEFAULT_TONE = { personality: 'cercano', detailLevel: 1, hintStyle: 'directas', reinforcementLevel: 'normal' };
+
+// Iconos exactos exportados de Figma para la barra de entrada.
+function IconMic({ size = 24, color = colors.accentOrange }) {
+    return (
+        <Svg width={(size * 48) / 75} height={size} viewBox="0 0 48 75" fill="none">
+            <Path d="M11.5481 46.887C12.9541 48.8572 14.8092 50.4634 16.9596 51.5725C19.1099 52.6815 21.4935 53.2614 23.9126 53.2641C25.5519 53.2737 27.1826 53.0275 28.7462 52.5345C31.7672 51.6057 34.4087 49.7271 36.2787 47.1773C38.1488 44.6275 39.1479 41.5423 39.1277 38.3794C39.1277 35.687 39.1277 33.0019 39.1277 30.3095V14.8338C39.1654 12.9224 38.8117 11.0235 38.0882 9.25414C37.3647 7.48477 36.2869 5.88243 34.9211 4.54585C33.1852 2.73851 31.0218 1.39854 28.6312 0.649897C26.2406 -0.0987424 23.7 -0.231865 21.2443 0.262844C17.8062 0.808861 14.6734 2.5585 12.4037 5.20015C10.1341 7.84181 8.87497 11.204 8.85065 14.6879C8.85065 22.6361 8.85065 30.5795 8.85065 38.518C8.81851 41.5267 9.76531 44.4642 11.5481 46.887ZM34.9284 26.6248V30.2731C34.9284 32.9509 34.9284 35.6286 34.9284 38.2991C34.9322 40.999 33.915 43.6003 32.0812 45.5805C30.2474 47.5606 27.7328 48.7729 25.0426 48.9738C23.207 49.1776 21.3498 48.9093 19.6467 48.1943C17.9436 47.4793 16.451 46.3412 15.3099 44.8878C13.8716 43.1758 13.084 41.0102 13.0864 38.7734V38.1167C13.0864 30.3752 13.0353 22.371 13.0864 14.4982C13.149 12.1242 14.0134 9.8414 15.5386 8.02211C17.0638 6.20282 19.1598 4.95432 21.4849 4.48018C23.7773 3.93979 26.1821 4.14343 28.3512 5.06164C30.5203 5.97985 32.3413 7.56499 33.5505 9.58768C34.4648 11.1709 34.9428 12.9687 34.9357 14.7973C34.9357 17.6138 34.9357 20.4326 34.9357 23.2539L34.9284 26.6248Z" fill={color} />
+            <Path d="M47.5844 37.3792C47.4307 37.2428 47.25 37.1404 47.054 37.0788C46.858 37.0172 46.6512 36.9977 46.4471 37.0217C46.0684 37.0435 45.6886 37.0435 45.3098 37.0217C45.1049 37.0026 44.8982 37.0273 44.7035 37.0939C44.5087 37.1606 44.3302 37.2677 44.1798 37.4084C44.0405 37.5535 43.9345 37.7272 43.869 37.9174C43.8035 38.1077 43.7802 38.31 43.8007 38.5101C43.8007 38.6998 43.8007 38.9187 43.8007 39.1522V39.3565C43.5996 42.6366 42.5862 45.8152 40.8519 48.6057C39.1177 51.3962 36.717 53.7111 33.8662 55.3418C31.0154 56.9725 27.804 57.8678 24.5213 57.947C21.2387 58.0261 17.988 57.2867 15.062 55.7954C8.55164 52.3588 4.90644 46.8208 4.23572 39.3346C4.23572 39.0428 4.19198 38.7509 4.1774 38.4591L4.08992 37.0581H1.07898L0.393682 37.1092L0 37.941V38.1307C0 38.2402 0 38.3569 0 38.4664C0.0416309 42.8677 1.32549 47.1677 3.70352 50.8703C5.64664 54.0238 8.30336 56.6759 11.4592 58.6126C14.6151 60.5492 18.1817 61.7162 21.8712 62.0192C21.8712 64.9378 21.8712 67.8564 21.8712 70.7749C19.3487 70.7749 16.819 70.7749 14.2965 70.7749H13.5529C13.3083 70.7736 13.0642 70.7956 12.8238 70.8406C12.3724 70.944 11.9682 71.1949 11.675 71.5537C11.3819 71.9125 11.2164 72.3587 11.2047 72.8221C11.193 73.2854 11.3357 73.7394 11.6104 74.1126C11.8851 74.4857 12.2761 74.7567 12.7218 74.8828C13.0077 74.9542 13.302 74.9862 13.5966 74.9777H34.4544C34.7574 74.9827 35.0595 74.9433 35.3512 74.8609C35.7841 74.727 36.1612 74.4546 36.4245 74.0856C36.6879 73.7166 36.8231 73.2712 36.8092 72.8179C36.8047 72.3634 36.6477 71.9235 36.3635 71.5689C36.0792 71.2143 35.6842 70.9655 35.2418 70.8625C34.9647 70.798 34.6806 70.7686 34.3961 70.7749H26.0996V62.0192H26.1434C26.8068 61.9536 27.4921 61.8879 28.1847 61.7493C37.181 59.947 43.3779 54.6425 46.6586 46.0036C47.5246 43.6142 47.9806 41.0955 48.0073 38.5539C48.0255 38.3392 47.9972 38.123 47.9242 37.9203C47.8512 37.7175 47.7353 37.5329 47.5844 37.3792Z" fill={color} />
+        </Svg>
+    );
+}
+
+function IconSend({ size = 24, color = colors.accentOrange }) {
+    return (
+        <Svg width={size} height={(size * 63) / 74} viewBox="0 0 74 63" fill="none">
+            <Path d="M69.3166 1.77599H4.15896C3.6311 1.76631 3.11499 1.93221 2.69173 2.2476C2.26848 2.563 1.96207 3.01001 1.82066 3.5184C1.67926 4.02678 1.71087 4.56772 1.91053 5.05619C2.11019 5.54466 2.46659 5.95299 2.9237 6.21699L33.5119 25.5531L44.887 59.5889C45.0415 60.0656 45.3432 60.4812 45.7487 60.7759C46.1543 61.0707 46.6428 61.2294 47.1442 61.2294C47.6456 61.2294 48.1341 61.0707 48.5397 60.7759C48.9452 60.4812 49.2469 60.0656 49.4014 59.5889L71.9827 5.84394C72.1861 5.40234 72.2739 4.91631 72.2378 4.4315C72.2017 3.94668 72.0429 3.47898 71.7764 3.0723C71.5099 2.66563 71.1443 2.33331 70.7141 2.10656C70.2838 1.87981 69.803 1.76606 69.3166 1.77599Z" stroke={color} strokeWidth={4} strokeMiterlimit={10} />
+            <Path d="M33.512 25.5539L71.7872 3.13574" stroke={color} strokeWidth={4} strokeMiterlimit={10} />
+        </Svg>
+    );
+}
 
 // Colores confirmados contra Figma (frame CHAT TUTOR IA, Bloque 8) sin
 // equivalente exacto en theme.js.
@@ -251,7 +271,7 @@ export default function TutorChatScreen({ navigation, route }) {
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel="Volver"
                 >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
+                    <Feather name="chevron-left" size={22} color={colors.textDark} />
                 </TouchableOpacity>
 
                 <View style={styles.headerInfo}>
@@ -340,7 +360,7 @@ export default function TutorChatScreen({ navigation, route }) {
                             Alert.alert('Próximamente', 'La entrada de voz no está disponible todavía.')
                         }
                     >
-                        <Ionicons name="mic-outline" size={22} color={colors.accentOrange} />
+                        <IconMic size={22} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -350,7 +370,7 @@ export default function TutorChatScreen({ navigation, route }) {
                         accessibilityLabel="Enviar mensaje"
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="arrow-up" size={18} color={colors.white} />
+                        <IconSend size={22} />
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -374,7 +394,14 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.md,
         gap: 12,
     },
-    backBtn: { width: 32 },
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     headerInfo: {
         flex: 1,
         flexDirection: 'row',
@@ -509,10 +536,7 @@ const styles = StyleSheet.create({
         flexShrink: 0,
     },
     sendBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.accentOrange,
+        width: 32,
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,

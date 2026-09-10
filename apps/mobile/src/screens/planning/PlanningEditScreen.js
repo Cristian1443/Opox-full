@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
+import {
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    ScrollView,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
+    ActivityIndicator,
+    Alert,
+} from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -102,6 +113,7 @@ export default function PlanningEditScreen({ navigation }) {
     const [examYear, setExamYear] = useState('');
     const [examMonth, setExamMonth] = useState('');
     const [examDay, setExamDay] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         planningApi.getPlan().then(({ data }) => {
@@ -136,6 +148,8 @@ export default function PlanningEditScreen({ navigation }) {
     const clearDate = () => { setExamYear(''); setExamMonth(''); setExamDay(''); };
 
     const handleSave = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
         const examDateValid = /^\d{4}-\d{2}-\d{2}$/.test(examDate);
         const { error } = await planningApi.updatePlan({
             testsPerDay,
@@ -143,7 +157,12 @@ export default function PlanningEditScreen({ navigation }) {
             intensity,
             examDate: examDateValid ? examDate : null,
         });
-        if (!error) navigation.goBack();
+        setIsSaving(false);
+        if (error) {
+            Alert.alert('Error al guardar', error.message ?? 'No se pudo guardar el plan. Inténtalo de nuevo.');
+            return;
+        }
+        navigation.goBack();
     };
 
     return (
@@ -160,7 +179,17 @@ export default function PlanningEditScreen({ navigation }) {
                 <View style={styles.headerSpacer} />
             </View>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+            <KeyboardAvoidingView
+                style={styles.flex}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+            >
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.body}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
                 {/* Nota: en Figma esta sección repite "RUTAS POR FASES" (copiado
                     de "Rumbo a la plaza") aunque aquí el contenido real es el
                     selector de tests diarios. Se usa una etiqueta funcional
@@ -248,16 +277,27 @@ export default function PlanningEditScreen({ navigation }) {
                     onDayChange={setExamDay}
                 />
 
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85}>
-                    <Text style={styles.saveButtonText}>Guardar cambios</Text>
+                <TouchableOpacity
+                    style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                    onPress={handleSave}
+                    disabled={isSaving}
+                    activeOpacity={0.85}
+                >
+                    {isSaving ? (
+                        <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                        <Text style={styles.saveButtonText}>Guardar cambios</Text>
+                    )}
                 </TouchableOpacity>
             </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
+    flex: { flex: 1 },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -324,5 +364,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignSelf: 'center',
     },
+    saveButtonDisabled: { opacity: 0.6 },
     saveButtonText: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.white },
 });

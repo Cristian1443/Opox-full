@@ -1,0 +1,22 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@opox/backend", "run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/CristianJohanReyesGu/Downloads/opox/OPOX/node_modules/expo/bin/cli",
+        "start",
+        "C:/Users/CristianJohanReyesGu/Downloads/opox/OPOX/apps/mobile",
+        "--web"
+      ],
+      "port": 8081
+    }
+  ]
+}

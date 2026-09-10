@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import Text from './AppText';
 import Svg, { Path } from 'react-native-svg';
 import AlertCardModal from './AlertCardModal';
 import { colors } from '../theme';

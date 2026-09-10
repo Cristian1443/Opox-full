@@ -2,10 +2,10 @@ import React from 'react';
 import {
     StyleSheet,
     View,
-    Text,
     TouchableOpacity,
     StatusBar,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path } from 'react-native-svg';

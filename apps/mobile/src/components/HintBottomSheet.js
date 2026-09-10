@@ -1,15 +1,15 @@
 import React, { useRef, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Animated,
-  ScrollView,
-  PanResponder,
-  ActivityIndicator,
+    View,
+    TouchableOpacity,
+    StyleSheet,
+    Modal,
+    Animated,
+    ScrollView,
+    PanResponder,
+    ActivityIndicator,
 } from 'react-native';
+import Text from './AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../theme';

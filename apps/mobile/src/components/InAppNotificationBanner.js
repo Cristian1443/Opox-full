@@ -1,11 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
+    View,
+    TouchableOpacity,
+    Animated,
+    StyleSheet,
 } from 'react-native';
+import Text from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

@@ -2,13 +2,13 @@ import {
     useEffect } from 'react';
 import {
     View,
-    Text,
     TouchableOpacity,
     StyleSheet,
     StatusBar,
     BackHandler,
     Linking,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';

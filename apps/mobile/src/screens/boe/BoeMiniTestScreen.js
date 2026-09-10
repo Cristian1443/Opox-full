@@ -2,15 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     View,
-    Text,
     TouchableOpacity,
     StatusBar,
     ScrollView,
     Alert,
     ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
@@ -30,14 +30,9 @@ const FIGMA = {
     evidenciaBorder: 'rgba(65, 41, 80, 0.2)',
 };
 
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
+// Flechas de la píldora de progreso — decorativas: el avance real está
+// gobernado por Confirmar/Siguiente pregunta para no romper el registro de
+// aciertos (score) del flujo de envío, que Figma no modela.
 function ChevronMiniIcon({ direction = 'left', size = 14, color = colors.white }) {
     const d = direction === 'left' ? 'M9 3L4 8L9 13' : 'M5 3L10 8L5 13';
     return (
@@ -237,8 +232,13 @@ export default function BoeMiniTestScreen({ route, navigation }) {
             <View style={styles.screen}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={handleClose}>
-                        <ChevronLeftIcon />
+                    <TouchableOpacity
+                        style={styles.backBtn}
+                        activeOpacity={0.7}
+                        onPress={handleClose}
+                        accessibilityLabel="Cerrar test"
+                    >
+                        <Feather name="chevron-left" size={22} color={colors.textDark} />
                     </TouchableOpacity>
                     <View style={styles.headerTitles}>
                         <Text style={styles.headerTitle}>Actualización BOE</Text>
@@ -246,19 +246,23 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                             {title ?? currentQ.context}
                         </Text>
                     </View>
-                    <View style={styles.iconButton} />
+                    <View style={styles.headerPlaceholder} />
                 </View>
 
-                {/* Píldora de progreso */}
-                <View style={styles.progressPill}>
-                    <ChevronMiniIcon direction="left" />
-                    <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                {/* ── Banda de progreso (a todo el ancho, fiel a Figma) ────────── */}
+                <View style={styles.progressBand}>
+                    <View style={styles.progressNavRow}>
+                        <ChevronMiniIcon direction="left" />
                         <Text style={styles.progressText}>
                             Pregunta {currentIndex + 1} de {total}
                         </Text>
+                        <ChevronMiniIcon direction="right" />
                     </View>
-                    <ChevronMiniIcon direction="right" />
+                    <View style={styles.progressTrackRow}>
+                        <View style={styles.progressTrack}>
+                            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                        </View>
+                    </View>
                 </View>
 
                 {/* Contenido */}
@@ -381,7 +385,6 @@ const styles = StyleSheet.create({
     screen: {
         flex: 1,
         backgroundColor: colors.white,
-        paddingHorizontal: spacing.lg,
         paddingTop: spacing.lg,
     },
 
@@ -431,13 +434,20 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: spacing.lg,
         marginBottom: spacing.md + 4,
     },
-    iconButton: {
-        width: 36,
-        height: 36,
+    backBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(65, 41, 80, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    headerPlaceholder: {
+        width: 44,
+        height: 44,
     },
     headerTitles: {
         flex: 1,
@@ -455,42 +465,48 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
 
-    // ── Progreso ──────────────────────────────────────────────────
-    progressPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    // ── Banda de progreso (a todo el ancho) ─────────────────────────
+    progressBand: {
         backgroundColor: colors.textDark,
-        borderRadius: 24,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.md + 4,
         marginBottom: spacing.lg,
     },
-    progressTrack: {
-        flex: 1,
-        height: 24,
-        marginHorizontal: 10,
+    progressNavRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 24,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        borderRadius: 24,
-        backgroundColor: colors.accentOrange,
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.sm + 4,
     },
     progressText: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 12.5,
+        fontFamily: 'Poppins-Bold',
+        fontSize: 17,
         color: colors.white,
+    },
+    progressTrackRow: {
+        paddingHorizontal: spacing.lg,
+    },
+    progressTrack: {
+        height: 12,
+        borderRadius: 6,
+        overflow: 'hidden',
+        backgroundColor: `${colors.accentOrange}33`,
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 6,
+        backgroundColor: colors.accentOrange,
     },
 
     // ── Contenido ─────────────────────────────────────────────────
-    scroll: { flex: 1 },
-    scrollContent: { paddingBottom: spacing.md },
+    scroll: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.md,
+    },
 
     questionText: {
         fontFamily: 'Poppins-SemiBold',

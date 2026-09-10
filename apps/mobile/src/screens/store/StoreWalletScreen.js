@@ -1,18 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  Share,
-  Linking,
+    View,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    StatusBar,
+    Share,
+    Linking,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path } from 'react-native-svg';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import { storeApi } from '../../api/store';
 
@@ -31,17 +30,10 @@ const FIGMA = {
 
 const STATUS_LABELS = { active: 'Activo', used: 'Usado', expired: 'Caducado' };
 
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
 function RewardRow({ item, navigation }) {
   const isActive = item.status === 'active';
   const isExpired = item.status === 'expired';
+  const isMuted = !isActive;
 
   const handlePress = () => {
     if (!isActive) return;
@@ -147,15 +139,15 @@ export default function StoreWalletScreen({ navigation }) {
       {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.iconButton}
+          style={styles.backBtn}
           activeOpacity={0.7}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Volver"
         >
-          <ChevronLeftIcon />
+          <Feather name="chevron-left" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mi cartera</Text>
-        <View style={styles.iconButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -225,11 +217,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(65, 41, 80, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: 44,
+    height: 44,
   },
   headerTitle: {
     flex: 1,

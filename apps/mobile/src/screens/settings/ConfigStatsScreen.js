@@ -1,7 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator,
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    ScrollView,
+    StatusBar,
+    ActivityIndicator,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Circle, Polygon, Line } from 'react-native-svg';

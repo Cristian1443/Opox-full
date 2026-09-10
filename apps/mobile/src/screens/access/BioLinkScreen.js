@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
-    Text,
     View,
     TouchableOpacity,
     ActivityIndicator,
     StatusBar,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 import { detectBiometricType, biometricLabel, setupBiometric } from '../../lib/biometric';

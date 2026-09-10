@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     Modal,
     TouchableOpacity,
@@ -10,6 +9,7 @@ import {
     Platform,
     ScrollView,
 } from 'react-native';
+import Text from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../theme';
 

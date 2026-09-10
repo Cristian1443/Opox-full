@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
     View,
-    Text,
     TouchableOpacity,
     StyleSheet,
     Dimensions,
@@ -10,6 +9,7 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
+import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
