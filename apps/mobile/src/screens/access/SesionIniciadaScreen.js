@@ -4,7 +4,7 @@ import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme';
-import { authApi, planningApi } from '../../api';
+import { api, authApi, planningApi } from '../../api';
 import { PENDING_OPOSICION_KEY } from '../onboarding/OppositionSelectorScreen';
 import { LEVEL_TEST_RESULT_KEY } from '../onboarding/LevelTestInProgressScreen';
 import { ONBOARDING_COMPLETED_KEY } from '../onboarding/SplashScreen';
@@ -26,6 +26,19 @@ export default function SesionIniciadaScreen({ navigation, route }) {
             const oposicion = await AsyncStorage.getItem(PENDING_OPOSICION_KEY);
             if (!oposicion) return;
             await authApi.updateProfile({ oposicion }).catch(() => undefined);
+            // La sesión guardada en AsyncStorage se cacheó al hacer register/verifyOtp,
+            // antes de aplicar la oposición pendiente, así que su `user.oposicion` está
+            // vacío. Sin refrescarla, todas las pantallas caerán al fallback
+            // 'justicia-tramitacion' y sólo verán 10 temas en vez del temario real.
+            const session = await api.loadSession();
+            if (session?.user) {
+                session.user = {
+                    ...session.user,
+                    oposicion,
+                    user_metadata: { ...(session.user.user_metadata || {}), oposicion },
+                };
+                await api.saveSession(session);
+            }
             await AsyncStorage.removeItem(PENDING_OPOSICION_KEY);
         };
 

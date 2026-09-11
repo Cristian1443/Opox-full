@@ -5,6 +5,58 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-10 — Sync de oposición en sesión local (usuarios nuevos veían solo 10 temas)
+
+Rama: `main`.
+
+### Bug reportado
+
+Con santigarciavel33 (usuario viejo) la app mostraba correctamente los 40 temas
+del curso "Policía de Galicia". Pero al crear un usuario nuevo (`Tester`), hacer
+onboarding desde cero eligiendo Policía de Galicia, y entrar a cualquier picker
+de temario (Generador Infinito, resúmenes del Aula, retos de clan, planificación,
+BOE), solo aparecían **10 temas** — los de `justicia-tramitacion`, no los de
+Galicia. Base de datos y Motor sí tenían los 40 correctamente cargados.
+
+### Diagnóstico
+
+El slug `policia-local-galicia` sí se guarda en `PENDING_OPOSICION_KEY` durante
+el onboarding y `SesionIniciadaScreen.applyPendingOposicion()` sí llama a
+`authApi.updateProfile({ oposicion })`, que actualiza `user_metadata` en Supabase
+y espeja a `profiles.oposicion`. Ambos quedan correctamente escritos en la DB.
+
+**El problema**: la sesión que el mobile guarda en AsyncStorage se cacheó al
+hacer `register`/`verifyOtp`, momento en que `user_metadata.oposicion` aún era
+`null`. `updateProfile` no devuelve una sesión nueva, así que la cache local
+queda con `user.oposicion = null` para siempre. Todas las pantallas de temario
+leen ese cache — cuando encuentran `null`/`undefined`, caen al fallback
+`'justicia-tramitacion'` y muestran los 10 temas de esa oposición. Coincide fila
+por fila con lo que veía Tester.
+
+santigarciavel33 no lo sufre porque tuvo un password-reset (2026-09-08) que sí
+devolvió una sesión fresca con el metadata actualizado en su momento.
+
+### Fix
+
+1. **Código** — `SesionIniciadaScreen.js`: tras `updateProfile`, recargar la
+   sesión de AsyncStorage y parchear `user.oposicion` + `user.user_metadata.oposicion`
+   con el slug antes de re-guardarla. Sin re-login. Solo cubre a usuarios nuevos
+   desde este build.
+
+2. **DB (para el cliente hoy)** — backfill SQL en Supabase que sincroniza
+   `auth.users.raw_user_meta_data.oposicion` con `profiles.oposicion` en todos
+   los usuarios desincronizados (documentado en CLAUDE.md). Los afectados deben
+   cerrar sesión y volver a entrar para que el AsyncStorage local se refresque.
+
+### Archivos modificados
+
+- `apps/mobile/src/screens/access/SesionIniciadaScreen.js` — importa `api`,
+  parchea la sesión local tras `updateProfile`.
+- `CLAUDE.md` — nueva subsección "Refresh de sesión local tras `updateProfile`"
+  en Onboarding · Bloque 0/1 con causa, fix y SQL de backfill.
+
+---
+
 ## 2026-09-09 (tarde) — Bloque 8 · Aula Virtual gaps del APK + curso Policía Galicia completo
 
 Rama: `feat/bloque3-ia-backend`.

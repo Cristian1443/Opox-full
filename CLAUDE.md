@@ -149,6 +149,38 @@ vinculada y el toggle aparece como OFF al volver a la pantalla.
 2. `applyLevelTestResult()` — aplica intensidad vía `planningApi.updatePlan({ intensity })`.
 3. `markOnboardingCompleted()` — escribe `ONBOARDING_COMPLETED_KEY = '1'`.
 
+**Refresh de sesión local tras `updateProfile` (revisión 2026-09-10)**:
+`authApi.updateProfile` actualiza `user_metadata.oposicion` en Supabase y espeja a
+`profiles.oposicion`, pero **no** devuelve una sesión nueva. La sesión que guarda
+el mobile en AsyncStorage se cacheó en `register`/`verifyOtp`, cuando aún no había
+oposición, así que su `user.oposicion` queda `null` para siempre en ese dispositivo.
+Sin refrescarla, todas las pantallas de temario (`GeneratorConfigScreen`,
+`PlanningTodayScreen`, `ChallengesScreen`, `TutorSummariesScreen`, etc.) leen
+`session.user.oposicion` vacío → caen al fallback `'justicia-tramitacion'` y sólo
+muestran 10 temas en lugar del temario real del curso.
+
+**Fix**: `applyPendingOposicion` recarga la sesión con `api.loadSession()` y parchea
+`user.oposicion` + `user.user_metadata.oposicion` con el slug elegido antes de
+guardarla de nuevo. Sin re-login manual.
+
+**Backfill SQL para usuarios previos** (correr una vez en Supabase SQL Editor):
+```sql
+UPDATE auth.users u
+SET raw_user_meta_data = jsonb_set(
+        COALESCE(u.raw_user_meta_data, '{}'::jsonb),
+        '{oposicion}',
+        to_jsonb(p.oposicion)),
+    updated_at = NOW()
+FROM public.profiles p
+WHERE p.id = u.id
+  AND p.oposicion IS NOT NULL
+  AND p.oposicion <> ''
+  AND (u.raw_user_meta_data->>'oposicion') IS DISTINCT FROM p.oposicion;
+```
+Los usuarios afectados deben cerrar sesión y volver a entrar para que su
+AsyncStorage cache lea el nuevo `user_metadata`. El fix de código sólo cubre a
+usuarios nuevos desde este build en adelante.
+
 **Navegación post-test** — usar siempre `replace` (no `navigate`) para evitar vuelta atrás:
 - `LevelTestProposalScreen`: "Ahora no" → `replace('Permissions')`.
 - `LevelTestResultScreen`: "Crear mi plan" → `replace('Permissions')`.
