@@ -14,12 +14,13 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
-import { authApi } from '../../api';
+import { api, authApi } from '../../api';
 import { colors, spacing } from '../../theme';
 import {
   isBiometricLinked, detectBiometricType, biometricLabel,
   setupBiometric, disableBiometric,
 } from '../../lib/biometric';
+import { OPPOSITIONS } from '../onboarding/OppositionSelectorScreen';
 
 // ─── 12.2 · Perfil y biometría ─────────────────────────────────────────────
 // Fiel al Figma (PerfilYBiometriaScreen.tsx). El hallazgo de nomenclatura
@@ -110,6 +111,10 @@ export default function ConfigPerfilScreen({ navigation }) {
   // Modal email (informativo — cambio requiere verificación)
   const [emailModalVisible, setEmailModalVisible] = useState(false);
 
+  // Modal cambiar oposición
+  const [oposicionModalVisible, setOposicionModalVisible] = useState(false);
+  const [oposicionSaving, setOposicionSaving] = useState(false);
+
   const loadProfile = useCallback(async () => {
     setLoading(true);
     const { data } = await authApi.me();
@@ -146,6 +151,36 @@ export default function ConfigPerfilScreen({ navigation }) {
     setNameModalVisible(false);
   };
 
+  // Cambiar oposición: llama al backend y refresca la sesión local para que
+  // el resto de la app (pickers de temario, dashboard, planning…) lea el
+  // nuevo slug sin necesidad de cerrar sesión. Mismo patrón que aplicamos en
+  // `SesionIniciadaScreen.applyPendingOposicion` — imprescindible para que el
+  // fallback `session.user.oposicion` no siga devolviendo el valor viejo.
+  const handleSaveOposicion = async (slug) => {
+    if (oposicionSaving) return;
+    setOposicionSaving(true);
+    const { data, error } = await authApi.updateProfile({ oposicion: slug });
+    if (error) {
+      setOposicionSaving(false);
+      Alert.alert('No se pudo guardar', error.message || 'Inténtalo de nuevo.');
+      return;
+    }
+    if (data) setUser((u) => ({ ...u, oposicion: data.oposicion || slug }));
+
+    const session = await api.loadSession();
+    if (session?.user) {
+      session.user = {
+        ...session.user,
+        oposicion: slug,
+        user_metadata: { ...(session.user.user_metadata || {}), oposicion: slug },
+      };
+      await api.saveSession(session);
+    }
+
+    setOposicionSaving(false);
+    setOposicionModalVisible(false);
+  };
+
   const handleBioToggle = async (value) => {
     if (bioLoading) return;
     setBioLoading(true);
@@ -154,8 +189,16 @@ export default function ConfigPerfilScreen({ navigation }) {
       const { ok, error } = await setupBiometric();
       if (ok) {
         setBioEnabled(true);
-      } else {
-        Alert.alert('No se pudo activar', error || 'Inténtalo de nuevo.');
+      } else if (error !== 'cancelada') {
+        // Traducir los códigos internos a mensajes que el usuario entienda.
+        // 'cancelada' es cuando el usuario aborta el prompt del OS: no
+        // mostramos alerta ahí — silencioso es lo correcto.
+        const friendly = error === 'lockout'
+          ? 'Tu dispositivo ha bloqueado temporalmente la biometría. Vuelve a intentarlo en unos minutos.'
+          : error && error.length < 120
+            ? error
+            : 'Inténtalo de nuevo en unos segundos.';
+        Alert.alert('No se pudo activar la biometría', friendly);
       }
     } else {
       Alert.alert(
@@ -254,13 +297,18 @@ export default function ConfigPerfilScreen({ navigation }) {
             <ChevronRightIcon />
           </TouchableOpacity>
 
-          {/* Oposición — sin chevron: campo informativo, sin pantalla de edición dedicada */}
-          <View style={[styles.row, styles.rowBorder]}>
+          <TouchableOpacity
+            style={[styles.row, styles.rowBorder]}
+            onPress={() => setOposicionModalVisible(true)}
+            activeOpacity={0.7}
+            accessibilityLabel="Cambiar oposición"
+          >
             <View style={styles.rowTextWrap}>
               <Text style={styles.rowSmallLabel}>Oposición</Text>
               <Text style={styles.rowValue}>{oposicionLine}</Text>
             </View>
-          </View>
+            <ChevronRightIcon />
+          </TouchableOpacity>
         </View>
 
         {/* ── Seguridad ───────────────────────────────────────────────── */}
@@ -329,6 +377,60 @@ export default function ConfigPerfilScreen({ navigation }) {
             <TouchableOpacity
               onPress={() => setNameModalVisible(false)}
               style={{ marginTop: 8 }}
+              accessibilityLabel="Cancelar"
+            >
+              <Text style={styles.cancel}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal: cambiar oposición ─────────────────────────────────── */}
+      <Modal
+        transparent
+        visible={oposicionModalVisible}
+        animationType="fade"
+        onRequestClose={() => !oposicionSaving && setOposicionModalVisible(false)}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Cambiar oposición</Text>
+            <Text style={styles.modalBody}>
+              Al cambiar de oposición se actualizará tu temario, planificación y
+              rankings. Puedes cambiarla en cualquier momento.
+            </Text>
+            {OPPOSITIONS.map((item, idx) => {
+              const isSelected = user?.oposicion === item.slug;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.opoRow,
+                    idx > 0 && styles.opoRowBorder,
+                    isSelected && styles.opoRowSelected,
+                    oposicionSaving && styles.opoRowDisabled,
+                  ]}
+                  activeOpacity={0.75}
+                  disabled={oposicionSaving}
+                  onPress={() => handleSaveOposicion(item.slug)}
+                  accessibilityLabel={`Elegir ${item.name}`}
+                >
+                  <View style={styles.opoTextWrap}>
+                    <Text style={styles.opoName}>{item.name}</Text>
+                    <Text style={styles.opoSub}>{item.sub}</Text>
+                  </View>
+                  {isSelected && oposicionSaving ? (
+                    <ActivityIndicator size="small" color={colors.accentOrange} />
+                  ) : isSelected ? (
+                    <View style={styles.opoCheckDot} />
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              onPress={() => setOposicionModalVisible(false)}
+              style={{ marginTop: 12 }}
+              disabled={oposicionSaving}
               accessibilityLabel="Cancelar"
             >
               <Text style={styles.cancel}>Cancelar</Text>
@@ -534,5 +636,43 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: colors.textSecondary,
     fontSize: 12,
+  },
+
+  // ── Filas del selector de oposición ─────────────────────────
+  opoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  opoRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: FIGMA.separator,
+  },
+  opoRowSelected: {
+    // ligero highlight con el naranja de acento
+  },
+  opoRowDisabled: {
+    opacity: 0.6,
+  },
+  opoTextWrap: {
+    flex: 1,
+  },
+  opoName: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.textDark,
+  },
+  opoSub: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: FIGMA.textMuted,
+    marginTop: 2,
+  },
+  opoCheckDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.accentOrange,
   },
 });

@@ -104,6 +104,16 @@ vinculada y el toggle aparece como OFF al volver a la pantalla.
   cada vez que la pantalla recibe foco. Sin esto el botón de huella no aparece tras configurarla
   en `ConfigPerfilScreen` y volver al login.
 
+**Biometría — `logout` no borra la vinculación local (revisión 2026-09-10)**:
+`authApi.logout` llamaba a `disableBiometric()` (→ `clearLocalKeys()`), que borraba
+`SecureStore['opox.biometric.enabled']`. Efecto: aunque la fila del dispositivo en
+`biometric_devices` siguiera intacta en Supabase, en el siguiente arranque de
+LoginScreen `isBiometricLinked()` devolvía `false` y el botón de huella **desaparecía
+para siempre** hasta reconfigurar la biometría desde Ajustes. Fix: `logout` solo
+limpia la sesión ahora; la privada Ed25519 sigue en SecureStore protegida por el
+prompt biométrico del OS. `disableBiometric()` solo se ejecuta desde `deleteAccount`
+o cuando el usuario desactiva explícitamente el toggle en `ConfigPerfilScreen`.
+
 **Flags de AsyncStorage** (todos exportados desde su pantalla de origen):
 - `ONBOARDING_COMPLETED_KEY = 'opox.onboardingCompleted'` — exportado desde `SplashScreen.js`.
   Escrito en `SesionIniciadaScreen` al completar login. Mientras exista, `SplashScreen`
@@ -115,12 +125,20 @@ vinculada y el toggle aparece como OFF al volver a la pantalla.
 - `LEVEL_TEST_RESULT_KEY = 'opox.levelTestResult'` — exportado desde `LevelTestInProgressScreen.js`.
   Guarda `{ score, level, intensity }` al completar el test. Leído en `SesionIniciadaScreen`
   para llamar `planningApi.updatePlan({ intensity })`. Borrado tras aplicar.
+- `PENDING_OTP_KEY = 'opox.pendingOtp'` — exportado desde `OtpScreen.js` (revisión
+  2026-09-10). Guarda `{ email, purpose }` al entrar a la pantalla OTP. `SplashScreen`
+  lo consulta al arrancar; si existe, retoma el OTP con los mismos params en vez de
+  perder el contexto y forzar registro desde cero. Se borra al verificar OK o al
+  pulsar "Volver" (abandono explícito).
 
-**`SplashScreen.resolveOnboardingEntryRoute()`** — árbol de decisión sin sesión:
-1. `ONBOARDING_COMPLETED_KEY` existe → `'Entrada'` (login directo).
-2. `PENDING_LEVEL_TEST_KEY` existe → `'LevelTestInProgress'` (reanudar test).
-3. `PENDING_OPOSICION_KEY` existe → `'LevelTestProposal'`.
-4. Ninguno → `'OnboardingSlider'` (usuario completamente nuevo).
+**`SplashScreen.resolveOnboardingEntryRoute()`** — árbol de decisión sin sesión
+(revisión 2026-09-10: añadido paso 1 · retomar OTP; función ahora devuelve
+`string | { name, params }` para poder pasar params al Otp):
+1. `PENDING_OTP_KEY` existe → `{ name: 'Otp', params: { email, purpose } }`.
+2. `ONBOARDING_COMPLETED_KEY` existe → `'Entrada'` (login directo).
+3. `PENDING_LEVEL_TEST_KEY` existe → `'LevelTestInProgress'` (reanudar test).
+4. `PENDING_OPOSICION_KEY` existe → `'LevelTestProposal'`.
+5. Ninguno → `'OnboardingSlider'` (usuario completamente nuevo).
 
 **Test de nivel (`LevelTestInProgressScreen.js`)**:
 - 20 preguntas únicas distribuidas en 4 temas: 8 Constitución, 8 Ley 39/2015, 2 Ley 40/2015, 2 Org. del Estado.
@@ -184,6 +202,50 @@ usuarios nuevos desde este build en adelante.
 **Navegación post-test** — usar siempre `replace` (no `navigate`) para evitar vuelta atrás:
 - `LevelTestProposalScreen`: "Ahora no" → `replace('Permissions')`.
 - `LevelTestResultScreen`: "Crear mi plan" → `replace('Permissions')`.
+
+**Password reset — flujo completo (revisión 2026-09-10)**:
+
+- Backend: `POST /auth/password/reset-request` →
+  `supabaseAuth.auth.resetPasswordForEmail(email, { redirectTo: env.PASSWORD_RESET_REDIRECT_URL })`.
+  Antes se hacía `.catch(() => undefined)` que tragaba **todos** los errores (SMTP
+  rate-limit, dominio no verificado, email inexistente) y el mobile veía siempre
+  `202 { sent: true }`. Ahora el use case en `SupabaseAuthRepository.requestPasswordReset`
+  loguea el error con `logger.warn` enmascarando el email (`ab***@dominio.com`) para
+  poder diagnosticar en logs de Render; se sigue devolviendo 202 al cliente para
+  preservar la anti-enumeración.
+- Configuración Supabase Dashboard (manual, obligatoria):
+  - Auth → Email Templates → Reset Password: el href debe apuntar a
+    `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery`
+    (no al `{{ .ConfirmationURL }}` por defecto — ese endpoint es HTTP y no abre
+    la app).
+  - Auth → URL Configuration → Redirect URLs: incluir `opox://reset-password`
+    (o el HTTPS de Universal Links cuando se despliegue el dominio).
+- Configuración SMTP en Supabase Dashboard: **imprescindible** en producción. El
+  SMTP compartido de Supabase tiene rate limit de ~4 emails/hora, y los errores
+  llegaban silenciados. Actualmente configurado con Gmail SMTP (App Password
+  de 16 chars, no la clave del usuario) — `smtp.gmail.com:587`, límite 500/día.
+  Migrar a Resend o SendGrid antes de escalar el APK.
+- Mobile:
+  - `RecuperarPasswordEmailScreen` — pide email, llama backend, navega a Enviado.
+  - `RecuperarPasswordEnviadoScreen` — botón "Abrir app de correo". Antes usaba
+    `Linking.openURL(\`mailto:${email}\`)` que abría la app de correo **en modo
+    composición** con destinatario = el propio email del usuario (por eso Santi
+    veía Outlook redactando un mail a sí mismo). Ahora prueba `message://` en
+    iOS, `googlegmail://` / `ms-outlook://` en Android, fallback web (`mail.google.com`,
+    `outlook.live.com`, `mail.yahoo.com`) según el dominio del email, y último
+    recurso `mailto:` sin destinatario para abrir el selector limpio.
+  - `RecuperarPasswordNuevaScreen.js` — recibe `token_hash` vía `route.params` (deep
+    link `opox://reset-password?token_hash=xxx&type=recovery`) y lo canjea con
+    `authApi.confirmPasswordReset` → `verifyOtp({ type: 'recovery' })` en backend.
+- Deep link `opox://reset-password` — **no funciona en Expo Go** (Expo Go solo
+  registra `exp://`). Requiere development build o standalone APK con el
+  `"scheme": "opox"` de `app.json:6` compilado en el AndroidManifest. Verificar
+  con `adb shell am start -a android.intent.action.VIEW -d "opox://reset-password?token_hash=fake"`.
+- Gmail Android puede bloquear los custom schemes en botones del email. Cuando
+  suceda el usuario ve el botón visualmente OK pero no dispara nada. La única
+  solución definitiva es migrar a Universal / App Links (`https://opox.ai/reset-password`)
+  con `assetlinks.json` en el dominio + `intentFilters` con `autoVerify: true`
+  en `app.json`. Pendiente hasta tener dominio propio.
 
 ---
 

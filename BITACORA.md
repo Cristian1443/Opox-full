@@ -5,6 +5,127 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-10 (tarde) — 4 gaps de Acceso + Perfil + Biometría
+
+Rama: `fix/gaps-acceso-perfil-biometria`.
+
+El cliente reportó cuatro bugs bloqueantes de la experiencia de acceso. Se
+diagnosticaron en paralelo con agentes Explore y se resolvieron uno a uno.
+
+### Gap 1 · Password reset
+
+Dos causas independientes.
+
+**Botón "Abrir app de correo"** (`RecuperarPasswordEnviadoScreen.js:41-50`)
+usaba `Linking.openURL(\`mailto:${email}\`)`. `mailto:` abre la app de correo
+**en modo composición** — con el destinatario ya rellenado con el propio email
+del usuario. Por eso Santi veía Outlook redactando un mail a `santigarciavel33@gmail.com`.
+Fix: cascada de schemes que abren la bandeja de entrada — iOS `message://`,
+Android `googlegmail://` / `ms-outlook://`, fallback web según dominio del email
+(`mail.google.com`, `outlook.live.com`, `mail.yahoo.com`), último recurso
+`mailto:` sin destinatario.
+
+**El email de reset no llegaba**. La plantilla del Dashboard de Supabase ya estaba
+correcta (`{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery`) y la
+Redirect URL `opox://reset-password` también estaba en la allowlist — comprobado
+con el cliente. El fallo estaba en dos capas más:
+
+- Backend `SupabaseAuthRepository.requestPasswordReset` hacía `.catch(() => undefined)`
+  y se tragaba **todos** los errores de Supabase por anti-enumeración. Los emails
+  fallaban en silencio (rate-limit del SMTP compartido de Supabase = ~4/hora en
+  free tier) y el mobile veía 202 OK. Ahora se loguea el error con `logger.warn`
+  enmascarando el email; sigue devolviéndose 202 al cliente para preservar la
+  anti-enumeración.
+- SMTP: el cliente configuró Gmail SMTP (`smtp.gmail.com:587`) con una App Password
+  de 16 chars — funciona (500/día máximo, requiere 2FA + App Password, no la clave
+  normal de Gmail). Pendiente migrar a Resend/SendGrid antes del APK público
+  porque Gmail personal bloquea la cuenta con volumen.
+
+**Deep link `opox://reset-password`** — con Gmail Android puede que el botón del
+email no dispare la app aunque el APK tenga el scheme registrado (Gmail bloquea
+custom schemes por seguridad). Verificado con `adb shell am start -a android.intent.action.VIEW -d "opox://..."`
+que dispara. La solución definitiva es Universal Links (`https://opox.ai/reset-password`)
+con `assetlinks.json` — pendiente hasta tener dominio propio.
+
+### Gap 1.1 · Pérdida de estado del OTP entre cierres de app
+
+`OtpScreen.js` no persistía nada. Si el usuario cerraba la app antes de teclear
+el código, al reabrirla iba a la pantalla de registro y perdía todo el contexto.
+
+**Fix**: nuevo flag `PENDING_OTP_KEY = 'opox.pendingOtp'` que guarda
+`{ email, purpose }` al entrar al OTP. `SplashScreen.resolveOnboardingEntryRoute`
+lo consulta primero — si existe, retoma la pantalla con esos params. `OtpScreen`
+borra el flag al verificar OK o al pulsar "Volver" (abandono explícito). La
+función ahora puede devolver `string` o `{ name, params }`, con branching en
+la navegación.
+
+Password reset no lo sufre porque usa deep link (no OTP manual), pero si en el
+futuro el reset pasa por OTP el flag se puede reutilizar (acepta `purpose` como
+param).
+
+### Gap 2 · No se podía cambiar la oposición desde el perfil
+
+`ConfigPerfilScreen.js:257-263` renderizaba la oposición como `<View>` puro sin
+`TouchableOpacity` ni chevron — decorativa. Si el usuario se registraba sin
+elegir oposición quedaba atrapado con "Sin configurar" en Dashboard.
+
+**Fix**: se exporta `OPPOSITIONS` desde `OppositionSelectorScreen.js`. La fila
+del perfil es ahora `TouchableOpacity` con chevron. Modal nuevo con las 3
+oposiciones — dot naranja en la seleccionada, `ActivityIndicator` mientras
+guarda. `handleSaveOposicion` llama al backend y **refresca la sesión local**
+(mismo patrón que `SesionIniciadaScreen.applyPendingOposicion` — sin ese refresh
+los pickers de temario seguirían leyendo `session.user.oposicion` viejo del
+AsyncStorage).
+
+### Gap 3 · Botón de huella desaparece del Login tras logout
+
+**Primera hipótesis descartada por el usuario**: no eran las tablas Supabase
+inexistentes — `biometric_devices` sí tiene filas reales, incluida la del
+tester (`b1c4ae84…`, creado 2026-09-11 00:16). El backend upserta bien.
+
+**Causa raíz real**: `apps/mobile/src/api/auth.js:43` llamaba a
+`disableBiometric()` dentro de `logout()`. Esa función hace `clearLocalKeys()`
+sobre SecureStore — borra `opox.biometric.enabled` y `opox.biometric.privateKey`.
+Efecto: cada logout dejaba la biometría "desactivada" en local aunque la fila
+del dispositivo siguiera en Supabase. Al volver al Login, `isBiometricLinked()`
+devolvía `false` → el botón nunca se renderizaba.
+
+**Fix**: `logout()` solo limpia la sesión ahora. La privada Ed25519 sigue en
+SecureStore protegida por el prompt del OS. `disableBiometric()` solo se ejecuta
+desde `deleteAccount()` (cuenta borrada, hay que limpiar) o cuando el usuario
+mueve el toggle en `ConfigPerfilScreen`.
+
+Plus mejora UX: los errores del toggle biométrico ahora se traducen a mensajes
+humanos (`'cancelada'` es silencioso, `'lockout'` explica la espera, otros se
+truncan si son muy largos).
+
+### Archivos modificados
+
+- `apps/backend/src/infrastructure/auth/SupabaseAuthRepository.ts` — logging en
+  `requestPasswordReset`.
+- `apps/mobile/src/api/auth.js` — `logout()` ya no borra biometría.
+- `apps/mobile/src/screens/access/OtpScreen.js` — `PENDING_OTP_KEY`, purpose
+  configurable, limpieza en verify y goBack.
+- `apps/mobile/src/screens/access/RecuperarPasswordEnviadoScreen.js` — cascada
+  de schemes para abrir bandeja de entrada real.
+- `apps/mobile/src/screens/onboarding/OppositionSelectorScreen.js` — export de
+  `OPPOSITIONS`.
+- `apps/mobile/src/screens/onboarding/SplashScreen.js` — nuevo paso del OTP en
+  `resolveOnboardingEntryRoute`, soporte para ruta con params.
+- `apps/mobile/src/screens/settings/ConfigPerfilScreen.js` — modal de cambio de
+  oposición + refresh de sesión local + mensajes de biometría más humanos.
+- `CLAUDE.md` — subsección de password reset completa, notas de logout no borra
+  biometría, `PENDING_OTP_KEY` en la lista de flags de AsyncStorage.
+
+### Pendientes fuera de código
+
+- **Universal Links** (`https://opox.ai/reset-password` + `assetlinks.json`)
+  para no depender de que Gmail Android respete el scheme `opox://`.
+- **SMTP de producción** (Resend / SendGrid) — Gmail personal se bloquea con volumen.
+- **Rebuild del APK** con estos cambios antes de que el cliente vuelva a probar.
+
+---
+
 ## 2026-09-10 — Sync de oposición en sesión local (usuarios nuevos veían solo 10 temas)
 
 Rama: `main`.

@@ -14,6 +14,7 @@ import camoImg from '../../imports/CargaInicial/3e43d7dd7590060c7fd1b2f8e506e66f
 import { api, authApi } from '../../api';
 import { PENDING_OPOSICION_KEY } from './OppositionSelectorScreen';
 import { PENDING_LEVEL_TEST_KEY } from './LevelTestInProgressScreen';
+import { PENDING_OTP_KEY } from '../access/OtpScreen';
 
 // Persiste entre instalaciones y sesiones. Si está presente, el usuario ya
 // completó el onboarding al menos una vez en este dispositivo → ir a login,
@@ -40,11 +41,30 @@ async function resolveSession() {
     return false;
 }
 
-// Sin sesión activa. Tres casos posibles:
-// 1. El usuario ya hizo el onboarding alguna vez → ir directo a login (Entrada).
-// 2. Cerró la app a mitad del onboarding → retomar donde se quedó.
-// 3. Usuario completamente nuevo → empezar desde el slider.
+// Sin sesión activa. Cuatro casos posibles, en orden de prioridad:
+// 1. Verificación OTP pendiente (registro cerrado a mitad) → retomar el OTP.
+// 2. El usuario ya hizo el onboarding alguna vez → ir directo a login (Entrada).
+// 3. Cerró la app a mitad del onboarding → retomar donde se quedó.
+// 4. Usuario completamente nuevo → empezar desde el slider.
+//
+// Devuelve un string con el nombre de la ruta o un objeto { name, params }
+// cuando la ruta necesita parámetros de retoma (caso OTP).
 async function resolveOnboardingEntryRoute() {
+    // El OTP se comprueba primero: si el usuario tenía uno a medias, retomarlo
+    // aunque ya hubiera completado onboarding antes en otro flujo (edge case
+    // de password reset con OTP en el futuro).
+    const pendingOtpRaw = await AsyncStorage.getItem(PENDING_OTP_KEY);
+    if (pendingOtpRaw) {
+        try {
+            const parsed = JSON.parse(pendingOtpRaw);
+            if (parsed?.email) {
+                return { name: 'Otp', params: { email: parsed.email, purpose: parsed.purpose } };
+            }
+        } catch {
+            await AsyncStorage.removeItem(PENDING_OTP_KEY);
+        }
+    }
+
     const completed = await AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY);
     if (completed) return 'Entrada';
 
@@ -89,7 +109,11 @@ export default function SplashScreen({ navigation }) {
 
             const entryRoute = await resolveOnboardingEntryRoute();
             if (cancelled) return;
-            navigation.replace(entryRoute);
+            if (typeof entryRoute === 'string') {
+                navigation.replace(entryRoute);
+            } else {
+                navigation.replace(entryRoute.name, entryRoute.params);
+            }
         }, 2500);
 
         return () => {

@@ -5,6 +5,7 @@ import {
     TouchableOpacity,
     Linking,
     Alert,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,15 +40,43 @@ export default function RecuperarPasswordEnviadoScreen({ route, navigation }) {
     }, [contador]);
 
     const handleAbrirCorreo = async () => {
-        // `Linking.canOpenURL('mailto:...')` da falso negativo en Android 11+
-        // (restricción de visibilidad de paquetes: la app no declara <queries>
-        // para el esquema mailto) aunque sí haya una app de correo instalada.
-        // Se omite el chequeo previo y se intenta abrir directamente.
-        try {
-            await Linking.openURL(`mailto:${email}`);
-        } catch {
-            Alert.alert('Error', 'No se pudo abrir la app de correo.');
+        // `mailto:` abre la app de correo en modo COMPOSICIÓN — con un mensaje
+        // nuevo al destinatario que le pasemos. Como aquí el destinatario era
+        // el propio email del usuario, se veía redactando un mail a sí mismo
+        // en Outlook. Se necesita abrir la BANDEJA de entrada.
+        //
+        // No existe una única URL universal para "abrir la app de correo":
+        // - iOS: `message://` abre Apple Mail directamente en la bandeja.
+        // - Android: no hay scheme genérico; se prueba con Gmail y Outlook,
+        //   y si falla se abre la versión web según el dominio del email.
+        const tryOpen = async (url) => {
+            try { await Linking.openURL(url); return true; } catch { return false; }
+        };
+
+        if (Platform.OS === 'ios') {
+            if (await tryOpen('message://')) return;
+        } else {
+            if (await tryOpen('googlegmail://')) return;
+            if (await tryOpen('ms-outlook://')) return;
         }
+
+        // Fallback web (nunca falla): según dominio del email, abre la bandeja
+        // correspondiente. Si el usuario tiene la app instalada, el sistema la
+        // abre; si no, la web sirve igual.
+        const domain = String(email).split('@')[1]?.toLowerCase() || '';
+        const web = (domain === 'gmail.com' || domain === 'googlemail.com')
+            ? 'https://mail.google.com'
+            : /outlook\.|hotmail\.|live\./.test(domain)
+                ? 'https://outlook.live.com/mail'
+                : /yahoo\./.test(domain)
+                    ? 'https://mail.yahoo.com'
+                    : null;
+        if (web && await tryOpen(web)) return;
+
+        // Último recurso — mailto vacío (sin destinatario) abre el selector de
+        // apps de correo sin redactar un mail a nadie.
+        if (await tryOpen('mailto:')) return;
+        Alert.alert('No se pudo abrir la app de correo.');
     };
 
     const handleReenviar = async () => {

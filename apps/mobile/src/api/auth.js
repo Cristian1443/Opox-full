@@ -40,7 +40,12 @@ export const authApi = {
         withSession(api.post(API_ROUTES.AUTH.REFRESH, { refreshToken })),
     logout: async () => {
         const res = await api.post(API_ROUTES.AUTH.LOGOUT, {}, { auth: true });
-        await Promise.all([api.clearSession(), disableBiometric()]);
+        // No borramos la biometría al cerrar sesión: la clave privada sigue
+        // protegida por el propio Face ID / huella del OS, y de otro modo el
+        // botón "Accede con biometría" desaparecería del Login para siempre
+        // hasta volver a configurarla en Ajustes. Solo se limpia al eliminar
+        // cuenta o al desactivar explícitamente el toggle desde ConfigPerfil.
+        await api.clearSession();
         return res;
     },
     acceptTerms: (input) => api.post(API_ROUTES.AUTH.TERMS_ACCEPT, input, { auth: true }),

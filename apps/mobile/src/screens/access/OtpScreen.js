@@ -10,14 +10,22 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 
 const OTP_LENGTH = 6;
 
+// Guarda { email, purpose } mientras el usuario está verificando su correo. Si
+// cierra la app antes de teclear el código, `SplashScreen.resolveOnboardingEntryRoute`
+// lo detecta al arrancar y lo devuelve directo a esta pantalla en lugar de
+// perder el contexto y forzar todo el flujo de registro/reset de cero.
+export const PENDING_OTP_KEY = 'opox.pendingOtp';
+
 export default function OtpScreen({ route, navigation }) {
     const { email } = route.params || { email: 'usuario@ejemplo.com' };
+    const purpose = route.params?.purpose || 'email_verification';
 
     // Un único string con el código. Las casillas solo son visualización.
     const [code, setCode] = useState('');
@@ -39,6 +47,12 @@ export default function OtpScreen({ route, navigation }) {
         return () => clearTimeout(t);
     }, []);
 
+    // Persistir email + purpose para que `SplashScreen` pueda retomar el OTP
+    // si el usuario cierra la app antes de verificar.
+    useEffect(() => {
+        AsyncStorage.setItem(PENDING_OTP_KEY, JSON.stringify({ email, purpose })).catch(() => {});
+    }, [email, purpose]);
+
     const handleChange = (text) => {
         if (error) setError('');
         // Solo dígitos, truncado al máximo
@@ -58,13 +72,14 @@ export default function OtpScreen({ route, navigation }) {
         const { data, error: apiError } = await authApi.verifyOtp({
             email,
             code,
-            purpose: 'email_verification',
+            purpose,
         });
 
         setIsVerifying(false);
 
         if (data?.accessToken) {
             setIsVerified(true);
+            await AsyncStorage.removeItem(PENDING_OTP_KEY).catch(() => {});
             navigation.replace('Terminos', { email });
             return;
         }
@@ -82,7 +97,14 @@ export default function OtpScreen({ route, navigation }) {
         setTimer(30);
         setCode('');
         focusInput();
-        await authApi.sendOtp({ email, purpose: 'email_verification' });
+        await authApi.sendOtp({ email, purpose });
+    };
+
+    // Si el usuario decide volver atrás (a la pantalla de registro) borramos
+    // la marca de OTP pendiente — abandonó intencionalmente.
+    const handleGoBack = () => {
+        AsyncStorage.removeItem(PENDING_OTP_KEY).catch(() => {});
+        navigation.goBack();
     };
 
     const formatTime = (seconds) => {
@@ -100,7 +122,7 @@ export default function OtpScreen({ route, navigation }) {
                     {/* Volver */}
                     <TouchableOpacity
                         style={s.backRow}
-                        onPress={() => navigation.goBack()}
+                        onPress={handleGoBack}
                         activeOpacity={0.7}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >

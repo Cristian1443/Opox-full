@@ -55,7 +55,9 @@ function SearchIcon({ size = 24 }) {
 }
 
 // ─── DATA ──────────────────────────────────────────────────
-const OPPOSITIONS = [
+// Exportado para reutilizarlo en `ConfigPerfilScreen` (permitir cambiar la
+// oposición desde Ajustes cuando el usuario se registró sin elegirla).
+export const OPPOSITIONS = [
     {
         id: '1',
         name: 'Policía local',

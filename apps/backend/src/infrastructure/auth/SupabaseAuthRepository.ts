@@ -14,6 +14,7 @@ import {
 } from '../../domain';
 import { generateChallengeBase64, verifyEd25519Signature } from './biometricCrypto';
 import { env } from '../../config';
+import { logger } from '@opox/utils';
 
 const CHALLENGE_TTL_SECONDS = 60;
 
@@ -270,16 +271,29 @@ export class SupabaseAuthRepository implements IAuthRepository {
     // ─── Password reset ───────────────────────────
 
     async requestPasswordReset(email: string): Promise<void> {
-        // Anti-enumeración: siempre resolvemos OK aunque el email no exista.
-        // redirectTo debe estar en la allowlist de "Redirect URLs" del
-        // proyecto Supabase, y la plantilla de email "Reset Password" debe
-        // enlazar a `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery`
-        // (no al `{{ .ConfirmationURL }}` por defecto) para que el link abra
-        // la app con el token en la propia URL en vez de depender del
-        // redirect alojado por Supabase — ver apps/backend/README.md.
-        await this.supabaseAuth.auth
-            .resetPasswordForEmail(email, { redirectTo: env.PASSWORD_RESET_REDIRECT_URL })
-            .catch(() => undefined);
+        // Anti-enumeración: siempre resolvemos OK aunque el email no exista o
+        // Supabase falle. redirectTo debe estar en la allowlist de "Redirect
+        // URLs" del proyecto Supabase, y la plantilla de email "Reset Password"
+        // debe enlazar a `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery`
+        // (no al `{{ .ConfirmationURL }}` por defecto) — ver apps/backend/README.md.
+        //
+        // Antes se hacía `.catch(() => undefined)` y se comía cualquier error
+        // (rate limit del SMTP compartido de Supabase, dominio no verificado,
+        // etc.). El resultado: el mobile veía 202 "OK" mientras el email nunca
+        // llegaba y no había traza en logs. Ahora loggeamos el error server-side
+        // — enmascarando el email — para poder diagnosticar sin filtrar al cliente.
+        const { error } = await this.supabaseAuth.auth
+            .resetPasswordForEmail(email, { redirectTo: env.PASSWORD_RESET_REDIRECT_URL });
+        if (error) {
+            const at = email.indexOf('@');
+            const masked = at > 0 ? `${email.slice(0, 2)}***${email.slice(at)}` : '***';
+            logger.warn('[password-reset] Supabase error — email may not exist or SMTP failed', {
+                email: masked,
+                message: error.message,
+                status: error.status,
+                code: (error as { code?: string }).code,
+            });
+        }
     }
 
     async confirmPasswordReset(input: {
