@@ -111,9 +111,17 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
     const [loading, setLoading]   = useState(true);
 
     useEffect(() => {
+        setLoading(true);
         tutorApi.listEpisodes(oposicion)
             .then((res) => {
-                if (!res?.error && Array.isArray(res?.data)) setEpisodes(res.data);
+                if (!res?.error && Array.isArray(res?.data) && res.data.length > 0) {
+                    setEpisodes(res.data);
+                } else if (oposicion !== 'policia-local-galicia') {
+                    return tutorApi.listEpisodes('policia-local-galicia')
+                        .then((res2) => {
+                            if (!res2?.error && Array.isArray(res2?.data)) setEpisodes(res2.data);
+                        });
+                }
             })
             .catch(() => {})
             .finally(() => setLoading(false));

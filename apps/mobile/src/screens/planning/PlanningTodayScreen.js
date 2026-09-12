@@ -231,8 +231,8 @@ export default function PlanningTodayScreen({ navigation }) {
                     <Text style={styles.goalLabel}>Objetivo diario: {goalCount} tests</Text>
                     <Text style={styles.goalNote}>
                         {remaining <= 0
-                            ? '¡Objetivo cumplido!'
-                            : `Te falta${remaining === 1 ? '' : 'n'} ${remaining} test${remaining === 1 ? '' : 's'} para completar tu objetivo diario recomendado.`}
+                            ? '¡Objetivo cumplido! Completaste todos tus tests de hoy.'
+                            : `Has completado ${completedCount} de ${goalCount} tests recomendados para hoy.`}
                     </Text>
                 </View>
 

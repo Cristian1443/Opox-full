@@ -129,9 +129,17 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
     const [loading, setLoading]     = useState(true);
 
     useEffect(() => {
+        setLoading(true);
         tutorApi.listSummaries(oposicion)
             .then((res) => {
-                if (!res?.error && Array.isArray(res?.data)) setSummaries(res.data);
+                if (!res?.error && Array.isArray(res?.data) && res.data.length > 0) {
+                    setSummaries(res.data);
+                } else if (oposicion !== 'policia-local-galicia') {
+                    return tutorApi.listSummaries('policia-local-galicia')
+                        .then((res2) => {
+                            if (!res2?.error && Array.isArray(res2?.data)) setSummaries(res2.data);
+                        });
+                }
             })
             .catch(() => {})
             .finally(() => setLoading(false));

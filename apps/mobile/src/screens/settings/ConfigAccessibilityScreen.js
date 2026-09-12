@@ -92,7 +92,7 @@ function MoonIcon({ size = 24, color = colors.accentOrange }) {
 
 export default function ConfigAccessibilityScreen({ navigation }) {
   const [prefs, setPrefs] = useState(DEFAULT);
-  const { setFontSize: applyFontSizeGlobally } = useContext(AccessibilityContext);
+  const { setFontSize: applyFontSizeGlobally, setTheme: applyThemeGlobally } = useContext(AccessibilityContext);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +102,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
       if (!cancelled && local) {
         setPrefs(local);
         if (local.fontSize) applyFontSizeGlobally(local.fontSize);
+        if (local.theme) applyThemeGlobally(local.theme);
       }
 
       // 2. Backend como source of truth (theme, fontScale, reduceMotion)
@@ -118,6 +119,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
         setPrefs(merged);
         saveA11yLocal(merged);
         applyFontSizeGlobally(merged.fontSize);
+        applyThemeGlobally(merged.theme);
       }
     }
     load();
@@ -126,6 +128,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
 
   const update = useCallback((patch) => {
     if (patch.fontSize !== undefined) applyFontSizeGlobally(patch.fontSize);
+    if (patch.theme !== undefined) applyThemeGlobally(patch.theme);
     setPrefs((prev) => {
       const next = { ...prev, ...patch };
       saveA11yLocal(next);

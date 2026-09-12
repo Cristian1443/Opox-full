@@ -14,3 +14,4 @@ export * from './store';
 export * from './config';
 export * from './scheduler';
 export * from './health';
+export * from './notifications';

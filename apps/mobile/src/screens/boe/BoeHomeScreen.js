@@ -429,7 +429,7 @@ export default function BoeHomeScreen({ navigation }) {
                             <Text style={styles.emptySubtitle}>
                                 {searchQuery.trim()
                                     ? 'Prueba con otro término o identificador BOE (ej. BOE-A-2023-...).'
-                                    : 'Verifica que MOTOR_BOE_BASE_URL y MOTOR_BOE_CURSO_ID estén configurados en el backend.'}
+                                    : 'Las normas para tu oposición estarán disponibles próximamente.'}
                             </Text>
                         </View>
                     ) : (

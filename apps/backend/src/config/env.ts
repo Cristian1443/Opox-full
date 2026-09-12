@@ -66,6 +66,11 @@ const envSchema = z.object({
     REVENUECAT_WEBHOOK_SECRET: optionalString,
     EXPO_ACCESS_TOKEN: optionalString,
 
+    // WhatsApp Business Cloud API — notificaciones de feedback al equipo
+    WHATSAPP_API_TOKEN: optionalString,
+    WHATSAPP_PHONE_NUMBER_ID: optionalString,
+    WHATSAPP_RECIPIENT_NUMBER: optionalString,
+
     // Deep link al que Supabase redirige tras verificar el email de
     // recuperación de contraseña. Debe estar en la allowlist de
     // "Redirect URLs" del proyecto Supabase (Authentication → URL

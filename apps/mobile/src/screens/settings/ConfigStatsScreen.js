@@ -186,15 +186,19 @@ function LawBar({ name, percent, isLast }) {
 export default function ConfigStatsScreen({ navigation }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(false);
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setAuthError(false);
       const res = await settingsApi.getProStats();
       if (!cancelled) {
         if (!res?.error && res?.data) {
           setStats(res.data);
+        } else if (res?.error?.status === 401 || res?.error?.status === 403) {
+          setAuthError(true);
         }
         setLoading(false);
       }
@@ -236,6 +240,11 @@ export default function ConfigStatsScreen({ navigation }) {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.ctaGreen} />
           <Text style={styles.loadingText}>Calculando estadísticas…</Text>
+        </View>
+      ) : authError ? (
+        <View style={styles.loadingContainer}>
+          <Ionicons name="lock-closed-outline" size={48} color={FIGMA.ringTrack} />
+          <Text style={styles.loadingText}>Inicia sesión de nuevo para ver tus estadísticas.</Text>
         </View>
       ) : !stats ? (
         <View style={styles.loadingContainer}>

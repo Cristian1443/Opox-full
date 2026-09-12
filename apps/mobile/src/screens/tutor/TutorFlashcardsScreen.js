@@ -117,11 +117,19 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        setLoading(true);
         // Reutilizamos listSummaries porque devuelve la misma lista de temas del
         // temario (con topicId + topicTitle). Alternativa: /training/topics.
         tutorApi.listSummaries(oposicion)
             .then((res) => {
-                if (!res?.error && Array.isArray(res?.data)) setTopics(res.data);
+                if (!res?.error && Array.isArray(res?.data) && res.data.length > 0) {
+                    setTopics(res.data);
+                } else if (oposicion !== 'policia-local-galicia') {
+                    return tutorApi.listSummaries('policia-local-galicia')
+                        .then((res2) => {
+                            if (!res2?.error && Array.isArray(res2?.data)) setTopics(res2.data);
+                        });
+                }
             })
             .catch(() => {})
             .finally(() => setLoading(false));

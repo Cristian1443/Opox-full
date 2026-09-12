@@ -5,6 +5,7 @@ import {
     ScrollView,
     TouchableOpacity,
     StatusBar,
+    ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -52,6 +53,7 @@ const getExpiryColor = (days) => {
 export default function StoreDiscountsScreen({ navigation }) {
   const [userBalance, setUserBalance] = useState(null);
   const [discountsData, setDiscountsData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
   const [selectedDiscount, setSelectedDiscount] = useState(null);
   const isNavigatingRef = useRef(false);
@@ -59,24 +61,28 @@ export default function StoreDiscountsScreen({ navigation }) {
   useFocusEffect(useCallback(() => {
     isNavigatingRef.current = false;
     let cancelled = false;
-    storeApi.getBalance().then(res => {
-      if (cancelled || !res?.data) return;
-      setUserBalance(res.data.balance);
-    });
-    storeApi.listDiscounts().then(res => {
-      if (cancelled || !res?.data) return;
-      setDiscountsData(res.data.map(d => ({
-        id: d.id,
-        partner: d.partner,
-        discount: d.discount,
-        description: d.subtitle,
-        cost: d.cost,
-        expiry: d.expiryDate,
-        expiryDays: 30,
-        icon: d.icon,
-        color: d.color,
-        isExpired: false,
-      })));
+    setLoading(true);
+    Promise.allSettled([
+      storeApi.getBalance(),
+      storeApi.listDiscounts(),
+    ]).then(([balRes, discRes]) => {
+      if (cancelled) return;
+      if (balRes.status === 'fulfilled' && balRes.value?.data) setUserBalance(balRes.value.data.balance);
+      if (discRes.status === 'fulfilled' && discRes.value?.data) {
+        setDiscountsData(discRes.value.data.map(d => ({
+          id: d.id,
+          partner: d.partner,
+          discount: d.discount,
+          description: d.subtitle,
+          cost: d.cost,
+          expiry: d.expiryDate,
+          expiryDays: 30,
+          icon: d.icon,
+          color: d.color,
+          isExpired: false,
+        })));
+      }
+      setLoading(false);
     });
     return () => { cancelled = true; };
   }, []));
@@ -130,38 +136,42 @@ export default function StoreDiscountsScreen({ navigation }) {
         <View style={styles.headerPlaceholder} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {discountsData.map((item, index) => (
-          <TouchableOpacity
-            key={item.id}
-            style={[styles.row, item.isExpired && styles.rowExpired]}
-            activeOpacity={0.7}
-            disabled={item.isExpired}
-            onPress={() => handleRedeem(item)}
-            accessibilityLabel={`${item.partner} ${item.discount}, ${item.cost} Opopoints`}
-          >
-            <StoreIcon />
-            <View style={styles.rowTextWrap}>
-              <Text style={styles.rowTitle}>{item.discount} en {item.partner}</Text>
-              <Text style={styles.rowSubtitle}>{item.description}</Text>
-              <View style={styles.rowFooter}>
-                <Text style={styles.rowPrice}>{item.cost} Opopoints</Text>
-                <Text style={[styles.rowExpiry, { color: item.isExpired ? colors.statRed : getExpiryColor(item.expiryDays) }]}>
-                  {item.isExpired ? 'Expirado' : `Caduca en ${item.expiry}`}
-                </Text>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} size="large" />
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {discountsData.map((item, index) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[styles.row, item.isExpired && styles.rowExpired]}
+              activeOpacity={0.7}
+              disabled={item.isExpired}
+              onPress={() => handleRedeem(item)}
+              accessibilityLabel={`${item.partner} ${item.discount}, ${item.cost} Opopoints`}
+            >
+              <StoreIcon />
+              <View style={styles.rowTextWrap}>
+                <Text style={styles.rowTitle}>{item.discount} en {item.partner}</Text>
+                <Text style={styles.rowSubtitle}>{item.description}</Text>
+                <View style={styles.rowFooter}>
+                  <Text style={styles.rowPrice}>{item.cost} Opopoints</Text>
+                  <Text style={[styles.rowExpiry, { color: item.isExpired ? colors.statRed : getExpiryColor(item.expiryDays) }]}>
+                    {item.isExpired ? 'Expirado' : `Caduca en ${item.expiry}`}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <ChevronRightIcon />
-          </TouchableOpacity>
-        ))}
+              <ChevronRightIcon />
+            </TouchableOpacity>
+          ))}
 
-        {discountsData.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="gift-outline" size={44} color={colors.textSecondary} />
-            <Text style={styles.emptyText}>No hay descuentos disponibles por ahora.</Text>
-          </View>
-        )}
-      </ScrollView>
+          {discountsData.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="gift-outline" size={44} color={colors.textSecondary} />
+              <Text style={styles.emptyText}>No hay descuentos disponibles por ahora.</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
 
       <InsufficientPointsModal
         visible={showInsufficientModal}

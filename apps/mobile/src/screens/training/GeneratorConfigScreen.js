@@ -54,29 +54,38 @@ const DEFAULTS = { difficulty: 'medium', count: 30, timed: true };
 function StepSlider({ labels, index, onChange }) {
     const [width, setWidth] = useState(0);
     const usable = Math.max(width - THUMB, 1);
+    // Ref para evitar stale closure: PanResponder.create se ejecuta una sola vez
+    // pero sus callbacks necesitan el valor actualizado de usable.
+    const usableRef = useRef(usable);
+    const labelsLenRef = useRef(labels.length);
     const startX = useRef(0);
     const [pos, setPos] = useState(0);
 
     useEffect(() => {
+        usableRef.current = usable;
+        labelsLenRef.current = labels.length;
         setPos((index / (labels.length - 1)) * usable);
-    }, [index, usable]);
+    }, [index, usable, labels.length]);
 
     const responder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
             onPanResponderGrant: (e) => {
-                const next = Math.max(0, Math.min(usable, e.nativeEvent.locationX - THUMB / 2));
+                const u = usableRef.current;
+                const next = Math.max(0, Math.min(u, e.nativeEvent.locationX - THUMB / 2));
                 startX.current = next;
                 setPos(next);
             },
             onPanResponderMove: (_, g) => {
-                const next = Math.max(0, Math.min(usable, startX.current + g.dx));
+                const u = usableRef.current;
+                const next = Math.max(0, Math.min(u, startX.current + g.dx));
                 setPos(next);
             },
             onPanResponderRelease: (_, g) => {
-                const next = Math.max(0, Math.min(usable, startX.current + g.dx));
-                const idx = Math.round((next / usable) * (labels.length - 1));
+                const u = usableRef.current;
+                const next = Math.max(0, Math.min(u, startX.current + g.dx));
+                const idx = Math.round((next / u) * (labelsLenRef.current - 1));
                 onChange(idx);
             },
         })
@@ -113,32 +122,40 @@ function StepSlider({ labels, index, onChange }) {
 function RangeSlider({ min, max, step, value, onChange }) {
     const [width, setWidth] = useState(0);
     const usable = Math.max(width - THUMB, 1);
+    // Mismo fix de stale closure que StepSlider.
+    const usableRef = useRef(usable);
     const startX = useRef(0);
     const [pos, setPos] = useState(0);
 
-    const valueToPos = (v) => ((v - min) / (max - min)) * usable;
+    const valueToPos = (v) => ((v - min) / (max - min)) * usableRef.current;
     const posToValue = (p) => {
-        const raw = min + (p / usable) * (max - min);
+        const raw = min + (p / usableRef.current) * (max - min);
         return Math.round(raw / step) * step;
     };
 
-    useEffect(() => setPos(valueToPos(value)), [value, usable]);
+    useEffect(() => {
+        usableRef.current = usable;
+        setPos(((value - min) / (max - min)) * usable);
+    }, [value, usable, min, max]);
 
     const responder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
             onPanResponderGrant: (e) => {
-                const next = Math.max(0, Math.min(usable, e.nativeEvent.locationX - THUMB / 2));
+                const u = usableRef.current;
+                const next = Math.max(0, Math.min(u, e.nativeEvent.locationX - THUMB / 2));
                 startX.current = next;
                 setPos(next);
             },
             onPanResponderMove: (_, g) => {
-                const next = Math.max(0, Math.min(usable, startX.current + g.dx));
+                const u = usableRef.current;
+                const next = Math.max(0, Math.min(u, startX.current + g.dx));
                 setPos(next);
             },
             onPanResponderRelease: (_, g) => {
-                const next = Math.max(0, Math.min(usable, startX.current + g.dx));
+                const u = usableRef.current;
+                const next = Math.max(0, Math.min(u, startX.current + g.dx));
                 onChange(posToValue(next));
             },
         })
@@ -209,7 +226,7 @@ function FatigueToggle({ value, onValueChange }) {
 }
 
 const TTL_WARN_MS  = 15_000;
-const TTL_KILL_MS  = 240_000;
+const TTL_KILL_MS  = 90_000;
 
 // ─── Pantalla 6.2 · Generador infinito ───────────────────────────────────────
 export default function GeneratorConfigScreen({ navigation, route }) {
@@ -610,7 +627,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                             <View style={styles.slowWarningRow}>
                                 <Ionicons name="time-outline" size={14} color={COLORS.grayText} />
                                 <Text style={styles.slowWarningText}>
-                                    Esto está tardando más de lo normal. Por favor espera…
+                                    Generando con varios temas puede tardar hasta 90 s. Por favor espera…
                                 </Text>
                             </View>
                         )}

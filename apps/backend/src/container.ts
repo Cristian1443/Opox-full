@@ -173,6 +173,7 @@ import {
     MotorTutorClient,
     MotorOnboardingClient,
     HealthAiClient,
+    WhatsAppNotificationClient,
 } from './infrastructure';
 import {
     HealthController,
@@ -674,12 +675,23 @@ export function buildContainer() {
         registerToken: useCases.registerPushToken,
     });
 
+    const whatsappClient = env.WHATSAPP_API_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_RECIPIENT_NUMBER
+        ? new WhatsAppNotificationClient(
+            env.WHATSAPP_API_TOKEN,
+            env.WHATSAPP_PHONE_NUMBER_ID,
+            env.WHATSAPP_RECIPIENT_NUMBER,
+          )
+        : undefined;
+
     const configController = new ConfigController({
         getPreferences:    useCases.getPreferences,
         updatePreferences: useCases.updatePreferences,
         getProStats:       useCases.getProStats,
         exportProStats:    useCases.exportProStats,
         submitFeedback:    useCases.submitFeedback,
+        notifyFeedback: whatsappClient
+            ? (type, message) => { whatsappClient.sendFeedback(type, message).catch(() => {}); }
+            : undefined,
     });
 
     const motivationController = new MotivationController({

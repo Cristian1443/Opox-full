@@ -57,6 +57,7 @@ export class ConfigController {
             getProStats:       GetProStatsUseCase;
             exportProStats:    ExportProStatsUseCase;
             submitFeedback:    SubmitFeedbackUseCase;
+            notifyFeedback?:   (type: string, message: string) => void;
         },
     ) {}
 
@@ -100,6 +101,7 @@ export class ConfigController {
         try {
             const { type, message } = req.body as { type: 'suggestion' | 'bug' | 'other'; message: string };
             await this.deps.submitFeedback.execute({ userId: req.authUser!.id, type, message });
+            this.deps.notifyFeedback?.(type, message);
             ok(res, 201, { submitted: true });
         } catch (e) { next(e); }
     };

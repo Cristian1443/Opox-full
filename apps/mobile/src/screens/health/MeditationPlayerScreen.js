@@ -293,14 +293,10 @@ export default function MeditationPlayerScreen({ navigation, route }) {
                 </View>
 
                 <View style={styles.controls}>
-                    <TouchableOpacity activeOpacity={0.7}>
-                        <ShuffleIcon />
-                    </TouchableOpacity>
-
                     <TouchableOpacity
                         style={styles.secondaryButton}
                         activeOpacity={0.75}
-                        onPress={() => skipBy(15)}
+                        onPress={() => skipBy(-15)}
                     >
                         <SkipIcon direction="previous" />
                     </TouchableOpacity>
@@ -323,13 +319,9 @@ export default function MeditationPlayerScreen({ navigation, route }) {
                     <TouchableOpacity
                         style={styles.secondaryButton}
                         activeOpacity={0.75}
-                        onPress={() => skipBy(-15)}
+                        onPress={() => skipBy(15)}
                     >
                         <SkipIcon direction="next" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity activeOpacity={0.7}>
-                        <RepeatIcon />
                     </TouchableOpacity>
                 </View>
             </View>

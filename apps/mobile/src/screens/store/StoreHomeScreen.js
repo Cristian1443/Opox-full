@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     FlatList,
     StatusBar,
+    ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -141,35 +142,40 @@ export default function StoreHomeScreen({ navigation }) {
   const [balance, setBalance] = useState(null);
   const [discounts, setDiscounts] = useState([]);
   const [realProducts, setRealProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
-    storeApi.getBalance().then(res => {
-      if (cancelled || !res?.data) return;
-      setBalance(res.data.balance);
-    });
-    storeApi.listDiscounts().then(res => {
-      if (cancelled || !res?.data) return;
-      setDiscounts(res.data.map(d => ({
-        id: d.id,
-        name: d.title,
-        price: d.cost,
-        icon: d.icon,
-        desc: d.subtitle,
-        type: 'discounts',
-      })));
-    });
-    storeApi.listProducts().then(res => {
-      if (cancelled || !res?.data) return;
-      setRealProducts(res.data.map(p => ({
-        id: p.id,
-        name: p.title,
-        price: p.cost,
-        icon: p.icon,
-        desc: p.subtitle,
-        type: 'real',
-        isPhase2: true,
-      })));
+    setLoading(true);
+    Promise.allSettled([
+      storeApi.getBalance(),
+      storeApi.listDiscounts(),
+      storeApi.listProducts(),
+    ]).then(([balRes, discRes, prodRes]) => {
+      if (cancelled) return;
+      if (balRes.status === 'fulfilled' && balRes.value?.data) setBalance(balRes.value.data.balance);
+      if (discRes.status === 'fulfilled' && discRes.value?.data) {
+        setDiscounts(discRes.value.data.map(d => ({
+          id: d.id,
+          name: d.title,
+          price: d.cost,
+          icon: d.icon,
+          desc: d.subtitle,
+          type: 'discounts',
+        })));
+      }
+      if (prodRes.status === 'fulfilled' && prodRes.value?.data) {
+        setRealProducts(prodRes.value.data.map(p => ({
+          id: p.id,
+          name: p.title,
+          price: p.cost,
+          icon: p.icon,
+          desc: p.subtitle,
+          type: 'real',
+          isPhase2: true,
+        })));
+      }
+      setLoading(false);
     });
     return () => { cancelled = true; };
   }, []));
@@ -255,17 +261,21 @@ export default function StoreHomeScreen({ navigation }) {
       </ScrollView>
 
       <View style={styles.contentArea}>
-        <FlatList
-          data={getCurrentItems()}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          contentContainerStyle={styles.gridContent}
-          columnWrapperStyle={styles.gridRow}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No hay productos en esta categoría.</Text>
-          }
-        />
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} size="large" />
+        ) : (
+          <FlatList
+            data={getCurrentItems()}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            contentContainerStyle={styles.gridContent}
+            columnWrapperStyle={styles.gridRow}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>No hay productos en esta categoría.</Text>
+            }
+          />
+        )}
       </View>
     </SafeAreaView>
   );

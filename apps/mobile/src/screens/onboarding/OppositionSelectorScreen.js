@@ -8,6 +8,7 @@ import {
     Platform,
     StatusBar,
     Dimensions,
+    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,6 +55,10 @@ function SearchIcon({ size = 24 }) {
     );
 }
 
+// Solo estas oposiciones tienen curso completo en el Motor IA.
+// El resto se muestra como "Próximamente".
+const ACTIVE_OPPOSITIONS = ['policia-local-galicia'];
+
 // ─── DATA ──────────────────────────────────────────────────
 // Exportado para reutilizarlo en `ConfigPerfilScreen` (permitir cambiar la
 // oposición desde Ajustes cuando el usuario se registró sin elegirla).
@@ -85,30 +90,38 @@ export const OPPOSITIONS = [
 // ─── CARD ITEM ─────────────────────────────────────────────
 const OppositionItem = ({ item, onPress }) => {
     const { Icon } = item;
+    const isActive = ACTIVE_OPPOSITIONS.includes(item.slug);
     return (
         <TouchableOpacity
             onPress={() => onPress(item)}
-            activeOpacity={0.75}
+            activeOpacity={isActive ? 0.75 : 0.9}
             style={[
                 styles.card,
                 item.isFirst && styles.cardFirst,
+                !isActive && styles.cardDisabled,
             ]}
         >
             {/* Icono a la izquierda */}
             <View style={styles.cardIconWrap}>
-                <Icon size={56} color={C.iconColor} />
+                <Icon size={56} color={isActive ? C.iconColor : '#BDBDBD'} />
             </View>
 
             {/* Textos centrales */}
             <View style={styles.cardTextWrap}>
-                <Text style={styles.cardName}>{item.name}</Text>
+                <Text style={[styles.cardName, !isActive && styles.cardNameDisabled]}>{item.name}</Text>
                 <Text style={styles.cardSub}>{item.sub}</Text>
             </View>
 
-            {/* Badge BOE LIVE a la derecha */}
-            <View style={styles.boeBadge}>
-                <Text style={styles.boeText}>BOE LIVE</Text>
-            </View>
+            {/* Badge: BOE LIVE para activas, Próximamente para las demás */}
+            {isActive ? (
+                <View style={styles.boeBadge}>
+                    <Text style={styles.boeText}>BOE LIVE</Text>
+                </View>
+            ) : (
+                <View style={styles.soonBadge}>
+                    <Text style={styles.soonText}>Próximamente</Text>
+                </View>
+            )}
         </TouchableOpacity>
     );
 };
@@ -126,6 +139,10 @@ export default function OppositionSelectorScreen({ navigation }) {
     );
 
     const handleSelect = async (item) => {
+        if (!ACTIVE_OPPOSITIONS.includes(item.slug)) {
+            Alert.alert('Próximamente', 'Esta oposición estará disponible pronto. Por ahora puedes preparar Policía Local de Galicia.');
+            return;
+        }
         await AsyncStorage.setItem(PENDING_OPOSICION_KEY, item.slug);
         navigation.navigate('LevelTestProposal');
     };
@@ -284,5 +301,30 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: C.boeGreen,
         letterSpacing: 0.3,
+    },
+
+    // Tarjeta desactivada (oposición no disponible aún)
+    cardDisabled: {
+        opacity: 0.55,
+    },
+    cardNameDisabled: {
+        color: '#888',
+    },
+
+    // Badge Próximamente
+    soonBadge: {
+        backgroundColor: 'rgba(65, 41, 80, 0.08)',
+        borderRadius: 8,
+        borderWidth: 0.92,
+        borderColor: 'rgba(65, 41, 80, 0.25)',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginLeft: 8,
+    },
+    soonText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#412950',
+        letterSpacing: 0.2,
     },
 });

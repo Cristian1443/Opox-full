@@ -19,8 +19,9 @@ export const PENDING_LEVEL_TEST_KEY = 'opox.pendingLevelTestIndex';
 // Resultado calculado: lo lee SesionIniciadaScreen para inicializar el plan.
 export const LEVEL_TEST_RESULT_KEY = 'opox.levelTestResult';
 
-// ─── 20 preguntas únicas sobre el temario de oposiciones ─────────────────────
-// topic: se usa para calcular fortalezas/debilidades por área
+// ─── 10 preguntas de fallback estático ───────────────────────────────────────
+// El Motor IA devuelve 10 preguntas dinámicas; este array se usa solo si el
+// Motor falla o tarda más de 5 s. topic: para calcular fortalezas/debilidades.
 const QUESTIONS = [
     {
         id: 1,
@@ -149,136 +150,6 @@ const QUESTIONS = [
             { id: 'B', text: '2 de octubre de 2016' },
             { id: 'C', text: '1 de enero de 2017' },
             { id: 'D', text: '2 de octubre de 2017' },
-        ],
-        correct: 'B',
-    },
-    {
-        id: 11,
-        topic: 'ley-39',
-        topicLabel: 'Ley 39/2015',
-        question: '¿Cuántos días hábiles tiene el interesado para subsanar defectos en su solicitud según la Ley 39/2015?',
-        options: [
-            { id: 'A', text: '5 días hábiles' },
-            { id: 'B', text: '10 días hábiles' },
-            { id: 'C', text: '15 días hábiles' },
-            { id: 'D', text: '20 días hábiles' },
-        ],
-        correct: 'B',
-    },
-    {
-        id: 12,
-        topic: 'constitucion',
-        topicLabel: 'Constitución',
-        question: 'El Defensor del Pueblo es elegido por:',
-        options: [
-            { id: 'A', text: 'El Gobierno' },
-            { id: 'B', text: 'El Rey' },
-            { id: 'C', text: 'Las Cortes Generales' },
-            { id: 'D', text: 'El Tribunal Constitucional' },
-        ],
-        correct: 'C',
-    },
-    {
-        id: 13,
-        topic: 'ley-39',
-        topicLabel: 'Ley 39/2015',
-        question: 'En el cómputo de plazos en días hábiles, se excluyen:',
-        options: [
-            { id: 'A', text: 'Solo los festivos nacionales' },
-            { id: 'B', text: 'Los sábados, domingos y festivos' },
-            { id: 'C', text: 'Solo los domingos' },
-            { id: 'D', text: 'Los festivos autonómicos únicamente' },
-        ],
-        correct: 'B',
-    },
-    {
-        id: 14,
-        topic: 'org-estado',
-        topicLabel: 'Org. del Estado',
-        question: 'La Administración General del Estado se organiza territorialmente principalmente en:',
-        options: [
-            { id: 'A', text: 'Comunidades Autónomas' },
-            { id: 'B', text: 'Delegaciones y Subdelegaciones del Gobierno' },
-            { id: 'C', text: 'Municipios' },
-            { id: 'D', text: 'Diputaciones Provinciales' },
-        ],
-        correct: 'B',
-    },
-    {
-        id: 15,
-        topic: 'constitucion',
-        topicLabel: 'Constitución',
-        question: '¿Qué artículo de la Constitución Española reconoce el principio de igualdad ante la ley?',
-        options: [
-            { id: 'A', text: 'Artículo 12' },
-            { id: 'B', text: 'Artículo 14' },
-            { id: 'C', text: 'Artículo 16' },
-            { id: 'D', text: 'Artículo 18' },
-        ],
-        correct: 'B',
-    },
-    {
-        id: 16,
-        topic: 'ley-39',
-        topicLabel: 'Ley 39/2015',
-        question: 'El recurso de reposición es un recurso:',
-        options: [
-            { id: 'A', text: 'Ordinario ante el superior jerárquico' },
-            { id: 'B', text: 'Extraordinario ante el mismo órgano' },
-            { id: 'C', text: 'Potestativo previo al contencioso-administrativo' },
-            { id: 'D', text: 'Obligatorio en todo caso' },
-        ],
-        correct: 'C',
-    },
-    {
-        id: 17,
-        topic: 'ley-40',
-        topicLabel: 'Ley 40/2015',
-        question: 'La Ley 40/2015 de Régimen Jurídico del Sector Público entró en vigor el:',
-        options: [
-            { id: 'A', text: '1 de enero de 2016' },
-            { id: 'B', text: '2 de octubre de 2016' },
-            { id: 'C', text: '1 de enero de 2017' },
-            { id: 'D', text: '1 de octubre de 2017' },
-        ],
-        correct: 'B',
-    },
-    {
-        id: 18,
-        topic: 'constitucion',
-        topicLabel: 'Constitución',
-        question: 'Según la Constitución, el Congreso de los Diputados se compone de:',
-        options: [
-            { id: 'A', text: 'Un mínimo de 300 y un máximo de 400 diputados' },
-            { id: 'B', text: 'Un mínimo de 250 y un máximo de 350 diputados' },
-            { id: 'C', text: 'Un número fijo de 350 diputados' },
-            { id: 'D', text: 'Un mínimo de 350 y un máximo de 450 diputados' },
-        ],
-        correct: 'A',
-    },
-    {
-        id: 19,
-        topic: 'constitucion',
-        topicLabel: 'Constitución',
-        question: '¿Cuántos títulos numerados (del I al X) contiene la Constitución Española?',
-        options: [
-            { id: 'A', text: '8' },
-            { id: 'B', text: '9' },
-            { id: 'C', text: '10' },
-            { id: 'D', text: '11' },
-        ],
-        correct: 'C',
-    },
-    {
-        id: 20,
-        topic: 'ley-39',
-        topicLabel: 'Ley 39/2015',
-        question: 'Los actos administrativos de las Administraciones Públicas sujetos al Derecho Administrativo se presumirán:',
-        options: [
-            { id: 'A', text: 'Definitivos y ejecutorios' },
-            { id: 'B', text: 'Válidos y producirán efectos desde la fecha en que se dicten' },
-            { id: 'C', text: 'Firmes desde su notificación' },
-            { id: 'D', text: 'Ejecutivos salvo suspensión judicial' },
         ],
         correct: 'B',
     },

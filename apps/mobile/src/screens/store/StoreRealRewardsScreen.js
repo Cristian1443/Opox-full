@@ -5,6 +5,7 @@ import {
     TouchableOpacity,
     StatusBar,
     FlatList,
+    ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -81,19 +82,22 @@ function StockBadge({ stock, isAvailable }) {
 export default function StoreRealRewardsScreen({ navigation }) {
   const [userBalance, setUserBalance] = useState(null);
   const [rewardsData, setRewardsData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('all');
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
   const [selectedReward, setSelectedReward] = useState(null);
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
-    storeApi.getBalance().then(res => {
-      if (cancelled || !res?.data) return;
-      setUserBalance(res.data.balance);
-    });
-    storeApi.listProducts().then(res => {
-      if (cancelled || !res?.data) return;
-      setRewardsData(res.data);
+    setLoading(true);
+    Promise.allSettled([
+      storeApi.getBalance(),
+      storeApi.listProducts(),
+    ]).then(([balRes, prodRes]) => {
+      if (cancelled) return;
+      if (balRes.status === 'fulfilled' && balRes.value?.data) setUserBalance(balRes.value.data.balance);
+      if (prodRes.status === 'fulfilled' && prodRes.value?.data) setRewardsData(prodRes.value.data);
+      setLoading(false);
     });
     return () => { cancelled = true; };
   }, []));
@@ -168,6 +172,9 @@ export default function StoreRealRewardsScreen({ navigation }) {
         })}
       </View>
 
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} size="large" />
+      ) : (
       <FlatList
         data={filteredRewards}
         keyExtractor={(item) => item.id}
@@ -199,6 +206,7 @@ export default function StoreRealRewardsScreen({ navigation }) {
           </View>
         }
       />
+      )}
 
       <InsufficientPointsModal
         visible={showInsufficientModal}

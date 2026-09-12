@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, Alert } from 'react-native';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { Platform, Alert, StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -20,7 +20,7 @@ import useNetworkWatcher from './src/hooks/useNetworkWatcher';
 import { pushApi } from './src/api';
 import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 import { supabase } from './src/lib/supabase';
-import { AccessibilityProvider } from './src/contexts/AccessibilityContext';
+import { AccessibilityProvider, AccessibilityContext } from './src/contexts/AccessibilityContext';
 
 // Tipografía de marca OPOX
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -189,6 +189,18 @@ const linking = {
   },
 };
 
+// Barra de estado global que refleja el tema elegido en Accesibilidad.
+// Las pantallas que declaran su propio <StatusBar> lo sobreescriben localmente.
+function ThemeStatusBar() {
+  const { isDark } = useContext(AccessibilityContext);
+  return (
+    <StatusBar
+      barStyle={isDark ? 'light-content' : 'dark-content'}
+      backgroundColor={isDark ? '#0F1B33' : '#F4F6FA'}
+    />
+  );
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     'Poppins-Light': Poppins_300Light,
@@ -208,6 +220,7 @@ export default function App() {
 
   return (
     <AccessibilityProvider>
+      <ThemeStatusBar />
       <SafeAreaProvider onLayout={onLayoutRootView}>
         <NavigationContainer ref={navigationRef} linking={linking}>
           <NetworkWatcher />

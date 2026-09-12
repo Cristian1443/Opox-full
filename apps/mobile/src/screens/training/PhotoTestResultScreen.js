@@ -74,12 +74,14 @@ export default function PhotoTestResultScreen({ navigation, route }) {
 
     const openQuizConfirm = () => setReadyModalOpen(true);
 
+    // Número real de preguntas que se van a generar — capado a 10 para evitar
+    // esperas largas, pero alineado con lo que muestra el modal de confirmación.
+    const actualCount = Math.min(questionsCount, 10);
+
     const startQuiz = async () => {
         setReadyModalOpen(false);
         setGenerating(true);
-        // Pedimos preguntas del tema detectado por la IA. Cap a 10 aunque el
-        // análisis diga que hay más disponibles — evita esperas largas.
-        const count = Math.min(questionsCount, 10);
+        const count = actualCount;
         const { data, error } = await trainingApi.generateQuestions({
             oposicion,
             topicId: relatedTopicId,
@@ -205,7 +207,7 @@ export default function PhotoTestResultScreen({ navigation, route }) {
                 visible={readyModalOpen}
                 onStart={startQuiz}
                 onDismiss={() => setReadyModalOpen(false)}
-                questionCount={questionsCount}
+                questionCount={actualCount}
             />
         </SafeAreaView>
     );

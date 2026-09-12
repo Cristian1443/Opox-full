@@ -155,8 +155,16 @@ export class ExportProStatsUseCase {
         const stats = await this.repo.getProStats(userId);
         const periodLabel = period === 'week' ? 'Semana' : period === 'month' ? 'Mes' : 'Histórico';
         const pdfBuffer = await buildPdfBuffer(stats, periodLabel);
-        const downloadUrl = await this.repo.storePdfReport(userId, period, pdfBuffer);
-        return { period, downloadUrl, message: 'Informe generado.' };
+        try {
+            const downloadUrl = await this.repo.storePdfReport(userId, period, pdfBuffer);
+            return { period, downloadUrl, message: 'Informe generado.' };
+        } catch {
+            // Si Supabase Storage falla (bucket no configurado, permisos, etc.)
+            // devolver el PDF como data URL base64 — el mobile puede abrirlo igualmente con Linking.openURL
+            const base64 = pdfBuffer.toString('base64');
+            const downloadUrl = `data:application/pdf;base64,${base64}`;
+            return { period, downloadUrl, message: 'Informe generado.' };
+        }
     }
 }
 

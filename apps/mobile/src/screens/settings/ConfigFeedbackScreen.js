@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     StyleSheet,
@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import FeedbackSuccessModal from './FeedbackSuccessModal';
-import { settingsApi } from '../../api';
+import { settingsApi, api } from '../../api';
 
 // ─── 12.9 · Tu opinión ──────────────────────────────────────────────────────
 // Fiel al Figma (FeedbackScreen.tsx). La validación de mensaje vacío, el
@@ -51,6 +52,18 @@ export default function ConfigFeedbackScreen({ navigation }) {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
+  useFocusEffect(useCallback(() => {
+    api.loadSession().then((session) => {
+      if (!session?.user?.id) {
+        Alert.alert(
+          'Sesión expirada',
+          'Vuelve a iniciar sesión para enviar tu opinión.',
+          [{ text: 'Aceptar', onPress: () => navigation.goBack() }],
+        );
+      }
+    }).catch(() => {});
+  }, [navigation]));
 
   const handleSubmit = async () => {
     if (!message.trim()) {
