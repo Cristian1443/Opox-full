@@ -187,43 +187,71 @@ function calcStrengthsAndWeaknesses(answers, qs = QUESTIONS) {
 }
 
 export default function LevelTestInProgressScreen({ navigation }) {
-    const [questions, setQuestions] = useState(QUESTIONS);
-    const [loadingQuestions, setLoadingQuestions] = useState(true);
+    // null = todavía esperando respuesta del backend (bloquea la UI)
+    const [questions, setQuestions] = useState(null);
     const [qIndex, setQIndex] = useState(0);
     const [selected, setSelected] = useState(null);
     const [answers, setAnswers] = useState([]); // respuesta elegida por pregunta
     const hasRestoredRef = useRef(false);
-    const startTimeRef = useRef(Date.now());
+    // Se asigna en el momento en que el usuario ve las preguntas por primera vez
+    const startTimeRef = useRef(null);
 
-    // Cargar preguntas del Motor IA con timeout de 5 s (fallback a estáticas)
+    // Esperar la respuesta del backend antes de mostrar cualquier pregunta.
+    // El backend ya gestiona el fallback a estáticas si el Motor falla —
+    // solo usamos QUESTIONS aquí si hay error de red (backend inaccesible).
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
-                const oposicion = await AsyncStorage.getItem('opox.pendingOposicion') ?? 'justicia-tramitacion';
+                const oposicion =
+                    (await AsyncStorage.getItem('opox.pendingOposicion')) ??
+                    'policia-local-galicia';
                 const res = await trainingApi.getLevelTestQuestions(oposicion);
-                if (!cancelled && !res?.error && Array.isArray(res?.data) && res.data.length >= 10) {
+                if (!cancelled && !res?.error && Array.isArray(res?.data) && res.data.length >= 5) {
+                    startTimeRef.current = Date.now();
                     setQuestions(res.data);
+                    return;
                 }
-            } catch { /* sin Motor: usar preguntas estáticas */ }
-            if (!cancelled) setLoadingQuestions(false);
+            } catch { /* error de red */ }
+            // Fallback local solo si el backend no respondió
+            if (!cancelled) {
+                startTimeRef.current = Date.now();
+                setQuestions(QUESTIONS);
+            }
         })();
         return () => { cancelled = true; };
     }, []);
 
-    const total = questions.length;
-
-    // Reanuda desde la pregunta donde se quedó si el usuario cerró la app a medias
+    // Reanuda desde la pregunta guardada — solo cuando las preguntas ya cargaron
     useEffect(() => {
+        if (!questions) return;
         (async () => {
             const saved = await AsyncStorage.getItem(PENDING_LEVEL_TEST_KEY);
             const savedIndex = saved != null ? parseInt(saved, 10) : NaN;
-            if (Number.isInteger(savedIndex) && savedIndex > 0 && savedIndex < QUESTIONS.length) {
+            if (Number.isInteger(savedIndex) && savedIndex > 0 && savedIndex < questions.length) {
                 setQIndex(savedIndex);
             }
             hasRestoredRef.current = true;
         })();
-    }, []);
+    }, [questions]);
+
+    // Pantalla de carga completa — bloquea hasta recibir preguntas del Motor
+    if (!questions) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+                <View style={styles.loadingScreen}>
+                    <ActivityIndicator size="large" color={colors.purple} />
+                    <Text style={styles.loadingScreenTitle}>Preparando tu test…</Text>
+                    <Text style={styles.loadingScreenSub}>
+                        La IA está seleccionando las preguntas para tu oposición
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    const total = questions.length;
 
     // Persiste la pregunta actual para recuperar si el usuario cierra la app
     useEffect(() => {
@@ -315,13 +343,6 @@ export default function LevelTestInProgressScreen({ navigation }) {
 
             {/* Cuerpo principal */}
             <View style={styles.body}>
-
-                {loadingQuestions ? (
-                    <View style={styles.loadingWrap}>
-                        <ActivityIndicator size="small" color={colors.purple} />
-                        <Text style={styles.loadingText}>Preparando preguntas…</Text>
-                    </View>
-                ) : null}
 
                 {/* Barra de progreso visual */}
                 <View style={styles.progressBarTrack}>
@@ -429,17 +450,27 @@ const styles = StyleSheet.create({
         fontSize: 18, fontWeight: '700', color: colors.textDark,
     },
 
+    loadingScreen: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xl,
+        gap: spacing.md,
+    },
+    loadingScreenTitle: {
+        fontSize: 17, fontWeight: '700',
+        color: colors.textDark, textAlign: 'center',
+    },
+    loadingScreenSub: {
+        fontSize: 13, color: colors.textDark, opacity: 0.5,
+        textAlign: 'center', lineHeight: 18,
+    },
     body: {
         flex: 1,
         paddingHorizontal: spacing.md + 2,
         paddingTop: spacing.sm,
         paddingBottom: 80,
     },
-    loadingWrap: {
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        marginBottom: spacing.sm,
-    },
-    loadingText: { fontSize: 11, color: colors.textDark, opacity: 0.5 },
 
     progressBarTrack: {
         height: 4, borderRadius: 2,
