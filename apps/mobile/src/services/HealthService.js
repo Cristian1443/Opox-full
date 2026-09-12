@@ -83,12 +83,21 @@ export async function getHealthConnectStatus() {
 /**
  * Comprueba si la app ya tiene todos los permisos de Health Connect concedidos
  * sin abrir ningún diálogo. Útil para detectar "ya conectado" antes de entrar al flujo.
+ *
+ * Validación estricta por recordType — no por longitud — para evitar falsos
+ * positivos cuando el usuario tiene N permisos de otro tipo ya concedidos.
  */
 export async function hasAllHealthPermissions() {
     if (!isHealthAvailable() || Platform.OS !== 'android' || !HealthConnect) return false;
     try {
         const granted = (await HealthConnect.getGrantedPermissions()) ?? [];
-        return granted.length >= ANDROID_PERMISSIONS.length;
+        return ANDROID_PERMISSIONS.every((required) =>
+            granted.some(
+                (g) =>
+                    g.recordType === required.recordType &&
+                    g.accessType === required.accessType,
+            ),
+        );
     } catch {
         return false;
     }
@@ -148,7 +157,11 @@ export async function requestHealthPermissions() {
             const granted = await HealthConnect.requestPermission(ANDROID_PERMISSIONS);
             return Array.isArray(granted) && granted.length > 0;
         } catch (err) {
-            console.warn('[HealthService] requestPermission error:', err);
+            // Error completo en log para detectar UninitializedPropertyAccessException
+            // (indica que HealthConnectPermissionDelegate no fue inicializado en onCreate)
+            // u otros crashes nativos que no llegan como promise rejection.
+            console.error('[HealthService] requestPermission error:', err?.message ?? String(err));
+            if (err?.stack) console.error('[HealthService] stack:', err.stack);
             return false;
         }
     }

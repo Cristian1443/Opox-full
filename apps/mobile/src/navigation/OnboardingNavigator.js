@@ -33,6 +33,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import HomeHealthScreen from '../screens/health/HomeHealthScreen';
 import ConnectDeviceScreen from '../screens/health/ConnectDeviceScreen';
 import PairingScreen from '../screens/health/PairingScreen';
+import HealthConnectRationaleScreen from '../screens/health/HealthConnectRationaleScreen';
 import MetricDetailScreen from '../screens/health/MetricDetailScreen';
 import FatigueEngineScreen from '../screens/health/FatigueEngineScreen';
 import BreathingExerciseScreen from '../screens/health/BreathingExerciseScreen';
@@ -170,6 +171,7 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="HomeHealth" component={HomeHealthScreen} />
             <Stack.Screen name="ConnectDevice" component={ConnectDeviceScreen} />
             <Stack.Screen name="Pairing" component={PairingScreen} />
+            <Stack.Screen name="HealthConnectRationale" component={HealthConnectRationaleScreen} />
             <Stack.Screen name="MetricDetail" component={MetricDetailScreen} />
             <Stack.Screen name="FatigueEngine" component={FatigueEngineScreen} />
             <Stack.Screen name="BreathingExercise" component={BreathingExerciseScreen} />

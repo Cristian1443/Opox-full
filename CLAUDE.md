@@ -834,6 +834,35 @@ usuario ya los había concedido desde Ajustes del dispositivo.
   (→ `Linking.openSettings()`); `!hasData && !pairingSkipped` → "Conecta tu wearable"
   (→ `ConnectDevice`).
 
+**Fix integración Health Connect — app invisible en ajustes y permisos denegados (revisión 2026-09-11)**:
+Dos causas independientes corregidas.
+
+**Causa 1 — `ACTION_SHOW_PERMISSIONS_RATIONALE` sin handler:**
+Google exige que la Activity que declara este intent-filter responda mostrando una pantalla
+de privacidad. Sin respuesta válida, HC marca la app como inválida → invisible en sus ajustes
+→ `requestPermission()` devuelve `[]` silenciosamente.
+- `HealthConnectRationaleScreen.js` (nueva) — pantalla de justificación de privacidad:
+  5 tipos de dato, por qué se leen, garantías (solo lectura, sin venta). Ruta de navegación:
+  `HealthConnectRationale`, deep-link `opox://health-rationale` en `linking` de `App.js`.
+- `plugins/withHealthConnectPermissionDelegate.js` — inyección `TAG_RATIONALE` en `onCreate`
+  **antes** de `super.onCreate()` (`offset: 0`): detecta el intent de rationale y lo muta a
+  `ACTION_VIEW + Uri("opox://health-rationale")` con clases completamente cualificadas
+  (sin imports extra). React Native lo procesa como deep-link y navega a la pantalla.
+- `plugins/withHealthConnect.js` — nueva función `fixRationaleIntentFilter()`: busca
+  iterativamente la Activity con `android:name` terminado en `.MainActivity` y coloca el
+  intent-filter allí; si el plugin oficial lo dejó en `activity[0]` (posiblemente splash),
+  lo elimina de ahí primero.
+
+**Causa 2 — `hasAllHealthPermissions()` con falso positivo:**
+Comparación `granted.length >= ANDROID_PERMISSIONS.length` podía devolver `true` con N
+permisos de otro tipo. Reemplazado por `.every((required) => granted.some(g => g.recordType
+=== required.recordType && g.accessType === required.accessType))`.
+`requestHealthPermissions()` catch: `console.warn` → `console.error` con `err.stack`
+para detectar `UninitializedPropertyAccessException` nativo en `adb logcat`.
+
+**Pendiente**: `eas build --profile development --platform android` — sin rebuild los
+cambios de manifest y MainActivity no tienen efecto (no hay `android/` en el repo).
+
 **Datos en HomeHealth** (`HomeHealthScreen.js`): `useFocusEffect` + `getHealthMetrics()`.
 Heurística de energía: `HRV×50% + sueño×30% + FC_reposo×20%`. Muestra `—` sin datos.
 `hasData` correcto (revisión 2026-09-07): `isHealthAvailable() && !!metrics &&

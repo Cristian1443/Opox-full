@@ -181,6 +181,10 @@ const linking = {
   config: {
     screens: {
       RecuperarPasswordNueva: 'reset-password',
+      // Health Connect lanza este deep-link cuando el usuario toca "Ver política
+      // de privacidad" en el diálogo de permisos de HC. Sin esta ruta la app
+      // es invisible en los ajustes de HC y los permisos se deniegan.
+      HealthConnectRationale: 'health-rationale',
     },
   },
 };

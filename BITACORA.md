@@ -5,6 +5,70 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-11 — Bloque 3 · Fix crítico integración Health Connect (invisible en ajustes, permisos denegados)
+
+Rama: `fix/gaps-acceso-perfil-biometria`.
+
+Diagnóstico y corrección completa de los dos síntomas reportados: la app era invisible
+en los ajustes nativos de Health Connect y `requestPermission()` devolvía siempre vacío.
+
+### Causa raíz 1 — `ACTION_SHOW_PERMISSIONS_RATIONALE` sin handler JS
+
+Google exige que la Activity que declara este intent-filter responda mostrando una
+pantalla de política de privacidad. HC lanzaba el intent → MainActivity recibía el
+intent → React Navigation no lo manejaba → HC marcaba la app como inválida → invisible
+en su menú de permisos.
+
+**Fix (3 capas)**:
+
+1. **`HealthConnectRationaleScreen.js`** (nueva pantalla) — muestra los 5 tipos de dato
+   leído, por qué se usan y garantías de privacidad (solo lectura, sin venta de datos).
+   Registrada en `OnboardingNavigator.js` como `HealthConnectRationale` y en el `linking`
+   config de `App.js` con path `opox://health-rationale`.
+
+2. **`withHealthConnectPermissionDelegate.js`** — nueva inyección Kotlin/Java en `onCreate`
+   **antes** de `super.onCreate()` (tag `opox-health-connect-rationale-redirect`): detecta
+   `intent.action == ACTION_SHOW_PERMISSIONS_RATIONALE` y muta el intent a
+   `ACTION_VIEW + Uri("opox://health-rationale")`. Así React Native lo procesa como deep-link
+   y React Navigation navega a `HealthConnectRationale`. Nombres de clase completamente
+   cualificados (`android.net.Uri`, `android.content.Intent`) — sin imports extra.
+   Regex de anchor mejorada a `super\.onCreate\s*\([^)]*\)` para tolerar variaciones de formato.
+
+3. **`withHealthConnect.js`** — nueva función `fixRationaleIntentFilter()` que busca
+   iterativamente la Activity con `android:name` terminado en `.MainActivity` (no `activity[0]`)
+   y garantiza que el intent-filter de HC quede ahí, no en la splash activity donde el
+   plugin oficial lo coloca ciegamente.
+
+### Causa raíz 2 — `hasAllHealthPermissions()` con falso positivo por longitud
+
+La función comparaba `granted.length >= ANDROID_PERMISSIONS.length`, que podía devolver
+`true` si el usuario tenía N permisos de otro tipo. Ahora usa `.every()` + `.some()` con
+cruce estricto por `recordType` y `accessType`.
+
+### Mejora de logging
+
+`requestHealthPermissions()` catch: `console.warn` → `console.error` con `err.message`
+y `err.stack` explícitos. Permite detectar en `adb logcat` el
+`UninitializedPropertyAccessException` nativo si la inyección del delegate falla.
+
+### Archivos modificados
+
+- `apps/mobile/src/screens/health/HealthConnectRationaleScreen.js` — pantalla nueva.
+- `apps/mobile/src/navigation/OnboardingNavigator.js` — import + `<Stack.Screen>`.
+- `apps/mobile/App.js` — `HealthConnectRationale: 'health-rationale'` en linking config.
+- `apps/mobile/plugins/withHealthConnect.js` — función `fixRationaleIntentFilter()`.
+- `apps/mobile/plugins/withHealthConnectPermissionDelegate.js` — inyección rationale + regex + queries refactor.
+- `apps/mobile/src/services/HealthService.js` — `hasAllHealthPermissions()` con `.every()`, logging mejorado.
+- `CLAUDE.md` — revisión 2026-09-11 en Bloque 3.
+
+### Pendiente obligatorio
+
+`eas build --profile development --platform android` — los config plugins solo se aplican
+en tiempo de build (no hay `android/` en el repo). Sin el rebuild, los cambios de manifest
+y MainActivity no tienen efecto.
+
+---
+
 ## 2026-09-10 (tarde) — 4 gaps de Acceso + Perfil + Biometría
 
 Rama: `fix/gaps-acceso-perfil-biometria`.
