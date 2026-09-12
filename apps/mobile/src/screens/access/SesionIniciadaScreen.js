@@ -68,7 +68,9 @@ export default function SesionIniciadaScreen({ navigation, route }) {
                 applyLevelTestResult(),
                 markOnboardingCompleted(),
             ]);
-            await registerForPushNotifications().catch(() => {});
+            // Fire-and-forget: el registro push no debe bloquear la entrada al Dashboard.
+            // El token se registra en background; si falla, el usuario ya está dentro.
+            registerForPushNotifications().catch(() => {});
             navigation.replace('Dashboard', { email });
         }, 2000);
 

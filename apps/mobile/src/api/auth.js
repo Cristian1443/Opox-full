@@ -35,9 +35,9 @@ export const authApi = {
     biometricLogin: (input) =>
         withSession(api.post(API_ROUTES.AUTH.BIOMETRIC_LOGIN, input)),
 
-    me: () => api.get(API_ROUTES.AUTH.ME, { auth: true }),
-    refresh: (refreshToken) =>
-        withSession(api.post(API_ROUTES.AUTH.REFRESH, { refreshToken })),
+    me: (opts) => api.get(API_ROUTES.AUTH.ME, { auth: true, ...opts }),
+    refresh: (refreshToken, opts) =>
+        withSession(api.post(API_ROUTES.AUTH.REFRESH, { refreshToken }, opts)),
     logout: async () => {
         const res = await api.post(API_ROUTES.AUTH.LOGOUT, {}, { auth: true });
         // No borramos la biometría al cerrar sesión: la clave privada sigue

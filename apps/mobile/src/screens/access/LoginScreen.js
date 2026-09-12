@@ -50,6 +50,9 @@ export default function LoginScreen({ navigation, route }) {
     const [blockUntil, setBlockUntil] = useState(null);
     const [now, setNow] = useState(Date.now());
     const [isLoggingIn, setIsLoggingIn] = useState(false);
+    // Mensaje de espera progresivo: aparece cuando el spinner lleva >8 s
+    // (cold-start del backend en Render plan free puede tardar 20-50 s).
+    const [slowHint, setSlowHint] = useState(false);
     // Permite cerrar el modal de "cuenta bloqueada" con "Entendido" sin
     // levantar el bloqueo — se reactiva automáticamente en cada bloqueo nuevo.
     const [blockModalDismissed, setBlockModalDismissed] = useState(false);
@@ -92,9 +95,9 @@ export default function LoginScreen({ navigation, route }) {
         }
 
         setIsLoggingIn(true);
-        // El backend (Render, plan free) puede tardar 20-50s en despertar tras
-        // inactividad — el spinner evita que el cold-start se sienta como que
-        // la app está congelada.
+        setSlowHint(false);
+        // Mostrar aviso si el servidor tarda más de 8 s (cold-start Render free).
+        const slowTimer = setTimeout(() => setSlowHint(true), 8_000);
         try {
             const { data, error: apiError } = await authApi.login({ email, password });
 
@@ -132,6 +135,8 @@ export default function LoginScreen({ navigation, route }) {
                 });
             }
         } finally {
+            clearTimeout(slowTimer);
+            setSlowHint(false);
             setIsLoggingIn(false);
         }
     };
@@ -291,6 +296,12 @@ export default function LoginScreen({ navigation, route }) {
                                 </Text>
                             )}
                         </TouchableOpacity>
+
+                        {slowHint && (
+                            <Text style={s.slowHintText}>
+                                El servidor está arrancando, por favor espera unos segundos…
+                            </Text>
+                        )}
                     </View>
 
                     {!isBlocked && !showAuthError && biometricAvailable && (
@@ -468,6 +479,14 @@ const s = StyleSheet.create({
         fontSize: 14,
         color: colors.statRed,
         marginTop: -2,
+    },
+    slowHintText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: colors.textDark,
+        opacity: 0.55,
+        textAlign: 'center',
+        marginTop: 10,
     },
     optionsRow: {
         flexDirection: 'row',

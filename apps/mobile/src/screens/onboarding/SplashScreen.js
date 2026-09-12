@@ -22,18 +22,31 @@ import { PENDING_OTP_KEY } from '../access/OtpScreen';
 export const ONBOARDING_COMPLETED_KEY = 'opox.onboardingCompleted';
 
 // Restaura la sesión guardada en AsyncStorage (si existe) para no forzar
-// login + onboarding de nuevo cada vez que se cierra la app. `me()` valida
-// que el accessToken siga vivo; si expiró, se intenta un refresh antes de
-// darla por perdida.
+// login + onboarding de nuevo cada vez que se cierra la app.
+//
+// Optimizaciones vs. la versión original:
+// 1. Comprobación local de caducidad: si `issuedAt + expiresIn` ya pasó,
+//    saltamos `me()` (que igualmente devolvería 401 tras despertar el backend)
+//    y vamos directo al refresh — evita un cold-start inútil en Render.
+// 2. Timeouts explícitos: si el backend tarda más de lo esperado no nos
+//    quedamos congelados indefinidamente; borramos la sesión y mandamos al login.
 async function resolveSession() {
     const session = await api.loadSession();
     if (!session?.accessToken) return false;
 
-    const { error: meError } = await authApi.me();
-    if (!meError) return true;
+    // Determinar si el access token sigue vigente localmente (con 60 s de margen).
+    const issuedAt = session.issuedAt ? new Date(session.issuedAt).getTime() : 0;
+    const expiresIn = typeof session.expiresIn === 'number' ? session.expiresIn : 3600;
+    const tokenLikelyValid = issuedAt > 0 && Date.now() < issuedAt + expiresIn * 1000 - 60_000;
 
+    if (tokenLikelyValid) {
+        const { error: meError } = await authApi.me({ timeoutMs: 10_000 });
+        if (!meError) return true;
+    }
+
+    // Token expirado o me() falló → intentar refresh
     if (session.refreshToken) {
-        const { error: refreshError } = await authApi.refresh(session.refreshToken);
+        const { error: refreshError } = await authApi.refresh(session.refreshToken, { timeoutMs: 15_000 });
         if (!refreshError) return true;
     }
 
@@ -94,18 +107,26 @@ export default function SplashScreen({ navigation }) {
     useEffect(() => {
         let cancelled = false;
 
+        // Iniciar la comprobación de red + sesión inmediatamente (en paralelo con
+        // los 2500 ms de la animación splash) para que el cold-start del backend
+        // se solape con el delay visual en lugar de sumarse a él.
+        const checkPromise = NetInfo.fetch()
+            .then(async (state) => {
+                const hasConnection = state.isConnected && state.isInternetReachable !== false;
+                if (!hasConnection) return 'offline';
+                const valid = await resolveSession();
+                return valid ? 'valid' : 'invalid';
+            })
+            .catch(() => 'invalid');
+
         const timer = setTimeout(async () => {
-            const state = await NetInfo.fetch();
-            const hasConnection = state.isConnected && state.isInternetReachable !== false;
-            const isUpdated = true; // reemplaza con tu lógica de versión
-
             if (cancelled) return;
-            if (!hasConnection) return navigation.replace('SplashNoConnection');
-            if (!isUpdated) return navigation.replace('SplashUpdate');
 
-            const hasValidSession = await resolveSession();
+            const result = await checkPromise;
             if (cancelled) return;
-            if (hasValidSession) return navigation.replace('Dashboard');
+
+            if (result === 'offline') return navigation.replace('SplashNoConnection');
+            if (result === 'valid') return navigation.replace('Dashboard');
 
             const entryRoute = await resolveOnboardingEntryRoute();
             if (cancelled) return;
