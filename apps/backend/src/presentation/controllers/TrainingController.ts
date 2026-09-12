@@ -396,7 +396,7 @@ export class TrainingController {
 
             if (this.deps.motorOnboarding) {
                 try {
-                    const questions = await this.deps.motorOnboarding.getLevelTestQuestions(oposicion, 20);
+                    const questions = await this.deps.motorOnboarding.getLevelTestQuestions(oposicion, 10);
                     this.ok<LevelTestQuestion[]>(res, 200, questions);
                     return;
                 } catch {

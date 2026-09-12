@@ -5,7 +5,7 @@ export class WhatsAppNotificationClient {
 
     constructor(
         private readonly apiToken: string,
-        private readonly phoneNumberId: string,
+        phoneNumberId: string,
         private readonly recipientNumber: string,
     ) {
         this.endpoint = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
@@ -31,8 +31,8 @@ export class WhatsAppNotificationClient {
                 const text = await res.text().catch(() => '');
                 logger.warn(`[WhatsApp] Envío fallido ${res.status}: ${text}`);
             }
-        } catch (err) {
-            logger.warn('[WhatsApp] Error de red al enviar feedback:', err);
+        } catch (err: unknown) {
+            logger.warn('[WhatsApp] Error de red al enviar feedback:', err as Record<string, unknown>);
         }
     }
 }
