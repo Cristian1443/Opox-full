@@ -291,21 +291,42 @@ function PodcastConfig({ topic, oposicion, onGenerated, onBack }) {
 
 // ─── 3) Player Figma con expo-audio ──────────────────────────────────────────
 function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
-    // podcast.velocidad viene del config — la velocidad Ya va grabada en el mp3,
-    // pero también podemos aplicar rate del player para ajuste fino.
     const player = useAudioPlayer({ uri: podcast.mp3Url });
     const status = useAudioPlayerStatus(player);
 
     const [showExitModal, setShowExitModal] = useState(false);
     const [sleepMinutes, setSleepMinutes]   = useState(null);
-    const sleepTimerRef = useRef(null);
-    const waveAnim      = useRef(new Animated.Value(0)).current;
-    const waveLoop      = useRef(null);
+    // elapsed se actualiza con polling cada 500 ms — useAudioPlayerStatus no
+    // garantiza actualizar currentTime de forma continua en Android.
+    const [elapsed, setElapsed]             = useState(0);
+    const progressIntervalRef = useRef(null);
+    const sleepTimerRef       = useRef(null);
+    const waveAnim            = useRef(new Animated.Value(0)).current;
+    const waveLoop            = useRef(null);
 
     const isPlaying = status?.playing ?? false;
-    const elapsed   = status?.currentTime ?? 0;
-    const totalSecs = status?.duration ?? podcast.totalSeconds ?? 600;
+    // duration puede llegar como NaN mientras el audio carga
+    const totalSecs = (status?.duration && Number.isFinite(status.duration) && status.duration > 0)
+        ? status.duration
+        : (podcast.estimatedSeconds ?? podcast.totalSeconds ?? 600);
     const progressPct = totalSecs > 0 ? Math.min((elapsed / totalSecs) * 100, 100) : 0;
+
+    // Polling de posición real del player cada 500 ms mientras reproduce
+    useEffect(() => {
+        if (isPlaying) {
+            progressIntervalRef.current = setInterval(() => {
+                const t = player.currentTime;
+                if (Number.isFinite(t)) setElapsed(t);
+            }, 500);
+        } else {
+            clearInterval(progressIntervalRef.current);
+            const t = player.currentTime;
+            if (Number.isFinite(t)) setElapsed(t);
+        }
+        return () => clearInterval(progressIntervalRef.current);
+    }, [isPlaying, player]);
+
+    useEffect(() => () => clearInterval(progressIntervalRef.current), []);
 
     // Waveform animado mientras reproduce
     useEffect(() => {
@@ -333,8 +354,12 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
     }, [player, isPlaying]);
 
     const skipBy = useCallback((delta) => {
-        const nextTime = Math.max(0, Math.min(totalSecs, elapsed + delta));
+        // Leer currentTime directamente para no depender del estado elapsed (puede ser stale)
+        const current = player.currentTime;
+        const base = Number.isFinite(current) ? current : elapsed;
+        const nextTime = Math.max(0, Math.min(totalSecs, base + delta));
         player.seekTo(nextTime);
+        setElapsed(nextTime);
     }, [player, elapsed, totalSecs]);
 
     const scheduleSleep = useCallback((minutes) => {
@@ -418,12 +443,9 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
                 </View>
 
                 <View style={styles.controlsRow}>
-                    <TouchableOpacity activeOpacity={0.7}>
-                        <ShuffleIcon />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.controlButton} activeOpacity={0.7} onPress={() => skipBy(-15)}>
-                        <SkipIcon direction="prev" />
+                    <TouchableOpacity style={styles.controlButton} activeOpacity={0.7} onPress={() => skipBy(-15)} accessibilityLabel="Retroceder 15 segundos">
+                        <Ionicons name="play-back" size={16} color={colors.textDark} />
+                        <Text style={styles.skipLabel}>15s</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -442,12 +464,9 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
                         )}
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.controlButton} activeOpacity={0.7} onPress={() => skipBy(15)}>
-                        <SkipIcon direction="next" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity activeOpacity={0.7}>
-                        <RepeatIcon />
+                    <TouchableOpacity style={styles.controlButton} activeOpacity={0.7} onPress={() => skipBy(15)} accessibilityLabel="Adelantar 15 segundos">
+                        <Ionicons name="play-forward" size={16} color={colors.textDark} />
+                        <Text style={styles.skipLabel}>15s</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -777,12 +796,18 @@ const styles = StyleSheet.create({
     },
     controlsRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: spacing.lg },
     controlButton: {
-        width: 33,
-        height: 33,
-        borderRadius: 16.5,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: FIGMA.controlBg,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    skipLabel: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 9,
+        color: colors.textDark,
+        marginTop: 1,
     },
     playButton: {
         width: 46,
