@@ -87,6 +87,7 @@ export default function PhotoTestResultScreen({ navigation, route }) {
             topicId: relatedTopicId,
             difficulty: 'medium',
             count,
+            skipMotor: true, // el topicId viene del OCR y no tiene mapeo al Motor RAG
         });
         setGenerating(false);
         if (error || !Array.isArray(data) || data.length === 0) {

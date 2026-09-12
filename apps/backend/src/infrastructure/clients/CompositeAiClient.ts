@@ -38,6 +38,11 @@ export class CompositeAiClient implements AiApiContract {
     constructor(private readonly cfg: CompositeAiConfig) {}
 
     async generateQuestions(params: GenerateQuestionsParams): Promise<GeneratedQuestion[]> {
+        // skipMotor: el topicId no tiene mapeo al Motor (ej. foto-test) — ir directo a OpenAI
+        if (params.skipMotor) {
+            logger.info('[composite-ai] skipMotor=true → OpenAI directo', { topicId: params.topicId });
+            return this.cfg.fallback.generateQuestions(params);
+        }
         try {
             return await this.cfg.questions.generateQuestions(params);
         } catch (err) {

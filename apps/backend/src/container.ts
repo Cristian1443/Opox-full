@@ -293,6 +293,7 @@ export function buildContainer() {
                 apiKey: env.MOTOR_API_KEY!,
                 openAiKey: env.AI_API_KEY ?? '',
                 timeoutMs: env.MOTOR_API_TIMEOUT_MS,
+                pollTimeoutMs: 60_000, // cap de 60 s; si el Motor tarda más, fallback a OpenAI
                 defaultCursoId: env.MOTOR_DEFAULT_CURSO_ID,
             }),
             fallback: openAiClient,

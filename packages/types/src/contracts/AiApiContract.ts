@@ -138,6 +138,12 @@ export interface GenerateQuestionsParams {
      * similares si son generadas dinámicamente).
      */
     excludeIds?: string[];
+    /**
+     * Saltar el Motor RAG e ir directo a OpenAI.
+     * Usar en flujos donde el topicId no tiene mapeo al Motor (foto-test)
+     * para evitar la espera de 60-90 s que siempre termina en fallback.
+     */
+    skipMotor?: boolean;
 }
 
 // ─── analyzePhoto ─────────────────────────────────────────────────────────────
