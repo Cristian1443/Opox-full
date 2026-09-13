@@ -5,6 +5,73 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-12 — Bloques 6/10 · Fixes post-testing: saveAttempt timeout, BOE catalog search
+
+Rama: `fix/gaps-12-09-26`.
+
+Tres bugs reportados durante sesión de pruebas en dispositivo real.
+
+### Bug 1 · Foto-test no se guardaba (Gateway Timeout en `saveAttempt`)
+
+Tras completar un foto-test (~70 s total: Motor timeout 60 s + fallback OpenAI ~10 s),
+el intento fallaba con `saveAttempt: Gateway Timeout` — el pool de conexiones de
+Supabase estaba agotado.
+
+Fix en `SupabaseTrainingRepository.saveAttempt`:
+- Reintento único tras 2 s si el error contiene `'timeout'`.
+- Si el reintento falla con conflicto PK (`23505`) — el primer intento llegó pero no
+  respondió — se recupera la fila ya existente por `id`.
+
+### Bug 2a · Búsqueda BOE tardaba 60 s en vez de 5 s (ENOTFOUND DNS)
+
+`axios timeout: 5000` no cubre la fase de resolución DNS. Con host caído
+(`ia.opox.ai`) el SO tardaba hasta 60 s en devolver `ENOTFOUND`.
+
+Fix en `MotorBoeClient.searchCatalog`: `AbortController` + `setTimeout(abort, 5000)`
+pasado como `signal` al request de Axios. Garantiza cancelación en ≤ 5 s
+independientemente del estado DNS.
+
+### Bug 2b · Modal "Añadir norma" mostraba leyes genéricas del BOE (12 000+)
+
+Dos causas:
+1. **Campo incorrecto**: el Motor devuelve `identificador` en el catálogo, pero
+   el código esperaba `identificador_boe`. Al ser `undefined`, el botón "Seguir"
+   enviaba `boeIdentifier: undefined` → Zod rechazaba → "Datos inválidos".
+2. **Query vacía vs catálogo**: `searchCatalog('')` devuelve todo el BOE (12 000+
+   leyes). El fallback a `listRegulations` solo corría si el catálogo estaba vacío,
+   lo que nunca ocurría.
+
+Fixes:
+- `MotorBoeClient.searchCatalog`: normaliza `identificador → identificador_boe`
+  (y `vigente → activa`) en cada entrada del catálogo.
+- `SearchBoeRegulationsUseCase`: sin query → salta el catálogo y devuelve
+  directamente `listRegulations(cursoId)` (las ~8 normas del curso activo).
+  Con query → busca en catálogo, fallback a `listRegulations` filtrado si falla.
+- `FollowRegulationUseCase` y `SearchBoeRegulationsUseCase`: migrados de
+  `defaultCursoId` (env var estale `MOTOR_BOE_CURSO_ID`) a `GetCursoIdUseCase`
+  (resuelve desde la tabla `training_courses` en Supabase → `672e3a8bad0f45c8`).
+
+### Bug 2c · Gateway Timeout en `getLastLawView` rompía el Dashboard entero
+
+`getLastLawView` lanzaba si Supabase hacía timeout; al estar en `Promise.all`
+del dashboard, arrastraba todas las demás promesas.
+
+Fix en `GetDashboardSummaryUseCase`: `.catch(() => null)` en la llamada a
+`getLastLawView` — si falla, el dashboard sigue cargando sin el dato de
+última ley vista.
+
+### Archivos modificados
+
+- `apps/backend/src/infrastructure/training/SupabaseTrainingRepository.ts` — retry saveAttempt.
+- `apps/backend/src/infrastructure/boe/MotorBoeClient.ts` — AbortController + normalización de campos.
+- `apps/backend/src/application/boe/BoeUseCases.ts` — skip catálogo sin query, `GetCursoIdUseCase` en Follow/Search.
+- `apps/backend/src/application/dashboard/GetDashboardSummaryUseCase.ts` — `.catch(() => null)` en getLastLawView.
+- `apps/backend/src/presentation/controllers/BoeController.ts` — pasa `oposicion` a follow y search.
+- `apps/backend/src/container.ts` — `getCursoIdUseCase` hoistado, reemplaza `MOTOR_BOE_CURSO_ID` en BOE use cases.
+- `apps/mobile/src/screens/boe/BoeHomeScreen.js` — `keyExtractor` con fallback a `identificador`.
+
+---
+
 ## 2026-09-11 — Bloque 3 · Fix crítico integración Health Connect (invisible en ajustes, permisos denegados)
 
 Rama: `fix/gaps-acceso-perfil-biometria`.

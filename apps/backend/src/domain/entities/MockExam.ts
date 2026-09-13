@@ -56,6 +56,8 @@ export interface ErrorPattern {
     domain: number;
     /** Porcentaje de fallo 0–100 */
     failRate: number;
+    /** ISO 8601 — fecha del último intento registrado para este tema */
+    lastAttemptDate: string;
 }
 
 /**

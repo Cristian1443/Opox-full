@@ -562,16 +562,24 @@ desplegado para detectar cambios en el BOE oficial. Integrado en:
 - `SyncBoeChangesUseCase` — tras upsert, si `preguntas_afectadas.length > 0`,
   llama `motor.regenerateQuestions(changeId, cursoId)` fire-and-forget.
 - Vars de entorno: `MOTOR_BOE_BASE_URL`, `MOTOR_BOE_API_KEY`, `MOTOR_BOE_OPENAI_KEY`
-  (opcional, cae a `AI_API_KEY`), **`MOTOR_BOE_CURSO_ID`** (obligatorio cuando el
-  Motor está activo — ID del curso en el Motor para la oposición activa).
+  (opcional, cae a `AI_API_KEY`). `MOTOR_BOE_CURSO_ID` ya no se usa para BOE use cases
+  — el curso se resuelve dinámicamente via `GetCursoIdUseCase` (tabla `training_courses`).
   Sin `MOTOR_BOE_BASE_URL`, el cliente no se instancia.
 
-**`SearchBoeRegulationsUseCase` — búsqueda con fallback**:
-- Llama `motor.searchCatalog(q)` con timeout de 5 s (configurado por request).
-- Si supera el timeout o devuelve vacío/no-sincronizado, hace fallback automático
-  a `motor.listRegulations(MOTOR_BOE_CURSO_ID)` y filtra localmente por el query.
-- Así el modal "Añadir norma" muestra siempre las normas monitorizadas del curso
-  sin requerir `POST /boe/catalog/sync` previo.
+**`MotorBoeClient.searchCatalog` — normalización de campos (revisión 2026-09-12)**:
+El Motor devuelve `identificador` en el catálogo (no `identificador_boe`). El cliente
+normaliza cada entrada: `identificador → identificador_boe`, `vigente → activa`,
+`id = e.id ?? e.identificador`. Sin esta normalización `followRegulation` enviaba
+`boeIdentifier: undefined` y Zod lo rechazaba con 422 "Datos inválidos".
+
+**`SearchBoeRegulationsUseCase` — búsqueda con fallback (revisión 2026-09-12)**:
+- Sin query (`q` vacío): salta el catálogo y devuelve `listRegulations(cursoId)` directamente.
+  El catálogo genérico sin filtro devuelve 12 000+ leyes del BOE — no es lo útil para el modal.
+- Con query: llama `motor.searchCatalog(q)` con timeout de 5 s (AbortController en cliente).
+  Si supera el timeout o devuelve vacío, fallback a `listRegulations(cursoId)` filtrado localmente.
+- `cursoId` resuelto via `GetCursoIdUseCase` (mismo patrón que `TrainingController`).
+- `FollowRegulationUseCase` también usa `GetCursoIdUseCase`; `BoeController` le pasa
+  `req.authUser?.oposicion`. `MOTOR_BOE_CURSO_ID` queda solo como fallback de `GetCursoIdUseCase`.
 
 **Modal "Añadir norma" (mobile `BoeHomeScreen`)**:
 - Al abrir: carga en paralelo `listRegulations()` (normas ya seguidas) y

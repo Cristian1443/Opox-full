@@ -220,7 +220,7 @@ export default function TrainingResultScreen({ navigation, route }) {
   if (isHighScore) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
-        <ScreenHeader title="Test completado" onBack={() => navigation.goBack()} />
+        <ScreenHeader title="Test completado" onBack={() => navigation.navigate('TrainingHome')} />
 
         <ScrollView contentContainerStyle={styles.celebrationBody} showsVerticalScrollIndicator={false}>
           <View style={styles.trophyWrap}>
@@ -236,7 +236,7 @@ export default function TrainingResultScreen({ navigation, route }) {
 
           <TouchableOpacity
             style={styles.primaryBtn}
-            onPress={() => navigation.goBack()}
+            onPress={() => navigation.navigate('TrainingHome')}
             activeOpacity={0.85}
           >
             <Text style={styles.primaryBtnText}>¿Vamos a por otro test?</Text>
@@ -257,7 +257,7 @@ export default function TrainingResultScreen({ navigation, route }) {
   // ── Pantalla de resultados con donut y estadísticas — mockup LOGRO2 ──
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
-      <ScreenHeader title="Test completado" onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Test completado" onBack={() => navigation.navigate('TrainingHome')} />
 
       <ScrollView
         contentContainerStyle={styles.contentPad}

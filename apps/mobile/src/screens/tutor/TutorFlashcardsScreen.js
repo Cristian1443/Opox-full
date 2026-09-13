@@ -15,6 +15,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Mismo fondo texturizado "cebra" que LoginScreen.js (assets/login/hero_bg.jpg)
 // — el patrón se concentra arriba y se desvanece a gris plano hacia abajo.
@@ -116,24 +117,25 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
     const [topics, setTopics]   = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
+        let cancelled = false;
         setLoading(true);
-        // Reutilizamos listSummaries porque devuelve la misma lista de temas del
-        // temario (con topicId + topicTitle). Alternativa: /training/topics.
         tutorApi.listSummaries(oposicion)
             .then((res) => {
+                if (cancelled) return;
                 if (!res?.error && Array.isArray(res?.data) && res.data.length > 0) {
                     setTopics(res.data);
                 } else if (oposicion !== 'policia-local-galicia') {
                     return tutorApi.listSummaries('policia-local-galicia')
                         .then((res2) => {
-                            if (!res2?.error && Array.isArray(res2?.data)) setTopics(res2.data);
+                            if (!cancelled && !res2?.error && Array.isArray(res2?.data)) setTopics(res2.data);
                         });
                 }
             })
             .catch(() => {})
-            .finally(() => setLoading(false));
-    }, [oposicion]);
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [oposicion]));
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

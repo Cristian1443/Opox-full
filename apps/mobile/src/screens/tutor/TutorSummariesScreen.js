@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     StyleSheet,
@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Colores confirmados contra Figma (frame RESUMEN INTELIGENTE, Bloque 8)
 // sin equivalente exacto en theme.js.
@@ -128,22 +129,25 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
     const [summaries, setSummaries] = useState([]);
     const [loading, setLoading]     = useState(true);
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
+        let cancelled = false;
         setLoading(true);
         tutorApi.listSummaries(oposicion)
             .then((res) => {
+                if (cancelled) return;
                 if (!res?.error && Array.isArray(res?.data) && res.data.length > 0) {
                     setSummaries(res.data);
                 } else if (oposicion !== 'policia-local-galicia') {
                     return tutorApi.listSummaries('policia-local-galicia')
                         .then((res2) => {
-                            if (!res2?.error && Array.isArray(res2?.data)) setSummaries(res2.data);
+                            if (!cancelled && !res2?.error && Array.isArray(res2?.data)) setSummaries(res2.data);
                         });
                 }
             })
             .catch(() => {})
-            .finally(() => setLoading(false));
-    }, [oposicion]);
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [oposicion]));
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

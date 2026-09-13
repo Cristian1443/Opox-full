@@ -144,11 +144,33 @@ export class MotorBoeClient implements MotorBoeContract {
      */
     async searchCatalog(query: string, limit = 20): Promise<MotorBoeCatalogResult> {
         logger.info('[motor-boe] searchCatalog', { query });
-        const { data } = await this.http.get<MotorBoeCatalogResult>('/v1/boe/catalog', {
-            params: { q: query, limit },
-            timeout: 5_000, // Timeout corto: si el catálogo tarda, cae al fallback de listRegulations
-        });
-        return data ?? { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
+        // AbortController + timeout: cubre también fallos DNS (ENOTFOUND), donde
+        // Axios timeout=5000 no aplica porque el SO puede tardar hasta 60 s en
+        // confirmar que el host no existe.
+        const TIMEOUT_MS = 5_000;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data } = await this.http.get<any>('/v1/boe/catalog', {
+                params: { q: query, limit },
+                timeout: TIMEOUT_MS,
+                signal: controller.signal,
+            });
+            if (!data) return { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
+            // El Motor devuelve 'identificador' (no 'identificador_boe'); normalizamos aquí
+            // para que el resto del stack use siempre identificador_boe.
+            const resultados: MotorBoeCatalogResult['resultados'] = (data.resultados ?? []).map((e: any) => ({
+                id: e.id ?? e.identificador,
+                identificador_boe: e.identificador_boe ?? e.identificador,
+                titulo: e.titulo ?? '',
+                url: e.url ?? '',
+                activa: e.activa ?? e.vigente ?? true,
+            }));
+            return { sincronizado: data.sincronizado ?? false, total: data.total ?? resultados.length, ultima_sincronizacion: data.ultima_sincronizacion ?? null, resultados };
+        } finally {
+            clearTimeout(timer);
+        }
     }
 
     /**

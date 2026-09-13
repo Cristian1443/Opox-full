@@ -200,18 +200,10 @@ export class MotorAiClient implements AiApiContract {
             preguntas = await this.pollJobForPreguntas(jobId);
         }
 
-        // Caso A (INC-04 resuelto): el job ya incluye correcta_idx en todas las preguntas.
-        // Caso B (INC-04 pendiente): las preguntas son origen="generada" sin correcta_idx.
-        //   → Fail-fast si NINGUNA tiene correcta_idx (evita cargar el banco en vano).
-        const todasGeneradasSinIdx = preguntas.every(
-            (p) => p.origen === 'generada' && typeof p.correcta_idx !== 'number',
-        );
-        if (todasGeneradasSinIdx && preguntas.length > 0) {
-            throw new Error(
-                '[MotorAiClient] todas las preguntas son origen="generada" sin correcta_idx (INC-04). ' +
-                'CompositeAiClient debe hacer fallback a OpenAI.',
-            );
-        }
+        // INC-04: el job result no incluye correcta_idx inline para origen="generada".
+        // El banco (/v1/courses/{id}/questions) SÍ tiene correcta_idx para esas preguntas —
+        // sus IDs coinciden con los del job. El workaround de banco (líneas siguientes)
+        // siempre funciona; no se hace fail-fast antes de intentarlo.
 
         // Separar las que ya traen correcta_idx en el job de las que necesitan el banco.
         const conIdx = preguntas.filter((p) => typeof p.correcta_idx === 'number');

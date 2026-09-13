@@ -435,7 +435,7 @@ export default function BoeHomeScreen({ navigation }) {
                     ) : (
                         <FlatList
                             data={searchResults}
-                            keyExtractor={item => item.id ?? item.identificador_boe}
+                            keyExtractor={item => item.id ?? item.identificador_boe ?? item.identificador}
                             contentContainerStyle={{ padding: spacing.md }}
                             renderItem={({ item }) => (
                                 <View style={styles.searchResultRow}>

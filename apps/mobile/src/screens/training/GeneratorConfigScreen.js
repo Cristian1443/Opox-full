@@ -54,16 +54,18 @@ const DEFAULTS = { difficulty: 'medium', count: 30, timed: true };
 function StepSlider({ labels, index, onChange }) {
     const [width, setWidth] = useState(0);
     const usable = Math.max(width - THUMB, 1);
-    // Ref para evitar stale closure: PanResponder.create se ejecuta una sola vez
-    // pero sus callbacks necesitan el valor actualizado de usable.
     const usableRef = useRef(usable);
     const labelsLenRef = useRef(labels.length);
+    // Ref para el índice actual: PanResponder.create corre solo una vez,
+    // así que usamos refs para leer el valor más reciente dentro del gesture.
+    const indexRef = useRef(index);
     const startX = useRef(0);
     const [pos, setPos] = useState(0);
 
     useEffect(() => {
         usableRef.current = usable;
         labelsLenRef.current = labels.length;
+        indexRef.current = index;
         setPos((index / (labels.length - 1)) * usable);
     }, [index, usable, labels.length]);
 
@@ -71,11 +73,13 @@ function StepSlider({ labels, index, onChange }) {
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: (e) => {
+            onPanResponderGrant: () => {
+                // Iniciar desde la posición actual del thumb (no del toque) —
+                // locationX es inestable en algunos dispositivos Android y causa
+                // saltos al extremo cuando el toque no es justo sobre el thumb.
                 const u = usableRef.current;
-                const next = Math.max(0, Math.min(u, e.nativeEvent.locationX - THUMB / 2));
-                startX.current = next;
-                setPos(next);
+                const n = labelsLenRef.current;
+                startX.current = indexRef.current * (u / Math.max(n - 1, 1));
             },
             onPanResponderMove: (_, g) => {
                 const u = usableRef.current;
@@ -122,31 +126,37 @@ function StepSlider({ labels, index, onChange }) {
 function RangeSlider({ min, max, step, value, onChange }) {
     const [width, setWidth] = useState(0);
     const usable = Math.max(width - THUMB, 1);
-    // Mismo fix de stale closure que StepSlider.
     const usableRef = useRef(usable);
+    const valueRef = useRef(value);
+    const minRef = useRef(min);
+    const maxRef = useRef(max);
+    const stepRef = useRef(step);
     const startX = useRef(0);
     const [pos, setPos] = useState(0);
 
-    const valueToPos = (v) => ((v - min) / (max - min)) * usableRef.current;
     const posToValue = (p) => {
-        const raw = min + (p / usableRef.current) * (max - min);
-        return Math.round(raw / step) * step;
+        const raw = minRef.current + (p / usableRef.current) * (maxRef.current - minRef.current);
+        return Math.round(raw / stepRef.current) * stepRef.current;
     };
 
     useEffect(() => {
         usableRef.current = usable;
-        setPos(((value - min) / (max - min)) * usable);
-    }, [value, usable, min, max]);
+        valueRef.current = value;
+        minRef.current = min;
+        maxRef.current = max;
+        stepRef.current = step;
+        setPos(((value - min) / Math.max(max - min, 1)) * usable);
+    }, [value, usable, min, max, step]);
 
     const responder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: (e) => {
+            onPanResponderGrant: () => {
+                // Mismo fix que StepSlider: iniciar desde la posición actual del thumb.
                 const u = usableRef.current;
-                const next = Math.max(0, Math.min(u, e.nativeEvent.locationX - THUMB / 2));
-                startX.current = next;
-                setPos(next);
+                const range = Math.max(maxRef.current - minRef.current, 1);
+                startX.current = ((valueRef.current - minRef.current) / range) * u;
             },
             onPanResponderMove: (_, g) => {
                 const u = usableRef.current;

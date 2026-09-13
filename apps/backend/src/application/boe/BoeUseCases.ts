@@ -21,6 +21,7 @@ import type {
     TrainingTopic,
 } from '@opox/types';
 import { logger } from '@opox/utils';
+import type { GetCursoIdUseCase } from '../training/GenerateUseCases';
 
 // ─── Feed (pantalla 10.1) ─────────────────────────────────────────────────────
 
@@ -331,20 +332,23 @@ export class FollowRegulationUseCase {
     constructor(
         private readonly repo: IBoeRepository,
         private readonly motor: MotorBoeContract | null,
-        private readonly defaultCursoId: string | null,
+        private readonly getCursoId: GetCursoIdUseCase | null,
     ) {}
 
-    async execute(userId: string, boeIdentifier: string, titulo: string): Promise<BoeWatchedRegulation> {
+    async execute(userId: string, boeIdentifier: string, titulo: string, oposicion?: string | null): Promise<BoeWatchedRegulation> {
         let motorNormaId: string | undefined;
 
-        if (this.motor && this.defaultCursoId) {
-            try {
-                const norma = await this.motor.followRegulation(this.defaultCursoId, boeIdentifier, titulo);
-                motorNormaId = norma.id;
-            } catch (err: any) {
-                // 409 = ya está en seguimiento en el Motor — no es error
-                if (err?.response?.status !== 409) {
-                    logger.warn('[boe] followRegulation motor error (non-fatal)', { boeIdentifier, err: err?.message });
+        if (this.motor) {
+            const cursoId = this.getCursoId ? await this.getCursoId.execute(oposicion ?? null) : null;
+            if (cursoId) {
+                try {
+                    const norma = await this.motor.followRegulation(cursoId, boeIdentifier, titulo);
+                    motorNormaId = norma.id;
+                } catch (err: any) {
+                    // 409 = ya está en seguimiento en el Motor — no es error
+                    if (err?.response?.status !== 409) {
+                        logger.warn('[boe] followRegulation motor error (non-fatal)', { boeIdentifier, err: err?.message });
+                    }
                 }
             }
         }
@@ -378,15 +382,41 @@ export class UnfollowRegulationUseCase {
 export class SearchBoeRegulationsUseCase {
     constructor(
         private readonly motor: MotorBoeContract | null,
-        private readonly defaultCursoId: string | null,
+        private readonly getCursoId: GetCursoIdUseCase | null,
     ) {}
 
-    async execute(query: string, limit = 20): Promise<MotorBoeCatalogResult> {
+    async execute(query: string, limit = 20, oposicion?: string | null): Promise<MotorBoeCatalogResult> {
         if (!this.motor) {
             return { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
         }
 
-        // Intentar catálogo del Motor (timeout corto configurado en MotorBoeClient.searchCatalog)
+        const cursoId = this.getCursoId ? await this.getCursoId.execute(oposicion ?? null) : null;
+
+        // Sin query: devolver directamente las normas monitorizadas del curso.
+        // El catálogo genérico sin filtro devuelve todo el BOE (12 000+ leyes), que
+        // no es lo que el usuario quiere ver al abrir el modal "Añadir norma".
+        if (!query.trim()) {
+            if (!cursoId) return { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
+            try {
+                const normas = await this.motor.listRegulations(cursoId);
+                return {
+                    sincronizado: true,
+                    total: normas.length,
+                    ultima_sincronizacion: null,
+                    resultados: normas.map(n => ({
+                        id: n.id,
+                        identificador_boe: n.identificador_boe,
+                        titulo: n.titulo,
+                        url: n.url,
+                        activa: n.activa,
+                    })),
+                };
+            } catch {
+                return { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
+            }
+        }
+
+        // Con query: buscar en el catálogo amplio del Motor
         let result: MotorBoeCatalogResult = { sincronizado: false, total: 0, ultima_sincronizacion: null, resultados: [] };
         try {
             result = await this.motor.searchCatalog(query, limit);
@@ -395,17 +425,15 @@ export class SearchBoeRegulationsUseCase {
             logger.info('[boe] searchCatalog timeout/error — usando listRegulations como fallback');
         }
 
-        // Fallback: mostrar las normas que el Motor ya monitoriza para el curso
-        if ((!result.sincronizado || result.resultados.length === 0) && this.defaultCursoId) {
+        // Fallback: filtrar normas del curso que coincidan con el query
+        if ((!result.sincronizado || result.resultados.length === 0) && cursoId) {
             try {
-                const normas = await this.motor.listRegulations(this.defaultCursoId);
+                const normas = await this.motor.listRegulations(cursoId);
                 const q = query.trim().toLowerCase();
-                const filtradas = q
-                    ? normas.filter(n =>
-                        n.titulo.toLowerCase().includes(q) ||
-                        n.identificador_boe.toLowerCase().includes(q),
-                    )
-                    : normas;
+                const filtradas = normas.filter(n =>
+                    n.titulo.toLowerCase().includes(q) ||
+                    n.identificador_boe.toLowerCase().includes(q),
+                );
                 return {
                     sincronizado: false,
                     total: filtradas.length,

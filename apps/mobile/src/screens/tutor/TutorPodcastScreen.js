@@ -20,6 +20,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
 import { API_BASE_URL } from '../../api/config';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Colores confirmados contra Figma (frame PODCAST, Bloque 8).
 const FIGMA = {
@@ -110,22 +111,25 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
     const [episodes, setEpisodes] = useState([]);
     const [loading, setLoading]   = useState(true);
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
+        let cancelled = false;
         setLoading(true);
         tutorApi.listEpisodes(oposicion)
             .then((res) => {
+                if (cancelled) return;
                 if (!res?.error && Array.isArray(res?.data) && res.data.length > 0) {
                     setEpisodes(res.data);
                 } else if (oposicion !== 'policia-local-galicia') {
                     return tutorApi.listEpisodes('policia-local-galicia')
                         .then((res2) => {
-                            if (!res2?.error && Array.isArray(res2?.data)) setEpisodes(res2.data);
+                            if (!cancelled && !res2?.error && Array.isArray(res2?.data)) setEpisodes(res2.data);
                         });
                 }
             })
             .catch(() => {})
-            .finally(() => setLoading(false));
-    }, [oposicion]);
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [oposicion]));
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

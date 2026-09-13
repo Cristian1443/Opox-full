@@ -697,7 +697,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
         onStay={() => setShowAbandonModal(false)}
         onConfirmExit={() => {
           setShowAbandonModal(false);
-          navigation.goBack();
+          navigation.navigate('TrainingHome');
         }}
       />
 
@@ -753,7 +753,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
         onExitAndSave={() => {
           setShowPauseModal(false);
           setIsPaused(false);
-          navigation.goBack();
+          navigation.navigate('TrainingHome');
         }}
       />
 

@@ -145,6 +145,7 @@ export class TrainingController {
             totalAnswered: p.totalAnswered,
             domain: p.domain,
             failRate: p.failRate,
+            lastAttemptDate: p.lastAttemptDate,
         };
     }
 
@@ -230,6 +231,18 @@ export class TrainingController {
         try {
             const body = req.body as AnalyzePhotoRequest;
             const result = await this.deps.analyzePhoto.execute(body);
+
+            // Normalizar relatedTopicId: si el slug devuelto por la IA (ej. "ley-39")
+            // no pertenece al curso activo, reemplazarlo por 'foto-test' para que el
+            // intento se registre correctamente en el Laboratorio de Errores.
+            if (result.relatedTopicId && result.relatedTopicId !== 'all') {
+                const courseTopics = await this.deps.listTopics.execute(body.oposicion ?? '');
+                const validIds = new Set(courseTopics.map((t) => t.topicId));
+                if (!validIds.has(result.relatedTopicId)) {
+                    result.relatedTopicId = 'foto-test';
+                }
+            }
+
             this.ok<PhotoTestResult>(res, 200, result);
         } catch (err) { next(err); }
     };

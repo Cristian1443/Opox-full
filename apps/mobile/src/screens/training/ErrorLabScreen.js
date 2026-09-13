@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     TouchableOpacity,
@@ -14,6 +14,7 @@ import Svg, { Path } from 'react-native-svg';
 import TrainingHeader from '../../components/TrainingHeader';
 import { colors } from '../../theme';
 import { trainingApi } from '../../api/training';
+import { useFocusEffect } from '@react-navigation/native';
 
 const COLORS = {
     purple: colors.textDark,
@@ -63,9 +64,22 @@ function IconTriangle({ size = 16, direction = 'right', color = COLORS.orange })
     );
 }
 
+function formatLastAttempt(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    const now = new Date();
+    const diffDays = Math.floor((now - d) / 86400000);
+    if (diffDays === 0) return 'hoy';
+    if (diffDays === 1) return 'ayer';
+    if (diffDays < 7) return `hace ${diffDays} días`;
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
 // ─── Item de debilidad con expansión propia ──────────────────────────────────
 function WeaknessItem({ item }) {
     const [open, setOpen] = useState(false);
+
+    const dateLabel = formatLastAttempt(item.lastAttemptDate);
 
     return (
         <View style={styles.itemWrapper}>
@@ -73,7 +87,10 @@ function WeaknessItem({ item }) {
                 <View style={{ marginRight: 10 }}>
                     <IconTriangle size={16} direction={open ? 'down' : 'right'} />
                 </View>
-                <Text style={styles.itemTitle} numberOfLines={1}>{item.topic}</Text>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.itemTitle} numberOfLines={1}>{item.topic}</Text>
+                    {dateLabel ? <Text style={styles.itemDate}>{dateLabel}</Text> : null}
+                </View>
                 <Text style={styles.itemPct}>{item.domain}%</Text>
             </TouchableOpacity>
 
@@ -85,6 +102,9 @@ function WeaknessItem({ item }) {
                     </View>
 
                     <Text style={styles.paragraph}>{item.description}</Text>
+                    {item.totalAnswered > 0 && (
+                        <Text style={styles.basadoEn}>Basado en {item.totalAnswered} preguntas</Text>
+                    )}
                     <Text style={[styles.paragraph, { marginTop: 8 }]}>
                         La IA ha preparado un test quirúrgico para eliminar esta debilidad.
                     </Text>
@@ -114,8 +134,9 @@ export default function ErrorLabScreen({ navigation }) {
     const [patterns, setPatterns] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
         let cancelled = false;
+        setLoading(true);
         trainingApi.listErrorPatterns().then(({ data }) => {
             if (cancelled) return;
             setPatterns((data ?? []).map((p, i) => ({
@@ -124,13 +145,15 @@ export default function ErrorLabScreen({ navigation }) {
                 topic: p.topic,
                 domain: p.domain,
                 failRate: p.failRate,
+                totalAnswered: p.totalAnswered ?? 0,
+                lastAttemptDate: p.lastAttemptDate ?? null,
                 description: `Fallas el ${p.failRate}% de las preguntas sobre ${p.topic}.`,
                 isPrimary: i === 0,
             })));
             setLoading(false);
         });
         return () => { cancelled = true; };
-    }, []);
+    }, []));
 
     const primary = patterns.find((p) => p.isPrimary);
 
@@ -261,10 +284,24 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.border,
     },
     itemTitle: {
-        flex: 1,
         fontFamily: 'Poppins-Medium',
         fontSize: 17,
         color: COLORS.purple,
+    },
+    itemDate: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11,
+        color: COLORS.gray,
+        opacity: 0.6,
+        marginTop: 1,
+    },
+    basadoEn: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: COLORS.gray,
+        opacity: 0.7,
+        marginTop: 4,
+        marginBottom: 4,
     },
     itemPct: {
         fontFamily: 'Poppins-Light',

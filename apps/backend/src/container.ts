@@ -377,6 +377,7 @@ export function buildContainer() {
     // ─── Use cases (application) ──────────────────
     const getWeek = new GetWeekUseCase(planningRepo);
     const getMacro = new GetMacroUseCase(planningRepo);
+    const getCursoIdUseCase = new GetCursoIdUseCase(trainingRepo, env.MOTOR_DEFAULT_CURSO_ID ?? '');
 
     const useCases = {
         register: new RegisterUseCase(authRepo),
@@ -443,7 +444,7 @@ export function buildContainer() {
         getMotivationSummary: new GetMotivationSummaryUseCase(dashboardRepo, motivationRepo),
 
         // Bloque 6 · Entrenamiento — multi-curso
-        getCursoId: new GetCursoIdUseCase(trainingRepo, env.MOTOR_DEFAULT_CURSO_ID ?? ''),
+        getCursoId: getCursoIdUseCase,
         listMockExams: new ListMockExamsUseCase(trainingRepo),
         getMockExam: new GetMockExamUseCase(trainingRepo),
         generateQuestions: new GenerateQuestionsUseCase(aiApi),
@@ -517,9 +518,9 @@ export function buildContainer() {
               )
             : undefined,
         listBoeRegulations: new ListFollowedRegulationsUseCase(boeRepo),
-        followBoeRegulation: new FollowRegulationUseCase(boeRepo, motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        followBoeRegulation: new FollowRegulationUseCase(boeRepo, motorBoe, getCursoIdUseCase),
         unfollowBoeRegulation: new UnfollowRegulationUseCase(boeRepo, motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
-        searchBoeCatalog: new SearchBoeRegulationsUseCase(motorBoe, env.MOTOR_BOE_CURSO_ID ?? null),
+        searchBoeCatalog: new SearchBoeRegulationsUseCase(motorBoe, getCursoIdUseCase),
         syncBoeCatalog: motorBoe ? new SyncBoeCatalogUseCase(motorBoe) : undefined,
 
         // Bloque 11 · Tienda

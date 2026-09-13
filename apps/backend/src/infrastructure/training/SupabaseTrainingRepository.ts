@@ -210,25 +210,50 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
     async saveAttempt(input: SaveAttemptInput): Promise<TrainingAttempt> {
         const attemptId = randomUUID();
 
-        const { data, error } = await this.supabaseAdmin
+        const insertPayload = {
+            id: attemptId,
+            user_id: input.userId,
+            source: input.source,
+            mock_exam_id: input.mockExamId ?? null,
+            topic_id: input.topicId ?? null,
+            difficulty: input.difficulty ?? null,
+            question_count: input.questionCount,
+            correct_count: input.correctCount,
+            wrong_count: input.wrongCount,
+            blank_count: input.blankCount,
+            score: input.score,
+            duration_secs: input.durationSecs ?? null,
+        };
+
+        let insertResult = await this.supabaseAdmin
             .from('training_attempts')
-            .insert({
-                id: attemptId,
-                user_id: input.userId,
-                source: input.source,
-                mock_exam_id: input.mockExamId ?? null,
-                topic_id: input.topicId ?? null,
-                difficulty: input.difficulty ?? null,
-                question_count: input.questionCount,
-                correct_count: input.correctCount,
-                wrong_count: input.wrongCount,
-                blank_count: input.blankCount,
-                score: input.score,
-                duration_secs: input.durationSecs ?? null,
-            })
+            .insert(insertPayload)
             .select('*')
             .single();
 
+        // Reintento único ante Gateway Timeout (error transitorio de Supabase —
+        // ocurre cuando el pool de conexiones se agota tras sesiones largas como
+        // foto-test con Motor timeout + fallback OpenAI ~70 s).
+        if (insertResult.error?.message?.toLowerCase().includes('timeout')) {
+            await new Promise((r) => setTimeout(r, 2000));
+            insertResult = await this.supabaseAdmin
+                .from('training_attempts')
+                .insert(insertPayload)
+                .select('*')
+                .single();
+            // Si el primer intento llegó a Supabase pero la respuesta no volvió,
+            // el reintento falla con conflicto PK (23505) — recuperamos la fila.
+            if (insertResult.error?.code === '23505') {
+                const { data: existing } = await this.supabaseAdmin
+                    .from('training_attempts')
+                    .select('*')
+                    .eq('id', attemptId)
+                    .single();
+                if (existing) insertResult = { data: existing, error: null, count: null, status: 200, statusText: 'OK', success: true };
+            }
+        }
+
+        const { data, error } = insertResult;
         if (error || !data) throw new Error(`saveAttempt: ${error?.message}`);
 
         if (input.responses.length > 0) {
@@ -279,28 +304,92 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
         // (service role), tenemos que filtrar manualmente por user_id.
         const { data, error } = await this.supabaseAdmin
             .from('training_attempt_responses')
-            .select('topic_id, topic, is_correct')
+            .select('topic_id, topic, is_correct, answered_at')
             .eq('user_id', userId);
 
         if (error) throw new Error(`listErrorPatterns: ${error.message}`);
 
         // Agrupamos en memoria (equivalente a la vista SQL)
-        const byTopic = new Map<string, { topic: string; total: number; correct: number }>();
+        const byTopic = new Map<string, { topic: string; total: number; correct: number; lastDate: string }>();
         for (const row of (data ?? [])) {
             const key = row.topic_id as string;
-            const entry = byTopic.get(key) ?? { topic: row.topic as string, total: 0, correct: 0 };
+            const rowDate = row.answered_at as string;
+            const entry = byTopic.get(key) ?? { topic: row.topic as string, total: 0, correct: 0, lastDate: rowDate };
             entry.total += 1;
             if (row.is_correct) entry.correct += 1;
+            if (rowDate > entry.lastDate) entry.lastDate = rowDate;
             byTopic.set(key, entry);
         }
 
+        // Enriquecer con labels legibles desde training_topics.
+        // El Motor devuelve topic = hex ID (ej. "0acb39953a424c20") en lugar del nombre;
+        // training_topics tiene el sort_order para reproducir el mismo "Tema N" que
+        // usa ListTopicsUseCase en el resto de la app.
+        // posMap: topicId → "Tema N" para el curso activo del usuario.
+        // Queda vacío si no se encuentra ningún topicId en training_topics.
+        const posMap = new Map<string, string>();
+        const topicIds = [...byTopic.keys()];
+        if (topicIds.length > 0) {
+            // Detectar la oposición del usuario buscando uno de los topicIds en la tabla
+            const { data: matched } = await this.supabaseAdmin
+                .from('training_topics')
+                .select('oposicion')
+                .in('topic_id', topicIds)
+                .limit(1);
+
+            const oposicion = (matched as Array<{ oposicion: string }> | null)?.[0]?.oposicion;
+            if (oposicion) {
+                // Cargar todos los temas de esa oposición ordenados para calcular Tema N
+                const { data: allTopics } = await this.supabaseAdmin
+                    .from('training_topics')
+                    .select('topic_id')
+                    .eq('oposicion', oposicion)
+                    .order('sort_order', { ascending: true });
+
+                ((allTopics ?? []) as Array<{ topic_id: string }>).forEach((t, i) => {
+                    posMap.set(t.topic_id, `Tema ${i + 1}`);
+                });
+
+                for (const [topicId, entry] of byTopic.entries()) {
+                    const label = posMap.get(topicId);
+                    if (label) entry.topic = label;
+                }
+            }
+        }
+
+        // Regex para detectar IDs hex sin resolver después del enriquecimiento.
+        const HEX_ID_RE = /^[0-9a-f]{12,}$/i;
+
         const patterns: ErrorPattern[] = [];
-        for (const [topicId, { topic, total, correct }] of byTopic.entries()) {
+        for (const [topicId, { topic, total, correct, lastDate }] of byTopic.entries()) {
             if (total < 5) continue; // mínimo estadístico
+            // 'all' = test quirúrgico sobre todos los temas — no es accionable por tema
+            if (topicId === 'all') continue;
+            // IDs hex sin resolver tras enriquecimiento (curso antiguo no mapeado)
+            if (HEX_ID_RE.test(topic)) continue;
+            // Foto-test: el Motor devuelve slugs semánticos que no pertenecen al curso
+            // activo; el controller los normaliza a 'foto-test'. Siempre mostrar.
+            if (topicId === 'foto-test') {
+                const wrong = total - correct;
+                patterns.push({
+                    topicId,
+                    topic: 'Foto-test',
+                    totalAnswered: total,
+                    totalCorrect: correct,
+                    totalWrong: wrong,
+                    domain: Math.round((correct / total) * 100),
+                    failRate: Math.round((wrong / total) * 100),
+                    lastAttemptDate: lastDate,
+                });
+                continue;
+            }
+            // Solo mostrar temas del curso activo del usuario (en posMap).
+            // Evita que pruebas de oposiciones antiguas contaminen el laboratorio.
+            if (posMap.size > 0 && !posMap.has(topicId)) continue;
             const wrong = total - correct;
             const domain = Math.round((correct / total) * 100);
             const failRate = Math.round((wrong / total) * 100);
-            patterns.push({ topicId, topic, totalAnswered: total, totalCorrect: correct, totalWrong: wrong, domain, failRate });
+            patterns.push({ topicId, topic, totalAnswered: total, totalCorrect: correct, totalWrong: wrong, domain, failRate, lastAttemptDate: lastDate });
         }
 
         return patterns.sort((a, b) => b.failRate - a.failRate);

@@ -46,7 +46,7 @@ export class GetDashboardSummaryUseCase {
             this.dashboardRepo.getGamification(input.userId),
             this.dashboardRepo.getUnreadNotificationCount(input.userId),
             this.dashboardRepo.getNextPendingNudge(input.userId),
-            this.trainingRepo.getLastLawView(input.userId),
+            this.trainingRepo.getLastLawView(input.userId).catch(() => null),
             this.trainingRepo.listErrorPatterns(input.userId),
             this.trainingRepo.getMockProgress(input.userId),
         ]);

@@ -54,28 +54,6 @@ const FIGMA = {
     playTriangle: '#65C681',
 };
 
-function ShuffleIcon({ size = 18, color = FIGMA.outlineIcon }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path d="M3 6h4l10 12h4" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M3 18h4l2.5-3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M14.5 6H21m0 0l-3-3m3 3l-3 3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M21 18h-6.5m6.5 0l-3 3m3-3l-3-3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
-function RepeatIcon({ size = 18, color = FIGMA.outlineIcon }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path d="M4 9a5 5 0 0 1 5-5h9" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
-            <Path d="M18 4l3 3-3 3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M20 15a5 5 0 0 1-5 5H6" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
-            <Path d="M6 20l-3-3 3-3" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
 function SkipIcon({ size = 14, color = colors.textDark, direction = 'next' }) {
     const isNext = direction === 'next';
     return (

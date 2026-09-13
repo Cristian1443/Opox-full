@@ -33,6 +33,8 @@ export interface ErrorPatternDTO {
     totalAnswered: number;
     domain: number;
     failRate: number;
+    /** ISO 8601 — fecha del último intento registrado para este tema */
+    lastAttemptDate: string;
 }
 
 export interface TrainingAttemptDTO {

@@ -141,7 +141,7 @@ export class BoeController {
     followRegulation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { boeIdentifier, titulo } = req.body as { boeIdentifier: string; titulo: string };
-            const result = await this.deps.followRegulation.execute(req.authUser!.id, boeIdentifier, titulo);
+            const result = await this.deps.followRegulation.execute(req.authUser!.id, boeIdentifier, titulo, req.authUser?.oposicion);
             ok(res, 201, result);
         } catch (e) { next(e); }
     };
@@ -160,7 +160,7 @@ export class BoeController {
         try {
             const query = (req.query['q'] as string) ?? '';
             const limit = Math.min(Number(req.query['limit'] ?? 20), 50);
-            const result = await this.deps.searchCatalog.execute(query, limit);
+            const result = await this.deps.searchCatalog.execute(query, limit, req.authUser?.oposicion);
             ok(res, 200, result);
         } catch (e) { next(e); }
     };
