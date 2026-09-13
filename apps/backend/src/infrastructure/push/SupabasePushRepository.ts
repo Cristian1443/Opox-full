@@ -57,6 +57,21 @@ export class SupabasePushRepository implements IPushRepository {
 
         if (error) logger.error('[push-repo] deleteToken', { error });
     }
+
+    async tryClaimDailyRun(jobName: string): Promise<boolean> {
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+        const { error } = await this.db
+            .from('cron_job_runs')
+            .insert({ job_name: jobName, run_date: today });
+
+        if (!error) return true; // primera vez hoy — procede con el envío
+        if (error.code === '23505') return false; // unique_violation — ya se reclamó, no reenviar
+
+        // Error inesperado (ej. tabla aún no migrada) — no bloqueamos el envío
+        // para no romper la funcionalidad existente si algo sale mal aquí.
+        logger.error('[push-repo] tryClaimDailyRun', { error, jobName });
+        return true;
+    }
 }
 
 function mapToken(row: Record<string, unknown>): PushToken {

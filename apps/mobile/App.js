@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Device from 'expo-device';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import {
   useFonts,
@@ -51,6 +52,24 @@ if (!IS_EXPO_GO) {
   } catch (_) {
     Notifications = null;
   }
+}
+
+/**
+ * ID estable por dispositivo físico: Android ID / vendor ID de iOS, que
+ * sobreviven a reinstalaciones de la app (a diferencia del token de push,
+ * que Expo rota cada vez). Cae al viejo comportamiento (derivado del token)
+ * solo si la llamada nativa falla o no devuelve nada.
+ */
+async function getStableDeviceId(fallbackToken) {
+  try {
+    const id = Platform.OS === 'ios'
+      ? await Application.getIosIdForVendorAsync()
+      : Application.getAndroidId();
+    if (id) return id.slice(0, 64);
+  } catch (err) {
+    console.warn('[push-reg] getStableDeviceId falló, usando fallback:', err?.message);
+  }
+  return fallbackToken.replace('ExponentPushToken[', '').replace(']', '').slice(0, 32);
 }
 
 /**
@@ -110,7 +129,13 @@ export async function registerForPushNotifications() {
     if (!token) { console.warn('[push-reg] abort: getExpoPushTokenAsync no devolvió token'); return; }
 
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-    const deviceId = token.replace('ExponentPushToken[', '').replace(']', '').slice(0, 32);
+    // ID estable por dispositivo (sobrevive reinstalaciones/builds nuevos del
+    // APK) en vez de derivarlo del token de push, que Expo rota en cada
+    // instalación. Antes, cada reinstalación durante testing generaba una
+    // fila NUEVA en vez de actualizar la existente — algunos usuarios
+    // acumularon hasta 10 tokens "vivos" y recibían el mismo push repetido
+    // una vez por cada fila vieja.
+    const deviceId = await getStableDeviceId(token);
     console.log('[push-reg] POST /push/token → platform=', platform, 'deviceId=', deviceId);
     const res = await pushApi.registerToken(token, platform, deviceId);
     console.log('[push-reg] backend response=', JSON.stringify(res).slice(0, 200));

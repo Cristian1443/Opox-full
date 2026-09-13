@@ -247,6 +247,15 @@ export class SendStreakWarningUseCase {
     ) {}
 
     async execute(): Promise<{ sent: number }> {
+        // node-cron corre en-proceso — si Render reinicia/redeploya justo en la
+        // ventana del cron, dos procesos pueden disparar el mismo job casi al
+        // mismo tiempo. Este guard hace que solo el primero en llegar envíe.
+        const canRun = await this.pushRepo.tryClaimDailyRun('streak-warning');
+        if (!canRun) {
+            logger.info('[notifications] streak-warning: ya se envió hoy, se omite');
+            return { sent: 0 };
+        }
+
         const tokens = await this.pushRepo.getAllTokens();
         if (tokens.length === 0) {
             logger.info('[notifications] streak-warning: sin tokens registrados');

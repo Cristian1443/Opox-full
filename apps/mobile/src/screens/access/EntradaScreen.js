@@ -10,12 +10,11 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
-// Lockups vectorizados reales exportados desde Figma (mismo origen que
+// Lockup vectorizado real exportado desde Figma (mismo origen que
 // SplashScreen.js: file BuqTDwvaSFpG2sI1PYdD36, frame "CARGA INICIAL"),
-// reusados aquí para no duplicar assets — la pantalla ENTRADA comparte
-// exactamente el mismo fondo/wordmark/badge que la carga inicial.
+// reusado aquí para no duplicar assets — la pantalla ENTRADA comparte
+// exactamente el mismo fondo/wordmark que la carga inicial.
 import OpoxLogo from '../../../assets/opoxLogo';
-import MasCopLogo from '../../../assets/masCopLogo';
 import camoImg from '../../imports/CargaInicial/3e43d7dd7590060c7fd1b2f8e506e66fc41fe1d7.jpg';
 
 const { width } = Dimensions.get('window');
@@ -42,7 +41,7 @@ export default function EntradaScreen({ navigation }) {
             <View style={s.content}>
                 <OpoxLogo width={width * 0.7} />
                 <Text style={s.tagline}>
-                    Empieza a preparar tu plaza{'\n'}con un tutor de
+                    La mejor app para{'\n'}preparar tus oposiciones
                 </Text>
             </View>
 
@@ -62,11 +61,6 @@ export default function EntradaScreen({ navigation }) {
                 >
                     <Text style={s.secondaryButtonText}>Ya tengo cuenta</Text>
                 </TouchableOpacity>
-
-                <View style={s.badgeRow}>
-                    <Text style={s.badgeLabel}>La APP de</Text>
-                    <MasCopLogo width={width * 0.23} />
-                </View>
             </View>
         </SafeAreaView>
     );
@@ -137,17 +131,5 @@ const s = StyleSheet.create({
         color: colors.purple,
         fontFamily: 'Poppins-SemiBold',
         fontSize: scale(36),
-    },
-    badgeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        marginTop: scale(278),
-    },
-    badgeLabel: {
-        color: colors.textDark,
-        fontFamily: 'Poppins-Bold',
-        fontSize: scale(25.96),
     },
 });

@@ -333,7 +333,12 @@ export default function LoginScreen({ navigation, route }) {
                             <Text style={s.footerDotText}>?</Text>
                         </View>
                         <Text style={s.footerText}>Ayuda</Text>
-                        <Text style={s.footerText}>Aviso legal</Text>
+                        <Text
+                            style={s.footerText}
+                            onPress={() => navigation.navigate('Terminos', { readOnly: true })}
+                        >
+                            Aviso legal
+                        </Text>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>

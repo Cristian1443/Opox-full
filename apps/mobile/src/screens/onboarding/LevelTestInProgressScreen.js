@@ -7,7 +7,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing } from '../../theme';
@@ -187,6 +187,7 @@ function calcStrengthsAndWeaknesses(answers, qs = QUESTIONS) {
 }
 
 export default function LevelTestInProgressScreen({ navigation }) {
+    const insets = useSafeAreaInsets();
     // null = todavía esperando respuesta del backend (bloquea la UI)
     const [questions, setQuestions] = useState(null);
     const [qIndex, setQIndex] = useState(0);
@@ -412,8 +413,11 @@ export default function LevelTestInProgressScreen({ navigation }) {
                 </View>
             </View>
 
-            {/* Botón fijo inferior */}
-            <View style={styles.bottomRow}>
+            {/* Botón fijo inferior — se suma insets.bottom porque un View absoluto
+                no hereda el padding de SafeAreaView; sin esto el botón queda tapado
+                por la barra de navegación del sistema en dispositivos con
+                navegación por botones. */}
+            <View style={[styles.bottomRow, { bottom: spacing.md + insets.bottom }]}>
                 <TouchableOpacity
                     style={[styles.btnPrimary, selected === null && styles.btnPrimaryOff]}
                     onPress={handleConfirm}

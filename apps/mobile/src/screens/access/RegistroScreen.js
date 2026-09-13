@@ -6,11 +6,11 @@ import {
     TouchableOpacity,
     KeyboardAvoidingView,
     Platform,
-    Alert,
     ScrollView,
     ActivityIndicator,
     Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
@@ -18,6 +18,7 @@ import { authApi } from '../../api';
 import OpoxWordmark from '../../../assets/opoxLogo';
 import { GoogleLogo, AppleLogo } from '../../components/icons/SocialAuthIcons';
 import EmailAlreadyRegisteredModal from '../../components/EmailAlreadyRegisteredModal';
+import AlertCardModal from '../../components/AlertCardModal';
 
 // Figma: elDJ7bHPEsMt5MMlSJ4BcI — frame "CREAR CUENTA" (node 2349:34).
 // Fondo de la pantalla (#f4f4f4) es literal de Figma: no coincide exactamente
@@ -31,8 +32,12 @@ const PASSWORD_COLORS = {
     débil: colors.statRed,
 };
 
+// El backend exige mínimo 8 caracteres (authValidators.ts) — por debajo de eso
+// es "débil" sin importar qué más tenga, para que el indicador ya avise antes
+// de intentar enviarla y que el servidor la rechace.
+const MIN_PASSWORD_LENGTH = 8;
 const validarPassword = (pass) => {
-    if (pass.length < 6) return 'débil';
+    if (pass.length < MIN_PASSWORD_LENGTH) return 'débil';
     if (pass.length < 10 || !/[0-9]/.test(pass)) return 'media';
     return 'fuerte';
 };
@@ -44,6 +49,7 @@ export default function RegistroScreen({ navigation }) {
     const [fuerza, setFuerza] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [emailExistsError, setEmailExistsError] = useState(false);
+    const [errorModal, setErrorModal] = useState(null); // { message } | null
     const emailInputRef = useRef(null);
 
     const handlePasswordChange = (text) => {
@@ -58,9 +64,13 @@ export default function RegistroScreen({ navigation }) {
 
     const handleRegistro = async () => {
         if (!nombre || !email || !password) {
-            Alert.alert('Error', 'Por favor completa todos los campos');
+            setErrorModal({ message: 'Por favor completa todos los campos.' });
             return;
         }
+        // El indicador de fuerza ya avisa en pantalla — no hace falta un
+        // popup aparte, solo bloquear el envío para no gastar una llamada
+        // al servidor con una contraseña que el backend va a rechazar.
+        if (password.length < MIN_PASSWORD_LENGTH) return;
 
         setIsLoading(true);
         setEmailExistsError(false);
@@ -78,7 +88,12 @@ export default function RegistroScreen({ navigation }) {
                 setEmailExistsError(true);
                 return;
             }
-            Alert.alert('Error', error.message);
+            // Si el backend devuelve errores de validación por campo (Zod),
+            // ese detalle es más útil que el mensaje genérico "Datos inválidos.".
+            const specificMessage = error.fields
+                ? Object.values(error.fields).join(' ')
+                : error.message;
+            setErrorModal({ message: specificMessage });
             return;
         }
 
@@ -124,7 +139,7 @@ export default function RegistroScreen({ navigation }) {
         { key: 'apple', label: 'Continuar con Apple', icon: <AppleLogo size={19} /> },
     ];
 
-    const isDisabled = !nombre || !email || !password || isLoading;
+    const isDisabled = !nombre || !email || password.length < MIN_PASSWORD_LENGTH || isLoading;
 
     return (
         <SafeAreaView style={s.container}>
@@ -192,7 +207,7 @@ export default function RegistroScreen({ navigation }) {
                                         ? 'Fuerza: media · añade un número o símbolo'
                                         : fuerza === 'fuerte'
                                             ? 'Fuerza: fuerte'
-                                            : 'Fuerza: débil'}
+                                            : `Fuerza: débil · mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
                                 </Text>
                             )}
                         </View>
@@ -236,6 +251,21 @@ export default function RegistroScreen({ navigation }) {
                 email={email}
                 onGoToLogin={handleIrALogin}
                 onUseAnotherEmail={handleUsarOtroEmail}
+            />
+
+            {/* Error genérico de registro — con el estilo de la app, no el
+                Alert.alert nativo del SO, y mostrando el mensaje específico
+                que devuelve el backend en vez de uno genérico. */}
+            <AlertCardModal
+                visible={!!errorModal}
+                iconBg="transparent"
+                iconSize={64}
+                icon={<Ionicons name="close-circle" size={56} color={colors.statRed} />}
+                title="No se pudo crear la cuenta"
+                description={errorModal?.message}
+                primaryLabel="Entendido"
+                primaryColor={colors.statRed}
+                onPrimaryPress={() => setErrorModal(null)}
             />
         </SafeAreaView>
     );

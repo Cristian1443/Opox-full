@@ -10,7 +10,7 @@ import {
     Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import Constants from 'expo-constants';
 import { colors, spacing } from '../../theme';
@@ -376,6 +376,7 @@ const err = StyleSheet.create({
 // 0.5 — Pantalla principal de permisos
 // ─────────────────────────────────────────────
 export default function PermissionsScreen({ navigation }) {
+    const insets = useSafeAreaInsets();
     const [modalVisible, setModalVisible] = useState(false);
     const [status, setStatus] = useState(null); // null | 'granted' | 'denied'
 
@@ -462,8 +463,11 @@ export default function PermissionsScreen({ navigation }) {
                 </View>
             </ScrollView>
 
-            {/* Botón fijo inferior (btn-row: absolute bottom:16 left:18 right:18) */}
-            <View style={styles.btnRow}>
+            {/* Botón fijo inferior (btn-row: absolute bottom:16 left:18 right:18) —
+                se suma insets.bottom porque un View absoluto no hereda el padding
+                de SafeAreaView; sin esto el botón queda tapado por la barra de
+                navegación del sistema en dispositivos con navegación por botones. */}
+            <View style={[styles.btnRow, { bottom: 16 + insets.bottom }]}>
                 <TouchableOpacity style={styles.btnPrimary} onPress={handleActivate} activeOpacity={0.85}>
                     <Text style={styles.btnPrimaryText}>Activar permisos</Text>
                 </TouchableOpacity>

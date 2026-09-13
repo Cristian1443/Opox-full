@@ -24,6 +24,9 @@ const FIGMA = {
 };
 
 export default function TerminosScreen({ navigation, route }) {
+    // "Aviso legal" desde LoginScreen navega aquí en modo solo-lectura — mismo
+    // texto legal, sin el checkbox/flujo de aceptación del onboarding.
+    const readOnly = route.params?.readOnly === true;
     const { email } = route.params || { email: 'usuario@ejemplo.com' };
     const [aceptado, setAceptado] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -88,7 +91,7 @@ export default function TerminosScreen({ navigation, route }) {
 
                 {/* Header (2349:495) */}
                 <View style={s.header}>
-                    <Text style={s.title}>Antes de empezar</Text>
+                    <Text style={s.title}>{readOnly ? 'Aviso legal' : 'Antes de empezar'}</Text>
                 </View>
 
                 {/* Tarjeta blanca (2349:506 "Rectangle 3467704") con el texto legal
@@ -107,30 +110,37 @@ export default function TerminosScreen({ navigation, route }) {
                     </Text>
                 </View>
 
-                {/* Checkbox + texto de aceptación (2349:512 "recordar mis datos") */}
-                <TouchableOpacity
-                    style={s.checkboxContainer}
-                    onPress={() => setAceptado(!aceptado)}
-                    activeOpacity={0.7}
-                >
-                    <View style={[s.checkbox, aceptado && s.checkboxChecked]}>
-                        {aceptado && <Ionicons name="checkmark" size={16} color={colors.white} />}
-                    </View>
-                    <Text style={s.checkboxText}>
-                        Acepto las{' '}
-                        <Text style={s.linkText} onPress={() => abrirEnlace('Condiciones de uso')}>
-                            condiciones de uso
-                        </Text>
-                        {' '}y la{' '}
-                        <Text style={s.linkText} onPress={() => abrirEnlace('Protección de datos')}>
-                            política de privacidad
-                        </Text>
-                    </Text>
-                </TouchableOpacity>
+                {/* Checkbox + botón de aceptación — solo en el flujo de onboarding.
+                    Desde "Aviso legal" (LoginScreen) es solo lectura: el usuario ya
+                    aceptó estos términos al registrarse. */}
+                {!readOnly && (
+                    <>
+                        <TouchableOpacity
+                            style={s.checkboxContainer}
+                            onPress={() => setAceptado(!aceptado)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[s.checkbox, aceptado && s.checkboxChecked]}>
+                                {aceptado && <Ionicons name="checkmark" size={16} color={colors.white} />}
+                            </View>
+                            <Text style={s.checkboxText}>
+                                Acepto las{' '}
+                                <Text style={s.linkText} onPress={() => abrirEnlace('Condiciones de uso')}>
+                                    condiciones de uso
+                                </Text>
+                                {' '}y la{' '}
+                                <Text style={s.linkText} onPress={() => abrirEnlace('Protección de datos')}>
+                                    política de privacidad
+                                </Text>
+                            </Text>
+                        </TouchableOpacity>
 
-                <View style={s.spacer} />
+                        <View style={s.spacer} />
+                    </>
+                )}
 
                 {/* BOTON (2349:492/493/494) */}
+                {!readOnly && (
                 <TouchableOpacity
                     style={[s.primaryButton, !canContinue && s.buttonDisabled]}
                     onPress={handleAceptar}
@@ -146,6 +156,7 @@ export default function TerminosScreen({ navigation, route }) {
                         <Text style={s.primaryButtonText}>Aceptar y continuar</Text>
                     )}
                 </TouchableOpacity>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
