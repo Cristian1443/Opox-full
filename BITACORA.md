@@ -60,9 +60,38 @@ Fix en `GetDashboardSummaryUseCase`: `.catch(() => null)` en la llamada a
 `getLastLawView` — si falla, el dashboard sigue cargando sin el dato de
 última ley vista.
 
+### Bug 5 · Test quirúrgico aparecía como "Tema 2" en ErrorLab en vez de ser global
+
+Al volver al Laboratorio de Errores tras un test quirúrgico, el patrón aparecía con
+título "Tema 2" (un solo tema) en lugar de reflejar todos los temas débiles del usuario.
+
+**Causa A — `MotorAiClient.generateSurgicalTest` ignoraba la distribución por temas**
+
+El método calculaba `distribution` proporcional al `failRate` de cada tema débil, pero
+luego llamaba a `generateQuestions({ topicId: 'all' })` — descartando el cálculo por
+completo. El Motor devolvía preguntas aleatorias del curso entero; el topic que por azar
+más respondías aparecía como único patrón en ErrorLab.
+
+Fix: llamadas paralelas al Motor (`Promise.allSettled`) por cada tema débil, cada una
+solicitando `Math.max(3, d.count)` preguntas (mínimo garantizado de 3). Fallback a
+`topicId: 'all'` si el Motor no responde o devuelve menos de la mitad de las preguntas
+solicitadas.
+
+**Causa B — umbral `listErrorPatterns` demasiado alto (5)**
+
+Aunque el test quirúrgico generase preguntas por tema, `listErrorPatterns` exigía ≥ 5
+respuestas por tema para mostrarlo en ErrorLab. Un test quirúrgico recién hecho produce
+exactamente 3 respuestas por tema → solo el tema con más historial previo (el "Tema 2"
+más fallado) superaba el umbral.
+
+Fix: umbral bajado 5 → 3 en `SupabaseTrainingRepository.listErrorPatterns`.
+Combinado con el `Math.max(3, d.count)` del fix anterior, el primer test quirúrgico
+ya distribuye ≥ 3 respuestas por tema débil — suficiente para que todos aparezcan.
+
 ### Archivos modificados
 
-- `apps/backend/src/infrastructure/training/SupabaseTrainingRepository.ts` — retry saveAttempt.
+- `apps/backend/src/infrastructure/clients/MotorAiClient.ts` — `generateSurgicalTest` con llamadas paralelas por tema.
+- `apps/backend/src/infrastructure/training/SupabaseTrainingRepository.ts` — retry saveAttempt + umbral 5→3 en `listErrorPatterns`.
 - `apps/backend/src/infrastructure/boe/MotorBoeClient.ts` — AbortController + normalización de campos.
 - `apps/backend/src/application/boe/BoeUseCases.ts` — skip catálogo sin query, `GetCursoIdUseCase` en Follow/Search.
 - `apps/backend/src/application/dashboard/GetDashboardSummaryUseCase.ts` — `.catch(() => null)` en getLastLawView.

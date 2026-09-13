@@ -48,6 +48,7 @@
 | 2 | Sliders se van a los extremos al arrastrar | ✅ Cerrado | `GeneratorConfigScreen`: `onPanResponderGrant` ahora inicializa `startX.current` desde la posición actual del thumb (no del toque). Aplica a `StepSlider` y `RangeSlider`. |
 | 3 | IA falla con muchos temas, no hay indicador de carga | ✅ Cerrado | Timeout reducido 240 s → 90 s. Mensaje dinámico bajo el botón: "La IA está pensando…" a los 15 s, aviso de espera a los 30 s. |
 | 4 | Foto-test no se guarda (Gateway Timeout en `saveAttempt`) | ✅ Cerrado | `SupabaseTrainingRepository.saveAttempt`: reintento único tras 2 s si el error es timeout; si el reintento falla con PK conflict (23505) se recupera la fila ya insertada. |
+| 5 | Test quirúrgico aparece en ErrorLab como "Tema 2" en vez de global | ✅ Cerrado | **Causa A — `MotorAiClient.generateSurgicalTest`** calculaba `distribution` por temas débiles pero ignoraba ese dato y pedía `topicId: 'all'` al Motor; las preguntas devueltas eran aleatorias del curso entero, no de los temas débiles del usuario. **Fix**: llamadas paralelas al Motor por cada tema débil (≥3 preguntas c/u, proporcional a `failRate`); fallback a `'all'` si el Motor no responde. **Causa B — `listErrorPatterns`** requería ≥5 respuestas por tema antes de mostrarlo, así que solo aparecía "Tema 2" (el más fallado) aunque el test cubriera 5 temas. **Fix**: umbral bajado 5→3. |
 
 ---
 
@@ -107,7 +108,7 @@
 
 | Estado | Count |
 |--------|-------|
-| ✅ Cerrado | 19 |
+| ✅ Cerrado | 20 |
 | ⏸️ Diferido (decisión cliente) | 2 |
 | ⚠️ Pendiente (requiere más info o acción externa) | 3 |
 

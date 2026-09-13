@@ -362,7 +362,7 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
 
         const patterns: ErrorPattern[] = [];
         for (const [topicId, { topic, total, correct, lastDate }] of byTopic.entries()) {
-            if (total < 5) continue; // mínimo estadístico
+            if (total < 3) continue; // mínimo estadístico
             // 'all' = test quirúrgico sobre todos los temas — no es accionable por tema
             if (topicId === 'all') continue;
             // IDs hex sin resolver tras enriquecimiento (curso antiguo no mapeado)

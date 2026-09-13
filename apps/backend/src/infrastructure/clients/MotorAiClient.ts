@@ -253,28 +253,67 @@ export class MotorAiClient implements AiApiContract {
     // ─── generateSurgicalTest ─────────────────────────────────────────────────
 
     async generateSurgicalTest(params: GenerateSurgicalTestParams): Promise<SurgicalTestResult> {
-        // El Motor no tiene endpoint /v1/tests/surgical todavía.
-        // Generamos desde el curso completo y calculamos la distribución
-        // esperada a partir de los failRate del usuario.
-        const questions = await this.generateQuestions({
-            oposicion: params.oposicion,
-            cursoId: params.cursoId,
-            topicId: 'all',
-            difficulty: 'medium',
-            count: params.count,
-        });
-
+        const count = params.count ?? 10;
         const totalFailRate =
             params.errorPatterns.reduce((s, p) => s + p.failRate, 0) || 1;
 
         const distribution = params.errorPatterns.map((p) => ({
             topicId: p.topicId,
             topic: p.topic,
-            count: Math.round((p.failRate / totalFailRate) * params.count),
+            count: Math.round((p.failRate / totalFailRate) * count),
             percentage: Math.round((p.failRate / totalFailRate) * 100),
         }));
 
-        return { questions, distribution };
+        // Temas reales con debilidades (excluye el placeholder 'all').
+        const targeted = distribution.filter((d) => d.topicId !== 'all' && d.count > 0);
+
+        if (targeted.length === 0) {
+            // Sin patrones reales → banco completo como fallback.
+            const questions = await this.generateQuestions({
+                oposicion: params.oposicion,
+                cursoId: params.cursoId,
+                topicId: 'all',
+                difficulty: 'medium',
+                count,
+            });
+            return { questions, distribution };
+        }
+
+        // Llamadas paralelas por tema débil según la distribución proporcional.
+        // Cada tema recibe al menos 2 preguntas para que su patrón tenga datos suficientes.
+        const results = await Promise.allSettled(
+            targeted.map((d) =>
+                this.generateQuestions({
+                    oposicion: params.oposicion,
+                    cursoId: params.cursoId,
+                    topicId: d.topicId,
+                    difficulty: 'medium',
+                    count: Math.max(3, d.count),
+                }),
+            ),
+        );
+
+        const allQuestions = results
+            .filter(
+                (r): r is PromiseFulfilledResult<GeneratedQuestion[]> =>
+                    r.status === 'fulfilled',
+            )
+            .flatMap((r) => r.value);
+
+        // Si el Motor no devolvió suficientes preguntas por temas individuales
+        // (por ejemplo si algún topicId no existe en el banco) → fallback a 'all'.
+        if (allQuestions.length < Math.ceil(count / 2)) {
+            const questions = await this.generateQuestions({
+                oposicion: params.oposicion,
+                cursoId: params.cursoId,
+                topicId: 'all',
+                difficulty: 'medium',
+                count,
+            });
+            return { questions, distribution };
+        }
+
+        return { questions: allQuestions, distribution };
     }
 
     // ─── Métodos que el Motor NO cubre ────────────────────────────────────────
