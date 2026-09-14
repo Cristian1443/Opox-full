@@ -18,6 +18,7 @@ declare const API_ROUTES: {
         readonly OTP_VERIFY: string;
         readonly PASSWORD_RESET_REQUEST: string;
         readonly PASSWORD_RESET_CONFIRM: string;
+        readonly PASSWORD_RESET_REDIRECT: string;
         readonly BIOMETRIC_CHALLENGE: string;
         readonly BIOMETRIC_LINK: string;
         readonly BIOMETRIC_LOGIN: string;

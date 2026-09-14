@@ -131,6 +131,23 @@ export class AuthController {
         } catch (err) { next(err); }
     };
 
+    // GET /auth/password/reset-redirect?token_hash=xxx&type=recovery
+    // Ruta pública. Gmail Android bloquea deep links custom (opox://) en emails.
+    // El template de Supabase apunta aquí con https://; Chrome abre la URL,
+    // el backend hace 302 hacia opox:// y el OS lanza la app correctamente.
+    resetRedirect = (req: Request, res: Response): void => {
+        const token_hash = req.query['token_hash'] as string | undefined;
+        const type       = req.query['type']       as string | undefined;
+
+        if (!token_hash) {
+            res.status(400).send('token_hash requerido');
+            return;
+        }
+
+        const deepLink = `opox://reset-password?token_hash=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(type ?? 'recovery')}`;
+        res.redirect(302, deepLink);
+    };
+
     biometricChallenge = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const challenge = await this.deps.createBiometricChallenge.execute(req.body.deviceId);
