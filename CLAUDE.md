@@ -153,6 +153,13 @@ o cuando el usuario desactiva explícitamente el toggle en `ConfigPerfilScreen`.
   `GET /training/level-test` (ruta pública, sin auth). Si el Motor responde con ≥10 preguntas, las
   usa en lugar de `QUESTIONS` local. Banner de carga mientras se realiza el fetch inicial.
   Si falla (error o vacío), continúa con las preguntas estáticas sin interrupción.
+- **Fix crash React Rules of Hooks (2026-09-13)**: el tercer `useEffect` (persiste `qIndex`
+  en AsyncStorage para reanudar si el usuario cierra la app) estaba declarado DESPUÉS del bloque
+  `if (!questions) return <loading>`. En el primer render (Motor cargando) se ejecutaban 8 hooks;
+  en el segundo render (preguntas disponibles) se intentaban 9 → "Rendered more hooks than during
+  the previous render" → crash con diálogo "OPOX continúa fallando". Fix: mover ese `useEffect`
+  ANTES del return condicional. La guarda `if (!hasRestoredRef.current) return` evita que se
+  sobreescriba `PENDING_LEVEL_TEST_KEY` antes de que la restauración termine.
 
 **`GET /training/level-test` — ruta pública**:
 - Sin `authMiddleware` — corre antes del login en onboarding.
@@ -234,18 +241,34 @@ usuarios nuevos desde este build en adelante.
     iOS, `googlegmail://` / `ms-outlook://` en Android, fallback web (`mail.google.com`,
     `outlook.live.com`, `mail.yahoo.com`) según el dominio del email, y último
     recurso `mailto:` sin destinatario para abrir el selector limpio.
+    **Fix (2026-09-13)**: el selector de cliente de correo no detectaba el dominio
+    correctamente — si el email era `@gmail.com` probaba igualmente `ms-outlook://`
+    primero. Ahora usa `isGmail`, `isOutlook`, `isYahoo` booleans para intentar
+    únicamente el esquema que corresponde al dominio antes de caer al fallback web.
   - `RecuperarPasswordNuevaScreen.js` — recibe `token_hash` vía `route.params` (deep
     link `opox://reset-password?token_hash=xxx&type=recovery`) y lo canjea con
     `authApi.confirmPasswordReset` → `verifyOtp({ type: 'recovery' })` en backend.
+    **Fix (2026-09-13)**: añadido campo de pegado manual para el caso en que Gmail
+    Android bloquee el custom scheme del botón del email. El usuario copia el enlace
+    y lo pega en un textarea; `parseTokenFromInput()` extrae el `token_hash` de una
+    URL completa `opox://...` o lo usa directamente si ya es el hash en bruto.
+- **`GET /auth/password/reset-redirect` — ruta pública (añadida 2026-09-13)**:
+  Endpoint `https://opox-backend-x2mu.onrender.com/auth/password/reset-redirect?token_hash=X&type=recovery`
+  que devuelve `302 → opox://reset-password?token_hash=X&type=recovery`. El template
+  de Supabase apunta a este endpoint HTTPS (Gmail no bloquea HTTPS); el SO recibe
+  el `302` y abre la app con el deep-link. `AuthController.resetRedirect` (sin use
+  case — solo redirect HTTP). Ruta constante `API_ROUTES.AUTH.PASSWORD_RESET_REDIRECT`.
+  **Acción manual requerida en Supabase**: Auth → Email Templates → Reset Password,
+  href del botón → `https://opox-backend-x2mu.onrender.com/auth/password/reset-redirect?token_hash={{ .TokenHash }}&type=recovery`.
 - Deep link `opox://reset-password` — **no funciona en Expo Go** (Expo Go solo
   registra `exp://`). Requiere development build o standalone APK con el
   `"scheme": "opox"` de `app.json:6` compilado en el AndroidManifest. Verificar
   con `adb shell am start -a android.intent.action.VIEW -d "opox://reset-password?token_hash=fake"`.
-- Gmail Android puede bloquear los custom schemes en botones del email. Cuando
-  suceda el usuario ve el botón visualmente OK pero no dispara nada. La única
-  solución definitiva es migrar a Universal / App Links (`https://opox.ai/reset-password`)
-  con `assetlinks.json` en el dominio + `intentFilters` con `autoVerify: true`
-  en `app.json`. Pendiente hasta tener dominio propio.
+- Gmail Android puede bloquear los custom schemes en botones del email. Solución
+  intermedia: backend redirect `https://` → `opox://`. Solución definitiva:
+  Universal / App Links (`https://opox.ai/reset-password`) con `assetlinks.json`
+  en el dominio + `intentFilters` con `autoVerify: true` en `app.json`.
+  Pendiente hasta tener dominio propio.
 
 ---
 
@@ -856,17 +879,22 @@ de privacidad. Sin respuesta válida, HC marca la app como inválida → invisib
   **antes** de `super.onCreate()` (`offset: 0`): detecta el intent de rationale y lo muta a
   `ACTION_VIEW + Uri("opox://health-rationale")` con clases completamente cualificadas
   (sin imports extra). React Native lo procesa como deep-link y navega a la pantalla.
-- `plugins/withHealthConnect.js` — nueva función `fixRationaleIntentFilter()`: busca
-  iterativamente la Activity con `android:name` terminado en `.MainActivity` y coloca el
-  intent-filter allí; si el plugin oficial lo dejó en `activity[0]` (posiblemente splash),
-  lo elimina de ahí primero.
+- `plugins/withHealthConnect.js` — **revisión 2026-09-13: `withDangerousMod`**:
+  El enfoque anterior (`fixRationaleIntentFilter` vía `withAndroidManifest`) no funcionaba
+  porque Expo aplica los `withAndroidManifest` en orden LIFO dentro de cada fase (sync
+  primero, async después). El plugin oficial de `react-native-health-connect` usa
+  `async withAndroidManifest` y corría SIEMPRE después de nuestro plugin, añadiendo una
+  segunda copia del filtro. Fix: `withDangerousMod` corre en una fase completamente
+  posterior a todos los `withAndroidManifest`; lee el `AndroidManifest.xml` ya escrito
+  en disco, elimina todas las copias del filtro y reinserta exactamente una en
+  `.MainActivity` usando una regex sobre el XML. Verificado con `npx expo prebuild --clean`:
+  exactamente 1 copia del filtro en `.MainActivity`, sin importar cuántos plugins lo añadan.
 
-**Causa 2 — `hasAllHealthPermissions()` con falso positivo:**
-Comparación `granted.length >= ANDROID_PERMISSIONS.length` podía devolver `true` con N
-permisos de otro tipo. Reemplazado por `.every((required) => granted.some(g => g.recordType
-=== required.recordType && g.accessType === required.accessType))`.
-`requestHealthPermissions()` catch: `console.warn` → `console.error` con `err.stack`
-para detectar `UninitializedPropertyAccessException` nativo en `adb logcat`.
+**Causa 2 — `requestHealthPermissions()` con falso positivo (revisión 2026-09-13):**
+`HealthService.js` usaba `existing.length >= ANDROID_PERMISSIONS.length` para detectar
+permisos ya concedidos — podía devolver `true` con N permisos de CUALQUIER tipo. Corregido
+con la misma comparación estricta que `hasAllHealthPermissions()`: `.every((required) =>
+existing.some(g => g.recordType === required.recordType && g.accessType === required.accessType))`.
 
 **Pendiente**: `eas build --profile development --platform android` — sin rebuild los
 cambios de manifest y MainActivity no tienen efecto (no hay `android/` en el repo).
