@@ -147,10 +147,15 @@ export async function requestHealthPermissions() {
             // requestPermission llamado sobre permisos ya concedidos puede abrir
             // el diálogo de HC de nuevo (molestia) o devolver [] silenciosamente
             // si el usuario denegó con "no volver a preguntar" (confusión).
-            const existing = await HealthConnect.getGrantedPermissions().catch(() => []);
-            if (Array.isArray(existing) && existing.length >= ANDROID_PERMISSIONS.length) {
-                return true;
-            }
+            const existing = (await HealthConnect.getGrantedPermissions().catch(() => [])) ?? [];
+            const allGranted = ANDROID_PERMISSIONS.every((required) =>
+                existing.some(
+                    (g) =>
+                        g.recordType === required.recordType &&
+                        g.accessType === required.accessType,
+                ),
+            );
+            if (allGranted) return true;
             // v3: no se llama initialize() — requestPermission() directamente.
             // initialize() en v3 lanza excepción nativa desde ciertos contextos
             // de Activity de Expo, que JS try/catch no intercepta → crash.
