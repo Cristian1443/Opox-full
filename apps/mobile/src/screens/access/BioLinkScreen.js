@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { detectBiometricType, biometricLabel, setupBiometric } from '../../lib/biometric';
 import { FaceScanIcon, LockIcon } from '../../components/icons/AccessIcons';
@@ -37,6 +38,19 @@ export default function BioLinkScreen({ navigation, route }) {
     }, [navigation, route?.params?.forceError]);
 
     const BIOMETRIC_TYPE = biometricLabel(biometricType) || 'biometría';
+    // Los pares Touch ID / huella en Android usan el pictograma de huella;
+    // Face ID / face unlock (o el estado 'both') mantienen el escaneo facial.
+    const isFingerOnly = biometricType === 'finger';
+    const HeroBiometricIcon = isFingerOnly ? (
+        <Ionicons name="finger-print" size={100} color={colors.textDark} />
+    ) : (
+        <FaceScanIcon size={100} color={colors.textDark} />
+    );
+    const ErrorBiometricIcon = isFingerOnly ? (
+        <Ionicons name="finger-print" size={70} color={colors.statRed} />
+    ) : (
+        <FaceScanIcon size={70} color={colors.statRed} />
+    );
 
     const handleActivateBiometrics = async () => {
         setIsProcessing(true);
@@ -84,7 +98,7 @@ export default function BioLinkScreen({ navigation, route }) {
             </TouchableOpacity>
 
             <View style={s.content}>
-                <FaceScanIcon size={100} color={colors.textDark} />
+                {HeroBiometricIcon}
 
                 <Text style={s.title}>Activa el acceso rápido</Text>
                 <Text style={s.subtitle}>
@@ -123,7 +137,7 @@ export default function BioLinkScreen({ navigation, route }) {
                 visible={errorState === 'not-recognized'}
                 iconBg="transparent"
                 iconSize={70}
-                icon={<FaceScanIcon size={70} color={colors.statRed} />}
+                icon={ErrorBiometricIcon}
                 title="No te hemos reconocido"
                 description="Inténtalo otra vez o entra con tu contraseña."
                 primaryLabel={`Reintentar ${BIOMETRIC_TYPE}`}

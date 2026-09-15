@@ -35,11 +35,21 @@ export async function detectBiometricType() {
         if (!enrolled) return 'none';
         const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
         const finger = types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
-        // En Android, el reconocimiento facial es biometría débil (Class 2) y no puede
-        // desbloquear claves de SecureStore (que requiere biometría fuerte/Class 3).
-        // Face ID solo se ofrece en iOS donde el hardware garantiza biometría fuerte.
-        const face = Platform.OS === 'ios' &&
-            types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+        // Face en Android solo si es el ÚNICO biométrico enrolado y el nivel
+        // es Class 3. getEnrolledLevelAsync() devuelve el nivel MÁXIMO enrolado
+        // en el dispositivo (no por tipo), así que en un Android con face débil
+        // (Class 2) + huella fuerte, el nivel reporta STRONG por la huella y
+        // creeríamos que el face es fuerte — falso positivo (visto en Tecno
+        // Spark Go 1). Al exigir "face-only + strong" garantizamos que ese
+        // strong solo puede venir del face, no de una huella coexistente.
+        // iOS: el Secure Enclave garantiza siempre Class 3, así que basta con
+        // detectar FACIAL_RECOGNITION.
+        const level = await LocalAuthentication.getEnrolledLevelAsync();
+        const isStrong = level === LocalAuthentication.SecurityLevel.BIOMETRIC_STRONG;
+        const hasFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+        const face = hasFace && (
+            Platform.OS === 'ios' || (isStrong && !finger)
+        );
         if (face && finger) return 'both';
         if (face) return 'face';
         if (finger) return 'finger';
@@ -107,6 +117,11 @@ async function promptBiometric(reason) {
         promptMessage: reason,
         cancelLabel: 'Cancelar',
         disableDeviceFallback: false,
+        // Android: rechaza en el prompt del OS cualquier biometría Class 2 (face
+        // débil). Coherente con el keystore de SecureStore, que también exige
+        // BIOMETRIC_STRONG. Sin este flag el usuario podría autenticar con face
+        // débil y luego el getItemAsync del SecureStore fallaría en silencio.
+        biometricsSecurityLevel: 'strong',
     });
     // `error` ya lo devuelve expo-local-authentication (p.ej. 'lockout' cuando
     // el propio SO bloquea la biometría tras demasiados intentos fallidos) —
@@ -150,7 +165,7 @@ export async function setupBiometric() {
     // Guardamos la privada protegida por biometría del OS
     await SecureStore.setItemAsync(KEY_PRIVATE, privateKeyB64, {
         requireAuthentication: true,
-        authenticationPrompt: 'Confirma para usar tu Face ID / huella',
+        authenticationPrompt: `Confirma para usar tu ${biometricLabel(type) || 'biometría'}`,
     });
 
     const { error } = await authApi.biometricLink({
