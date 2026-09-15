@@ -114,6 +114,51 @@ limpia la sesión ahora; la privada Ed25519 sigue en SecureStore protegida por e
 prompt biométrico del OS. `disableBiometric()` solo se ejecuta desde `deleteAccount`
 o cuando el usuario desactiva explícitamente el toggle en `ConfigPerfilScreen`.
 
+**Biometría — paridad multi-plataforma Face ID / Touch ID / huella (revisión 2026-09-14)**:
+Antes solo se ofrecían Face ID en iPhone y huella en Android — Touch ID (iPad/iPhone SE/8)
+mostraba icono de rostro y face en Android no se ofrecía en absoluto.
+
+- `detectBiometricType()` en `apps/mobile/src/lib/biometric.js`: consulta
+  `LocalAuthentication.getEnrolledLevelAsync()`. Devuelve `'face'`, `'finger'`, `'both'`
+  o `'none'`. En Android solo expone face cuando (a) es el único biométrico enrolado y
+  (b) `getEnrolledLevelAsync()` reporta `BIOMETRIC_STRONG`. En iOS el Secure Enclave
+  garantiza Class 3 → basta con detectar `FACIAL_RECOGNITION`.
+- `promptBiometric()` pasa `biometricsSecurityLevel: 'strong'` a `authenticateAsync` —
+  el prompt del OS en Android rechaza Class 2 antes de intentar desbloquear el keystore.
+  `SecureStoreOptions` no expone ese flag; ya usa Class 3 por defecto cuando
+  `requireAuthentication: true`.
+- `setupBiometric()`: `authenticationPrompt` de `SecureStore.setItemAsync` es dinámico
+  ahora (`Confirma para usar tu ${biometricLabel(type)}`).
+- `BioLinkScreen.js`: hero (`FaceScanIcon` size 100) y modal "no reconocido" ahora eligen
+  `Ionicons name="finger-print"` vs `FaceScanIcon` según el tipo detectado. Requiere
+  `import { Ionicons } from '@expo/vector-icons'`.
+- `ConfigPerfilScreen.js` (sección Seguridad): fila biométrica dividida en dos cuando
+  `bioType === 'both'` — una fila "Face ID" con `FaceIdIcon` y otra "Huella / Touch ID"
+  con `FingerprintIcon`. Ambas comparten el mismo toggle `bioEnabled` y llaman al mismo
+  `handleBioToggle` porque la clave Ed25519 en SecureStore es única y el prompt del OS
+  acepta cualquier biometría strong.
+
+**Falso positivo Face ID en Android con huella coexistente (Tecno Spark Go 1)**:
+`getEnrolledLevelAsync()` devuelve el nivel MÁXIMO enrolado en el dispositivo, NO por
+tipo. En un Android con face Class 2 (cámara 2D) + huella Class 3, el nivel reporta
+STRONG por la huella — creíamos que face era strong, exponíamos la fila "Face ID", y
+al activarla el prompt del OS pedía huella (porque el face era débil). Fix definitivo:
+en Android exigir face-only (sin huella enrolada) además del nivel strong. Trade-off:
+Pixel 8+ con face Class 3 + huella enrolados no ve la fila dedicada "Face ID", pero
+puede desbloquear con face desde el prompt del OS igualmente. `expo-local-authentication`
+no expone un API público de "nivel por tipo" — cualquier detección más fina requeriría
+módulo nativo.
+
+**Feedback WhatsApp — mensaje más humano (revisión 2026-09-14)**:
+`WhatsAppNotificationClient.sendFeedback` (`apps/backend/src/infrastructure/notifications/`)
+antes enviaba `[OPOX Feedback] Tipo: suggestion\n\n<mensaje>` — estilo log. Reescrito con
+formato WhatsApp (`*negrita*` con asteriscos simples), traducción del tipo a español
+(`TYPE_LABELS: suggestion → Sugerencia`, `bug → Reporte de un error`, `other → Otro comentario`),
+timestamp en zona Madrid vía `Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid' })`
+(Render corre en UTC), mensaje entrecomillado, cierre en `_cursiva_`. Sin cambios de firma —
+el cliente sigue recibiendo `(type, message)`. Variables `WHATSAPP_API_TOKEN`,
+`WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_RECIPIENT_NUMBER` documentadas en `.env.example`.
+
 **Flags de AsyncStorage** (todos exportados desde su pantalla de origen):
 - `ONBOARDING_COMPLETED_KEY = 'opox.onboardingCompleted'` — exportado desde `SplashScreen.js`.
   Escrito en `SesionIniciadaScreen` al completar login. Mientras exista, `SplashScreen`

@@ -5,6 +5,73 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-14 — Bloque 1 · Paridad biométrica multi-plataforma + tono WhatsApp
+
+Rama: `fix/gaps-12-09-26`.
+
+### Paridad Face ID / Touch ID / huella
+
+Hasta hoy solo se ofrecían dos combinaciones: Face ID en iPhone y huella en
+Android. La app ignoraba silenciosamente Touch ID (iPad/iPhone SE/8) y rostro
+en Android — el filtro `Platform.OS === 'ios'` de `detectBiometricType` bloqueaba
+face fuera de iOS, y `BioLinkScreen` pintaba el pictograma de cara aunque el
+usuario tuviera Touch ID.
+
+**Cambios**:
+- `detectBiometricType()` ahora consulta `LocalAuthentication.getEnrolledLevelAsync()`.
+  En Android solo expone face cuando (a) es el único biométrico enrolado y
+  (b) el nivel es `BIOMETRIC_STRONG` (Class 3). En iOS el Secure Enclave garantiza
+  Class 3, así que basta con detectar `FACIAL_RECOGNITION`.
+- `promptBiometric()` pasa `biometricsSecurityLevel: 'strong'` a
+  `authenticateAsync` — el prompt del OS en Android rechaza cualquier biometría
+  Class 2 antes de intentar desbloquear el keystore.
+- `authenticationPrompt` del `SecureStore.setItemAsync` es dinámico ahora
+  (`Confirma para usar tu ${biometricLabel(type)}`) — antes decía "Face ID / huella"
+  en todos los dispositivos.
+- `BioLinkScreen`: hero y modal de "no reconocido" eligen `Ionicons finger-print`
+  vs `FaceScanIcon` según el tipo detectado. Antes ambos usaban `FaceScanIcon`
+  fijo, incluso en Touch ID / huella.
+- `ConfigPerfilScreen` (sección Seguridad, Bloque 12.2): fila biométrica dividida.
+  Cuando el dispositivo soporta ambos métodos aparecen dos filas separadas —
+  Face ID y Touch ID/Huella — cada una con su icono propio (`FaceIdIcon` y
+  `FingerprintIcon` respectivamente). Ambas comparten el mismo toggle porque la
+  clave Ed25519 en SecureStore se desbloquea con cualquier biometría strong del OS.
+
+**Fix Tecno Spark Go 1 (falso positivo Face ID)**:
+En el primer intento, Face ID aparecía como configurable en el Tecno Spark Go 1,
+pero al activarlo el OS pedía la huella (no el rostro). Causa: `getEnrolledLevelAsync()`
+devuelve el nivel MÁXIMO enrolado en el dispositivo, no por tipo. En un Android
+con face débil (Class 2, cámara 2D) + huella fuerte, el nivel reporta `STRONG` por
+la huella y creíamos que el face era fuerte. Al pedir strong al OS, este solo
+aceptaba huella. Solución: exigir "face-only + strong" en Android — si hay huella
+enrolada no exponemos face, porque no podemos garantizar que el strong provenga
+del rostro. Trade-off aceptado: usuarios de Pixel 8+ con face Class 3 + huella
+enrolados no ven la fila "Face ID" en Perfil, pero pueden desbloquear con face
+desde el prompt del OS igualmente.
+
+**Backend, SQL y contratos**: sin cambios. El flujo Ed25519 challenge-response
+es agnóstico al tipo de biometría — solo verifica la firma.
+
+### Mensaje WhatsApp de "Mi opinión" más amable
+
+`WhatsAppNotificationClient.sendFeedback` construía un mensaje estilo log
+(`[OPOX Feedback] Tipo: suggestion\n\n...`) que era poco humano para el equipo
+que lo recibe en su móvil. Reescrito con:
+- Encabezado en `*negrita*` (formato WhatsApp): `*Nuevo mensaje desde OPOX*`.
+- Traducción del `type` a español (`suggestion → Sugerencia`, `bug → Reporte
+  de un error`, `other → Otro comentario`) vía tabla `TYPE_LABELS`. Fallback al
+  valor original si llega un tipo nuevo, para no romper.
+- Timestamp en Zona Horaria Madrid con `Intl.DateTimeFormat('es-ES', { timeZone:
+  'Europe/Madrid' })` — Render corre en UTC y sin esto la hora salía desfasada.
+- Cuerpo del mensaje entrecomillado para diferenciarlo del texto plantilla.
+- Cierre en `_cursiva_` humano.
+
+Sin cambios de firma ni de container — el cliente sigue recibiendo `(type, message)`.
+`.env.example` documenta ahora las tres vars `WHATSAPP_*` (con placeholder de token
+vacío; solo hardcoded los IDs no-secretos del Meta Business Account de prueba).
+
+---
+
 ## 2026-09-13 — Bloques 0/1/3 · Tres bugs críticos en dispositivo real
 
 Rama: `fix/gaps-12-09-26`.
