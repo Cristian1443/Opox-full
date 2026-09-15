@@ -25,6 +25,7 @@ export const API_ROUTES = {
 
         PASSWORD_RESET_REQUEST: '/auth/password/reset-request',
         PASSWORD_RESET_CONFIRM: '/auth/password/reset-confirm',
+        PASSWORD_RESET_REDIRECT: '/auth/password/reset-redirect',
 
         BIOMETRIC_CHALLENGE: '/auth/biometric/challenge',
         BIOMETRIC_LINK: '/auth/biometric/link',

@@ -62,3 +62,6 @@ mockups_bloque3/
 # Entornos de prueba locales (contienen credenciales, nunca subir)
 newman-env-*.json
 TESTING_*.md
+
+# Capturas de pantalla de sesiones de testing (referencia local, no commitear)
+screenshots/

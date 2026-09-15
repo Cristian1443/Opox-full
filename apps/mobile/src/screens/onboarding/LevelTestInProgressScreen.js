@@ -236,6 +236,13 @@ export default function LevelTestInProgressScreen({ navigation }) {
         })();
     }, [questions]);
 
+    // Persiste la pregunta actual para recuperar si el usuario cierra la app.
+    // Debe estar antes del return condicional para no violar las Reglas de Hooks.
+    useEffect(() => {
+        if (!hasRestoredRef.current) return;
+        AsyncStorage.setItem(PENDING_LEVEL_TEST_KEY, String(qIndex));
+    }, [qIndex]);
+
     // Pantalla de carga completa — bloquea hasta recibir preguntas del Motor
     if (!questions) {
         return (
@@ -253,12 +260,6 @@ export default function LevelTestInProgressScreen({ navigation }) {
     }
 
     const total = questions.length;
-
-    // Persiste la pregunta actual para recuperar si el usuario cierra la app
-    useEffect(() => {
-        if (!hasRestoredRef.current) return;
-        AsyncStorage.setItem(PENDING_LEVEL_TEST_KEY, String(qIndex));
-    }, [qIndex]);
 
     const question = questions[qIndex];
     const isFirst = qIndex === 0;

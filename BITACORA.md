@@ -5,6 +5,145 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-14 — Bloque 1 · Paridad biométrica multi-plataforma + tono WhatsApp
+
+Rama: `fix/gaps-12-09-26`.
+
+### Paridad Face ID / Touch ID / huella
+
+Hasta hoy solo se ofrecían dos combinaciones: Face ID en iPhone y huella en
+Android. La app ignoraba silenciosamente Touch ID (iPad/iPhone SE/8) y rostro
+en Android — el filtro `Platform.OS === 'ios'` de `detectBiometricType` bloqueaba
+face fuera de iOS, y `BioLinkScreen` pintaba el pictograma de cara aunque el
+usuario tuviera Touch ID.
+
+**Cambios**:
+- `detectBiometricType()` ahora consulta `LocalAuthentication.getEnrolledLevelAsync()`.
+  En Android solo expone face cuando (a) es el único biométrico enrolado y
+  (b) el nivel es `BIOMETRIC_STRONG` (Class 3). En iOS el Secure Enclave garantiza
+  Class 3, así que basta con detectar `FACIAL_RECOGNITION`.
+- `promptBiometric()` pasa `biometricsSecurityLevel: 'strong'` a
+  `authenticateAsync` — el prompt del OS en Android rechaza cualquier biometría
+  Class 2 antes de intentar desbloquear el keystore.
+- `authenticationPrompt` del `SecureStore.setItemAsync` es dinámico ahora
+  (`Confirma para usar tu ${biometricLabel(type)}`) — antes decía "Face ID / huella"
+  en todos los dispositivos.
+- `BioLinkScreen`: hero y modal de "no reconocido" eligen `Ionicons finger-print`
+  vs `FaceScanIcon` según el tipo detectado. Antes ambos usaban `FaceScanIcon`
+  fijo, incluso en Touch ID / huella.
+- `ConfigPerfilScreen` (sección Seguridad, Bloque 12.2): fila biométrica dividida.
+  Cuando el dispositivo soporta ambos métodos aparecen dos filas separadas —
+  Face ID y Touch ID/Huella — cada una con su icono propio (`FaceIdIcon` y
+  `FingerprintIcon` respectivamente). Ambas comparten el mismo toggle porque la
+  clave Ed25519 en SecureStore se desbloquea con cualquier biometría strong del OS.
+
+**Fix Tecno Spark Go 1 (falso positivo Face ID)**:
+En el primer intento, Face ID aparecía como configurable en el Tecno Spark Go 1,
+pero al activarlo el OS pedía la huella (no el rostro). Causa: `getEnrolledLevelAsync()`
+devuelve el nivel MÁXIMO enrolado en el dispositivo, no por tipo. En un Android
+con face débil (Class 2, cámara 2D) + huella fuerte, el nivel reporta `STRONG` por
+la huella y creíamos que el face era fuerte. Al pedir strong al OS, este solo
+aceptaba huella. Solución: exigir "face-only + strong" en Android — si hay huella
+enrolada no exponemos face, porque no podemos garantizar que el strong provenga
+del rostro. Trade-off aceptado: usuarios de Pixel 8+ con face Class 3 + huella
+enrolados no ven la fila "Face ID" en Perfil, pero pueden desbloquear con face
+desde el prompt del OS igualmente.
+
+**Backend, SQL y contratos**: sin cambios. El flujo Ed25519 challenge-response
+es agnóstico al tipo de biometría — solo verifica la firma.
+
+### Mensaje WhatsApp de "Mi opinión" más amable
+
+`WhatsAppNotificationClient.sendFeedback` construía un mensaje estilo log
+(`[OPOX Feedback] Tipo: suggestion\n\n...`) que era poco humano para el equipo
+que lo recibe en su móvil. Reescrito con:
+- Encabezado en `*negrita*` (formato WhatsApp): `*Nuevo mensaje desde OPOX*`.
+- Traducción del `type` a español (`suggestion → Sugerencia`, `bug → Reporte
+  de un error`, `other → Otro comentario`) vía tabla `TYPE_LABELS`. Fallback al
+  valor original si llega un tipo nuevo, para no romper.
+- Timestamp en Zona Horaria Madrid con `Intl.DateTimeFormat('es-ES', { timeZone:
+  'Europe/Madrid' })` — Render corre en UTC y sin esto la hora salía desfasada.
+- Cuerpo del mensaje entrecomillado para diferenciarlo del texto plantilla.
+- Cierre en `_cursiva_` humano.
+
+Sin cambios de firma ni de container — el cliente sigue recibiendo `(type, message)`.
+`.env.example` documenta ahora las tres vars `WHATSAPP_*` (con placeholder de token
+vacío; solo hardcoded los IDs no-secretos del Meta Business Account de prueba).
+
+---
+
+## 2026-09-13 — Bloques 0/1/3 · Tres bugs críticos en dispositivo real
+
+Rama: `fix/gaps-12-09-26`.
+
+### Bug 1 · Crash en el test de nivel (Bloque 0 — Onboarding)
+
+Al pulsar "Iniciar test de nivel" la app mostraba el spinner de "Preparando tu test…"
+y a continuación el diálogo de Android "OPOX continúa fallando". El gap aparecía como
+cerrado en el estado, pero el crash era real y reproducible.
+
+**Causa**: violación de las React Rules of Hooks. El `useEffect` que persiste la
+pregunta actual (`qIndex`) en AsyncStorage — para poder reanudar si el usuario cierra
+la app a mitad — estaba declarado después del bloque `if (!questions) return <loading>`.
+En el primer render (Motor aún cargando) React montaba 8 hooks y devolvía la pantalla
+de carga. En el segundo render (preguntas disponibles) se intentaban 9 hooks → excepción
+interna de React → proceso nativo crashea.
+
+**Fix**: mover ese `useEffect` antes del return condicional. La guarda
+`if (!hasRestoredRef.current) return` dentro del efecto evita que se sobreescriba
+`PENDING_LEVEL_TEST_KEY` antes de que termine la restauración.
+
+### Bug 2 · Flujo de reset de contraseña (Bloque 1 — Acceso)
+
+Dos sub-bugs en el flujo de recuperación de contraseña:
+
+**2a — "Abrir app de correo" abría Outlook para cuentas Gmail**:
+El código de `RecuperarPasswordEnviadoScreen` probaba `ms-outlook://` antes de
+`googlegmail://` sin comprobar el dominio del email. Fix: detección de dominio antes
+de seleccionar el esquema nativo (`isGmail`, `isOutlook`, `isYahoo`); cada tipo de
+cuenta solo intenta su esquema propio.
+
+**2b — El botón "Restablecer contraseña" del email de Gmail no abría la app**:
+Gmail Android bloquea los custom schemes (`opox://`) en botones de email por política
+de seguridad. El usuario veía el botón pero al pulsarlo no pasaba nada.
+
+Fix en dos capas:
+- **Backend**: nueva ruta pública `GET /auth/password/reset-redirect` que recibe
+  `token_hash` y devuelve `302 → opox://reset-password?token_hash=…`. El template de
+  Supabase ahora apunta a este endpoint HTTPS — Gmail no bloquea HTTPS → el OS recibe
+  el redirect y abre la app con el deep-link.
+- **Mobile**: `RecuperarPasswordNuevaScreen` añade un campo de pegado manual (visible
+  solo cuando no llega token por deep link). `parseTokenFromInput()` extrae el
+  `token_hash` de una URL completa pegada o lo usa directamente si es el hash en bruto.
+- **Supabase** (acción manual pendiente): Auth → Email Templates → Reset Password,
+  href → `https://opox-backend-x2mu.onrender.com/auth/password/reset-redirect?token_hash={{ .TokenHash }}&type=recovery`.
+
+### Bug 3 · Health Connect no mostraba la app en sus ajustes (Bloque 3 — Salud)
+
+`requestPermission()` devolvía `[]` sin mostrar diálogo. La app era invisible en
+los ajustes de Health Connect.
+
+**Causa 1 — Filtro `ACTION_SHOW_PERMISSIONS_RATIONALE` duplicado**:
+El plugin oficial de `react-native-health-connect` añade el intent-filter usando un
+callback `async withAndroidManifest`. Expo aplica los mods en orden LIFO entre fases
+(sync primero, async después); el plugin oficial corría siempre DESPUÉS de nuestro
+plugin, añadiendo una segunda copia. HC valida que exista exactamente una copia →
+con dos copias consideraba el manifiesto inválido → app invisible.
+
+Fix: reemplazado `withAndroidManifest` por `withDangerousMod` en
+`plugins/withHealthConnect.js`. `withDangerousMod` corre en una fase completamente
+posterior a todos los `withAndroidManifest`; lee el `AndroidManifest.xml` ya escrito
+y garantiza exactamente 1 copia del filtro en `.MainActivity` sin importar cuántos
+plugins lo hayan añadido. Verificado con `npx expo prebuild --clean`.
+
+**Causa 2 — Falso positivo en `requestHealthPermissions()`**:
+La función usaba `existing.length >= ANDROID_PERMISSIONS.length` para detectar si ya
+había permisos concedidos. Podía devolver `true` si el usuario tenía N permisos de
+cualquier otro tipo. Fix: comparación estricta por `recordType` + `accessType` con
+`.every()`, igual que `hasAllHealthPermissions()`.
+
+---
+
 ## 2026-09-12 — Bloques 6/10 · Fixes post-testing: saveAttempt timeout, BOE catalog search
 
 Rama: `fix/gaps-12-09-26`.

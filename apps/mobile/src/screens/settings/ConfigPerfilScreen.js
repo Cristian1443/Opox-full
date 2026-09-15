@@ -235,8 +235,14 @@ export default function ConfigPerfilScreen({ navigation }) {
   const oposicionLine = [user?.oposicion, user?.especialidad].filter(Boolean).join(' · ')
     || 'Sin configurar';
 
-  const bioLabel = bioType !== 'none' ? biometricLabel(bioType) : null;
-  const BioIcon = bioType === 'face' ? FaceIdIcon : FingerprintIcon;
+  // Estructura de filas biométricas: cuando el dispositivo soporta ambos
+  // métodos ('both'), se muestran dos filas independientes (Face ID + Huella)
+  // aunque bajo el capó comparten el mismo par de claves Ed25519 en SecureStore
+  // — el prompt del OS acepta cualquier biometría fuerte para desbloquear la
+  // clave. Ambos toggles reflejan y modifican el mismo estado `bioEnabled`.
+  const showFaceRow = bioType === 'face' || bioType === 'both';
+  const showFingerRow = bioType === 'finger' || bioType === 'both';
+  const fingerLabel = biometricLabel('finger'); // 'Touch ID' en iOS, 'Huella' en Android
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -314,12 +320,12 @@ export default function ConfigPerfilScreen({ navigation }) {
         {/* ── Seguridad ───────────────────────────────────────────────── */}
         <Text style={[styles.sectionLabel, styles.securityLabel]}>SEGURIDAD</Text>
         <View style={styles.card}>
-          {bioType !== 'none' && (
+          {showFaceRow && (
             <View style={styles.row}>
-              <BioIcon />
+              <FaceIdIcon />
               <View style={styles.rowTextWrap}>
-                <Text style={styles.rowTitle}>{bioLabel}</Text>
-                <Text style={styles.rowSubtitle}>Acceso biométrico</Text>
+                <Text style={styles.rowTitle}>Face ID</Text>
+                <Text style={styles.rowSubtitle}>Acceso con reconocimiento facial</Text>
               </View>
               <Switch
                 value={bioEnabled}
@@ -327,7 +333,24 @@ export default function ConfigPerfilScreen({ navigation }) {
                 disabled={bioLoading}
                 trackColor={{ false: '#E2E2E6', true: colors.purple }}
                 thumbColor={colors.white}
-                accessibilityLabel={`${bioLabel} ${bioEnabled ? 'activada' : 'desactivada'}`}
+                accessibilityLabel={`Face ID ${bioEnabled ? 'activado' : 'desactivado'}`}
+              />
+            </View>
+          )}
+          {showFingerRow && (
+            <View style={[styles.row, showFaceRow && styles.rowBorder]}>
+              <FingerprintIcon />
+              <View style={styles.rowTextWrap}>
+                <Text style={styles.rowTitle}>{fingerLabel}</Text>
+                <Text style={styles.rowSubtitle}>Acceso con huella dactilar</Text>
+              </View>
+              <Switch
+                value={bioEnabled}
+                onValueChange={handleBioToggle}
+                disabled={bioLoading}
+                trackColor={{ false: '#E2E2E6', true: colors.purple }}
+                thumbColor={colors.white}
+                accessibilityLabel={`${fingerLabel} ${bioEnabled ? 'activada' : 'desactivada'}`}
               />
             </View>
           )}

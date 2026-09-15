@@ -42,6 +42,8 @@ export function createAuthRouter(
         validateBody(passwordResetConfirmSchema),
         controller.confirmPasswordReset,
     );
+    // Ruta pública GET — el email apunta aquí con https://; hace 302 → opox://
+    r.get(API_ROUTES.AUTH.PASSWORD_RESET_REDIRECT, controller.resetRedirect);
 
     r.post(
         API_ROUTES.AUTH.BIOMETRIC_CHALLENGE,

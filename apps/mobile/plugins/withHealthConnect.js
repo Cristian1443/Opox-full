@@ -9,17 +9,21 @@
  *    del plugin oficial no se propaga por algún motivo.
  * 3. CORRECCIÓN del intent-filter ACTION_SHOW_PERMISSIONS_RATIONALE:
  *    El plugin oficial (app.plugin.js) usa activity[0] sin comprobar si esa
- *    activity es MainActivity — en builds de Expo SDK 57, activity[0] suele ser
- *    la splash activity. Esta función busca iterativamente la activity con
- *    android:name .MainActivity y mueve el intent-filter ahí. Sin este fix
- *    Health Connect no puede verificar el rationale → la app es invisible en sus
- *    ajustes de permisos → requestPermission() devuelve siempre vacío.
+ *    activity es MainActivity; además, la fase async de ese plugin corre DESPUÉS
+ *    de la fase async de este plugin (Expo aplica los mods en orden LIFO dentro de
+ *    cada fase). La deduplicación se hace por tanto con withDangerousMod, que corre
+ *    en una fase completamente posterior a todos los withAndroidManifest (sync y async).
+ *    withDangerousMod modifica directamente el AndroidManifest.xml ya generado,
+ *    garantizando que sin importar cuántas veces lo añadan los plugins previos,
+ *    el fichero final siempre contendrá exactamente UNA copia del filtro en MainActivity.
  *
  * Ver: https://developer.android.com/health-connect/develop/get-started
  * y https://developer.android.com/training/basics/intents/package-visibility
  */
 
-const { withAndroidManifest } = require('@expo/config-plugins');
+const { withAndroidManifest, withDangerousMod } = require('@expo/config-plugins');
+const fs = require('fs');
+const path = require('path');
 
 const HEALTH_CONNECT_PACKAGE = 'com.google.android.apps.healthdata';
 const RATIONALE_ACTION = 'androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE';
@@ -63,75 +67,72 @@ function ensureUsesPermissions(manifest) {
 }
 
 /**
- * Asegura que el intent-filter ACTION_SHOW_PERMISSIONS_RATIONALE esté en
- * la Activity correcta (aquella cuyo android:name termina en .MainActivity),
- * NO en activity[0] como hace el plugin oficial incondicionalmente.
+ * Post-procesa el AndroidManifest.xml ya escrito en disco para garantizar
+ * exactamente UNA copia de ACTION_SHOW_PERMISSIONS_RATIONALE en MainActivity.
  *
- * Si el official plugin ya lo puso en la activity equivocada, lo elimina de
- * ahí y lo (re)crea en MainActivity.
+ * Usa withDangerousMod (no withAndroidManifest) porque la fase "dangerous" corre
+ * DESPUÉS de que todos los withAndroidManifest (sync y async) han terminado.
+ * Esto evita el problema de orden entre plugins: no importa cuántas veces los
+ * plugins oficiales de react-native-health-connect añadan el filtro — este paso
+ * los deduplica todos antes de que Gradle lo compile.
  */
-function fixRationaleIntentFilter(manifest) {
-    const activities = manifest.application?.[0]?.activity ?? [];
-
-    // Buscar MainActivity por nombre — no por índice
-    const mainIdx = activities.findIndex((a) => {
-        const name = a.$?.['android:name'] ?? '';
-        return (
-            name === '.MainActivity' ||
-            name === 'MainActivity' ||
-            name.endsWith('.MainActivity')
-        );
-    });
-
-    if (mainIdx === -1) {
-        // Manifest aún no tiene activities (ocurre en algunos prebuild parciales)
-        return;
-    }
-
-    const mainActivity = activities[mainIdx];
-
-    // Comprobar si MainActivity ya tiene el intent-filter correcto
-    const existingFilters = mainActivity['intent-filter'] ?? [];
-    const alreadyOnMain = existingFilters.some(
-        (f) =>
-            Array.isArray(f.action) &&
-            f.action.some((a) => a.$?.['android:name'] === RATIONALE_ACTION),
-    );
-
-    if (alreadyOnMain) return;
-
-    // El plugin oficial lo añadió a activity[0] — si es una activity diferente,
-    // quitarlo de allí para evitar que quede en la splash activity.
-    if (mainIdx !== 0) {
-        const firstActivity = activities[0];
-        if (Array.isArray(firstActivity['intent-filter'])) {
-            firstActivity['intent-filter'] = firstActivity['intent-filter'].filter(
-                (f) =>
-                    !(
-                        Array.isArray(f.action) &&
-                        f.action.some((a) => a.$?.['android:name'] === RATIONALE_ACTION)
-                    ),
+function withRationaleDedup(config) {
+    return withDangerousMod(config, [
+        'android',
+        async (config) => {
+            const manifestPath = path.join(
+                config.modRequest.platformProjectRoot,
+                'app',
+                'src',
+                'main',
+                'AndroidManifest.xml',
             );
-        }
-    }
 
-    // Añadir el intent-filter a MainActivity
-    if (!Array.isArray(mainActivity['intent-filter'])) {
-        mainActivity['intent-filter'] = [];
-    }
-    mainActivity['intent-filter'].push({
-        action: [{ $: { 'android:name': RATIONALE_ACTION } }],
-    });
+            if (!fs.existsSync(manifestPath)) return config;
+
+            let xml = fs.readFileSync(manifestPath, 'utf-8');
+
+            // Cuenta cuántas veces aparece el filtro de rationale
+            const rationalePattern =
+                /<intent-filter>\s*<action android:name="androidx\.health\.ACTION_SHOW_PERMISSIONS_RATIONALE"\/>\s*<\/intent-filter>/g;
+
+            const matches = xml.match(rationalePattern);
+            if (!matches || matches.length <= 1) return config; // 0 o 1 — nada que hacer
+
+            // Elimina TODAS las copias, luego reinserta UNA sola
+            xml = xml.replace(rationalePattern, '');
+
+            // Buscar la etiqueta de cierre de MainActivity para insertar el filtro justo antes
+            // Buscamos el <activity android:name=".MainActivity"...>...</activity> y añadimos
+            // el intent-filter antes del </activity> de esa activity.
+            // Estrategia: reemplazar el primer bloque </activity> que venga después de ".MainActivity"
+            xml = xml.replace(
+                /(android:name="\.MainActivity"[\s\S]*?)([ \t]*<\/activity>)/,
+                (_, before, closingTag) =>
+                    `${before}      <intent-filter>\n        <action android:name="${RATIONALE_ACTION}"/>\n      </intent-filter>\n${closingTag}`,
+            );
+
+            fs.writeFileSync(manifestPath, xml, 'utf-8');
+            return config;
+        },
+    ]);
 }
 
 const withHealthConnect = (config) => {
-    return withAndroidManifest(config, (config) => {
+    // Paso 1: añadir <queries> y <uses-permission> vía withAndroidManifest (sync)
+    config = withAndroidManifest(config, (config) => {
         const manifest = config.modResults.manifest;
         ensureQueriesForHealthConnect(manifest);
         ensureUsesPermissions(manifest);
-        fixRationaleIntentFilter(manifest);
         return config;
     });
+
+    // Paso 2: deduplicar el intent-filter de rationale en una fase posterior
+    // (withDangerousMod) para garantizar exactamente 1 copia en MainActivity,
+    // independientemente del orden en que los plugins async previos lo hayan añadido.
+    config = withRationaleDedup(config);
+
+    return config;
 };
 
 module.exports = withHealthConnect;

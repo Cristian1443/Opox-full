@@ -40,41 +40,37 @@ export default function RecuperarPasswordEnviadoScreen({ route, navigation }) {
     }, [contador]);
 
     const handleAbrirCorreo = async () => {
-        // `mailto:` abre la app de correo en modo COMPOSICIÓN — con un mensaje
-        // nuevo al destinatario que le pasemos. Como aquí el destinatario era
-        // el propio email del usuario, se veía redactando un mail a sí mismo
-        // en Outlook. Se necesita abrir la BANDEJA de entrada.
-        //
-        // No existe una única URL universal para "abrir la app de correo":
-        // - iOS: `message://` abre Apple Mail directamente en la bandeja.
-        // - Android: no hay scheme genérico; se prueba con Gmail y Outlook,
-        //   y si falla se abre la versión web según el dominio del email.
         const tryOpen = async (url) => {
             try { await Linking.openURL(url); return true; } catch { return false; }
         };
 
+        const domain = String(email).split('@')[1]?.toLowerCase() || '';
+        const isGmail   = domain === 'gmail.com' || domain === 'googlemail.com';
+        const isOutlook = /outlook\.|hotmail\.|live\./.test(domain);
+        const isYahoo   = /yahoo\./.test(domain);
+
         if (Platform.OS === 'ios') {
+            // iOS: Apple Mail es el único scheme universal de bandeja
             if (await tryOpen('message://')) return;
         } else {
-            if (await tryOpen('googlegmail://')) return;
-            if (await tryOpen('ms-outlook://')) return;
+            // Android: solo intentar el scheme de la app que coincide con el
+            // dominio del email — evita abrir Outlook para cuentas Gmail, etc.
+            if (isGmail   && await tryOpen('googlegmail://')) return;
+            if (isOutlook && await tryOpen('ms-outlook://')) return;
         }
 
-        // Fallback web (nunca falla): según dominio del email, abre la bandeja
-        // correspondiente. Si el usuario tiene la app instalada, el sistema la
-        // abre; si no, la web sirve igual.
-        const domain = String(email).split('@')[1]?.toLowerCase() || '';
-        const web = (domain === 'gmail.com' || domain === 'googlemail.com')
+        // Fallback web según el dominio: la web siempre funciona y abre la
+        // bandeja correcta sin redactar ningún correo.
+        const web = isGmail
             ? 'https://mail.google.com'
-            : /outlook\.|hotmail\.|live\./.test(domain)
+            : isOutlook
                 ? 'https://outlook.live.com/mail'
-                : /yahoo\./.test(domain)
+                : isYahoo
                     ? 'https://mail.yahoo.com'
                     : null;
         if (web && await tryOpen(web)) return;
 
-        // Último recurso — mailto vacío (sin destinatario) abre el selector de
-        // apps de correo sin redactar un mail a nadie.
+        // Último recurso: selector del SO sin destinatario (no compose mode)
         if (await tryOpen('mailto:')) return;
         Alert.alert('No se pudo abrir la app de correo.');
     };

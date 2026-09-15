@@ -1,0 +1,4 @@
+# Carpetas nativas generadas por expo prebuild — no commitear
+# Se regeneran con: npx expo prebuild --platform android|ios
+android/
+ios/
