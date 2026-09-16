@@ -87,6 +87,16 @@ export function createTrainingRouter(
         controller.generateSurgicalTest,
     );
 
+    // ─── Streaming (Fase 2 · gaps-15-09-26) ──────────────────────────────
+    // Proxies del Motor: startTestJob → job → session → answer. Si el Motor no
+    // está configurado en env, cada handler devuelve 503 y el mobile cae al
+    // flujo síncrono (/training/generate). Sin schemas Zod estrictos — los
+    // handlers solo re-envían campos.
+    r.post(API_ROUTES.TRAINING.GENERATE_STREAM, authMiddleware, controller.generateStream);
+    r.get(API_ROUTES.TRAINING.JOB_STATUS, authMiddleware, controller.getJobStatus);
+    r.get(API_ROUTES.TRAINING.SESSION_QUESTIONS, authMiddleware, controller.getSessionQuestions);
+    r.post(API_ROUTES.TRAINING.SESSION_ANSWER, authMiddleware, controller.postSessionAnswer);
+
     r.post(
         API_ROUTES.TRAINING.ATTEMPTS,
         authMiddleware,

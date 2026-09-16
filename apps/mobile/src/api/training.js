@@ -75,4 +75,16 @@ export const trainingApi = {
             `${API_ROUTES.TRAINING.LEVEL_TEST}?oposicion=${encodeURIComponent(oposicion)}`,
             { auth: false },
         ),
+
+    // ─── Streaming (Fase 2 · gaps-15-09-26) ────────────────────────────────
+    // Devuelven 503 { code:'MOTOR_UNAVAILABLE' } cuando el Motor no está configurado.
+    // El caller debe detectarlo para caer al flujo síncrono (`generateQuestions`).
+    startTestJob: (body) =>
+        api.post(API_ROUTES.TRAINING.GENERATE_STREAM, body, { auth: true }),
+    getJobStatus: (jobId) =>
+        api.get(API_ROUTES.TRAINING.JOB_STATUS.replace(':jobId', jobId), { auth: true }),
+    getSessionQuestions: (sessionId) =>
+        api.get(API_ROUTES.TRAINING.SESSION_QUESTIONS.replace(':sessionId', sessionId), { auth: true }),
+    postSessionAnswer: (sessionId, body) =>
+        api.post(API_ROUTES.TRAINING.SESSION_ANSWER.replace(':sessionId', sessionId), body, { auth: true }),
 };

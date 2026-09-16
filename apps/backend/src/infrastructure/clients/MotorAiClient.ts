@@ -117,6 +117,16 @@ export class MotorAiClient implements AiApiContract {
     private questionBankLoadedAt = 0;
     private readonly CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
 
+    /**
+     * Getter del cliente axios con auth ya configurada. Uso limitado a servicios
+     * de infraestructura que necesiten golpear endpoints del Motor no cubiertos
+     * por los métodos públicos (ej. CourseSyncService — /v1/courses catálogo).
+     * Preferir métodos tipados cuando existan.
+     */
+    rawHttp(): AxiosInstance {
+        return this.http;
+    }
+
     constructor(config: MotorAiConfig) {
         this.config = config;
         this.http = axios.create({
@@ -342,6 +352,122 @@ export class MotorAiClient implements AiApiContract {
 
     async generateBoeMiniTest(_params: GenerateBoeMiniTestParams): Promise<BoeMiniTestAiResult> {
         throw new Error('[MotorAiClient] generateBoeMiniTest no forma parte del Motor. Usa CompositeAiClient.');
+    }
+
+    // ─── Streaming API (Fase 2 · gaps-15-09-26) ───────────────────────────────
+    // Los métodos anteriores (generateQuestions/generateSurgicalTest) esperan a
+    // que el Motor termine antes de devolver preguntas. Estos exponen el pipeline
+    // async del Motor (job_id + sesion_id + polling) para que el mobile pueda
+    // mostrar la primera pregunta en cuanto está lista mientras el resto se genera.
+
+    /** Arranca un job en el Motor y devuelve solo el jobId. Sin polling. */
+    async startTestJob(input: {
+        userId: string;
+        cursoId: string;
+        temaIds?: string[] | null;
+        count: number;
+        difficulty?: 'easy' | 'medium' | 'hard';
+    }): Promise<{ jobId: string; sessionId: string | null }> {
+        const body = {
+            curso_id: input.cursoId,
+            user_id: input.userId,
+            tema_ids: input.temaIds ?? null,
+            n_preguntas: input.count,
+            dificultad: DIFF_TO_MOTOR[input.difficulty ?? 'medium'] ?? 'media',
+        };
+        const res = await this.http.post<Record<string, unknown>>('/v1/tests/generate', body, {
+            headers: { 'X-OpenAI-Key': this.config.openAiKey },
+            validateStatus: (s) => s === 200 || s === 202,
+        });
+        const data = res.data;
+        // 200 = respuesta desde caché ya con sesion_id. 202 = job en curso.
+        if (res.status === 200) {
+            const resultado = data.resultado as { sesion_id?: string } | undefined;
+            return {
+                jobId: (data.job_id as string) ?? '',
+                sessionId: resultado?.sesion_id ?? null,
+            };
+        }
+        return { jobId: data.job_id as string, sessionId: null };
+    }
+
+    /** Consulta el estado del job. Formato tolerante al schema real del Motor. */
+    async getJobStatus(jobId: string): Promise<{
+        status: string;
+        sessionId: string | null;
+        progress: { done: number; total: number };
+    }> {
+        const res = await this.http.get<Record<string, unknown>>(`/v1/jobs/${jobId}`);
+        const raw = res.data;
+        const estado = String(raw.estado ?? raw.status ?? 'pending');
+        const resultado = (raw.resultado ?? {}) as Record<string, unknown>;
+        // El schema del Motor puede exponer `progreso: { done, total }` o `progress` o nada.
+        const progresoRaw = (raw.progreso ?? raw.progress ?? {}) as Record<string, unknown>;
+        const done = Number(progresoRaw.done ?? 0);
+        const total = Number(progresoRaw.total ?? (resultado.preguntas as unknown[] | undefined)?.length ?? 0);
+        return {
+            status: estado,
+            sessionId: (progresoRaw.sesion_id as string | undefined)
+                ?? (resultado.sesion_id as string | undefined)
+                ?? null,
+            progress: { done, total },
+        };
+    }
+
+    /** Devuelve las preguntas publicadas hasta el momento en la sesión. */
+    async getSessionQuestions(sessionId: string): Promise<{
+        questions: GeneratedQuestion[];
+        deficit: number | null;
+    }> {
+        const res = await this.http.get<Record<string, unknown>>(`/v1/tests/${sessionId}`);
+        const data = res.data;
+        const preguntas = (data.preguntas as MotorPreguntaJob[] | undefined) ?? [];
+
+        // Reutiliza el mapeo de banco para resolver correcta_idx (INC-04).
+        if (preguntas.length > 0) await this.ensureQuestionBank();
+
+        const mapped: GeneratedQuestion[] = [];
+        for (const p of preguntas) {
+            const full: MotorPreguntaFull | undefined = typeof p.correcta_idx === 'number'
+                ? (p as unknown as MotorPreguntaFull)
+                : this.questionBankCache.get(p.id);
+            if (!full || typeof full.correcta_idx !== 'number') continue;
+            mapped.push(this.mapPregunta(p, full));
+        }
+        return {
+            questions: mapped,
+            deficit: (data.deficit as number | undefined) ?? null,
+        };
+    }
+
+    /** Envía la respuesta del usuario a la sesión activa (background). */
+    async postSessionAnswer(input: {
+        sessionId: string;
+        questionId: string;
+        optionIndex: number;
+        userId: string;
+    }): Promise<{
+        correct: boolean;
+        correctIndex: number | null;
+        explanation: string | null;
+        evidence?: { cita?: string; pagina?: number };
+    }> {
+        const res = await this.http.post<Record<string, unknown>>(
+            `/v1/tests/${input.sessionId}/answer`,
+            {
+                user_id: input.userId,
+                pregunta_id: input.questionId,
+                opcion_idx: input.optionIndex,
+            },
+            { headers: { 'X-OpenAI-Key': this.config.openAiKey } },
+        );
+        const data = res.data;
+        return {
+            correct: Boolean(data.correcta),
+            correctIndex: typeof data.correctaIdx === 'number' ? (data.correctaIdx as number) : null,
+            explanation: (data.explicacion as string | null) ?? null,
+            evidence: (data.evidencia as { cita?: string; pagina?: number } | undefined),
+        };
     }
 
     // ─── Helpers privados ─────────────────────────────────────────────────────

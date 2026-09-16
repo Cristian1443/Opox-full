@@ -56,11 +56,23 @@ export function createServer(): Express {
     app.use(createConfigRouter(container.controllers.config, container.middleware.auth));
     app.use(createPushRouter(container.controllers.push, container.middleware.auth));
 
-    // Cron de notificaciones (racha diaria a las 20:00h Colombia = 01:00 UTC)
+    // Cron de notificaciones (racha diaria a las 20:00h Colombia = 01:00 UTC).
+    // Al mismo scheduler se le añade el auto-sync del cursoId del Motor cuando
+    // el servicio esté disponible (Fase 4 · gaps-15-09-26): cada 30 min consulta
+    // el catálogo del Motor y actualiza `training_courses` + `training_topics`
+    // en Supabase si el equipo IA re-subió los módulos.
     const scheduler = new NotificationScheduler();
-    scheduler
-        .registerStreakWarning(() => container.useCases.sendStreakWarning.execute())
-        .start();
+    scheduler.registerStreakWarning(() => container.useCases.sendStreakWarning.execute());
+
+    if (container.courseSyncService) {
+        const syncService = container.courseSyncService;
+        scheduler.registerCourseSync(() => syncService.refresh());
+        // Ejecutar una vez al arrancar (fire-and-forget). Si el Motor no responde,
+        // el backend sigue vivo con los valores previos de `training_courses`.
+        syncService.refresh().catch(() => { /* logueado dentro del servicio */ });
+    }
+
+    scheduler.start();
 
     // 404 catch-all
     app.use((_req, res) => {

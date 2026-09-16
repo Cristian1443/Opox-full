@@ -7,12 +7,15 @@ import {
     Animated,
     Vibration,
     AccessibilityInfo,
+    ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
+import { useTestSession } from '../../hooks/useTestSession';
+import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 // Iconos exactos exportados de Figma para la barra inferior de herramientas
 // (antes Ionicons genéricos: star/star-outline, warning-outline,
@@ -149,7 +152,7 @@ const MAX_HINTS = 3;
 
 export default function QuestionActiveScreen({ navigation, route }) {
   const {
-    questions = MOCK_QUESTIONS,
+    questions: paramQuestions = null,
     startIndex = 0,
     // Sources soportados: 'generator' | 'official' | 'surgical' | 'notes' (Bloque 9).
     // El runner es agnóstico al source; solo lo propaga a TrainingResult y usa
@@ -167,7 +170,25 @@ export default function QuestionActiveScreen({ navigation, route }) {
     // Respuestas ya dadas al retomar un simulacro — se restauran tal cual,
     // alineadas por índice con `questions` (mismo formato que produce este runner).
     resumeAnswers = null,
+    // Fase 2 · Streaming (gaps-15-09-26): si viene jobId, las preguntas llegan
+    // incrementalmente vía useTestSession. La primera se ve en ~5-8s.
+    jobId = null,
+    expectedTotal = null,
   } = route?.params ?? {};
+
+  // Streaming: usa useTestSession cuando hay jobId. En caso contrario, se
+  // comporta como antes con las preguntas del route.params o los mocks.
+  const {
+    questions: streamedRaw,
+    progress: streamProgress,
+    status: streamStatus,
+  } = useTestSession(jobId, { expectedTotal });
+  const streamedQuestions = jobId && streamedRaw?.length
+    ? adaptGeneratedQuestions(streamedRaw)
+    : [];
+  const questions = jobId
+    ? streamedQuestions
+    : (paramQuestions ?? MOCK_QUESTIONS);
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [selectedOption, setSelectedOption] = useState(null);
@@ -197,8 +218,15 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const timerPulseAnim = useRef(new Animated.Value(1)).current;
   const pulseRef = useRef(null);
 
+  // Streaming: si aún no llega la primera pregunta, mostramos loader con el
+  // progreso del job. Se calcula ANTES del uso de `questions[currentIndex]`
+  // porque en modo stream ese array puede estar vacío en el primer render.
+  const streamStillLoading =
+    jobId && questions.length === 0 && streamStatus !== 'error';
+  const streamHasError = jobId && streamStatus === 'error';
+
   const question = questions[currentIndex];
-  const total = questions.length;
+  const total = jobId && expectedTotal ? expectedTotal : questions.length;
   const progress = total > 0 ? (currentIndex + 1) / total : 0;
 
   useEffect(() => {
@@ -340,6 +368,42 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
   // Cuando el usuario ha respondido, se ocultan las opciones incorrectas no elegidas.
   // Correcta se muestra en verde, elegida (si fue mal) en rojo — mockup.
+  // Loader de streaming: se renderiza ANTES de que llegue la primera pregunta
+  // en modo stream — evita crash por `question.options` undefined.
+  if (streamStillLoading || streamHasError) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          {streamHasError ? (
+            <>
+              <Text style={{ fontSize: 15, color: colors.textDark, textAlign: 'center', marginBottom: 12 }}>
+                El motor está tardando más de lo normal.
+              </Text>
+              <TouchableOpacity
+                style={{ backgroundColor: colors.ctaGreen, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                onPress={() => navigation.goBack()}
+              >
+                <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Volver</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color={colors.selectionBorder} />
+              <Text style={{ fontSize: 14, color: colors.textDark, marginTop: 12 }}>
+                Preparando tu test…
+              </Text>
+              {streamProgress?.total > 0 && (
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
+                  {streamProgress.done} de {streamProgress.total} preguntas listas
+                </Text>
+              )}
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const visibleOptions = question.options.filter((opt) => {
     if (!isSubmitted) return true;
     if (opt.correct) return true;

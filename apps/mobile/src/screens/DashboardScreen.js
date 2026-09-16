@@ -16,6 +16,7 @@ import BoeAlertBanner from '../components/BoeAlertBanner';
 import AlertCardModal from '../components/AlertCardModal';
 import { dashboardApi, planningApi, boeApi, trainingApi } from '../api';
 import { colors } from '../theme';
+import { useThemeColors } from '../hooks/useThemeColors';
 import { getHealthMetrics, isHealthAvailable } from '../services/HealthService';
 import { adaptGeneratedQuestions } from '../utils/questionAdapter';
 
@@ -482,6 +483,9 @@ function StaleLawsWarningIcon({ size = 80, color = '#E8E8E8' }) {
 // ─── Pantalla principal (2.1 Dashboard + 2.2 Acceso rápido) ─────────────────
 export default function DashboardScreen({ navigation }) {
     const insets = useSafeAreaInsets();
+    // Fase 3 · dark mode global (gaps-15-09-26). Solo el fondo principal y la
+    // StatusBar se adaptan al tema — el resto de tokens estáticos siguen igual.
+    const themeColors = useThemeColors();
     const [activeNudge, setActiveNudge] = useState(null); // null | 'fatigue' | 'academic' | 'boe'
     const nudge = activeNudge ? NUDGES[activeNudge] : null;
     const [boeBannerVisible, setBoeBannerVisible] = useState(false);
@@ -601,8 +605,11 @@ export default function DashboardScreen({ navigation }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.white }]}>
+            <StatusBar
+                barStyle={themeColors.textDark === '#F0F0F2' ? 'light-content' : 'dark-content'}
+                backgroundColor={themeColors.white}
+            />
 
             {/* Header (dash-head) */}
             <View style={styles.header}>

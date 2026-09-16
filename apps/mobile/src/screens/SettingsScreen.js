@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, storeApi, settingsApi } from '../api';
 import { colors, spacing } from '../theme';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 // ─── 12.1 · Ajustes · hub principal ────────────────────────────────────────
 // Fiel al Figma (HomeConfigScreen.tsx). El reference no muestra la fila
@@ -159,6 +160,9 @@ export default function SettingsScreen({ navigation }) {
   const [opopoints, setOpopoints] = useState(null);
   const [toneLabel, setToneLabel] = useState('Equilibrado');
   const [probLabel, setProbLabel] = useState(null); // null = sin datos aún
+  // Fase 3 · dark mode (gaps-15-09-26).
+  const themeColors = useThemeColors();
+  const isDark = themeColors.textDark === '#F0F0F2';
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
@@ -272,8 +276,11 @@ export default function SettingsScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: themeColors.white }]} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={themeColors.white}
+      />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>

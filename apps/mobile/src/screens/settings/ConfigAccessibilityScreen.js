@@ -10,6 +10,7 @@ import Text from '../../components/AppText';
 import { colors, spacing } from '../../theme';
 import { settingsApi } from '../../api';
 import { AccessibilityContext } from '../../contexts/AccessibilityContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 // ─── 12.5 · Accesibilidad ───────────────────────────────────────────────────
 // Fiel al Figma (AccesibilidadScreen.tsx). "Modo noche" es un switch binario
@@ -93,6 +94,10 @@ function MoonIcon({ size = 24, color = colors.accentOrange }) {
 export default function ConfigAccessibilityScreen({ navigation }) {
   const [prefs, setPrefs] = useState(DEFAULT);
   const { setFontSize: applyFontSizeGlobally, setTheme: applyThemeGlobally } = useContext(AccessibilityContext);
+  // Fase 3 · dark mode. Esta pantalla es especialmente crítica porque contiene
+  // el toggle "Modo noche" — debe reflejar el cambio en tiempo real.
+  const themeColors = useThemeColors();
+  const isDark = themeColors.textDark === '#F0F0F2';
 
   useEffect(() => {
     let cancelled = false;
@@ -149,8 +154,11 @@ export default function ConfigAccessibilityScreen({ navigation }) {
   }, []);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: themeColors.white }]} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={themeColors.white}
+      />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
