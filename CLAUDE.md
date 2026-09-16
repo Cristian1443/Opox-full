@@ -1093,11 +1093,35 @@ Microservicio RAG del equipo IA. Dominio: `ia.opox.ai`. URL en `.env` (`MOTOR_AP
 generación (chat, flashcards, summary, podcast, tests) muere con `falta_openai_key`.**
 `isMotorConfigured = Boolean(MOTOR_API_BASE_URL && MOTOR_API_KEY)`.
 
-**Curso activo (revisión 2026-09-09)**: `672e3a8bad0f45c8` — Policía de Galicia completo
-(40 temas, 4 bloques, 1784 páginas). Reemplaza el curso parcial `0bed919120024e5f` (Bloque 1,
-266 páginas). El mapping vive en la tabla Supabase `training_courses`, no en el `.env`:
+**Curso activo (revisión 2026-09-15)**: `ef7d941bea5f41d7` — Policía de Galicia completo
+(40 temas, 4 bloques, 1784 páginas). Historial de IDs (cada re-ingesta del Motor genera uno nuevo,
+por lo que los IDs anteriores devuelven `curso_no_encontrado` en cada llamada):
+`0bed919120024e5f` (parcial, solo Tema 1, hasta 2026-09-09) →
+`672e3a8bad0f45c8` (completo, 2026-09-09 → 2026-09-15) →
+`ef7d941bea5f41d7` (completo, desde 2026-09-15).
+El mapping vive en la tabla Supabase `training_courses`, no en el `.env`:
 `GetCursoIdUseCase.execute(oposicion)` consulta la tabla; `MOTOR_DEFAULT_CURSO_ID` es solo
 fallback. Actualizar el curso = ejecutar `training_courses.sql` en Supabase, sin tocar env vars.
+**Auto-sync del cursoId — `CourseSyncService` (revisión 2026-09-15)**: cada re-ingesta
+del Motor genera un `course_id` nuevo que invalida el anterior (`404 curso_no_encontrado`).
+Para evitar tener que actualizar la BD manualmente cada vez, hay un servicio en
+`infrastructure/scheduler/CourseSyncService.ts` que se ejecuta al arrancar el backend
+y cada 30 min via cron:
+1. Lee todas las filas de `training_courses` (esperando un `label` como "Policía de Galicia").
+2. Consulta `GET /v1/courses` del Motor.
+3. Filtra por `estado: "listo"` + match exacto de `titulo` (case-insensitive) contra el `label`.
+4. Desempate: `creado` DESC (el más reciente gana), luego `n_temas` DESC.
+5. Si el `motor_curso_id` en la tabla ≠ el ganador, hace `UPDATE` + refresca
+   `training_topics` con los temas del curso nuevo (`GET /v1/courses/{id}` →
+   `documentos[*].bloques[*].temas`, ordenados globalmente con `sort_order = 1..N`).
+Log estructurado (`[course-sync] cambio detectado {oposicion, from, to}`,
+`[course-sync] topics refrescados {count}`). El servicio nunca lanza — cualquier
+fallo se degrada con `logger.warn` y conserva los valores previos de las tablas.
+
+**Recovery manual** (solo si el auto-sync está deshabilitado o el Motor rechaza el
+label): listar cursos con `GET https://ia.opox.ai/v1/courses` (headers `X-API-Key: opox-…`);
+copiar el `id` con `estado: "listo"` a `training_courses` y a
+`MOTOR_DEFAULT_CURSO_ID`/`MOTOR_BOE_CURSO_ID` en `.env` (local + Render).
 
 **Endpoints reales en uso (2026-09-04)** — alineados con OpenAPI `ia.opox.ai`:
 - `/v1/classroom/tutor` — chat Tutor IA con historial y tono (Bloque 8).
@@ -1184,5 +1208,90 @@ pnpm lint                       # lint completo
 | 11 | Tienda OPOX | Frontend + backend completo. Revisión 2026-08-28: motor earn automático por tests (1 O/acierto × multiplicador, cap 100 O/día), mini-test BOE hasta 5 O, `getTodayTestEarnings` en repo. Revisión 2026-08-27: puente earn→ledger, `POST /store/discounts/:id/redeem`, 8 pantallas sin mocks, canje por `redeemType`, fixes tabs UI. |
 | 12 | Configuración | Frontend + backend completo. Revisión 2026-08-30 (3 pasadas): feedback real, tono IA multi-dispositivo, accesibilidad mapeada, stats reales con velocidad, subtextos API, PDF real (pdfkit+Supabase Storage URL firmada), racha caduca correctamente en lectura, botón envío TutorChat. Gaps pendientes: ThemeContext global, chat soporte (Intercom), RevenueCat (suscripción). |
 | 13 | Notificaciones Push | Backend + mobile completo (3 fases: infraestructura base, hábito/retención, Supabase Realtime). Prueba end-to-end pendiente de EAS development build |
+
+---
+
+## Gaps-15-09-26 · notas clave
+
+**Streak milestones ahora otorgan Opopoints (2026-09-15)** — fix crítico. Hasta
+esta rama `SupabaseDashboardRepository.registerActivity` nunca daba los
++50/+100/+200/+300/+500/+1000 Opopoints que la app anunciaba en `MotivationHomeScreen`
+como "Próximo hito: Racha de 7 días · +50 Opopoints". Ahora detecta el cruce
+(`oldStreak < milestone.days <= newStreak`), suma `milestone.points` al `points`
+del evento y persiste en `user_opopoints_ledger` con `reason:
+'<original>+streak_milestone_<days>'`. Tabla `STREAK_MILESTONES` movida a
+`packages/types/src/motivation.ts` como fuente de verdad; mobile lee desde
+`apps/mobile/src/lib/streakMilestones.js` (misma tabla, duplicada para evitar
+que mobile importe `@opox/types`).
+
+**Helper `enrichTopicsWithLabels`** — `apps/backend/src/infrastructure/shared/topicLabels.ts`.
+Antes `SupabaseTrainingRepository.listErrorPatterns` tenía el enriquecimiento
+`topic_id → "Tema N"` en línea y `SupabaseConfigRepository.getProStats` no lo
+aplicaba en absoluto (mostraba UUIDs hex crudos en Estadísticas Pro). Ahora
+ambos usan el mismo helper + regex `HEX_ID_RE` para filtrar IDs sin resolver.
+
+**Fases del plan macro — 5 fases fijas (2026-09-15)**: `MacroUseCase.PHASE_DEFS`
+cambió de 4 pesos `[0.35, 0.30, 0.25, 0.10]` a 5 pesos `[0.20, 0.20, 0.20, 0.15,
+0.25]`. `enrichMacroWithTopics` en `PlanningController` reparte los temas por
+posición absoluta (chunks de `Math.ceil(N/4)`) y la fase `integral` recibe
+TODOS los temas — no una división proporcional. Se elimina `PHASE_WEIGHTS`.
+
+**Agenda con notificaciones locales (2026-09-15)** — `apps/mobile/src/lib/agendaNotifications.js`.
+Programa 3 notificaciones locales (T-3d, T-2d, T-0 a las 09:00 hora local) al
+crear una fecha; guarda los `identifier` en AsyncStorage `opox.agenda.notif.<id>`
+para poder cancelarlos al borrar. Long-press sobre una fila abre confirmación
+`Alert.alert` y llama `DELETE /planning/agenda/:id` (endpoint nuevo — ruta
+constante `PLANNING.AGENDA_DELETE`).
+
+**Barra de reto individual (2026-09-15)** — `ChallengesScreen.js`:
+`percent = completedByMe ? max(clanPercent, myShare) : clanPercent`. Antes
+retos completados por 1 de 2 miembros mostraban `myShare = 50%` — correcto —
+pero un usuario que ya completó siempre veía "0 de 2 del clan" con barra vacía
+hasta que el segundo miembro lo hiciera. La formula garantiza feedback visual
+inmediato al usuario.
+
+**Test quirúrgico dinámico (2026-09-15)** — `SurgicalTestPreviewScreen.js`:
+consume `trainingApi.listErrorPatterns()` al montar, toma top-3 patrones y
+distribuye `TOTAL_QUESTIONS=15` proporcionalmente al `failRate` de cada uno
+(mínimo 1 pregunta por patrón, el último absorbe el redondeo). Antes hardcoded
+`[{plazos:8}, {recursos:7}]` sin relación con el usuario, y solicitaba count=10
+al backend — inconsistencia entre 15 anunciadas y 10 entregadas.
+
+**Streaming de tests con job polling — Fase 2 (2026-09-15)**:
+- 4 endpoints proxy nuevos: `POST /training/generate-stream`, `GET
+  /training/job/:jobId`, `GET /training/session/:sessionId`, `POST
+  /training/session/:sessionId/answer`. Rutas constantes en `packages/constants`:
+  `TRAINING.GENERATE_STREAM`, `JOB_STATUS`, `SESSION_QUESTIONS`, `SESSION_ANSWER`.
+- `MotorAiClient` añade 4 métodos: `startTestJob`, `getJobStatus`,
+  `getSessionQuestions`, `postSessionAnswer`. Reutiliza el `questionBankCache`
+  para resolver `correcta_idx` de preguntas incrementales (INC-04 workaround).
+- Use cases en `application/training/StreamingTestUseCases.ts` — proxies
+  delgados. Si `motorAiClient === undefined`, cada handler responde 503 y el
+  mobile cae al flujo síncrono legacy (`trainingApi.generateQuestions`).
+- Mobile: `useTestSession(jobId)` (`apps/mobile/src/hooks/useTestSession.js`)
+  polling cada 2.5 s, timeout 90 s. `QuestionActiveScreen` acepta `jobId`
+  opcional junto al `questions[]` legacy; renderiza loader con "N de M
+  preguntas listas" hasta que llega la primera. `GeneratorConfigScreen` intenta
+  streaming primero y solo cae al síncrono si el backend devuelve 503.
+
+**Dark mode global — Fase 3 (2026-09-15)**:
+- `theme.js` exporta `lightColors` y `darkColors` (paleta oscura pragmática:
+  `#0F0F14` fondo, `#1A1A21` superficies, `#F0F0F2` textos). Alias
+  `colors = lightColors` para no romper imports existentes.
+- `useThemeColors()` hook en `apps/mobile/src/hooks/useThemeColors.js` retorna
+  la paleta activa según `AccessibilityContext.isDark`.
+- `AppText.js` aplica `darkColors.textDark` por defecto cuando el tema es oscuro
+  y el estilo no declara `color` explícito. Textos con color naranja/verde/morado
+  se respetan tal cual — mantienen el diseño.
+- `ThemedSafeArea` reusable en `components/ThemedSafeArea.js` (patrón para
+  pantallas nuevas).
+- Pantallas migradas: `DashboardScreen`, `MotivationHomeScreen`, `SettingsScreen`,
+  `ConfigAccessibilityScreen`, `StreakDetailScreen`. Patrón mínimo: `const
+  themeColors = useThemeColors()` en el componente + `backgroundColor:
+  themeColors.white/grayLight` en el SafeAreaView + `StatusBar` con
+  `barStyle/backgroundColor` dinámicos.
+- Pantallas NO migradas siguen viéndose en tema claro aunque el toggle esté ON
+  — sin crashes ni comportamiento anómalo. Migración por pantalla en próximas
+  iteraciones.
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

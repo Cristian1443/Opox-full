@@ -5,6 +5,109 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-15 — Gaps del cliente: 10 correcciones + streaming + dark mode
+
+Rama: `fix/gaps-15-09-26` (parte de `fix/gaps-12-09-26`).
+
+Nuevo lote de gaps recogidos tras pruebas en dispositivo real. Se abordan los
+10 bugs y mejoras identificados en `gaps-15-09-26.md`, más dos ampliaciones
+aprobadas por el cliente: streaming de tests con job polling y modo oscuro global.
+
+### Correcciones puntuales (Fase 1)
+
+**Bloque 4 · Planificación**:
+- Rumbo a la plaza: al pulsar "Estudiar esta fase" el Generador Infinito ahora
+  pre-selecciona los temas que la fase indica. Antes el `topicId="id1,id2,id3"`
+  concatenado se metía como un único elemento en el Set y quedaba sin selección.
+- Redistribución en 5 fases fijas: temas 1-10 (Base), 11-20 (Profundización),
+  21-30 (Simulacros), 31-40 (Repaso final), + Fase 5 nueva "Repaso integral"
+  con TODOS los temas.
+- Agenda: purpose header con explicación ("Añade fechas clave: examen, repaso,
+  tutoría. Recibirás recordatorios 3 días, 2 días y el mismo día"), programación
+  de 3 notificaciones locales (T-3d, T-2d, T-0 a las 9:00 hora local) con
+  `expo-notifications` lazy require. Long-press sobre una fecha → confirmación
+  → borrado + cancelación de recordatorios. Nuevo endpoint `DELETE
+  /planning/agenda/:id`.
+
+**Bloque 5 · Motivación** (fix crítico):
+- Racha con hitos operativos por primera vez. Hasta hoy la app anunciaba
+  "+50 Opopoints por racha de 7 días" pero el backend nunca los otorgaba
+  — `registerActivity` no detectaba el cruce de hito. Añadido detector: si
+  `oldStreak < milestone.days <= newStreak`, suma `milestone.points` al bonus
+  del evento. Tabla `STREAK_MILESTONES` movida a `@opox/types` como fuente de
+  verdad compartida entre backend y `StreakDetailUseCase`; `MotivationHomeScreen`
+  y `StreakDetailScreen` la consumen desde `apps/mobile/src/lib/streakMilestones.js`.
+- `StreakDetailScreen` rediseñado alineado con `MotivationHomeScreen` (misma
+  llama Figma, mismo grid de pips, mismo hito). Antes usaba `ScreenHeader`
+  legacy, statusBar hardcoded y emoji 🏅 — salto brusco de estilo respecto al
+  hub que la origina.
+- Barra verde de reto completado: cuando `completedByMe=true` la barra ahora
+  refleja al menos `myShare = round(100/memberCount)`. Antes con 2 miembros y
+  solo el usuario terminado, el clan mostraba 50% correctamente pero otros
+  retos completados individualmente aparecían al 0%. Fórmula:
+  `percent = completedByMe ? max(clanPercent, myShare) : clanPercent`.
+
+**Bloque 6 · Entrenamiento**:
+- Laboratorio de errores ordenado por fecha DESC (más reciente arriba). Antes
+  se ordenaba solo por `failRate` — un tema recién estudiado quedaba debajo de
+  otro antiguo con peor tasa de fallo, contradiciendo la expectativa.
+- Test quirúrgico dinámico. Antes hardcoded 15 preguntas (8 plazos + 7 recursos)
+  y solicitaba 10 al backend. Ahora consume `trainingApi.listErrorPatterns()`,
+  toma los top-3 patrones más recientes, distribuye `TOTAL_QUESTIONS=15`
+  proporcionalmente al `failRate` de cada tema y renderiza "QUÉ INCLUYE" con
+  los temas reales. Si no hay patrones, muestra "Todo el temario · 15 preguntas".
+
+**Bloque 8 · Aula Virtual**:
+- Menú de "tres puntos" con estética Figma. Antes `Alert.alert('Opciones', ...)`
+  nativo (verde chillón, mayúsculas, se veía "muy desarrollador"). Ahora Modal
+  transparent con sheet blanco, filas con icono + label, botón Cancelar
+  separado. "Compartir chat" ya funciona: `Share.share` con la conversación
+  serializada como `[Tutor] ... / [Tú] ...`.
+- Respuestas del Tutor renderizadas como markdown (`react-native-markdown-display`).
+  Antes se veían `##`, backticks y bullets como texto crudo. Ahora encabezados
+  en SemiBold, listas con bullets, bloques de código con fondo tintado y
+  monoespaciada. Burbujas > 500 caracteres se colapsan con botón "Ver más" —
+  evita el "muro de scroll" reportado.
+
+**Bloque 12 · Configuración**:
+- Estadísticas Pro con "Dominio por tema" y "Tema N" real. Antes la sección
+  mostraba UUIDs hex crudos (`23116c4c10d3465a`) porque `getProStats` no
+  aplicaba el mapeo `topic_id → "Tema N"` que sí hace `listErrorPatterns`.
+  Extraído el helper compartido `enrichTopicsWithLabels` en
+  `infrastructure/shared/topicLabels.ts` y aplicado en ambos repositorios.
+  Título de sección cambiado a "DOMINIO POR TEMA" (era "DOMINIO POR LEY").
+
+### Fase 2 · Streaming de tests con job polling
+
+Nuevo pipeline asíncrono expuesto al mobile. El flujo síncrono actual bloqueaba
+la UI hasta que el Motor terminaba las N preguntas (16-30 s típicos). Ahora el
+mobile navega a `TrainingSession` con un `jobId` en cuanto el Motor arranca, y
+las preguntas van llegando incrementalmente — la primera se ve en ~5-8 s.
+
+4 endpoints proxy nuevos (`POST /training/generate-stream`, `GET /training/job/:jobId`,
+`GET /training/session/:sessionId`, `POST /training/session/:sessionId/answer`).
+Cuando el Motor no está configurado, devuelven 503 y el mobile cae al flujo
+síncrono legacy sin necesidad de feature flag.
+
+`useTestSession(jobId)` en mobile encapsula el polling cada 2.5 s. `QuestionActiveScreen`
+acepta `jobId` opcional junto al `questions[]` legacy; renderiza loader con
+"N de M preguntas listas" mientras espera la primera.
+
+### Fase 3 · Dark mode global
+
+Nueva paleta `darkColors` en `theme.js`, hook `useThemeColors()` reactivo al
+`AccessibilityContext.isDark`. `AppText` aplica color claro por defecto cuando
+el tema es oscuro y no hay `color` explícito en el estilo. `ThemedSafeArea`
+reusable para pantallas nuevas.
+
+Pantallas migradas en este PR (fondo + StatusBar dinámicos):
+`DashboardScreen`, `MotivationHomeScreen`, `SettingsScreen`,
+`ConfigAccessibilityScreen`, `StreakDetailScreen`. El resto de pantallas
+se ven en tema claro aunque el toggle esté ON — pendiente migración por
+pantalla en próximas iteraciones.
+
+---
+
 ## 2026-09-14 — Bloque 1 · Paridad biométrica multi-plataforma + tono WhatsApp
 
 Rama: `fix/gaps-12-09-26`.
