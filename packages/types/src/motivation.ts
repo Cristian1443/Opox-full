@@ -5,6 +5,27 @@
 export type RankingScope = 'weekly' | 'global' | 'oposicion' | 'topic';
 export type ClanRole = 'leader' | 'member';
 
+/**
+ * Hitos de racha con premio de Opopoints. Fuente de verdad única que consumen:
+ *  - `StreakDetailUseCase` (para calcular `nextMilestone`).
+ *  - `SupabaseDashboardRepository.registerActivity` (para OTORGAR el premio
+ *    cuando la racha CRUZA un hito — antes esto no ocurría: la app mostraba
+ *    "+50 Opopoints" pero nunca los daba).
+ *  - `MotivationHomeScreen.js` / `StreakDetailScreen.js` (fallback local si el
+ *    endpoint no está disponible).
+ *
+ * Regla: solo se otorga el bonus cuando `oldStreak < milestone.days <= newStreak`
+ * — pasar del día 6 al 7 da +50 una sola vez, aunque el usuario mantenga la racha.
+ */
+export const STREAK_MILESTONES: readonly { days: number; points: number }[] = [
+    { days: 7,   points: 50   },
+    { days: 14,  points: 100  },
+    { days: 21,  points: 200  },
+    { days: 30,  points: 300  },
+    { days: 60,  points: 500  },
+    { days: 100, points: 1000 },
+];
+
 export interface ProfileDTO {
     displayName: string | null;
     oposicion: string | null;

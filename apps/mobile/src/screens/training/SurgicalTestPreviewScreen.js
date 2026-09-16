@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     TouchableOpacity,
@@ -54,14 +54,65 @@ function SurgicalIllustration({ size = 180 }) {
 }
 
 // ─── Pantalla 6.9 · Test Quirúrgico · Preview ────────────────────────────────
-export default function SurgicalTestPreviewScreen({ navigation, route }) {
-    const subtopics = [
-        { id: 'plazos', label: 'Plazos administrativos', count: 8 },
-        { id: 'recursos', label: 'Recursos', count: 7 },
-    ];
-    const total = subtopics.reduce((acc, s) => acc + s.count, 0);
+// Total fijo (15 preguntas) — el número de preguntas real que se genera. Antes
+// la pantalla anunciaba 15 (8 plazos + 7 recursos hardcoded) pero pedía 10 al
+// backend — inconsistencia entre lo prometido en pantalla y lo entregado en test.
+const TOTAL_QUESTIONS = 15;
+// Máximo de "subtemas" a mostrar en "QUÉ INCLUYE" (los patrones con peor fail
+// rate más recientes). El resto de patrones se agrega bajo "Y más temas…".
+const MAX_SUBTOPICS = 3;
 
+/**
+ * Reparte `total` preguntas entre `patterns` proporcionalmente al `failRate`,
+ * garantizando al menos 1 pregunta por patrón. La última entrada absorbe el
+ * redondeo para que la suma coincida exactamente con `total`.
+ */
+function distributeCounts(patterns, total) {
+    if (patterns.length === 0) return [];
+    const totalFail = patterns.reduce((s, p) => s + Math.max(1, p.failRate), 0);
+    const raw = patterns.map((p) => Math.max(1, Math.round((Math.max(1, p.failRate) / totalFail) * total)));
+    const sum = raw.reduce((s, n) => s + n, 0);
+    // Ajuste final: última entrada compensa el redondeo (puede quedar N-k o N+k).
+    raw[raw.length - 1] = Math.max(1, raw[raw.length - 1] + (total - sum));
+    return raw;
+}
+
+export default function SurgicalTestPreviewScreen({ navigation, route }) {
+    // Subtemas reales derivados de listErrorPatterns — antes hardcoded a
+    // Plazos administrativos + Recursos, sin relación con el usuario.
+    const [patterns, setPatterns] = useState([]);
+    const [loadingPatterns, setLoadingPatterns] = useState(true);
     const [generating, setGenerating] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        trainingApi.listErrorPatterns()
+            .then(({ data }) => {
+                if (cancelled) return;
+                // listErrorPatterns ya viene ordenado por fecha DESC (ver
+                // SupabaseTrainingRepository.listErrorPatterns). Tomamos los primeros
+                // MAX_SUBTOPICS para mostrar en "QUÉ INCLUYE".
+                setPatterns((data ?? []).slice(0, MAX_SUBTOPICS));
+                setLoadingPatterns(false);
+            })
+            .catch(() => {
+                if (!cancelled) setLoadingPatterns(false);
+            });
+        return () => { cancelled = true; };
+    }, []);
+
+    const counts = distributeCounts(patterns, TOTAL_QUESTIONS);
+    const subtopics = patterns.map((p, i) => ({
+        id: p.topicId,
+        label: p.topic,
+        count: counts[i] ?? 1,
+    }));
+    // Si listErrorPatterns aún no responde (o devolvió vacío), mostramos 15 como
+    // fallback textual sin desglose. El backend generará igualmente un test
+    // sobre todo el temario en ese caso.
+    const total = subtopics.length > 0
+        ? subtopics.reduce((acc, s) => acc + s.count, 0)
+        : TOTAL_QUESTIONS;
 
     const startTest = async () => {
         if (generating) return;
@@ -73,7 +124,7 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
             'justicia-tramitacion';
         // El backend calcula los errorPatterns del usuario y pide el test
         // quirúrgico a la IA (siempre difficulty hard).
-        const { data, error } = await trainingApi.generateSurgical(oposicion, 10);
+        const { data, error } = await trainingApi.generateSurgical(oposicion, TOTAL_QUESTIONS);
         setGenerating(false);
         if (error || !data?.questions || data.questions.length === 0) {
             Alert.alert(
@@ -122,12 +173,24 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
                 <Text style={styles.sectionHeader}>QUÉ INCLUYE</Text>
 
                 <View style={styles.list}>
-                    {subtopics.map((s) => (
-                        <View key={s.id} style={styles.listRow}>
-                            <View style={styles.bullet} />
-                            <Text style={styles.listText}>{s.label} · {s.count} preguntas</Text>
+                    {loadingPatterns ? (
+                        <View style={styles.listRow}>
+                            <ActivityIndicator size="small" color={COLORS.purple} />
+                            <Text style={[styles.listText, { marginLeft: 8 }]}>Analizando tus fallos…</Text>
                         </View>
-                    ))}
+                    ) : subtopics.length === 0 ? (
+                        <View style={styles.listRow}>
+                            <View style={styles.bullet} />
+                            <Text style={styles.listText}>Todo el temario · {TOTAL_QUESTIONS} preguntas</Text>
+                        </View>
+                    ) : (
+                        subtopics.map((s) => (
+                            <View key={s.id} style={styles.listRow}>
+                                <View style={styles.bullet} />
+                                <Text style={styles.listText}>{s.label} · {s.count} preguntas</Text>
+                            </View>
+                        ))
+                    )}
                 </View>
 
                 {/* Botón */}

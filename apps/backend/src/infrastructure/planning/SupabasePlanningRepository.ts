@@ -240,4 +240,18 @@ export class SupabasePlanningRepository implements IPlanningRepository {
         if (error || !data) throw new Error(`createDate: ${error?.message}`);
         return toDomainDate(data as DateRow);
     }
+
+    async deleteDate(input: { userId: string; dateId: string }): Promise<boolean> {
+        // Filtramos por user_id en el DELETE para no borrar filas de otros
+        // usuarios si el `dateId` de otro se colara por error en el path.
+        const { data, error } = await this.supabaseAdmin
+            .from('plan_dates')
+            .delete()
+            .eq('id', input.dateId)
+            .eq('user_id', input.userId)
+            .select('id')
+            .maybeSingle();
+        if (error) throw new Error(`deleteDate: ${error.message}`);
+        return data != null;
+    }
 }

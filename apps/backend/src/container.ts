@@ -34,6 +34,7 @@ import {
     GetMacroUseCase,
     ListAgendaUseCase,
     CreateAgendaDateUseCase,
+    DeleteAgendaDateUseCase,
     GetPlanningSummaryUseCase,
     GetProfileUseCase,
     MarkExamPassedUseCase,
@@ -59,6 +60,10 @@ import {
     GenerateQuestionsUseCase,
     AnalyzePhotoUseCase,
     GenerateSurgicalTestUseCase,
+    StartTestJobUseCase,
+    GetJobStatusUseCase,
+    GetSessionQuestionsUseCase,
+    PostSessionAnswerUseCase,
     SaveAttemptUseCase,
     ListErrorPatternsUseCase,
     SaveMockProgressUseCase,
@@ -174,6 +179,7 @@ import {
     MotorOnboardingClient,
     HealthAiClient,
     WhatsAppNotificationClient,
+    CourseSyncService,
 } from './infrastructure';
 import {
     HealthController,
@@ -286,18 +292,21 @@ export function buildContainer() {
     // Si el Motor está configurado, lo usamos para generateQuestions/generateSurgicalTest
     // (RAG + evidencia verbatim del temario). El cliente OpenAI se mantiene como fallback
     // para Foto-Test, Pista IA, Bloque 9 y Bloque 10.
-    const aiApi = isMotorConfigured
-        ? new CompositeAiClient({
-            questions: new MotorAiClient({
-                baseUrl: env.MOTOR_API_BASE_URL!,
-                apiKey: env.MOTOR_API_KEY!,
-                openAiKey: env.AI_API_KEY ?? '',
-                timeoutMs: env.MOTOR_API_TIMEOUT_MS,
-                pollTimeoutMs: 60_000, // cap de 60 s; si el Motor tarda más, fallback a OpenAI
-                defaultCursoId: env.MOTOR_DEFAULT_CURSO_ID,
-            }),
-            fallback: openAiClient,
+    // Extraído como variable para poder inyectarlo también en los use cases de streaming
+    // (Fase 2 · gaps-15-09-26), que necesitan acceder a startTestJob/getJobStatus/etc.
+    const motorAiClient = isMotorConfigured
+        ? new MotorAiClient({
+            baseUrl: env.MOTOR_API_BASE_URL!,
+            apiKey: env.MOTOR_API_KEY!,
+            openAiKey: env.AI_API_KEY ?? '',
+            timeoutMs: env.MOTOR_API_TIMEOUT_MS,
+            pollTimeoutMs: 60_000, // cap de 60 s; si el Motor tarda más, fallback a OpenAI
+            defaultCursoId: env.MOTOR_DEFAULT_CURSO_ID,
           })
+        : undefined;
+
+    const aiApi = motorAiClient
+        ? new CompositeAiClient({ questions: motorAiClient, fallback: openAiClient })
         : openAiClient;
 
     if (isMotorConfigured) {
@@ -306,6 +315,13 @@ export function buildContainer() {
             'usarán RAG con evidencia verbatim del temario oficial.',
         );
     }
+
+    // Servicio de auto-sync de curso Motor ↔ Supabase (Fase 4 · gaps-15-09-26).
+    // Solo tiene sentido cuando el Motor y Supabase están ambos configurados
+    // — el resto del backend puede correr sin él.
+    const courseSyncService = motorAiClient && isSupabaseConfigured
+        ? new CourseSyncService(getSupabaseAdmin(), motorAiClient)
+        : undefined;
 
     // ─── Expo Push Service + use cases de notificaciones ─────────────────────
     // Se construyen antes del objeto useCases para evitar referencias circulares.
@@ -421,6 +437,7 @@ export function buildContainer() {
         getMacro,
         listAgenda: new ListAgendaUseCase(planningRepo),
         createAgendaDate: new CreateAgendaDateUseCase(planningRepo),
+        deleteAgendaDate: new DeleteAgendaDateUseCase(planningRepo),
         getPlanningSummary: new GetPlanningSummaryUseCase(planningRepo, getWeek, getMacro),
 
         // Bloque 5 · Motivación
@@ -450,6 +467,12 @@ export function buildContainer() {
         generateQuestions: new GenerateQuestionsUseCase(aiApi),
         analyzePhoto: new AnalyzePhotoUseCase(aiApi),
         generateSurgicalTest: new GenerateSurgicalTestUseCase(aiApi, trainingRepo),
+        // Fase 2 · Streaming (gaps-15-09-26). Undefined si el Motor no está configurado;
+        // el controller devolverá 503 y el mobile caerá al flujo síncrono.
+        startTestJob: new StartTestJobUseCase(motorAiClient, getCursoIdUseCase),
+        getJobStatus: new GetJobStatusUseCase(motorAiClient),
+        getSessionQuestions: new GetSessionQuestionsUseCase(motorAiClient),
+        postSessionAnswer: new PostSessionAnswerUseCase(motorAiClient),
         saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo, storeRepo),
         listErrorPatterns: new ListErrorPatternsUseCase(trainingRepo),
         saveMockProgress: new SaveMockProgressUseCase(trainingRepo),
@@ -582,6 +605,7 @@ export function buildContainer() {
         listTopics: useCases.listTopics,
         listAgenda: useCases.listAgenda,
         createAgendaDate: useCases.createAgendaDate,
+        deleteAgendaDate: useCases.deleteAgendaDate,
     });
     const trainingController = new TrainingController({
         listMockExams: useCases.listMockExams,
@@ -604,6 +628,11 @@ export function buildContainer() {
         listTopics: useCases.listTopics,
         getCursoId: useCases.getCursoId,
         motorOnboarding,
+        // Fase 2 · Streaming (gaps-15-09-26)
+        startTestJob: useCases.startTestJob,
+        getJobStatus: useCases.getJobStatus,
+        getSessionQuestions: useCases.getSessionQuestions,
+        postSessionAnswer: useCases.postSessionAnswer,
     });
 
     const notesController = new NotesController({
@@ -733,6 +762,7 @@ export function buildContainer() {
         useCases,
         pushRepo,
         pushService,
+        courseSyncService,
         controllers: {
             health: healthController,
             auth: authController,

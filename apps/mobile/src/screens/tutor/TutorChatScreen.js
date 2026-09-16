@@ -8,12 +8,15 @@ import {
     Platform,
     StyleSheet,
     Alert,
+    Modal,
+    Share,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
+import Markdown from 'react-native-markdown-display';
 import { colors, spacing } from '../../theme';
 import { tutorApi } from '../../api';
 
@@ -112,14 +115,82 @@ function Avatar({ size = 39 }) {
     );
 }
 
+// Tokens de estilo del renderer markdown — mapeados a los tokens Figma actuales.
+// Antes las respuestas del Tutor llegaban con `##`, backticks y `├──` visibles como
+// texto crudo, obligando al usuario a scrollear un muro de caracteres sin formato.
+const markdownStyles = {
+    body: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 16,
+        lineHeight: 22,
+        color: colors.textDark,
+        margin: 0,
+    },
+    heading1: { fontFamily: 'Poppins-SemiBold', fontSize: 18, marginTop: 8, marginBottom: 4, color: colors.textDark },
+    heading2: { fontFamily: 'Poppins-SemiBold', fontSize: 17, marginTop: 8, marginBottom: 4, color: colors.textDark },
+    heading3: { fontFamily: 'Poppins-SemiBold', fontSize: 16, marginTop: 6, marginBottom: 2, color: colors.textDark },
+    strong: { fontFamily: 'Poppins-SemiBold' },
+    em: { fontStyle: 'italic' },
+    bullet_list: { marginVertical: 4 },
+    ordered_list: { marginVertical: 4 },
+    list_item: { marginVertical: 2 },
+    code_inline: {
+        backgroundColor: 'rgba(65,41,80,0.06)',
+        borderRadius: 4,
+        paddingHorizontal: 4,
+        fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+        fontSize: 14,
+    },
+    code_block: {
+        backgroundColor: 'rgba(65,41,80,0.06)',
+        borderRadius: 8,
+        padding: 10,
+        fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+        fontSize: 13,
+    },
+    fence: {
+        backgroundColor: 'rgba(65,41,80,0.06)',
+        borderRadius: 8,
+        padding: 10,
+        fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+        fontSize: 13,
+    },
+    blockquote: {
+        borderLeftWidth: 3,
+        borderLeftColor: colors.selectionBorder,
+        paddingLeft: 10,
+        marginVertical: 6,
+        opacity: 0.85,
+    },
+};
+
+// Umbral para colapsar burbujas largas. Si el texto supera este límite mostramos
+// un "Ver más" — evita el "muro de scroll" reportado en el gap.
+const COLLAPSE_THRESHOLD = 500;
+
 // ─── Burbuja de mensaje ───────────────────────────────────────────────────────
 function MessageBubble({ msg, onAction }) {
+    const [expanded, setExpanded] = useState(false);
+    const isLong = msg.isAI && typeof msg.text === 'string' && msg.text.length > COLLAPSE_THRESHOLD;
+    const displayText = isLong && !expanded ? `${msg.text.slice(0, COLLAPSE_THRESHOLD)}…` : msg.text;
+
     return (
         <View style={[styles.messageRow, msg.isAI ? styles.rowLeft : styles.rowRight]}>
             {msg.isAI && <Avatar size={26} />}
 
             <View style={[styles.bubble, msg.isAI ? styles.bubbleLeft : styles.bubbleRight]}>
-                <Text style={styles.msgText}>{msg.text}</Text>
+                {msg.isAI ? (
+                    <Markdown style={markdownStyles}>{displayText}</Markdown>
+                ) : (
+                    <Text style={styles.msgText}>{msg.text}</Text>
+                )}
+
+                {isLong && (
+                    <TouchableOpacity onPress={() => setExpanded((v) => !v)} activeOpacity={0.7}>
+                        <Text style={styles.expandText}>{expanded ? 'Ver menos' : 'Ver más'}</Text>
+                    </TouchableOpacity>
+                )}
+
                 <Text style={styles.timestamp}>{msg.timestamp}</Text>
 
                 {msg.isAI && msg.actions?.length > 0 && (
@@ -159,6 +230,7 @@ export default function TutorChatScreen({ navigation, route }) {
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [showScrollBtn, setShowScrollBtn] = useState(false);
+    const [optionsVisible, setOptionsVisible] = useState(false);
     const scrollRef = useRef(null);
     const conversationIdRef = useRef(null);
     const tonePrefsRef = useRef(DEFAULT_TONE);
@@ -239,6 +311,40 @@ export default function TutorChatScreen({ navigation, route }) {
         sendToApi(text);
     }, [inputText, addMessage, sendToApi]);
 
+    // ─── Handlers del menú "tres puntos" ─────────────────────────────────────
+    // Antes se usaba Alert.alert con estilo nativo (pantalla oscura, texto en
+    // mayúsculas verde) — poco alineado con Figma y "Compartir chat" no hacía
+    // nada. Ahora es un Modal Figma y Share.share exporta la conversación real.
+    const handleNewConversation = useCallback(async () => {
+        setOptionsVisible(false);
+        setMessages(buildInitialMessages(technique, tonePrefsRef.current.personality));
+        setInputText('');
+        try {
+            const res = await tutorApi.createConversation('Nueva conversación', technique);
+            if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
+        } catch { /* fallback: la conversación anterior se descarta igualmente */ }
+    }, [technique]);
+
+    const handleShareChat = useCallback(async () => {
+        setOptionsVisible(false);
+        // Serialización simple del chat como texto plano legible. Se omite el
+        // saludo automático inicial cuando el usuario no ha enviado nada.
+        const hasUserMessage = messages.some((m) => !m.isAI);
+        if (!hasUserMessage) {
+            Alert.alert('Nada para compartir', 'Envía algún mensaje al Tutor antes de compartir.');
+            return;
+        }
+        const transcript = messages
+            .map((m) => `${m.isAI ? '[Tutor]' : '[Tú]'} ${m.text}`)
+            .join('\n\n');
+        try {
+            await Share.share({
+                title: 'Conversación con el Tutor IA de OPOX',
+                message: `Conversación con el Tutor IA de OPOX\n\n${transcript}`,
+            });
+        } catch { /* usuario canceló el sheet o falló el share — ignorar */ }
+    }, [messages]);
+
     const handleAction = useCallback((label) => {
         if (label === 'Crear flashcards') {
             // Ir al picker de temas — antes iba directo a Loading con topicId por
@@ -286,27 +392,54 @@ export default function TutorChatScreen({ navigation, route }) {
                     style={styles.moreBtn}
                     accessibilityLabel="Más opciones"
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={() =>
-                        Alert.alert('Opciones', null, [
-                            {
-                                text: 'Nueva conversación',
-                                onPress: async () => {
-                                    setMessages(buildInitialMessages(technique, tonePrefsRef.current.personality));
-                                    setInputText('');
-                                    try {
-                                        const res = await tutorApi.createConversation('Nueva conversación', technique);
-                                        if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
-                                    } catch {}
-                                },
-                            },
-                            { text: 'Compartir chat', onPress: () => {} },
-                            { text: 'Cancelar', style: 'cancel' },
-                        ])
-                    }
+                    onPress={() => setOptionsVisible(true)}
                 >
                     <Ionicons name="ellipsis-vertical" size={22} color={colors.textDark} />
                 </TouchableOpacity>
             </View>
+
+            {/* Modal "Opciones" — reemplaza el Alert.alert nativo. Diseño Figma:
+                sheet blanco con esquinas redondeadas, filas con icono + label. */}
+            <Modal
+                transparent
+                visible={optionsVisible}
+                animationType="fade"
+                onRequestClose={() => setOptionsVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.optionsOverlay}
+                    activeOpacity={1}
+                    onPress={() => setOptionsVisible(false)}
+                >
+                    <View style={styles.optionsCard}>
+                        <Text style={styles.optionsTitle}>Opciones</Text>
+                        <TouchableOpacity
+                            style={styles.optionsRow}
+                            onPress={handleNewConversation}
+                            activeOpacity={0.75}
+                        >
+                            <Ionicons name="chatbubbles-outline" size={20} color={colors.textDark} />
+                            <Text style={styles.optionsRowText}>Nueva conversación</Text>
+                        </TouchableOpacity>
+                        <View style={styles.optionsSeparator} />
+                        <TouchableOpacity
+                            style={styles.optionsRow}
+                            onPress={handleShareChat}
+                            activeOpacity={0.75}
+                        >
+                            <Ionicons name="share-social-outline" size={20} color={colors.textDark} />
+                            <Text style={styles.optionsRowText}>Compartir chat</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.optionsCancelBtn}
+                            onPress={() => setOptionsVisible(false)}
+                            activeOpacity={0.75}
+                        >
+                            <Text style={styles.optionsCancelText}>Cancelar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
 
             <KeyboardAvoidingView
                 style={styles.flex}
@@ -462,6 +595,12 @@ const styles = StyleSheet.create({
     },
 
     msgText: { fontFamily: 'Poppins-Regular', fontSize: 16, lineHeight: 20, color: colors.textDark },
+    expandText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.accentOrange,
+        marginTop: 4,
+    },
     timestamp: { fontFamily: 'Poppins-Regular', fontSize: 9, marginTop: 4, alignSelf: 'flex-end', color: FIGMA.timestampMuted },
 
     // Chips de acción — outline, sin relleno (ver nota junto a ActionChip)
@@ -542,4 +681,53 @@ const styles = StyleSheet.create({
         flexShrink: 0,
     },
     sendBtnDisabled: { opacity: 0.4 },
+
+    // ── Modal "Opciones" (tres puntos) ────────────────────────────────────
+    optionsOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(15,27,51,0.45)',
+        justifyContent: 'flex-end',
+        padding: spacing.md,
+    },
+    optionsCard: {
+        backgroundColor: colors.white,
+        borderRadius: 16,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+    },
+    optionsTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.textMuted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+        marginBottom: spacing.sm,
+        paddingHorizontal: spacing.xs,
+    },
+    optionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingHorizontal: spacing.xs,
+        paddingVertical: 14,
+    },
+    optionsRowText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 15,
+        color: colors.textDark,
+    },
+    optionsSeparator: {
+        height: 1,
+        backgroundColor: 'rgba(65,41,80,0.08)',
+    },
+    optionsCancelBtn: {
+        marginTop: spacing.sm,
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    optionsCancelText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.accentOrange,
+    },
 });

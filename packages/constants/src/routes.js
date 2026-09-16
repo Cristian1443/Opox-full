@@ -57,6 +57,7 @@ export const API_ROUTES = {
         WEEK: '/planning/week',
         MACRO: '/planning/macro',
         AGENDA: '/planning/agenda',
+        AGENDA_DELETE: '/planning/agenda/:id',
     },
 
     TRAINING: {
@@ -64,6 +65,11 @@ export const API_ROUTES = {
         MOCK_DETAIL:        '/training/mocks/:id',
         MOCK_QUESTIONS:     '/training/mocks/:id/questions',
         GENERATE:           '/training/generate',
+        // Streaming (Fase 2 · gaps-15-09-26)
+        GENERATE_STREAM:    '/training/generate-stream',
+        JOB_STATUS:         '/training/job/:jobId',
+        SESSION_QUESTIONS:  '/training/session/:sessionId',
+        SESSION_ANSWER:     '/training/session/:sessionId/answer',
         PHOTO_TEST:         '/training/photo-test',
         SURGICAL:           '/training/surgical',
         ATTEMPTS:           '/training/attempts',

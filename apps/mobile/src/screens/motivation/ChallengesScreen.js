@@ -25,7 +25,15 @@ function hoursLeft(expiresAt) {
 
 // Figma ("RETOS - LISTADO Y CREACION", 2336:959)
 function ChallengeCard({ item, onStart }) {
-    const percent = item.memberCount > 0 ? Math.round((item.completedCount / item.memberCount) * 100) : 0;
+    // La barra refleja el progreso del clan (completedCount/memberCount). Cuando el
+    // propio usuario ya completó el reto (completedByMe), forzamos que la barra
+    // muestre al menos "su parte" — con 2 miembros y solo yo he terminado, se ve
+    // 50% aunque el backend aún no haya refrescado la cuenta agregada.
+    const clanPercent = item.memberCount > 0
+        ? Math.round((item.completedCount / item.memberCount) * 100)
+        : 0;
+    const myShare = item.memberCount > 0 ? Math.round(100 / item.memberCount) : 0;
+    const percent = item.completedByMe ? Math.max(clanPercent, myShare) : clanPercent;
     const left = hoursLeft(item.expiresAt);
     const isMarathon = !item.expiresAt;
     const subtitle = isMarathon

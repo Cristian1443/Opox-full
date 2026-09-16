@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { planningApi } from '../../api';
 import { colors, spacing } from '../../theme';
+import { scheduleAgendaReminders, cancelAgendaReminders } from '../../lib/agendaNotifications';
 
 const FIGMA = {
     orangeAlt: '#F37D27',
@@ -47,11 +48,16 @@ function formatDay(dateIso) {
     };
 }
 
-function DateRow({ item, index, showTopBorder }) {
+function DateRow({ item, index, showTopBorder, onLongPress }) {
     const { day, month } = formatDay(item.eventDate);
     const badge = BADGE_PALETTE[index % BADGE_PALETTE.length];
     return (
-        <View style={[styles.row, showTopBorder && styles.rowTopBorder]}>
+        <TouchableOpacity
+            style={[styles.row, showTopBorder && styles.rowTopBorder]}
+            onLongPress={() => onLongPress(item)}
+            delayLongPress={400}
+            activeOpacity={0.7}
+        >
             <View style={[styles.dateBadge, { backgroundColor: badge.bg }]}>
                 <Text style={[styles.dateBadgeDay, { color: badge.solid }]}>{day}</Text>
                 <Text style={[styles.dateBadgeMonth, { color: badge.solid }]}>{month}</Text>
@@ -60,7 +66,7 @@ function DateRow({ item, index, showTopBorder }) {
                 <Text style={styles.rowTitle}>{item.title}</Text>
                 {item.subtitle && <Text style={styles.rowSubtitle}>{item.subtitle}</Text>}
             </View>
-        </View>
+        </TouchableOpacity>
     );
 }
 
@@ -114,9 +120,11 @@ export default function PlanningAgendaScreen({ navigation }) {
             return;
         }
         setSaving(true);
+        const eventDateIso = toIso(selectedDate);
+        const title = form.title.trim();
         const { data, error } = await planningApi.createAgendaDate({
-            title: form.title.trim(),
-            eventDate: toIso(selectedDate),
+            title,
+            eventDate: eventDateIso,
             subtitle: form.subtitle.trim() || undefined,
             kind: 'custom',
         });
@@ -124,9 +132,35 @@ export default function PlanningAgendaScreen({ navigation }) {
         if (data) {
             setDates(prev => [...prev, data].sort((a, b) => a.eventDate.localeCompare(b.eventDate)));
             setModalVisible(false);
+            // Programar 3 recordatorios locales (T-3d, T-2d, T-0). Fire-and-forget
+            // — si el usuario no da permisos de notificación, la fecha igualmente queda guardada.
+            scheduleAgendaReminders(data.id, title, eventDateIso).catch(() => {});
         } else {
             Alert.alert('No se pudo guardar', error?.message ?? 'Comprueba tu conexión e inténtalo de nuevo.');
         }
+    };
+
+    const handleLongPress = (item) => {
+        Alert.alert(
+            'Eliminar fecha',
+            `¿Quieres eliminar "${item.title}"? Los recordatorios se cancelarán.`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        const { error } = await planningApi.deleteAgendaDate(item.id);
+                        if (error) {
+                            Alert.alert('No se pudo eliminar', 'Comprueba tu conexión e inténtalo de nuevo.');
+                            return;
+                        }
+                        setDates((prev) => prev.filter((d) => d.id !== item.id));
+                        cancelAgendaReminders(item.id).catch(() => {});
+                    },
+                },
+            ],
+        );
     };
 
     const displayDate = selectedDate
@@ -145,8 +179,20 @@ export default function PlanningAgendaScreen({ navigation }) {
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <Text style={styles.sectionLabel}>FECHAS CLAVE</Text>
+                {/* Purpose header — antes la pantalla no explicaba para qué servía la agenda
+                    ni que había recordatorios automáticos. */}
+                <Text style={styles.purposeText}>
+                    Añade fechas clave: examen, repaso, tutoría. Recibirás recordatorios 3 días
+                    antes, 2 días antes y el mismo día del evento. Mantén pulsada una fila para eliminarla.
+                </Text>
                 {dates.map((d, index) => (
-                    <DateRow key={d.id} item={d} index={index} showTopBorder={index === 0} />
+                    <DateRow
+                        key={d.id}
+                        item={d}
+                        index={index}
+                        showTopBorder={index === 0}
+                        onLongPress={handleLongPress}
+                    />
                 ))}
                 <TouchableOpacity style={[styles.row, dates.length === 0 && styles.rowTopBorder]} onPress={openModal} activeOpacity={0.7}>
                     <Text style={styles.addIcon}>+</Text>
@@ -257,6 +303,13 @@ const styles = StyleSheet.create({
     scroll: { flex: 1 },
     body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 24 },
     sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: colors.textDark, marginBottom: 8 },
+    purposeText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: FIGMA.textNote,
+        lineHeight: 16,
+        marginBottom: spacing.md,
+    },
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 26 },
     rowTopBorder: { borderTopWidth: 0.44, borderTopColor: FIGMA.separator },
     listBottomBorder: { borderTopWidth: 0.44, borderTopColor: FIGMA.separator },

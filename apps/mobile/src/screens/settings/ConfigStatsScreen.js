@@ -18,11 +18,13 @@ import { settingsApi } from '../../api';
 // ─── 12.6 · Estadísticas Pro ────────────────────────────────────────────────
 // Fiel al Figma (EstadisticasProScreen.tsx) para el anillo de probabilidad y
 // el radar de soft-skills — ambos son mejoras reales de precisión: el radar
-// de Figma dibuja el polígono real por eje. "DOMINIO POR LEY" NO se reproduce
+// de Figma dibuja el polígono real por eje. "DOMINIO POR TEMA" NO se reproduce
 // como gráfico de líneas: el propio TSX de referencia documenta que 2 líneas
-// no pueden representar sin ambigüedad 3 leyes, así que se conserva la barra
-// de progreso exacta por ley, solo reestilizada. Datos reales desde
-// GET /config/pro-stats (training_attempt_responses + streak).
+// no pueden representar sin ambigüedad 3 temas, así que se conserva la barra
+// de progreso exacta por tema, solo reestilizada. Datos reales desde
+// GET /config/pro-stats (training_attempt_responses + streak). El backend
+// resuelve `topic_id → "Tema N"` con enrichTopicsWithLabels — antes se
+// pintaban UUIDs hex crudos porque getProStats no aplicaba el mapeo.
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   ringTrack: '#E7E7EA',
@@ -277,7 +279,7 @@ export default function ConfigStatsScreen({ navigation }) {
           {/* ── Dominio por ley (datos reales del backend) ─────────────────── */}
           {stats.topicBreakdown.length > 0 && (
             <>
-              <Text style={[styles.sectionLabel, styles.sectionSpacing]}>DOMINIO POR LEY</Text>
+              <Text style={[styles.sectionLabel, styles.sectionSpacing]}>DOMINIO POR TEMA</Text>
               <View style={styles.lawList}>
                 {stats.topicBreakdown.map((t, idx) => (
                   <LawBar

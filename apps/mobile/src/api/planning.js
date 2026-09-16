@@ -38,4 +38,6 @@ export const planningApi = {
 
     listAgenda: () => api.get(API_ROUTES.PLANNING.AGENDA, { auth: true }),
     createAgendaDate: (input) => api.post(API_ROUTES.PLANNING.AGENDA, input, { auth: true }),
+    deleteAgendaDate: (id) =>
+        api.delete(API_ROUTES.PLANNING.AGENDA_DELETE.replace(':id', id), { auth: true }),
 };

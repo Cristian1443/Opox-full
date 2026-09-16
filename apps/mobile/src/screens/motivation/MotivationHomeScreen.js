@@ -14,26 +14,8 @@ import { RachaPeligroModal } from '../../components/MotivationModals';
 import DestacadoBanner from '../../components/DestacadoBanner';
 import { motivationApi, planningApi } from '../../api';
 import { colors, spacing } from '../../theme';
-
-// Escalera de hitos de racha — misma tabla que apps/backend/src/application/motivation/StreakDetailUseCase.ts.
-// MotivationHomeScreen solo pide motivationApi.getSummary() (gamification.currentStreak/longestStreak/opopointsBalance),
-// no el endpoint separado /motivation/streak (StreakDetailUseCase) que expone nextMilestone/recentActivityDates.
-// Para no añadir una llamada de red nueva a esta pantalla, el próximo hito se deriva aquí mismo a partir del
-// currentStreak ya disponible, usando la misma tabla fija que el backend.
-const STREAK_MILESTONES = [
-    { days: 7, points: 50 },
-    { days: 14, points: 100 },
-    { days: 21, points: 200 },
-    { days: 30, points: 300 },
-    { days: 60, points: 500 },
-    { days: 100, points: 1000 },
-];
-
-function getNextMilestone(currentStreak) {
-    const next = STREAK_MILESTONES.find((m) => m.days > currentStreak);
-    if (!next) return null;
-    return { days: next.days, points: next.points, remaining: next.days - currentStreak };
-}
+import { getNextMilestone } from '../../lib/streakMilestones';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 // Figma: el chevron dentro del círculo de 24dp mide ~5.5x11dp — bastante más chico
 // que el botón que lo contiene.
@@ -160,6 +142,10 @@ export default function MotivationHomeScreen({ navigation }) {
     const [summary, setSummary] = useState(null);
     const [dangerVisible, setDangerVisible] = useState(false);
     const [dangerHours, setDangerHours] = useState(null);
+    // Fase 3 · dark mode (gaps-15-09-26). Solo el fondo raíz y el StatusBar
+    // cambian; los tokens dentro del StyleSheet siguen siendo estáticos.
+    const themeColors = useThemeColors();
+    const isDark = themeColors.textDark === '#F0F0F2';
 
     const loadData = useCallback(() => {
         let cancelled = false;
@@ -185,8 +171,11 @@ export default function MotivationHomeScreen({ navigation }) {
     const handleShopPress = () => navigation.navigate('StoreHome');
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.grayLight }]}>
+            <StatusBar
+                barStyle={isDark ? 'light-content' : 'dark-content'}
+                backgroundColor={themeColors.grayLight}
+            />
 
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

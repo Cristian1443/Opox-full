@@ -13,6 +13,7 @@ import {
     type ITrainingRepository,
     type SaveAttemptInput,
 } from '../../domain';
+import { enrichTopicsWithLabels, HEX_ID_RE } from '../shared/topicLabels';
 
 // ─── Row types (espejo del schema SQL) ───────────────────────────────────────
 
@@ -321,44 +322,14 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
             byTopic.set(key, entry);
         }
 
-        // Enriquecer con labels legibles desde training_topics.
-        // El Motor devuelve topic = hex ID (ej. "0acb39953a424c20") en lugar del nombre;
-        // training_topics tiene el sort_order para reproducir el mismo "Tema N" que
-        // usa ListTopicsUseCase en el resto de la app.
-        // posMap: topicId → "Tema N" para el curso activo del usuario.
-        // Queda vacío si no se encuentra ningún topicId en training_topics.
-        const posMap = new Map<string, string>();
-        const topicIds = [...byTopic.keys()];
-        if (topicIds.length > 0) {
-            // Detectar la oposición del usuario buscando uno de los topicIds en la tabla
-            const { data: matched } = await this.supabaseAdmin
-                .from('training_topics')
-                .select('oposicion')
-                .in('topic_id', topicIds)
-                .limit(1);
-
-            const oposicion = (matched as Array<{ oposicion: string }> | null)?.[0]?.oposicion;
-            if (oposicion) {
-                // Cargar todos los temas de esa oposición ordenados para calcular Tema N
-                const { data: allTopics } = await this.supabaseAdmin
-                    .from('training_topics')
-                    .select('topic_id')
-                    .eq('oposicion', oposicion)
-                    .order('sort_order', { ascending: true });
-
-                ((allTopics ?? []) as Array<{ topic_id: string }>).forEach((t, i) => {
-                    posMap.set(t.topic_id, `Tema ${i + 1}`);
-                });
-
-                for (const [topicId, entry] of byTopic.entries()) {
-                    const label = posMap.get(topicId);
-                    if (label) entry.topic = label;
-                }
-            }
+        // Enriquecer con labels legibles ("Tema N") desde `training_topics`.
+        // Helper compartido con SupabaseConfigRepository.getProStats para evitar
+        // que ambos repos deriven en formas distintas del mismo mapeo.
+        const posMap = await enrichTopicsWithLabels(this.supabaseAdmin, [...byTopic.keys()]);
+        for (const [topicId, entry] of byTopic.entries()) {
+            const label = posMap.get(topicId);
+            if (label) entry.topic = label;
         }
-
-        // Regex para detectar IDs hex sin resolver después del enriquecimiento.
-        const HEX_ID_RE = /^[0-9a-f]{12,}$/i;
 
         const patterns: ErrorPattern[] = [];
         for (const [topicId, { topic, total, correct, lastDate }] of byTopic.entries()) {
@@ -392,7 +363,16 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
             patterns.push({ topicId, topic, totalAnswered: total, totalCorrect: correct, totalWrong: wrong, domain, failRate, lastAttemptDate: lastDate });
         }
 
-        return patterns.sort((a, b) => b.failRate - a.failRate);
+        // Orden por fecha de último intento (más reciente arriba), empate por
+        // peor fail rate. Antes se ordenaba solo por failRate — un tema
+        // recién estudiado quedaba debajo de otro antiguo con peor tasa de
+        // fallo, contradiciendo la expectativa del usuario ("el nuevo debe
+        // aparecer arriba").
+        return patterns.sort((a, b) => {
+            const dateCmp = (b.lastAttemptDate ?? '').localeCompare(a.lastAttemptDate ?? '');
+            if (dateCmp !== 0) return dateCmp;
+            return b.failRate - a.failRate;
+        });
     }
 
     // ─── Bookmarks ─────────────────────────────────
