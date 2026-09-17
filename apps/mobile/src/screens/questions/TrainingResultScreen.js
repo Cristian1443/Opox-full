@@ -17,17 +17,27 @@ const OPTION_ID_TO_INDEX = { A: 0, B: 1, C: 2, D: 3 };
 // Mapea el shape del móvil a SaveAttemptResponseInput del backend.
 // La UI trabaja con { questionId, selected: 'A'|'B'|'C'|'D'|null, isCorrect }
 // pero el backend necesita el snapshot completo de la pregunta.
-function buildResponses(questions, answers) {
+function buildResponses(questions, answers, fallbackTopicId = null) {
+  // Cuando el Motor arranca un test con streaming, las preguntas del SesionOut
+  // vienen con `tema_id: ""` (default del schema). `requestedTopicId` viene
+  // como fallback: es el tema que el usuario eligió en el generador, así el
+  // Zod del backend (topicId min length 1) pasa y el Laboratorio agrupa por
+  // el tema real en vez de por string vacío. Si el usuario eligió "todos" el
+  // fallback es 'all' — el Lab lo agrupa aparte pero al menos persiste.
+  const fallback = fallbackTopicId && fallbackTopicId.length > 0
+    ? fallbackTopicId.split(',')[0]?.trim() || 'all'
+    : 'all';
   return questions
     .map((q, i) => {
       const answer = answers[i] ?? { selected: null };
       // Sólo aceptamos questionId si es UUID; los MOCK_QUESTIONS tienen "q1"
       // que rompería la validación Zod uuid() del backend.
       const uuidLike = typeof q.id === 'string' && /^[0-9a-f-]{36}$/i.test(q.id);
+      const topicId = (q.topicId && q.topicId.length > 0) ? q.topicId : fallback;
       return {
         questionId: uuidLike ? q.id : undefined,
-        topicId: q.topicId ?? 'all',
-        topic: q.law ?? 'General',
+        topicId,
+        topic: (q.law && q.law.length > 0) ? q.law : 'General',
         questionText: q.title ?? q.text ?? '',
         optionsSnapshot: (q.options ?? []).map((o) => o.text),
         correctIndex: (q.options ?? []).findIndex((o) => o.correct),
@@ -162,6 +172,9 @@ export default function TrainingResultScreen({ navigation, route }) {
     challengeId = null,
     clanId = null,
     taskId = null,
+    // TopicId que el usuario eligió en el generador — fallback cuando el
+    // Motor no puebla `tema_id` en las preguntas del SesionOut streaming.
+    requestedTopicId = null,
   } = route?.params ?? {};
 
   const total = questions.length;
@@ -185,14 +198,19 @@ export default function TrainingResultScreen({ navigation, route }) {
             setBoeUnread(res.data.totalUnread);
         }
     }).catch(() => {});
-    const responses = buildResponses(questions, answers);
+    const responses = buildResponses(questions, answers, requestedTopicId);
     if (responses.length === 0) return; // MOCK data, no persistimos
     // 'photo' no es un enum válido del backend — se guarda como 'generator'.
     const backendSource = source === 'photo' ? 'generator' : source;
+    // Fallback del topicId a nivel de attempt (metadato del intento).
+    const attemptTopicId = requestedTopicId && !requestedTopicId.includes(',')
+      && requestedTopicId !== 'all'
+      ? requestedTopicId : undefined;
     trainingApi
       .saveAttempt({
         source: backendSource,
         mockExamId: mockExamId ?? undefined,
+        topicId: attemptTopicId,
         durationSecs: elapsedSeconds,
         responses,
       })

@@ -175,6 +175,10 @@ export default function QuestionActiveScreen({ navigation, route }) {
     // incrementalmente vía useTestSession. La primera se ve en ~5-8s.
     jobId = null,
     expectedTotal = null,
+    // Fallback de topicId cuando el Motor no puebla `tema_id` en las preguntas.
+    // Sin esto la persistencia en training_attempt_responses fallaría por Zod
+    // (topicId: min length 1) y el Laboratorio mostraría 0%.
+    requestedTopicId = null,
     // Bloque 6.6 · Simulacro real del banco: mode='bank_mock' + sesionId.
     // Las preguntas llegan SIN correctIndex; la corrección se resuelve pregunta
     // a pregunta contra /training/session/:sessionId/answer del Motor.
@@ -429,7 +433,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
       if (source === 'official' && mockExamId) {
         trainingApi.clearMockProgress().catch(() => {});
       }
-      navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId });
+      navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId, requestedTopicId });
       return;
     }
     // Autoguardado del progreso de simulacros oficiales — permite retomar
@@ -898,7 +902,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
           if (source === 'official' && mockExamId) {
             trainingApi.clearMockProgress().catch(() => {});
           }
-          navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId });
+          navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId, requestedTopicId });
         }}
       />
 

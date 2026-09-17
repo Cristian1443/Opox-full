@@ -404,6 +404,9 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                     examTitle: isChallengeMode ? 'Reto de clan' : 'Generador infinito',
                     timedMode: fatigueMode,
                     oposicion,
+                    // TopicId solicitado — fallback para el Laboratorio cuando
+                    // Motor no puebla `tema_id` en las preguntas del SesionOut.
+                    requestedTopicId: backendTopicId,
                     ...(challengeId && { challengeId }),
                     ...(challengeClanId && { clanId: challengeClanId }),
                     ...(taskId && { taskId }),
