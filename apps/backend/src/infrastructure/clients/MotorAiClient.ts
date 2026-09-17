@@ -393,17 +393,31 @@ export class MotorAiClient implements AiApiContract {
             n_preguntas: input.count,
             dificultad: DIFF_TO_MOTOR[input.difficulty ?? 'medium'] ?? 'media',
         };
+        const t0 = Date.now();
         const res = await this.http.post<Record<string, unknown>>('/v1/tests/generate', body, {
             headers: { 'X-OpenAI-Key': this.config.openAiKey },
             validateStatus: (s) => s === 200 || s === 202,
         });
         const data = res.data;
+        logger.info('[motor-ai][stream] startTestJob', {
+            status: res.status,
+            jobId: data.job_id,
+            hasResultado: !!data.resultado,
+            ms: Date.now() - t0,
+            cursoId: input.cursoId,
+            temas: input.temaIds?.length ?? 'null',
+            n: input.count,
+        });
         // 200 = respuesta desde caché ya con sesion_id. 202 = job en curso.
+        // Fuente autoritativa del sesion_id: `recurso_id` en la raíz del JobOut
+        // (verificado contra openapi.json). Los sitios secundarios son fallback.
         if (res.status === 200) {
             const resultado = data.resultado as { sesion_id?: string } | undefined;
             return {
                 jobId: (data.job_id as string) ?? '',
-                sessionId: resultado?.sesion_id ?? null,
+                sessionId: (data.recurso_id as string | undefined)
+                    ?? resultado?.sesion_id
+                    ?? null,
             };
         }
         return { jobId: data.job_id as string, sessionId: null };
@@ -419,15 +433,30 @@ export class MotorAiClient implements AiApiContract {
         const raw = res.data;
         const estado = String(raw.estado ?? raw.status ?? 'pending');
         const resultado = (raw.resultado ?? {}) as Record<string, unknown>;
-        // El schema del Motor puede exponer `progreso: { done, total }` o `progress` o nada.
         const progresoRaw = (raw.progreso ?? raw.progress ?? {}) as Record<string, unknown>;
         const done = Number(progresoRaw.done ?? 0);
         const total = Number(progresoRaw.total ?? (resultado.preguntas as unknown[] | undefined)?.length ?? 0);
+        // Fuente autoritativa del sesion_id: `JobOut.recurso_id` en la raíz
+        // (verificado contra openapi.json). Los sitios secundarios se conservan
+        // como red de seguridad por si el Motor cambia la exposición del campo.
+        const sessionId = (raw.recurso_id as string | undefined)
+            ?? (progresoRaw.sesion_id as string | undefined)
+            ?? (resultado.sesion_id as string | undefined)
+            ?? null;
+        // Log de diagnóstico limitado a estados terminales (done/error) o si hay
+        // sesionId nuevo — evita spamear el log con cada tick del polling.
+        if (estado === 'done' || estado === 'error' || sessionId) {
+            logger.info('[motor-ai][stream] getJobStatus', {
+                jobId, estado, sessionId, done, total,
+                mensaje: raw.mensaje,
+                recursoId: raw.recurso_id,
+                progresoKeys: Object.keys(progresoRaw),
+                resultadoKeys: Object.keys(resultado),
+            });
+        }
         return {
             status: estado,
-            sessionId: (progresoRaw.sesion_id as string | undefined)
-                ?? (resultado.sesion_id as string | undefined)
-                ?? null,
+            sessionId,
             progress: { done, total },
         };
     }
@@ -445,13 +474,21 @@ export class MotorAiClient implements AiApiContract {
         if (preguntas.length > 0) await this.ensureQuestionBank();
 
         const mapped: GeneratedQuestion[] = [];
+        let dropped = 0;
         for (const p of preguntas) {
             const full: MotorPreguntaFull | undefined = typeof p.correcta_idx === 'number'
                 ? (p as unknown as MotorPreguntaFull)
                 : this.questionBankCache.get(p.id);
-            if (!full || typeof full.correcta_idx !== 'number') continue;
+            if (!full || typeof full.correcta_idx !== 'number') { dropped++; continue; }
             mapped.push(this.mapPregunta(p, full));
         }
+        logger.info('[motor-ai][stream] getSessionQuestions', {
+            sessionId,
+            preguntasMotor: preguntas.length,
+            mapped: mapped.length,
+            dropped,
+            bankSize: this.questionBankCache.size,
+        });
         return {
             questions: mapped,
             deficit: (data.deficit as number | undefined) ?? null,
