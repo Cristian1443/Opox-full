@@ -188,10 +188,22 @@ export default function QuestionActiveScreen({ navigation, route }) {
     questions: streamedRaw,
     progress: streamProgress,
     status: streamStatus,
+    sessionId: streamSessionId,
   } = useTestSession(jobId, { expectedTotal });
-  const streamedQuestions = jobId && streamedRaw?.length
-    ? adaptGeneratedQuestions(streamedRaw)
-    : [];
+  // Preguntas del stream: mutables porque las que vienen con correctIndex: -1
+  // (Motor generó nuevas, no están en el banco) reciben corrección diferida
+  // vía POST /training/session/:sessionId/answer al responder cada una.
+  const [streamQuestionsState, setStreamQuestionsState] = useState([]);
+  useEffect(() => {
+    if (!jobId || !streamedRaw?.length) return;
+    const adapted = adaptGeneratedQuestions(streamedRaw);
+    // Merge preservando ediciones locales (correctIndex resuelto por answer).
+    setStreamQuestionsState((prev) => {
+      const byId = new Map(prev.map((q) => [q.id, q]));
+      return adapted.map((q) => byId.get(q.id) ?? q);
+    });
+  }, [jobId, streamedRaw]);
+
   // En modo bank_mock las preguntas son MUTABLES: al responder cada una, el
   // backend devuelve correctIndex + explicación y hay que reflejarlo en la UI
   // (verde/rojo, feedback). En el resto de modos las preguntas ya vienen con
@@ -201,7 +213,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const [isCorrectionLoading, setIsCorrectionLoading] = useState(false);
   const questions = isBankMock
     ? bankQuestions
-    : (jobId ? streamedQuestions : (paramQuestions ?? MOCK_QUESTIONS));
+    : (jobId ? streamQuestionsState : (paramQuestions ?? MOCK_QUESTIONS));
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [selectedOption, setSelectedOption] = useState(null);
@@ -325,10 +337,19 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const handleConfirm = async () => {
     if (!selectedOption) return;
 
-    // Modo bank_mock (Bloque 6.6): la corrección la hace el Motor por pregunta.
-    // Bloqueamos la UI mientras esperamos la respuesta del /answer para no
-    // pintar verde/rojo con datos inventados.
-    if (isBankMock) {
+    // Corrección diferida por Motor: cubre dos escenarios equivalentes:
+    //   - bank_mock (Bloque 6.6) → sesión Motor + sesionId en params
+    //   - streaming (Bloque 6.2) → sesión Motor + streamSessionId del hook,
+    //     preguntas con correctIndex: -1 (ninguna opción marcada correct=true)
+    //     porque son preguntas nuevas del Motor no presentes en el banco.
+    // Ambos flujos comparten POST /training/session/:sessionId/answer para
+    // que el Motor devuelva el correcta_idx real + explicación + evidencia.
+    const needsMotorCorrection =
+      isBankMock
+      || (jobId && streamSessionId && question && !question.options.some((o) => o.correct));
+    const motorSessionId = isBankMock ? sesionId : streamSessionId;
+
+    if (needsMotorCorrection && motorSessionId) {
       if (isCorrectionLoading) return;
       const optionIds = ['A', 'B', 'C', 'D'];
       const optionIndex = optionIds.indexOf(selectedOption);
@@ -336,7 +357,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
       setIsCorrectionLoading(true);
       const timeSecs = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
-      const { data, error } = await trainingApi.postSessionAnswer(sesionId, {
+      const { data, error } = await trainingApi.postSessionAnswer(motorSessionId, {
         questionId: question.id,
         optionIndex,
       });
@@ -347,8 +368,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
         return;
       }
 
-      // Aplicar la corrección real a la pregunta activa: marca `correct` en la
-      // opción que devolvió el Motor y guarda la explicación/evidencia.
       const correctIndex = typeof data.correctIndex === 'number' ? data.correctIndex : null;
       const evidenceText = data.evidence?.cita ?? '';
       const explanation = data.explanation ?? evidenceText ?? '';
@@ -364,9 +383,17 @@ export default function QuestionActiveScreen({ navigation, route }) {
           ? { article: '', title: '', text: evidenceText, boeUrl: null }
           : question.articleRef,
       };
-      const updatedQuestions = [...bankQuestions];
-      updatedQuestions[currentIndex] = updatedQuestion;
-      setBankQuestions(updatedQuestions);
+      if (isBankMock) {
+        const updatedQuestions = [...bankQuestions];
+        updatedQuestions[currentIndex] = updatedQuestion;
+        setBankQuestions(updatedQuestions);
+      } else {
+        setStreamQuestionsState((prev) => {
+          const next = [...prev];
+          next[currentIndex] = updatedQuestion;
+          return next;
+        });
+      }
 
       const isCorrect = Boolean(data.correct);
       if (!isCorrect) Vibration.vibrate(80);

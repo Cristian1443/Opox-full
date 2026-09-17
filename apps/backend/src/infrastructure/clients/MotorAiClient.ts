@@ -472,28 +472,61 @@ export class MotorAiClient implements AiApiContract {
         const data = res.data;
         const preguntas = (data.preguntas as MotorPreguntaJob[] | undefined) ?? [];
 
-        // Reutiliza el mapeo de banco para resolver correcta_idx (INC-04).
+        // Cargamos el banco por si alguna pregunta del stream sí está ahí
+        // (raro: `/v1/tests/generate` produce IDs nuevos). Best-effort.
         if (preguntas.length > 0) await this.ensureQuestionBank();
 
         const mapped: GeneratedQuestion[] = [];
-        let dropped = 0;
+        let fromBank = 0;
+        let deferred = 0;
         for (const p of preguntas) {
             const full: MotorPreguntaFull | undefined = typeof p.correcta_idx === 'number'
                 ? (p as unknown as MotorPreguntaFull)
                 : this.questionBankCache.get(p.id);
-            if (!full || typeof full.correcta_idx !== 'number') { dropped++; continue; }
-            mapped.push(this.mapPregunta(p, full));
+            if (full && typeof full.correcta_idx === 'number') {
+                mapped.push(this.mapPregunta(p, full));
+                fromBank++;
+            } else {
+                // La pregunta es nueva del Motor (no está en el banco) y el
+                // SesionOut de /v1/tests/{id} no expone correcta_idx.
+                // La incluimos con correctIndex: -1 → el mobile detecta el
+                // marcador y resuelve la corrección por pregunta via
+                // POST /v1/tests/{id}/answer (mismo patrón que bank_mock).
+                mapped.push({
+                    id: p.id,
+                    text: p.enunciado,
+                    options: p.opciones as [string, string, string, string],
+                    correctIndex: -1 as unknown as 0 | 1 | 2 | 3,
+                    explanation: p.explicacion ?? '',
+                    topicId: (p as unknown as { tema_id?: string }).tema_id ?? '',
+                    topic: (p as unknown as { tema_titulo?: string }).tema_titulo ?? '',
+                    difficulty: (p.dificultad === 'facil' ? 'easy'
+                        : p.dificultad === 'dificil' ? 'hard' : 'medium'),
+                });
+                deferred++;
+            }
         }
+        // El deficit real del Motor: qué preguntas se pidieron / publicaron / descarte.
+        const deficitRaw = data.deficit as
+            | { pedidas?: number; publicadas?: number; motivos_descarte?: Record<string, number> }
+            | number | null | undefined;
+        const deficitCount = typeof deficitRaw === 'number'
+            ? deficitRaw
+            : (deficitRaw?.pedidas != null && deficitRaw?.publicadas != null
+                ? deficitRaw.pedidas - deficitRaw.publicadas
+                : null);
         logger.info('[motor-ai][stream] getSessionQuestions', {
             sessionId,
             preguntasMotor: preguntas.length,
             mapped: mapped.length,
-            dropped,
+            fromBank,
+            deferred,
             bankSize: this.questionBankCache.size,
+            deficit: deficitRaw,
         });
         return {
             questions: mapped,
-            deficit: (data.deficit as number | undefined) ?? null,
+            deficit: deficitCount,
         };
     }
 
