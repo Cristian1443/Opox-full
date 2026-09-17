@@ -1200,7 +1200,7 @@ pnpm lint                       # lint completo
 | 3 | Salud | Frontend + backend completo. Fatiga: `HealthController.analyzeFatigue` → `MotorFatigueClient` `/v1/fatigue/biometrics`, try/catch → `buildFatigueLocally`. Siempre devuelve 200. IA directa (2026-09-09): `HealthAiClient` con Gemini (`gemini-3.6-flash`, 3 reintentos) para `POST /health/menus`, `/health/meditation`, `/health/study-technique`. Smoke test 3/3 PASS. Pendiente deploy a Render + `HEALTH_GEMINI_API_KEY` en env vars de Render. |
 | 4 | Planificación | Frontend + backend completo (revisado y auditado post-testing: 10 bugs/gaps cerrados) |
 | 5 | Motivación | Frontend + backend completo |
-| 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **activo** vía workaround banco (2026-09-04): job IDs coinciden con banco → `correcta_idx` resuelto por id-cruce → ~5.6 s, `articleRef` presente. INC-04 pendiente en el Motor (job result sin `correcta_idx` directo). |
+| 6 | Entrenamiento | Frontend + backend + IA completo. Motor RAG **activo** vía workaround banco (2026-09-04): job IDs coinciden con banco → `correcta_idx` resuelto por id-cruce → ~5.6 s, `articleRef` presente. INC-04 pendiente en el Motor (job result sin `correcta_idx` directo). Bloque 6.6 (2026-09-17): Banco de exámenes oficiales completo — upload PDF/DOCX + polling job + simulacro real desde el banco. Laboratorio rediseñado con tabs Débiles / Dominados (umbral 80%) y test quirúrgico dinámico (max 5 temas × 4 preguntas = 20). |
 | 7 | Sesión de test activa | Frontend + backend + IA completo. Pista IA vía `/v1/modes/hint` del Motor (requiere `pregunta_id` real del banco). Fallback a OpenAI directo. |
 | 8 | Aula Virtual / Tutor IA | Frontend + backend completo. Rediseño Figma (2026-08-26). Motor IA operativo (2026-09-04). Revisión 2026-09-09: (a) chat timeout 15→60s; (b) resúmenes/podcast fallback a `listTopics` cuando la caché está vacía; (c) podcast pipeline completo con `expo-audio` player Figma — `POST /v1/classroom/podcast` (Motor) + polling job + proxy `/tutor/podcast/audio/:filename` (Motor requiere `X-API-Key` que expo-audio no envía); (d) `X-OpenAI-Key` obligatorio en todos los endpoints Motor; (e) `TopicPicker` en flashcards y navegación desde chat; (f) mapeo `label='Tema N'` global. Curso activo `672e3a8bad0f45c8` (40 temas). |
 | 9 | Factoría de Apuntes | Frontend + backend completo. Rediseño Figma completo (2026-08-26): 4 pantallas + 5 modales reestilizados. Upload end-to-end funcional en Android (PDF + galería + cámara). Pipeline OCR→tags→preguntas con AiApiClientStub. IA real esperando entrega del `BRIEF_IA_BLOQUE9.md` |
@@ -1293,5 +1293,134 @@ al backend — inconsistencia entre 15 anunciadas y 10 entregadas.
 - Pantallas NO migradas siguen viéndose en tema claro aunque el toggle esté ON
   — sin crashes ni comportamiento anómalo. Migración por pantalla en próximas
   iteraciones.
+
+---
+
+## Gaps-17-09-26 · notas clave
+
+### Bloque 6.6 · Banco de Exámenes Oficiales (Motor IA) — funcionalidad nueva
+
+Los usuarios pueden subir un examen en PDF/Word al banco compartido del curso;
+las preguntas se extraen con OCR + LLM del Motor y quedan disponibles para
+todos. Los simulacros del banco componen preguntas de un examen concreto
+(`exam_id`) o del banco entero (`solo_oficiales`, `distribucion`).
+
+**Rutas nuevas** en `packages/constants/src/routes.js`:
+- `BANK_EXAMS: '/training/bank/exams'` — lista del banco del curso
+- `BANK_EXAM_UPLOAD: '/training/bank/exams/upload'` — subir examen (JSON base64)
+- `BANK_EXAM_JOB: '/training/bank/exams/jobs/:jobId'` — polling del OCR
+- `BANK_MOCK_START: '/training/bank/mock-exams'` — arrancar simulacro
+- `BANK_MOCK_RESULT: '/training/bank/mock-exams/:sessionId/result'` — resultado
+
+**`MotorAiClient` — 5 métodos nuevos** para el Bloque 6.6:
+- `listBankExams(cursoId, limit, offset)` → `GET /v1/bank/exams`.
+- `uploadBankExam(input)` → `POST /v1/bank/exams` (multipart con `form-data`;
+  requiere `X-OpenAI-Key` BYOK). Devuelve `202 + job_id`.
+- `getBankExamJob(jobId)` → `GET /v1/jobs/{id}`. Enum de estados del Motor:
+  `reserved | queued | running | done | error` (NO `pending | processing`).
+  `cost_usd` viene en el ROOT del `JobOut`, no dentro de `resultado`.
+- `startBankMock(input)` → `POST /v1/bank/mock-exams`. Acepta **`exam_id`**
+  (en inglés, no `examen_id`) — verificado en `/openapi.json` 2026-09-17. El
+  Motor devuelve `SesionOut` con preguntas SIN `correcta_idx` (vista pública).
+- `getBankMockResult(sesionId)` → `GET /v1/tests/{id}/result`. Schema real
+  `ResultadoSesionOut`: `{ sesion_id, respondidas, total, aciertos, nota_pct,
+  tiempo_total_ms, por_tema[] }`. NO trae detalle pregunta-a-pregunta.
+
+**Regla operativa crítica**: **la fuente autoritativa del Motor es
+`https://ia.opox.ai/openapi.json`**, no la Postman collection. La Postman
+`MotorIA_Motor_completo.postman_collection*.json` está desfasada al menos en:
+(a) `SimulacroIn.exam_id` no listado; (b) enum de `JobOut.estado` distinto;
+(c) `ResultadoSesionOut` con schema inventado. Ante un `422 extra_forbidden`
+o `missing`, la respuesta del Motor te dice el nombre exacto — segunda fuente.
+
+**Bugs pre-existentes descubiertos y corregidos**:
+- `postSessionAnswer` enviaba `opcion_idx` cuando el Motor exige `elegida_idx`.
+  Mapeo de respuesta leía `correctaIdx` (camelCase) — el schema `ResponderOut`
+  es snake_case: `correcta_idx`. Ambos afectaban también al streaming Fase 2,
+  pero en la práctica el streaming nunca llamaba a `postSessionAnswer` desde
+  el mobile (`useTestSession.postAnswer` era código muerto).
+- `mockExamId` en validador Zod era `.uuid()` — los IDs del Motor son hex de
+  16 chars. Ampliado a `z.string().min(1).max(64).optional()`. Efecto cascada
+  del bug: `saveAttempt` 400 → intento no persistido → tarjeta 0% completado,
+  cero Opopoints y Laboratorio sin datos del examen.
+- `training_attempts.mock_exam_id` y `mock_exam_progress.mock_exam_id` eran
+  `uuid` con FK a `training_mock_exams`. Migrados a `text` sin FK vía
+  `bloque6_bank_mock_ids.sql` y `bloque6_mock_progress_fix.sql`.
+- `errorHandler` global aprendió a manejar `AxiosError`: 4xx del upstream se
+  propagan con status real + `detail` del payload FastAPI extraído; 5xx como
+  `502 upstream/<code>`. Antes cualquier fallo del Motor salía como `500
+  common/internal-error` opaco.
+
+**Mobile — flujo del banco**:
+- `OfficialMocksScreen.js` consume `trainingApi.listBankExams()` (antes
+  `listMocks` sobre Supabase). Enriquecido con `bestScore/completedAt/status/
+  attemptCount` desde `ITrainingRepository.getBankExamStats({ userId,
+  mockExamIds })` — nuevo método. Chips de filtro por procedencia (Todos /
+  Oficiales / Profesor / Otros). FAB verde "＋ Subir examen".
+- `ExamUploadScreen.js` (nuevo): formulario con `DocumentPicker` para PDF/DOCX
+  + `FSFile.arrayBuffer()` + `bufferToBase64` en chunks. Fuentes disponibles al
+  usuario: `profesor` u `otro` (el use case rechaza `oficial` con 403 salvo
+  admin). Máximo 20 MB.
+- `ExamUploadJobScreen.js` (nuevo): polling 3 s / timeout 5 min con card final
+  contextual — éxito con métricas `extraidas/guardadas/duplicadas/sinTema`,
+  aviso especial para `ya_incorporado` (dedupe por SHA-256) y `corte` (límite
+  de coste alcanzado).
+- `MockInstructionsScreen.startExam`: `trainingApi.startBankMock({ examId,
+  nPreguntas, contrarrelojSeg })` → navega a `TrainingSession` con
+  `mode: 'bank_mock' + sesionId`.
+- `QuestionActiveScreen` — modo `bank_mock`: al confirmar respuesta,
+  `postSessionAnswer(sesionId, { questionId, optionIndex })` → recibe
+  `correcta / correcta_idx / explicacion / justificaciones / evidencia` → aplica
+  corrección real a la pregunta ANTES de mostrar feedback. Spinner
+  "Corrigiendo…" en el CTA mientras espera.
+
+**Cleanup DB — única oposición operativa**:
+`CourseSyncService` fallaba silencioso con `sin curso "listo" para label
+"Justicia · Tramitación Procesal"` — el Motor no tenía un curso con ese título.
+Los IDs hex del banco (curso `ef7d941bea5f41d7` de Policía de Galicia) no
+matcheaban con `training_topics` de `justicia-tramitacion` (que tenía slugs
+legacy `constitucion, ley-39`), y el Laboratorio descartaba los temas del
+examen. Solución: cleanup full-stack `bloque6_dbclean_policia_galicia_only.sql`:
+- Migra `raw_user_meta_data.oposicion` y `public.profiles.oposicion` de
+  `justicia-tramitacion` → `policia-local-galicia` en TODOS los usuarios.
+- Elimina la fila obsoleta de `training_courses`.
+- Borra los `training_topics` viejos de `justicia-tramitacion` (los slugs
+  legacy) para que el sync repueble desde el Motor.
+- `training_courses.sql` deja solo `policia-local-galicia` como seed permanente.
+
+**SQL a correr en orden en cualquier deploy nuevo** (todos idempotentes con
+`RAISE NOTICE` para diagnóstico):
+1. `bloque6_bank_mock_ids.sql` — `training_attempts.mock_exam_id` a text.
+2. `bloque6_mock_progress_fix.sql` — `mock_exam_progress.mock_exam_id` a text.
+3. `bloque6_dbclean_policia_galicia_only.sql` — cleanup completo.
+
+### Laboratorio de errores rediseñado (2026-09-17)
+
+`ErrorLabScreen` con tabs "Débiles · N / Dominados · N". Umbral
+`MASTERY_THRESHOLD = 80`: temas con `domain >= 80%` pasan al tab "Dominados"
+(verde), no aparecen como debilidades ni entran al test quirúrgico.
+
+- `WeaknessItem` es contextual — misma card sirve para ambos tabs, cambia
+  título (`Patrón de fallo detectado` vs `Tema dominado`), icono (X rojo vs
+  check verde), copy ("Fallas el X%" vs "Aciertas el X%"), progress bar y
+  porcentaje. La frase secundaria en dominados explica el mecanismo dinámico
+  ("Si vuelves a bajar del 80%, aparecerá otra vez en tus debilidades").
+- `SupabaseTrainingRepository.listErrorPatterns` bajó `total < 3 → total < 2`
+  (mínimo estadístico para simulacros grandes con muchos temas).
+- El filtro `HEX_ID_RE.test(topic)` ya no es necesario tras la limpieza de DB
+  — con `training_topics` poblado correctamente por el sync, los hex se
+  resuelven a "Tema N".
+- Los items del tab "Dominados" se ordenan por `domain DESC` (los mejores
+  primero — refuerzo positivo).
+
+### Test quirúrgico dinámico (2026-09-17)
+
+`SurgicalTestPreviewScreen`: cambio de fórmula.
+- `MAX_SUBTOPICS = 5` (era 3), `QUESTIONS_PER_TOPIC = 4`, `MIN_TOTAL = 5`.
+- Total dinámico: `max(5, patternsCount × 4)`, tope de 20 preguntas.
+- Filtro previo `p.domain < 80` — los dominados nunca entran al quirúrgico.
+- El `count` que envía al backend es dinámico (antes siempre 15).
+- Distribución proporcional al `failRate` mantiene: 1 tema débil → 5 preguntas,
+  3 → 12, 5+ → 20 (top-5 por fail_rate).
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

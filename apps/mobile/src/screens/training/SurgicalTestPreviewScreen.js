@@ -54,13 +54,16 @@ function SurgicalIllustration({ size = 180 }) {
 }
 
 // ─── Pantalla 6.9 · Test Quirúrgico · Preview ────────────────────────────────
-// Total fijo (15 preguntas) — el número de preguntas real que se genera. Antes
-// la pantalla anunciaba 15 (8 plazos + 7 recursos hardcoded) pero pedía 10 al
-// backend — inconsistencia entre lo prometido en pantalla y lo entregado en test.
-const TOTAL_QUESTIONS = 15;
-// Máximo de "subtemas" a mostrar en "QUÉ INCLUYE" (los patrones con peor fail
-// rate más recientes). El resto de patrones se agrega bajo "Y más temas…".
-const MAX_SUBTOPICS = 3;
+// Test quirúrgico dinámico: hasta MAX_SUBTOPICS temas débiles × QUESTIONS_PER_TOPIC
+// preguntas c/u = tope de 20. Si el usuario tiene menos temas débiles, el test
+// es más corto (ej. 2 temas → 8 preguntas). Mínimo MIN_TOTAL para que valga la
+// pena arrancarlo. Diseño 2026-09-17: antes era 3 temas × 5 fijo = 15.
+const MAX_SUBTOPICS = 5;
+const QUESTIONS_PER_TOPIC = 4;
+const MIN_TOTAL = 5;
+// Umbral de dominio: temas con domain >= MASTERY_THRESHOLD ya no cuentan como
+// debilidad. Coincide con el umbral del ErrorLabScreen (tab "Dominados").
+const MASTERY_THRESHOLD = 80;
 
 /**
  * Reparte `total` preguntas entre `patterns` proporcionalmente al `failRate`,
@@ -89,10 +92,11 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
         trainingApi.listErrorPatterns()
             .then(({ data }) => {
                 if (cancelled) return;
-                // listErrorPatterns ya viene ordenado por fecha DESC (ver
-                // SupabaseTrainingRepository.listErrorPatterns). Tomamos los primeros
-                // MAX_SUBTOPICS para mostrar en "QUÉ INCLUYE".
-                setPatterns((data ?? []).slice(0, MAX_SUBTOPICS));
+                // Filtramos temas DÉBILES (dominio < 80%): los ya dominados no
+                // aportan al test quirúrgico y viven en el tab "Dominados".
+                // Backend ordena por fail_rate DESC → tomamos los primeros MAX_SUBTOPICS.
+                const weakOnly = (data ?? []).filter((p) => p.domain < MASTERY_THRESHOLD);
+                setPatterns(weakOnly.slice(0, MAX_SUBTOPICS));
                 setLoadingPatterns(false);
             })
             .catch(() => {
@@ -101,18 +105,22 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
         return () => { cancelled = true; };
     }, []);
 
-    const counts = distributeCounts(patterns, TOTAL_QUESTIONS);
+    // Total dinámico: patrones × 4 preguntas por tema, mínimo MIN_TOTAL.
+    // Si el usuario tiene 1 tema débil → 5. Si tiene 3 → 12. Si tiene 5 → 20.
+    // Si `patterns` está vacío (sin debilidades) cae a MIN_TOTAL como fallback
+    // textual — el backend genera igual un test genérico si no hay patterns.
+    const totalQuestions = patterns.length > 0
+        ? Math.max(MIN_TOTAL, patterns.length * QUESTIONS_PER_TOPIC)
+        : MIN_TOTAL;
+    const counts = distributeCounts(patterns, totalQuestions);
     const subtopics = patterns.map((p, i) => ({
         id: p.topicId,
         label: p.topic,
         count: counts[i] ?? 1,
     }));
-    // Si listErrorPatterns aún no responde (o devolvió vacío), mostramos 15 como
-    // fallback textual sin desglose. El backend generará igualmente un test
-    // sobre todo el temario en ese caso.
     const total = subtopics.length > 0
         ? subtopics.reduce((acc, s) => acc + s.count, 0)
-        : TOTAL_QUESTIONS;
+        : totalQuestions;
 
     const startTest = async () => {
         if (generating) return;
@@ -123,8 +131,9 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
             session?.user?.user_metadata?.oposicion ??
             'justicia-tramitacion';
         // El backend calcula los errorPatterns del usuario y pide el test
-        // quirúrgico a la IA (siempre difficulty hard).
-        const { data, error } = await trainingApi.generateSurgical(oposicion, TOTAL_QUESTIONS);
+        // quirúrgico a la IA. Pasamos el `total` real (dinámico según cuántas
+        // debilidades tiene el usuario) para que el Motor no genere de más.
+        const { data, error } = await trainingApi.generateSurgical(oposicion, total);
         setGenerating(false);
         if (error || !data?.questions || data.questions.length === 0) {
             Alert.alert(
@@ -181,7 +190,7 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
                     ) : subtopics.length === 0 ? (
                         <View style={styles.listRow}>
                             <View style={styles.bullet} />
-                            <Text style={styles.listText}>Todo el temario · {TOTAL_QUESTIONS} preguntas</Text>
+                            <Text style={styles.listText}>Todo el temario · {totalQuestions} preguntas</Text>
                         </View>
                     ) : (
                         subtopics.map((s) => (

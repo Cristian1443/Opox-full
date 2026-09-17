@@ -206,6 +206,57 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
         return ((data ?? []) as QuestionRow[]).map(toQuestion);
     }
 
+    /**
+     * Historial de intentos por examen del banco (Bloque 6.6 · Motor).
+     * Agrupa `training_attempts` con `source='official'` y devuelve mejor score,
+     * fecha del último completado y nº de intentos por mockExamId.
+     *
+     * Nota importante: consultamos TODOS los intentos oficiales del usuario y
+     * filtramos en cliente. Un `.in('mock_exam_id', ids)` sobre una columna
+     * uuid con IDs hex del Motor falla con "invalid input syntax for type uuid".
+     * Esto hace la query resiliente independientemente de si la columna es
+     * uuid legacy o text migrado.
+     */
+    async getBankExamStats(input: {
+        userId: string;
+        mockExamIds: string[];
+    }): Promise<Map<string, { bestScore: number | null; completedAt: Date | null; attemptCount: number }>> {
+        const result = new Map<string, { bestScore: number | null; completedAt: Date | null; attemptCount: number }>();
+        if (input.mockExamIds.length === 0) return result;
+
+        const wanted = new Set(input.mockExamIds);
+
+        const { data, error } = await this.supabaseAdmin
+            .from('training_attempts')
+            .select('mock_exam_id, score, completed_at')
+            .eq('user_id', input.userId)
+            .eq('source', 'official')
+            .not('mock_exam_id', 'is', null);
+
+        if (error) throw new Error(`getBankExamStats: ${error.message}`);
+
+        for (const row of (data ?? []) as Array<{
+            mock_exam_id: string | null;
+            score: number | null;
+            completed_at: string;
+        }>) {
+            if (!row.mock_exam_id) continue;
+            const key = String(row.mock_exam_id);
+            if (!wanted.has(key)) continue;
+            const existing = result.get(key) ?? { bestScore: null, completedAt: null, attemptCount: 0 };
+            existing.attemptCount += 1;
+            const rowDate = new Date(row.completed_at);
+            if (!existing.completedAt || rowDate > existing.completedAt) {
+                existing.completedAt = rowDate;
+            }
+            if (row.score !== null && (existing.bestScore === null || row.score > existing.bestScore)) {
+                existing.bestScore = row.score;
+            }
+            result.set(key, existing);
+        }
+        return result;
+    }
+
     // ─── Intentos ──────────────────────────────────
 
     async saveAttempt(input: SaveAttemptInput): Promise<TrainingAttempt> {
@@ -333,10 +384,12 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
 
         const patterns: ErrorPattern[] = [];
         for (const [topicId, { topic, total, correct, lastDate }] of byTopic.entries()) {
-            if (total < 3) continue; // mínimo estadístico
+            if (total < 2) continue; // mínimo estadístico (bajado de 3 para simulacros grandes)
             // 'all' = test quirúrgico sobre todos los temas — no es accionable por tema
             if (topicId === 'all') continue;
-            // IDs hex sin resolver tras enriquecimiento (curso antiguo no mapeado)
+            // Los IDs hex sin resolver ahora reciben label "Tema del banco XXXX" desde
+            // enrichTopicsWithLabels — ya no filtramos por HEX_ID_RE. Solo saltamos si
+            // el label sigue siendo un hex crudo (fallback del fallback, no debería pasar).
             if (HEX_ID_RE.test(topic)) continue;
             // Foto-test: el Motor devuelve slugs semánticos que no pertenecen al curso
             // activo; el controller los normaliza a 'foto-test'. Siempre mostrar.
@@ -486,7 +539,15 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
                 },
                 { onConflict: 'user_id' },
             );
-        if (error) throw new Error(`saveMockProgress: ${error.message}`);
+        if (error) {
+            // Fail-soft: "reanudar simulacro" es una feature secundaria. Si la
+            // tabla no está migrada (mock_exam_id sigue uuid) o RLS bloquea,
+            // no queremos que un PUT por-pregunta rompa el runner. Log y sigue.
+            // Correr bloque6_mock_progress_fix.sql para eliminar este warning.
+            // eslint-disable-next-line no-console
+            console.warn(`[saveMockProgress] no persistido: ${error.message}`);
+            return;
+        }
     }
 
     async getMockProgress(userId: string): Promise<MockExamProgress | null> {

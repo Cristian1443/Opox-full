@@ -5,6 +5,142 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-17 — Bloque 6.6 Banco de Exámenes Oficiales + Laboratorio rediseñado
+
+Rama: `fix/gaps-15-09-26`.
+
+### Bloque 6.6 · Banco de Exámenes Oficiales (funcionalidad nueva)
+
+El equipo IA expuso el módulo "Banco de exámenes" del Motor: los usuarios pueden
+subir un examen en PDF o Word (título, año, procedencia) y sus preguntas se
+incorporan al banco compartido del curso. Se integraron cinco endpoints proxy
+propios bajo `/training/bank/*` que hablan con `POST /v1/bank/exams` (upload
+multipart), `GET /v1/jobs/{id}` (polling del OCR/extracción), `GET /v1/bank/exams`
+(listado), `POST /v1/bank/mock-exams` (simulacro) y `GET /v1/tests/{id}/result`
+(resultado agregado).
+
+- La pantalla "Exámenes oficiales" del hub deja de leer de la tabla mockeada
+  `training_mock_exams` (Justicia 2019-2023, sin preguntas). Ahora lista los
+  exámenes reales del banco del curso: los 8 "Test Unitaria 2018-2025" de
+  Policía de Galicia que subió el equipo IA.
+- FAB verde "＋ Subir examen" abre un formulario nuevo (`ExamUploadScreen`).
+  DocumentPicker para PDF/DOCX, campos de título/año/procedencia (Profesor u
+  Otro — "Oficial" queda reservado al equipo), lectura del archivo con
+  `FSFile.arrayBuffer()` + `bufferToBase64` en chunks (patrón de Bloque 9).
+- `ExamUploadJobScreen` con polling de 3 s / timeout 5 min. Al terminar muestra
+  card verde con métricas del job (`guardadas / extraidas`, `duplicadas`,
+  `sin_tema`), maneja `yaIncorporado` (dedupe por SHA-256) y `corte` (límite
+  de coste alcanzado).
+- Chips de filtro por procedencia en la lista (Todos / Oficiales / De profesor
+  / Otros) — filtro en cliente sin llamada extra.
+- Simulacro real desde el banco: al pulsar un examen se llama
+  `POST /v1/bank/mock-exams` con `exam_id`, se abre una sesión Motor y se
+  navega al runner con `mode: 'bank_mock'` + `sesionId`. Las preguntas llegan
+  SIN `correctIndex` (vista pública del banco) — el runner las corrige pregunta
+  a pregunta contra `/v1/tests/{sesion_id}/answer`. Mismo patrón que el
+  mini-test BOE del Bloque 10.
+
+### Fixes pre-existentes descubiertos durante la implementación
+
+Al arrancar el nuevo flujo salieron a la luz cuatro bugs veteranos que
+convivían silenciosos porque nadie usaba los endpoints afectados:
+
+- **Postman collection desfasada vs OpenAPI real**: la Postman del Motor no
+  documenta el campo `exam_id` en `POST /v1/bank/mock-exams`, ni los estados
+  reales del enum de `JobOut`, ni el schema del `ResultadoSesionOut`. La fuente
+  autoritativa es `https://ia.opox.ai/openapi.json`. Anotado en `CLAUDE.md`
+  como regla operativa.
+- **`postSessionAnswer` mandaba `opcion_idx`** cuando el Motor exige
+  `elegida_idx`. Además el mapeo de la respuesta leía `correctaIdx` (camelCase)
+  cuando el schema `ResponderOut` es snake_case (`correcta_idx`). Bug ancestral
+  que rompía cualquier `/answer` — el streaming de tests infinitos (Fase 2)
+  no lo llamaba en la práctica, por eso pasó desapercibido.
+- **`mockExamId` validador Zod exigía UUID** cuando los IDs del Motor son
+  hex de 16 chars. Efecto cascada: `saveAttempt` fallaba con 400 → intento
+  no persistido → tarjeta del banco quedaba en 0% completado, cero Opopoints
+  y Laboratorio de errores sin datos del examen. Ampliado a `z.string().min(1).max(64)`.
+- **`mock_exam_id` en Postgres seguía `uuid`** con FK a `training_mock_exams`.
+  Migrado a `text` sin FK en dos tablas (`training_attempts`,
+  `mock_exam_progress`). SQLs idempotentes con bloque `DO $$ RAISE NOTICE`
+  para diagnosticar por qué fallaba silenciosamente antes.
+- **Body 25 MB** ya estaba configurado en Express (`bloque6_bank_mock_ids.sql`
+  no lo tocó). El upload de PDFs de hasta 20 MB pasa sin ajustes adicionales.
+
+### Cleanup de datos legacy: única oposición operativa
+
+`CourseSyncService` fallaba silencioso con `[course-sync] sin curso "listo"
+para label "Justicia · Tramitación Procesal"` — el Motor no tenía ningún curso
+con ese título en `estado: listo`. Consecuencia: `training_topics` para
+`justicia-tramitacion` seguía con los slugs viejos (`constitucion`, `ley-39`),
+los intentos del banco (con IDs hex del Motor) no matcheaban, y el Laboratorio
+descartaba esos temas.
+
+- Nuevo SQL `bloque6_dbclean_policia_galicia_only.sql`: migra
+  `raw_user_meta_data.oposicion` y `public.profiles.oposicion` de
+  `justicia-tramitacion` → `policia-local-galicia` para todos los usuarios;
+  elimina la fila obsoleta de `training_courses` y sus `training_topics`.
+- `training_courses.sql` actualizado — solo queda `policia-local-galicia` como
+  seed permanente. Documentado.
+- El fallback `Tema del banco XXXX` que se había puesto como red de seguridad
+  se retiró — con la DB limpia y los 40 temas del Motor sincronizados en
+  `training_topics`, ya no hace falta.
+- `errorHandler` global aprendió a traducir `AxiosError` upstream: 4xx del
+  Motor se propagan con status real y `detail` extraído del payload, 5xx
+  como `502 upstream/<code>`. Antes cualquier fallo del Motor salía como
+  `500 common/internal-error` opaco al mobile.
+
+### Laboratorio de errores rediseñado (segunda pasada)
+
+Tras el examen, el Laboratorio no reflejaba lo que el usuario acababa de hacer
+por dos filtros silenciosos: `total < 3` respuestas descartaba temas de
+simulacros grandes (93 preguntas / 30 temas ≈ 3 respuestas por tema), y el
+filtro `HEX_ID_RE.test(topic)` descartaba temas cuyo label seguía siendo hex
+porque no estaban resueltos. Además, temas con dominio alto seguían
+apareciendo como debilidades.
+
+- Umbral bajado a `total >= 2` (alineado con la vista SQL de patterns).
+- **Umbral de dominio `MASTERY_THRESHOLD = 80`**: temas con `domain >= 80%`
+  ya no aparecen como debilidad — pasan al tab nuevo "Dominados" (verde) y
+  no entran al test quirúrgico.
+- Tabs "Débiles · N / Dominados · N" con contador y colores propios
+  (morado para débiles, verde para dominados). Empty states contextuales.
+- Card expandida **contextual** según dominio: título ("Patrón de fallo
+  detectado" vs "Tema dominado"), icono (X rojo vs check verde), copy
+  ("Fallas el X%" vs "Aciertas el X%"), progress bar y porcentaje pintados
+  según categoría. La frase secundaria en dominados explica el mecanismo
+  ("Si vuelves a bajar del 80%, aparecerá otra vez en tus debilidades")
+  para que el usuario entienda que la clasificación es dinámica.
+- Los items del tab "Dominados" se ordenan por `domain DESC` (los mejores
+  primero — refuerzo positivo).
+
+### Test quirúrgico dinámico
+
+Antes era fijo: 15 preguntas repartidas entre los top-3 patrones. El resto de
+debilidades quedaba sin trabajar en ese ciclo y la app no lo comunicaba.
+Ahora:
+
+- `MAX_SUBTOPICS = 5` × `QUESTIONS_PER_TOPIC = 4` = **tope 20 preguntas**.
+- Si el usuario tiene menos temas débiles, el test es más corto (1 tema → 5
+  preguntas mínimo, 2 → 8, 3 → 12, 4 → 16, 5+ → 20).
+- Filtro previo `domain < 80` en el mobile — los temas dominados nunca
+  entran al test quirúrgico. Consistente con el tab del Laboratorio.
+- La UI muestra el desglose real ("QUÉ INCLUYE") con los temas y su count
+  de preguntas. Al terminar sube el dominio de los atacados → siguiente ciclo
+  ataca los que quedaron abajo. Iteración natural sin sesiones de 100 preguntas.
+
+### Documentación operativa
+
+- `apps/backend/supabase/bloque6_bank_mock_ids.sql` — ALTER de columna uuid
+  → text idempotente + vista de patterns recreada.
+- `apps/backend/supabase/bloque6_mock_progress_fix.sql` — reset de FK y
+  ALTER para `mock_exam_progress` (nombre real, no `training_mock_progress`).
+- `apps/backend/supabase/bloque6_dbclean_policia_galicia_only.sql` — cleanup
+  full-stack: user_metadata + profiles + training_courses + training_topics.
+- Todos son idempotentes con `RAISE NOTICE` para diagnóstico. Se recomienda
+  correr en orden en cualquier deploy nuevo.
+
+---
+
 ## 2026-09-15 — Gaps del cliente: 10 correcciones + streaming + dark mode
 
 Rama: `fix/gaps-15-09-26` (parte de `fix/gaps-12-09-26`).

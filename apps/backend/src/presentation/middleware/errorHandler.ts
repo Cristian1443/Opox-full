@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import axios from 'axios';
 import { DomainError } from '../../domain';
 import { logger } from '@opox/utils';
 import type { ApiErrorResponse } from '@opox/types';
@@ -27,6 +28,40 @@ export function errorHandler(
             },
         };
         res.status(err.httpStatus).json(body);
+        return;
+    }
+
+    // Errores de servicios upstream (Motor IA, otras APIs externas vía axios).
+    // Traducimos el status real del upstream y devolvemos el detail cuando existe,
+    // para que el mobile pueda mostrar mensajes útiles en lugar de "Error interno".
+    if (axios.isAxiosError(err)) {
+        const upstreamStatus = err.response?.status ?? 502;
+        const detail = err.response?.data as { detail?: unknown; error?: unknown } | undefined;
+        const rawMessage = typeof detail?.detail === 'string'
+            ? detail.detail
+            : typeof detail?.error === 'string'
+                ? detail.error
+                : Array.isArray(detail?.detail)
+                    ? detail.detail.map((d: { msg?: string }) => d?.msg).filter(Boolean).join('; ')
+                    : err.message;
+        // Mapeamos a status HTTP nuestro: 4xx del upstream lo propagamos como 4xx
+        // (bad request/validation), 5xx como 502 bad gateway (nuestro proxy falla).
+        const propagatedStatus = upstreamStatus >= 400 && upstreamStatus < 500 ? upstreamStatus : 502;
+        logger.warn('[upstream-error]', {
+            path: req.path,
+            method: req.method,
+            upstreamStatus,
+            url: err.config?.url,
+            detail,
+        });
+        const body: ApiErrorResponse = {
+            ok: false,
+            error: {
+                code: `upstream/${upstreamStatus}`,
+                message: rawMessage || 'El servicio externo devolvió un error.',
+            },
+        };
+        res.status(propagatedStatus).json(body);
         return;
     }
 

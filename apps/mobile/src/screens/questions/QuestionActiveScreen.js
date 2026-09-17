@@ -8,6 +8,7 @@ import {
     Vibration,
     AccessibilityInfo,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -174,6 +175,11 @@ export default function QuestionActiveScreen({ navigation, route }) {
     // incrementalmente vía useTestSession. La primera se ve en ~5-8s.
     jobId = null,
     expectedTotal = null,
+    // Bloque 6.6 · Simulacro real del banco: mode='bank_mock' + sesionId.
+    // Las preguntas llegan SIN correctIndex; la corrección se resuelve pregunta
+    // a pregunta contra /training/session/:sessionId/answer del Motor.
+    mode = null,
+    sesionId = null,
   } = route?.params ?? {};
 
   // Streaming: usa useTestSession cuando hay jobId. En caso contrario, se
@@ -186,9 +192,16 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const streamedQuestions = jobId && streamedRaw?.length
     ? adaptGeneratedQuestions(streamedRaw)
     : [];
-  const questions = jobId
-    ? streamedQuestions
-    : (paramQuestions ?? MOCK_QUESTIONS);
+  // En modo bank_mock las preguntas son MUTABLES: al responder cada una, el
+  // backend devuelve correctIndex + explicación y hay que reflejarlo en la UI
+  // (verde/rojo, feedback). En el resto de modos las preguntas ya vienen con
+  // correctIndex resuelto y no hace falta estado local.
+  const isBankMock = mode === 'bank_mock' && !!sesionId;
+  const [bankQuestions, setBankQuestions] = useState(isBankMock ? (paramQuestions ?? []) : null);
+  const [isCorrectionLoading, setIsCorrectionLoading] = useState(false);
+  const questions = isBankMock
+    ? bankQuestions
+    : (jobId ? streamedQuestions : (paramQuestions ?? MOCK_QUESTIONS));
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [selectedOption, setSelectedOption] = useState(null);
@@ -306,8 +319,67 @@ export default function QuestionActiveScreen({ navigation, route }) {
     setSelectedOption(id);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedOption) return;
+
+    // Modo bank_mock (Bloque 6.6): la corrección la hace el Motor por pregunta.
+    // Bloqueamos la UI mientras esperamos la respuesta del /answer para no
+    // pintar verde/rojo con datos inventados.
+    if (isBankMock) {
+      if (isCorrectionLoading) return;
+      const optionIds = ['A', 'B', 'C', 'D'];
+      const optionIndex = optionIds.indexOf(selectedOption);
+      if (optionIndex < 0) return;
+
+      setIsCorrectionLoading(true);
+      const timeSecs = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
+      const { data, error } = await trainingApi.postSessionAnswer(sesionId, {
+        questionId: question.id,
+        optionIndex,
+      });
+      setIsCorrectionLoading(false);
+
+      if (error || !data) {
+        Alert.alert('Error', error?.message || 'No pudimos corregir la respuesta. Reintenta.');
+        return;
+      }
+
+      // Aplicar la corrección real a la pregunta activa: marca `correct` en la
+      // opción que devolvió el Motor y guarda la explicación/evidencia.
+      const correctIndex = typeof data.correctIndex === 'number' ? data.correctIndex : null;
+      const evidenceText = data.evidence?.cita ?? '';
+      const explanation = data.explanation ?? evidenceText ?? '';
+      const updatedQuestion = {
+        ...question,
+        options: question.options.map((o, i) => ({
+          ...o,
+          correct: correctIndex !== null ? i === correctIndex : o.correct,
+        })),
+        explanation: explanation || question.explanation,
+        explanationWrong: explanation || question.explanationWrong,
+        articleRef: evidenceText
+          ? { article: '', title: '', text: evidenceText, boeUrl: null }
+          : question.articleRef,
+      };
+      const updatedQuestions = [...bankQuestions];
+      updatedQuestions[currentIndex] = updatedQuestion;
+      setBankQuestions(updatedQuestions);
+
+      const isCorrect = Boolean(data.correct);
+      if (!isCorrect) Vibration.vibrate(80);
+      clearInterval(timerRef.current);
+      setIsSubmitted(true);
+      setAnswers(prev => [...prev, {
+        questionId: question.id,
+        selected: selectedOption,
+        isCorrect,
+        timeSecs,
+      }]);
+      animateFeedback();
+      return;
+    }
+
+    // Flujo original — preguntas con correctIndex ya resuelto en cliente.
     clearInterval(timerRef.current);
     const timeSecs = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
     const selected = question.options.find(o => o.id === selectedOption);
@@ -602,12 +674,19 @@ export default function QuestionActiveScreen({ navigation, route }) {
         {/* ── CTA PRINCIPAL ── */}
         {!isSubmitted ? (
           <TouchableOpacity
-            style={[styles.mainBtn, !selectedOption && styles.mainBtnDisabled]}
+            style={[styles.mainBtn, (!selectedOption || isCorrectionLoading) && styles.mainBtnDisabled]}
             onPress={handleConfirm}
-            disabled={!selectedOption}
+            disabled={!selectedOption || isCorrectionLoading}
             activeOpacity={0.85}
           >
-            <Text style={styles.mainBtnText}>Confirmar respuesta</Text>
+            {isCorrectionLoading ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ActivityIndicator color={colors.white} size="small" />
+                <Text style={styles.mainBtnText}>Corrigiendo…</Text>
+              </View>
+            ) : (
+              <Text style={styles.mainBtnText}>Confirmar respuesta</Text>
+            )}
           </TouchableOpacity>
         ) : (
           <TouchableOpacity

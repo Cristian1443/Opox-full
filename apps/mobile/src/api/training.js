@@ -87,4 +87,37 @@ export const trainingApi = {
         api.get(API_ROUTES.TRAINING.SESSION_QUESTIONS.replace(':sessionId', sessionId), { auth: true }),
     postSessionAnswer: (sessionId, body) =>
         api.post(API_ROUTES.TRAINING.SESSION_ANSWER.replace(':sessionId', sessionId), body, { auth: true }),
+
+    // ─── Banco de exámenes oficiales (Bloque 6.6 · Motor IA) ────────────────
+    // Todas devuelven 503 { code:'MOTOR_UNAVAILABLE' } si el backend no tiene
+    // el Motor configurado — el caller muestra empty-state, nunca fallback local.
+    listBankExams: (limit = 100, offset = 0) =>
+        api.get(
+            `${API_ROUTES.TRAINING.BANK_EXAMS}?limit=${limit}&offset=${offset}`,
+            { auth: true },
+        ),
+
+    /**
+     * Sube un examen al banco del curso activo.
+     * @param {{titulo:string, anio:number, fuente:'profesor'|'otro'|'oficial', file:{base64:string, mimeType:string, fileName?:string}}} body
+     * @returns {Promise<{data:{jobId:string}, error?:{code:string,message:string}}>}
+     */
+    uploadBankExam: (body) =>
+        api.post(API_ROUTES.TRAINING.BANK_EXAM_UPLOAD, body, { auth: true }),
+
+    getBankExamJob: (jobId) =>
+        api.get(API_ROUTES.TRAINING.BANK_EXAM_JOB.replace(':jobId', jobId), { auth: true }),
+
+    /**
+     * Arranca un simulacro real del banco. Devuelve sesión Motor + preguntas SIN correctIndex
+     * — la corrección se resuelve por pregunta con postSessionAnswer.
+     */
+    startBankMock: (body) =>
+        api.post(API_ROUTES.TRAINING.BANK_MOCK_START, body, { auth: true }),
+
+    getBankMockResult: (sessionId) =>
+        api.get(
+            API_ROUTES.TRAINING.BANK_MOCK_RESULT.replace(':sessionId', sessionId),
+            { auth: true },
+        ),
 };

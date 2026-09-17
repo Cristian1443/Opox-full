@@ -64,6 +64,12 @@ import {
     GetJobStatusUseCase,
     GetSessionQuestionsUseCase,
     PostSessionAnswerUseCase,
+    // Bloque 6.6 · Banco de exámenes oficiales
+    ListBankExamsUseCase,
+    UploadBankExamUseCase,
+    GetBankExamJobUseCase,
+    StartBankMockUseCase,
+    GetBankMockResultUseCase,
     SaveAttemptUseCase,
     ListErrorPatternsUseCase,
     SaveMockProgressUseCase,
@@ -473,6 +479,13 @@ export function buildContainer() {
         getJobStatus: new GetJobStatusUseCase(motorAiClient),
         getSessionQuestions: new GetSessionQuestionsUseCase(motorAiClient),
         postSessionAnswer: new PostSessionAnswerUseCase(motorAiClient),
+        // Bloque 6.6 · Banco de exámenes oficiales (Motor IA). Todos aceptan
+        // motorAiClient=undefined y lanzan MOTOR_UNAVAILABLE si es null → 503.
+        listBankExams: new ListBankExamsUseCase(motorAiClient, getCursoIdUseCase, trainingRepo),
+        uploadBankExam: new UploadBankExamUseCase(motorAiClient, getCursoIdUseCase),
+        getBankExamJob: new GetBankExamJobUseCase(motorAiClient),
+        startBankMock: new StartBankMockUseCase(motorAiClient, getCursoIdUseCase),
+        getBankMockResult: new GetBankMockResultUseCase(motorAiClient),
         saveAttempt: new SaveAttemptUseCase(trainingRepo, dashboardRepo, storeRepo),
         listErrorPatterns: new ListErrorPatternsUseCase(trainingRepo),
         saveMockProgress: new SaveMockProgressUseCase(trainingRepo),
@@ -633,6 +646,12 @@ export function buildContainer() {
         getJobStatus: useCases.getJobStatus,
         getSessionQuestions: useCases.getSessionQuestions,
         postSessionAnswer: useCases.postSessionAnswer,
+        // Bloque 6.6 · Banco de exámenes oficiales
+        listBankExams: useCases.listBankExams,
+        uploadBankExam: useCases.uploadBankExam,
+        getBankExamJob: useCases.getBankExamJob,
+        startBankMock: useCases.startBankMock,
+        getBankMockResult: useCases.getBankMockResult,
     });
 
     const notesController = new NotesController({

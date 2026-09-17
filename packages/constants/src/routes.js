@@ -83,6 +83,12 @@ export const API_ROUTES = {
         LAW_VIEW:           '/training/law-view',
         TOPICS:             '/training/topics',
         LEVEL_TEST:         '/training/level-test',
+        // Banco de exámenes oficiales (Bloque 6.6 · Motor IA)
+        BANK_EXAMS:         '/training/bank/exams',
+        BANK_EXAM_UPLOAD:   '/training/bank/exams/upload',
+        BANK_EXAM_JOB:      '/training/bank/exams/jobs/:jobId',
+        BANK_MOCK_START:    '/training/bank/mock-exams',
+        BANK_MOCK_RESULT:   '/training/bank/mock-exams/:sessionId/result',
     },
 
     BOE: {

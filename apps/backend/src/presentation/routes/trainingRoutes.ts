@@ -163,5 +163,15 @@ export function createTrainingRouter(
         controller.saveLawView,
     );
 
+    // ─── Banco de exámenes oficiales (Bloque 6.6 · Motor IA) ─────────────
+    // Proxies del Motor. Si no está configurado, cada handler responde 503.
+    // Sin schemas Zod estrictos aquí — el use case valida el body internamente
+    // (fuente, MIME, tamaño) y lanza BankExamValidationError con status propio.
+    r.get(API_ROUTES.TRAINING.BANK_EXAMS, authMiddleware, controller.listBankExams);
+    r.post(API_ROUTES.TRAINING.BANK_EXAM_UPLOAD, authMiddleware, controller.uploadBankExam);
+    r.get(API_ROUTES.TRAINING.BANK_EXAM_JOB, authMiddleware, controller.getBankExamJob);
+    r.post(API_ROUTES.TRAINING.BANK_MOCK_START, authMiddleware, controller.startBankMock);
+    r.get(API_ROUTES.TRAINING.BANK_MOCK_RESULT, authMiddleware, controller.getBankMockResult);
+
     return r;
 }

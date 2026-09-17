@@ -70,6 +70,11 @@ declare const API_ROUTES: {
         readonly LAW_VIEW: string;
         readonly TOPICS: string;
         readonly LEVEL_TEST: string;
+        readonly BANK_EXAMS: string;
+        readonly BANK_EXAM_UPLOAD: string;
+        readonly BANK_EXAM_JOB: string;
+        readonly BANK_MOCK_START: string;
+        readonly BANK_MOCK_RESULT: string;
     };
 
     readonly BOE: {
