@@ -54,14 +54,17 @@ function withHealthConnectPermissionDelegate(config) {
         const rationaleBlock = isKotlin
             ? [
                 '    // HC rationale: convertir el intent a deep-link antes de que RN lo lea',
-                '    if (intent?.action == "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE") {',
+                '    if (intent?.action == "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" ||',
+                '        intent?.action == "android.intent.action.VIEW_PERMISSION_USAGE") {',
                 '      intent.setData(android.net.Uri.parse("opox://health-rationale"))',
                 '      intent.setAction(android.content.Intent.ACTION_VIEW)',
                 '    }',
               ].join('\n')
             : [
                 '    // HC rationale: convertir el intent a deep-link antes de que RN lo lea',
-                '    if ("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE".equals(intent != null ? intent.getAction() : null)) {',
+                '    String hcAction = intent != null ? intent.getAction() : null;',
+                '    if ("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE".equals(hcAction) ||',
+                '        "android.intent.action.VIEW_PERMISSION_USAGE".equals(hcAction)) {',
                 '      intent.setData(android.net.Uri.parse("opox://health-rationale"));',
                 '      intent.setAction(android.content.Intent.ACTION_VIEW);',
                 '    }',

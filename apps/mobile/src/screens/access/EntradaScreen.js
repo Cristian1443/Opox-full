@@ -84,9 +84,8 @@ const s = StyleSheet.create({
     content: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'flex-end',
+        justifyContent: 'center',
         paddingHorizontal: 24,
-        paddingBottom: 32,
         zIndex: 1,
     },
     tagline: {

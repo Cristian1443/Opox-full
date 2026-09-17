@@ -27,6 +27,8 @@ const path = require('path');
 
 const HEALTH_CONNECT_PACKAGE = 'com.google.android.apps.healthdata';
 const RATIONALE_ACTION = 'androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE';
+const VIEW_PERMISSION_USAGE_ACTION = 'android.intent.action.VIEW_PERMISSION_USAGE';
+const HEALTH_PERMISSIONS_CATEGORY = 'android.intent.category.HEALTH_PERMISSIONS';
 
 const HEALTH_PERMISSIONS = [
     'android.permission.health.READ_HEART_RATE',
@@ -64,6 +66,42 @@ function ensureUsesPermissions(manifest) {
             manifest['uses-permission'].push({ $: { 'android:name': perm } });
         }
     }
+}
+
+/**
+ * Android 14+ exige que la app declare un <activity-alias> que responda a
+ * VIEW_PERMISSION_USAGE + categoría HEALTH_PERMISSIONS. Sin él, Health Connect
+ * considera la app inválida y requestPermission() devuelve un array vacío sin
+ * abrir ningún diálogo (se queda "concediendo permisos" y termina en denegado).
+ * Ver: https://developer.android.com/health-and-fitness/guides/health-connect/develop/get-started#restrict-data-access
+ */
+function ensureViewPermissionUsageAlias(manifest) {
+    const application = manifest.application?.[0];
+    if (!application) return;
+
+    if (!Array.isArray(application['activity-alias'])) {
+        application['activity-alias'] = [];
+    }
+
+    const already = application['activity-alias'].some(
+        (a) => a.$?.['android:name'] === '.ViewPermissionUsageActivity',
+    );
+    if (already) return;
+
+    application['activity-alias'].push({
+        $: {
+            'android:name': '.ViewPermissionUsageActivity',
+            'android:exported': 'true',
+            'android:targetActivity': '.MainActivity',
+            'android:permission': 'android.permission.START_VIEW_PERMISSION_USAGE',
+        },
+        'intent-filter': [
+            {
+                action: [{ $: { 'android:name': VIEW_PERMISSION_USAGE_ACTION } }],
+                category: [{ $: { 'android:name': HEALTH_PERMISSIONS_CATEGORY } }],
+            },
+        ],
+    });
 }
 
 /**
@@ -124,6 +162,7 @@ const withHealthConnect = (config) => {
         const manifest = config.modResults.manifest;
         ensureQueriesForHealthConnect(manifest);
         ensureUsesPermissions(manifest);
+        ensureViewPermissionUsageAlias(manifest);
         return config;
     });
 
