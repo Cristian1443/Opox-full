@@ -315,17 +315,33 @@ export class SupabaseAuthRepository implements IAuthRepository {
         });
         if (updateErr) throw new Error(`confirmPasswordReset: ${updateErr.message}`);
 
+        // El token de verifyOtp puede quedar invalidado al cambiar la contraseña
+        // (Supabase revoca sesiones tras admin.updateUserById en algunas
+        // configuraciones). Hacemos un login fresco con la nueva contraseña
+        // para garantizar que el mobile recibe un access_token válido y con
+        // todo el user_metadata (display_name, oposicion, etc.) intacto.
+        const email = data.user.email;
+        if (!email) throw new Error('confirmPasswordReset: usuario sin email');
+
+        const { data: freshLogin, error: loginErr } = await this.supabaseAuth.auth.signInWithPassword({
+            email,
+            password: input.newPassword,
+        });
+        if (loginErr || !freshLogin.session || !freshLogin.user) {
+            throw new Error(`confirmPasswordReset: fresh login failed: ${loginErr?.message ?? 'unknown'}`);
+        }
+
         return this.toDomainSession({
             session: {
-                access_token: data.session.access_token,
-                refresh_token: data.session.refresh_token,
-                expires_in: data.session.expires_in,
+                access_token: freshLogin.session.access_token,
+                refresh_token: freshLogin.session.refresh_token,
+                expires_in: freshLogin.session.expires_in,
             },
             user: {
-                id: data.user.id,
-                email: data.user.email ?? null,
-                user_metadata: data.user.user_metadata ?? {},
-                created_at: data.user.created_at,
+                id: freshLogin.user.id,
+                email: freshLogin.user.email ?? null,
+                user_metadata: freshLogin.user.user_metadata ?? {},
+                created_at: freshLogin.user.created_at,
             },
         });
     }
