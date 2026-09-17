@@ -16,8 +16,14 @@ import { trainingApi } from '../api';
 // El hook expone `postAnswer(questionId, optionIndex)` para enviar respuestas
 // mientras el motor sigue generando (postSessionAnswer del backend).
 
-const DEFAULT_INTERVAL_MS = 2500;
-const DEFAULT_TIMEOUT_MS = 90_000;
+// Intervalo bajado a 1.5 s (antes 2.5 s) — el contador "N de M preguntas"
+// avanza ~40 % más rápido, reduce la sensación de "no pasa nada".
+// Timeout subido a 180 s (antes 90 s) — el Motor tarda 60-120 s en generar
+// 30 preguntas RAG con evidencia verbatim; 90 s cortaba antes de terminar
+// y el usuario veía "El motor está tardando más de lo normal" aunque el
+// job estaba a punto de completar.
+const DEFAULT_INTERVAL_MS = 1500;
+const DEFAULT_TIMEOUT_MS = 180_000;
 
 export function useTestSession(jobId, opts = {}) {
     const intervalMs = opts.intervalMs ?? DEFAULT_INTERVAL_MS;

@@ -442,15 +442,24 @@ export default function QuestionActiveScreen({ navigation, route }) {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           {streamHasError ? (
             <>
-              <Text style={{ fontSize: 15, color: colors.textDark, textAlign: 'center', marginBottom: 12 }}>
-                El motor está tardando más de lo normal.
+              <Text style={{ fontSize: 15, color: colors.textDark, textAlign: 'center', marginBottom: 16, paddingHorizontal: 20 }}>
+                El motor está tardando más de lo normal.{'\n'}
+                Prueba con menos preguntas o vuelve a intentar.
               </Text>
-              <TouchableOpacity
-                style={{ backgroundColor: colors.ctaGreen, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
-                onPress={() => navigation.goBack()}
-              >
-                <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Volver</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.ctaGreen, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                  onPress={() => navigation.goBack()}
+                >
+                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Volver</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.selectionBorder, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                  onPress={() => navigation.replace('GeneratorConfig')}
+                >
+                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Reintentar</Text>
+                </TouchableOpacity>
+              </View>
             </>
           ) : (
             <>
@@ -458,9 +467,14 @@ export default function QuestionActiveScreen({ navigation, route }) {
               <Text style={{ fontSize: 14, color: colors.textDark, marginTop: 12 }}>
                 Preparando tu test…
               </Text>
-              {streamProgress?.total > 0 && (
+              {streamProgress?.total > 0 ? (
                 <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
                   {streamProgress.done} de {streamProgress.total} preguntas listas
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, textAlign: 'center', paddingHorizontal: 20 }}>
+                  El Motor extrae cada pregunta del temario oficial.{'\n'}
+                  Puede tardar hasta 2 minutos.
                 </Text>
               )}
             </>

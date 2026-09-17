@@ -125,6 +125,17 @@ export class MotorAiClient implements AiApiContract {
     private readonly CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
 
     /**
+     * Precarga el banco de preguntas de forma proactiva (fire-and-forget).
+     * Se llama al arrancar el server desde `container.ts` para que la primera
+     * llamada de streaming no pague el coste de cargar 336+ preguntas del
+     * Motor (2 páginas × ~1 s = 2-4 s de latencia añadida en la primera
+     * respuesta). Idempotente — `ensureQuestionBank` respeta el TTL.
+     */
+    async preloadQuestionBank(): Promise<void> {
+        await this.ensureQuestionBank();
+    }
+
+    /**
      * Getter del cliente axios con auth ya configurada. Uso limitado a servicios
      * de infraestructura que necesiten golpear endpoints del Motor no cubiertos
      * por los métodos públicos (ej. CourseSyncService — /v1/courses catálogo).
