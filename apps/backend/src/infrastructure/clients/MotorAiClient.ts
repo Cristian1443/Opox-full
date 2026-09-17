@@ -409,15 +409,14 @@ export class MotorAiClient implements AiApiContract {
             n: input.count,
         });
         // 200 = respuesta desde caché ya con sesion_id. 202 = job en curso.
-        // Fuente autoritativa del sesion_id: `recurso_id` en la raíz del JobOut
-        // (verificado contra openapi.json). Los sitios secundarios son fallback.
+        // `recurso_id` en JobOut = cursoId (NO sessionId). El sessionId real
+        // vive en `resultado.sesion_id` cuando el job termina.
         if (res.status === 200) {
             const resultado = data.resultado as { sesion_id?: string } | undefined;
+            const progreso = data.progreso as { sesion_id?: string } | undefined;
             return {
                 jobId: (data.job_id as string) ?? '',
-                sessionId: (data.recurso_id as string | undefined)
-                    ?? resultado?.sesion_id
-                    ?? null,
+                sessionId: progreso?.sesion_id ?? resultado?.sesion_id ?? null,
             };
         }
         return { jobId: data.job_id as string, sessionId: null };
@@ -436,11 +435,12 @@ export class MotorAiClient implements AiApiContract {
         const progresoRaw = (raw.progreso ?? raw.progress ?? {}) as Record<string, unknown>;
         const done = Number(progresoRaw.done ?? 0);
         const total = Number(progresoRaw.total ?? (resultado.preguntas as unknown[] | undefined)?.length ?? 0);
-        // Fuente autoritativa del sesion_id: `JobOut.recurso_id` en la raíz
-        // (verificado contra openapi.json). Los sitios secundarios se conservan
-        // como red de seguridad por si el Motor cambia la exposición del campo.
-        const sessionId = (raw.recurso_id as string | undefined)
-            ?? (progresoRaw.sesion_id as string | undefined)
+        // Fuente autoritativa del sesion_id: `progreso.sesion_id` (visible
+        // desde 'running') o `resultado.sesion_id` (visible en 'done').
+        // `JobOut.recurso_id` NO es el sessionId — apunta al curso del job
+        // (mismo valor que curso_id), por lo que usarlo hace que
+        // `GET /v1/tests/{cursoId}` devuelva 404 sesion_no_encontrada.
+        const sessionId = (progresoRaw.sesion_id as string | undefined)
             ?? (resultado.sesion_id as string | undefined)
             ?? null;
         // Log de diagnóstico limitado a estados terminales (done/error) o si hay
@@ -450,6 +450,8 @@ export class MotorAiClient implements AiApiContract {
                 jobId, estado, sessionId, done, total,
                 mensaje: raw.mensaje,
                 recursoId: raw.recurso_id,
+                progresoSesionId: progresoRaw.sesion_id,
+                resultadoSesionId: resultado.sesion_id,
                 progresoKeys: Object.keys(progresoRaw),
                 resultadoKeys: Object.keys(resultado),
             });
