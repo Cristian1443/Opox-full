@@ -37,4 +37,6 @@ export interface IPlanningRepository {
         subtitle?: string | null;
         kind?: PlanDateKind;
     }): Promise<PlanDate>;
+    /** Borra una fecha propia del usuario. Devuelve true si borró, false si no existía o no era suya. */
+    deleteDate(input: { userId: string; dateId: string }): Promise<boolean>;
 }

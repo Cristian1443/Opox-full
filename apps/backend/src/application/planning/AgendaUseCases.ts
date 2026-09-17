@@ -21,3 +21,11 @@ export class CreateAgendaDateUseCase {
         return this.planningRepo.createDate(input);
     }
 }
+
+export class DeleteAgendaDateUseCase {
+    constructor(private readonly planningRepo: IPlanningRepository) { }
+
+    execute(input: { userId: string; dateId: string }): Promise<boolean> {
+        return this.planningRepo.deleteDate(input);
+    }
+}

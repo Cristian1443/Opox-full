@@ -6,6 +6,7 @@
 // Re-exportamos los tipos del contrato de IA para que el móvil no tenga
 // que importar de '@opox/types/contracts' directamente.
 export type { GeneratedQuestion, PhotoTestResult, SurgicalTestResult, HintResult } from './contracts/AiApiContract';
+import type { GeneratedQuestion } from './contracts/AiApiContract';
 
 export type TrainingSource = 'generator' | 'official' | 'surgical';
 export type TrainingDifficulty = 'easy' | 'medium' | 'hard';
@@ -167,4 +168,115 @@ export interface SaveLawViewRequest {
 export interface RateQuestionResponse {
     questionId: string;
     rating: number;
+}
+
+// ─── Banco de exámenes oficiales (Bloque 6.6 · Motor IA) ──────────────────────
+
+export type BankExamSource = 'oficial' | 'profesor' | 'otro';
+
+export interface BankExamDTO {
+    id: string;
+    cursoId: string;
+    titulo: string;
+    anio: number;
+    fuente: BankExamSource;
+    nPreguntas: number;
+    /** Historial del usuario sobre este examen (enriquecido en backend). */
+    status: 'pending' | 'completed';
+    /** Mejor score obtenido (0-10) o null si no lo ha completado. */
+    bestScore: number | null;
+    /** ISO 8601 de la última vez que lo completó. */
+    completedAt: string | null;
+    /** Nº de veces que lo ha intentado. */
+    attemptCount: number;
+}
+
+export interface UploadBankExamRequest {
+    titulo: string;
+    anio: number;
+    fuente: BankExamSource;
+    file: {
+        base64: string;
+        mimeType: string;
+        fileName?: string;
+    };
+}
+
+export interface UploadBankExamResponse {
+    jobId: string;
+}
+
+export interface BankExamJobResult {
+    examenId?: string;
+    extraidas?: number;
+    guardadas?: number;
+    duplicadas?: number;
+    descartadas?: number;
+    sinTema?: number;
+    yaIncorporado?: boolean;
+    corte?: string;
+}
+
+/**
+ * Estados del Motor: `reserved | queued | running | done | error`.
+ * Verificado en /openapi.json 2026-09-17.
+ */
+export type BankExamJobStatusEnum = 'reserved' | 'queued' | 'running' | 'done' | 'error';
+
+export interface BankExamJobStatus {
+    status: BankExamJobStatusEnum;
+    /** Mensaje humano del Motor (por ej. progreso: "OCR página 3 de 60…"). */
+    message?: string;
+    result?: BankExamJobResult;
+    error?: string;
+    /** Coste real del job en USD (viene en el root del JobOut, no en `resultado`). */
+    costUsd?: number;
+}
+
+export interface StartBankMockRequest {
+    /** Opcional — si viene, el simulacro se compone SOLO con preguntas de ese examen del banco. */
+    examId?: string;
+    /** true = solo preguntas de exámenes con fuente 'oficial'. */
+    soloOficiales?: boolean;
+    /** 5–100. Ignorado si viene `distribucion`. */
+    nPreguntas?: number;
+    /** 0 = sin límite. */
+    contrarrelojSeg?: number;
+    /** Distribución por tema: `{tema_id: cantidad}`. Cuando viene, se ignora `nPreguntas`. */
+    distribucion?: Record<string, number>;
+}
+
+export interface StartBankMockResponse {
+    sesionId: string;
+    questions: GeneratedQuestion[];
+    contrarrelojSeg: number;
+    deficit?: {
+        pedidas: number;
+        publicadas: number;
+        motivosDescarte?: Record<string, number>;
+    };
+}
+
+/**
+ * Resultado agregado de un simulacro (schema `ResultadoSesionOut` del Motor).
+ * No incluye detalle pregunta-a-pregunta — la corrección de cada pregunta ya
+ * llega en tiempo real vía POST /v1/tests/{id}/answer.
+ * Verificado en /openapi.json 2026-09-17.
+ */
+export interface BankMockTopicResult {
+    temaId: string;
+    temaTitulo: string;
+    aciertos: number;
+    fallos: number;
+}
+
+export interface BankMockResultDTO {
+    sesionId: string;
+    respondidas: number;
+    total: number;
+    aciertos: number;
+    /** Nota en el rango que el Motor decida (típicamente 0-10 o 0-100). */
+    notaPct: number;
+    tiempoTotalMs: number;
+    porTema: BankMockTopicResult[];
 }

@@ -21,6 +21,7 @@ import type {
     GetMacroUseCase,
     ListAgendaUseCase,
     CreateAgendaDateUseCase,
+    DeleteAgendaDateUseCase,
     ToggleTaskResult,
     ListTopicsUseCase,
 } from '../../application';
@@ -29,20 +30,41 @@ import type { WeekResult } from '../../application/planning/WeekUseCase';
 import type { MacroResult, MacroPhase } from '../../application/planning/MacroUseCase';
 import type { PlanningSummary } from '../../application/planning/GetPlanningSummaryUseCase';
 
-// Pesos de las fases — deben coincidir con los de MacroUseCase.PHASE_DEFS
-const PHASE_WEIGHTS = [0.35, 0.30, 0.25, 0.10];
-
-/** Enriquece las fases macro con los temas del temario distribuidos proporcionalmente. */
+/** Enriquece las fases macro con los temas del temario.
+ *
+ * Reparto (para el caso típico de 40 temas):
+ *  - Fase 1 (base):           temas  1-10 → primeros 10
+ *  - Fase 2 (profundización): temas 11-20 → siguientes 10
+ *  - Fase 3 (simulacros):     temas 21-30 → siguientes 10
+ *  - Fase 4 (repaso final):   temas 31-40 → últimos 10
+ *  - Fase 5 (repaso integral): TODOS los temas (repaso completo antes del examen)
+ *
+ * Si el temario tiene menos de 40 temas (curso parcial), reparte tantos como
+ * pueda en las 4 primeras fases (~N/4 cada una) y la fase 5 sigue mostrando el
+ * temario completo.
+ */
 function enrichMacroWithTopics(
     macro: MacroResult,
     topics: TrainingTopic[],
 ): MacroResult & { phases: Array<MacroPhase & { topics: { topicId: string; name: string }[] }> } {
-    let idx = 0;
+    const total = topics.length;
+    const chunkSize = Math.max(1, Math.ceil(total / 4));
+
     const phases = macro.phases.map((phase, i) => {
-        const count = Math.max(1, Math.round(topics.length * (PHASE_WEIGHTS[i] ?? 0.1)));
-        const phaseTopics = topics.slice(idx, Math.min(idx + count, topics.length));
-        idx += count;
-        return { ...phase, topics: phaseTopics.map((t) => ({ topicId: t.topicId, name: t.label })) };
+        // Última fase — repaso integral: todos los temas.
+        if (phase.key === 'integral') {
+            return {
+                ...phase,
+                topics: topics.map((t) => ({ topicId: t.topicId, name: t.label })),
+            };
+        }
+        const from = i * chunkSize;
+        const to = Math.min(from + chunkSize, total);
+        const phaseTopics = topics.slice(from, to);
+        return {
+            ...phase,
+            topics: phaseTopics.map((t) => ({ topicId: t.topicId, name: t.label })),
+        };
     });
     return { ...macro, phases };
 }
@@ -62,6 +84,7 @@ export class PlanningController {
             listTopics: ListTopicsUseCase;
             listAgenda: ListAgendaUseCase;
             createAgendaDate: CreateAgendaDateUseCase;
+            deleteAgendaDate: DeleteAgendaDateUseCase;
         },
     ) { }
 
@@ -226,6 +249,18 @@ export class PlanningController {
         try {
             const date = await this.deps.createAgendaDate.execute({ userId: req.authUser!.id, ...req.body });
             this.ok(res, 201, this.serializeDate(date));
+        } catch (err) { next(err); }
+    };
+
+    deleteAgendaDate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const dateId = String(req.params['id']);
+            const removed = await this.deps.deleteAgendaDate.execute({ userId: req.authUser!.id, dateId });
+            if (!removed) {
+                res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Fecha no encontrada' } });
+                return;
+            }
+            res.status(204).end();
         } catch (err) { next(err); }
     };
 }

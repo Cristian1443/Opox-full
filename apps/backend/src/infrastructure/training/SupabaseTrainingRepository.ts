@@ -13,6 +13,7 @@ import {
     type ITrainingRepository,
     type SaveAttemptInput,
 } from '../../domain';
+import { enrichTopicsWithLabels, HEX_ID_RE } from '../shared/topicLabels';
 
 // ─── Row types (espejo del schema SQL) ───────────────────────────────────────
 
@@ -205,6 +206,57 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
         return ((data ?? []) as QuestionRow[]).map(toQuestion);
     }
 
+    /**
+     * Historial de intentos por examen del banco (Bloque 6.6 · Motor).
+     * Agrupa `training_attempts` con `source='official'` y devuelve mejor score,
+     * fecha del último completado y nº de intentos por mockExamId.
+     *
+     * Nota importante: consultamos TODOS los intentos oficiales del usuario y
+     * filtramos en cliente. Un `.in('mock_exam_id', ids)` sobre una columna
+     * uuid con IDs hex del Motor falla con "invalid input syntax for type uuid".
+     * Esto hace la query resiliente independientemente de si la columna es
+     * uuid legacy o text migrado.
+     */
+    async getBankExamStats(input: {
+        userId: string;
+        mockExamIds: string[];
+    }): Promise<Map<string, { bestScore: number | null; completedAt: Date | null; attemptCount: number }>> {
+        const result = new Map<string, { bestScore: number | null; completedAt: Date | null; attemptCount: number }>();
+        if (input.mockExamIds.length === 0) return result;
+
+        const wanted = new Set(input.mockExamIds);
+
+        const { data, error } = await this.supabaseAdmin
+            .from('training_attempts')
+            .select('mock_exam_id, score, completed_at')
+            .eq('user_id', input.userId)
+            .eq('source', 'official')
+            .not('mock_exam_id', 'is', null);
+
+        if (error) throw new Error(`getBankExamStats: ${error.message}`);
+
+        for (const row of (data ?? []) as Array<{
+            mock_exam_id: string | null;
+            score: number | null;
+            completed_at: string;
+        }>) {
+            if (!row.mock_exam_id) continue;
+            const key = String(row.mock_exam_id);
+            if (!wanted.has(key)) continue;
+            const existing = result.get(key) ?? { bestScore: null, completedAt: null, attemptCount: 0 };
+            existing.attemptCount += 1;
+            const rowDate = new Date(row.completed_at);
+            if (!existing.completedAt || rowDate > existing.completedAt) {
+                existing.completedAt = rowDate;
+            }
+            if (row.score !== null && (existing.bestScore === null || row.score > existing.bestScore)) {
+                existing.bestScore = row.score;
+            }
+            result.set(key, existing);
+        }
+        return result;
+    }
+
     // ─── Intentos ──────────────────────────────────
 
     async saveAttempt(input: SaveAttemptInput): Promise<TrainingAttempt> {
@@ -321,51 +373,23 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
             byTopic.set(key, entry);
         }
 
-        // Enriquecer con labels legibles desde training_topics.
-        // El Motor devuelve topic = hex ID (ej. "0acb39953a424c20") en lugar del nombre;
-        // training_topics tiene el sort_order para reproducir el mismo "Tema N" que
-        // usa ListTopicsUseCase en el resto de la app.
-        // posMap: topicId → "Tema N" para el curso activo del usuario.
-        // Queda vacío si no se encuentra ningún topicId en training_topics.
-        const posMap = new Map<string, string>();
-        const topicIds = [...byTopic.keys()];
-        if (topicIds.length > 0) {
-            // Detectar la oposición del usuario buscando uno de los topicIds en la tabla
-            const { data: matched } = await this.supabaseAdmin
-                .from('training_topics')
-                .select('oposicion')
-                .in('topic_id', topicIds)
-                .limit(1);
-
-            const oposicion = (matched as Array<{ oposicion: string }> | null)?.[0]?.oposicion;
-            if (oposicion) {
-                // Cargar todos los temas de esa oposición ordenados para calcular Tema N
-                const { data: allTopics } = await this.supabaseAdmin
-                    .from('training_topics')
-                    .select('topic_id')
-                    .eq('oposicion', oposicion)
-                    .order('sort_order', { ascending: true });
-
-                ((allTopics ?? []) as Array<{ topic_id: string }>).forEach((t, i) => {
-                    posMap.set(t.topic_id, `Tema ${i + 1}`);
-                });
-
-                for (const [topicId, entry] of byTopic.entries()) {
-                    const label = posMap.get(topicId);
-                    if (label) entry.topic = label;
-                }
-            }
+        // Enriquecer con labels legibles ("Tema N") desde `training_topics`.
+        // Helper compartido con SupabaseConfigRepository.getProStats para evitar
+        // que ambos repos deriven en formas distintas del mismo mapeo.
+        const posMap = await enrichTopicsWithLabels(this.supabaseAdmin, [...byTopic.keys()]);
+        for (const [topicId, entry] of byTopic.entries()) {
+            const label = posMap.get(topicId);
+            if (label) entry.topic = label;
         }
-
-        // Regex para detectar IDs hex sin resolver después del enriquecimiento.
-        const HEX_ID_RE = /^[0-9a-f]{12,}$/i;
 
         const patterns: ErrorPattern[] = [];
         for (const [topicId, { topic, total, correct, lastDate }] of byTopic.entries()) {
-            if (total < 3) continue; // mínimo estadístico
+            if (total < 2) continue; // mínimo estadístico (bajado de 3 para simulacros grandes)
             // 'all' = test quirúrgico sobre todos los temas — no es accionable por tema
             if (topicId === 'all') continue;
-            // IDs hex sin resolver tras enriquecimiento (curso antiguo no mapeado)
+            // Los IDs hex sin resolver ahora reciben label "Tema del banco XXXX" desde
+            // enrichTopicsWithLabels — ya no filtramos por HEX_ID_RE. Solo saltamos si
+            // el label sigue siendo un hex crudo (fallback del fallback, no debería pasar).
             if (HEX_ID_RE.test(topic)) continue;
             // Foto-test: el Motor devuelve slugs semánticos que no pertenecen al curso
             // activo; el controller los normaliza a 'foto-test'. Siempre mostrar.
@@ -392,7 +416,16 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
             patterns.push({ topicId, topic, totalAnswered: total, totalCorrect: correct, totalWrong: wrong, domain, failRate, lastAttemptDate: lastDate });
         }
 
-        return patterns.sort((a, b) => b.failRate - a.failRate);
+        // Orden por fecha de último intento (más reciente arriba), empate por
+        // peor fail rate. Antes se ordenaba solo por failRate — un tema
+        // recién estudiado quedaba debajo de otro antiguo con peor tasa de
+        // fallo, contradiciendo la expectativa del usuario ("el nuevo debe
+        // aparecer arriba").
+        return patterns.sort((a, b) => {
+            const dateCmp = (b.lastAttemptDate ?? '').localeCompare(a.lastAttemptDate ?? '');
+            if (dateCmp !== 0) return dateCmp;
+            return b.failRate - a.failRate;
+        });
     }
 
     // ─── Bookmarks ─────────────────────────────────
@@ -506,7 +539,15 @@ export class SupabaseTrainingRepository implements ITrainingRepository {
                 },
                 { onConflict: 'user_id' },
             );
-        if (error) throw new Error(`saveMockProgress: ${error.message}`);
+        if (error) {
+            // Fail-soft: "reanudar simulacro" es una feature secundaria. Si la
+            // tabla no está migrada (mock_exam_id sigue uuid) o RLS bloquea,
+            // no queremos que un PUT por-pregunta rompa el runner. Log y sigue.
+            // Correr bloque6_mock_progress_fix.sql para eliminar este warning.
+            // eslint-disable-next-line no-console
+            console.warn(`[saveMockProgress] no persistido: ${error.message}`);
+            return;
+        }
     }
 
     async getMockProgress(userId: string): Promise<MockExamProgress | null> {

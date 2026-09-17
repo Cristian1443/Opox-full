@@ -63,6 +63,11 @@ export function createPlanningRouter(
         validateBody(createAgendaDateSchema),
         controller.createAgendaDate,
     );
+    r.delete(
+        API_ROUTES.PLANNING.AGENDA_DELETE,
+        authMiddleware,
+        controller.deleteAgendaDate,
+    );
 
     return r;
 }

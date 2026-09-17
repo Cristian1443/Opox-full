@@ -41,6 +41,21 @@ export interface ITrainingRepository {
     /** Preguntas de un simulacro oficial cargadas en DB (vacío hasta que se importen). */
     listMockQuestions(mockExamId: string): Promise<GeneratedQuestion[]>;
 
+    // ─── Historial de intentos por examen (Bloque 6.6 · Motor) ───────────
+    /**
+     * Devuelve el mejor score, la última fecha de completado y el nº de intentos
+     * de cada mockExamId dado (IDs pueden ser UUIDs Supabase legacy o hex del Motor).
+     * Usado por ListBankExamsUseCase para enriquecer la lista del banco.
+     */
+    getBankExamStats(input: {
+        userId: string;
+        mockExamIds: string[];
+    }): Promise<Map<string, {
+        bestScore: number | null;
+        completedAt: Date | null;
+        attemptCount: number;
+    }>>;
+
     // ─── Intentos ─────────────────────────────────
     saveAttempt(input: SaveAttemptInput): Promise<TrainingAttempt>;
 

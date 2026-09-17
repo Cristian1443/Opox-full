@@ -27,7 +27,10 @@ export const generateSurgicalSchema = z.object({
 });
 
 const responseInputSchema = z.object({
-    questionId: z.string().uuid().optional(),
+    // El id puede ser UUID de Supabase (36 chars) o hex del Motor (16 chars).
+    // Aceptamos cualquier string alfanumérico razonable — el repo lo persiste
+    // tal cual y `training_attempt_responses.question_id` no tiene FK.
+    questionId: z.string().min(1).max(64).optional(),
     topicId: z.string().min(1).max(60),
     topic: z.string().min(1).max(120),
     questionText: z.string().min(1),
@@ -39,7 +42,9 @@ const responseInputSchema = z.object({
 
 export const saveAttemptSchema = z.object({
     source: sourceSchema,
-    mockExamId: z.string().uuid().optional(),
+    // UUID (mocks legacy Supabase) o hex del Motor (16 chars, banco de exámenes
+    // Bloque 6.6). El schema Postgres se migra a text en bloque6_bank_mock_ids.sql.
+    mockExamId: z.string().min(1).max(64).optional(),
     topicId: z.string().min(1).max(60).optional(),
     difficulty: difficultySchema.optional(),
     durationSecs: z.number().int().positive().optional(),
@@ -73,7 +78,8 @@ export const rateQuestionSchema = z.object({
 });
 
 export const saveMockProgressSchema = z.object({
-    mockExamId: z.string().uuid(),
+    // UUID legacy o hex del Motor (mismo criterio que saveAttemptSchema).
+    mockExamId: z.string().min(1).max(64),
     examTitle: z.string().min(1).max(200),
     currentIndex: z.number().int().min(0),
     questionCount: z.number().int().min(1).max(200),

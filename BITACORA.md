@@ -5,6 +5,245 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-17 — Bloque 6.6 Banco de Exámenes Oficiales + Laboratorio rediseñado
+
+Rama: `fix/gaps-15-09-26`.
+
+### Bloque 6.6 · Banco de Exámenes Oficiales (funcionalidad nueva)
+
+El equipo IA expuso el módulo "Banco de exámenes" del Motor: los usuarios pueden
+subir un examen en PDF o Word (título, año, procedencia) y sus preguntas se
+incorporan al banco compartido del curso. Se integraron cinco endpoints proxy
+propios bajo `/training/bank/*` que hablan con `POST /v1/bank/exams` (upload
+multipart), `GET /v1/jobs/{id}` (polling del OCR/extracción), `GET /v1/bank/exams`
+(listado), `POST /v1/bank/mock-exams` (simulacro) y `GET /v1/tests/{id}/result`
+(resultado agregado).
+
+- La pantalla "Exámenes oficiales" del hub deja de leer de la tabla mockeada
+  `training_mock_exams` (Justicia 2019-2023, sin preguntas). Ahora lista los
+  exámenes reales del banco del curso: los 8 "Test Unitaria 2018-2025" de
+  Policía de Galicia que subió el equipo IA.
+- FAB verde "＋ Subir examen" abre un formulario nuevo (`ExamUploadScreen`).
+  DocumentPicker para PDF/DOCX, campos de título/año/procedencia (Profesor u
+  Otro — "Oficial" queda reservado al equipo), lectura del archivo con
+  `FSFile.arrayBuffer()` + `bufferToBase64` en chunks (patrón de Bloque 9).
+- `ExamUploadJobScreen` con polling de 3 s / timeout 5 min. Al terminar muestra
+  card verde con métricas del job (`guardadas / extraidas`, `duplicadas`,
+  `sin_tema`), maneja `yaIncorporado` (dedupe por SHA-256) y `corte` (límite
+  de coste alcanzado).
+- Chips de filtro por procedencia en la lista (Todos / Oficiales / De profesor
+  / Otros) — filtro en cliente sin llamada extra.
+- Simulacro real desde el banco: al pulsar un examen se llama
+  `POST /v1/bank/mock-exams` con `exam_id`, se abre una sesión Motor y se
+  navega al runner con `mode: 'bank_mock'` + `sesionId`. Las preguntas llegan
+  SIN `correctIndex` (vista pública del banco) — el runner las corrige pregunta
+  a pregunta contra `/v1/tests/{sesion_id}/answer`. Mismo patrón que el
+  mini-test BOE del Bloque 10.
+
+### Fixes pre-existentes descubiertos durante la implementación
+
+Al arrancar el nuevo flujo salieron a la luz cuatro bugs veteranos que
+convivían silenciosos porque nadie usaba los endpoints afectados:
+
+- **Postman collection desfasada vs OpenAPI real**: la Postman del Motor no
+  documenta el campo `exam_id` en `POST /v1/bank/mock-exams`, ni los estados
+  reales del enum de `JobOut`, ni el schema del `ResultadoSesionOut`. La fuente
+  autoritativa es `https://ia.opox.ai/openapi.json`. Anotado en `CLAUDE.md`
+  como regla operativa.
+- **`postSessionAnswer` mandaba `opcion_idx`** cuando el Motor exige
+  `elegida_idx`. Además el mapeo de la respuesta leía `correctaIdx` (camelCase)
+  cuando el schema `ResponderOut` es snake_case (`correcta_idx`). Bug ancestral
+  que rompía cualquier `/answer` — el streaming de tests infinitos (Fase 2)
+  no lo llamaba en la práctica, por eso pasó desapercibido.
+- **`mockExamId` validador Zod exigía UUID** cuando los IDs del Motor son
+  hex de 16 chars. Efecto cascada: `saveAttempt` fallaba con 400 → intento
+  no persistido → tarjeta del banco quedaba en 0% completado, cero Opopoints
+  y Laboratorio de errores sin datos del examen. Ampliado a `z.string().min(1).max(64)`.
+- **`mock_exam_id` en Postgres seguía `uuid`** con FK a `training_mock_exams`.
+  Migrado a `text` sin FK en dos tablas (`training_attempts`,
+  `mock_exam_progress`). SQLs idempotentes con bloque `DO $$ RAISE NOTICE`
+  para diagnosticar por qué fallaba silenciosamente antes.
+- **Body 25 MB** ya estaba configurado en Express (`bloque6_bank_mock_ids.sql`
+  no lo tocó). El upload de PDFs de hasta 20 MB pasa sin ajustes adicionales.
+
+### Cleanup de datos legacy: única oposición operativa
+
+`CourseSyncService` fallaba silencioso con `[course-sync] sin curso "listo"
+para label "Justicia · Tramitación Procesal"` — el Motor no tenía ningún curso
+con ese título en `estado: listo`. Consecuencia: `training_topics` para
+`justicia-tramitacion` seguía con los slugs viejos (`constitucion`, `ley-39`),
+los intentos del banco (con IDs hex del Motor) no matcheaban, y el Laboratorio
+descartaba esos temas.
+
+- Nuevo SQL `bloque6_dbclean_policia_galicia_only.sql`: migra
+  `raw_user_meta_data.oposicion` y `public.profiles.oposicion` de
+  `justicia-tramitacion` → `policia-local-galicia` para todos los usuarios;
+  elimina la fila obsoleta de `training_courses` y sus `training_topics`.
+- `training_courses.sql` actualizado — solo queda `policia-local-galicia` como
+  seed permanente. Documentado.
+- El fallback `Tema del banco XXXX` que se había puesto como red de seguridad
+  se retiró — con la DB limpia y los 40 temas del Motor sincronizados en
+  `training_topics`, ya no hace falta.
+- `errorHandler` global aprendió a traducir `AxiosError` upstream: 4xx del
+  Motor se propagan con status real y `detail` extraído del payload, 5xx
+  como `502 upstream/<code>`. Antes cualquier fallo del Motor salía como
+  `500 common/internal-error` opaco al mobile.
+
+### Laboratorio de errores rediseñado (segunda pasada)
+
+Tras el examen, el Laboratorio no reflejaba lo que el usuario acababa de hacer
+por dos filtros silenciosos: `total < 3` respuestas descartaba temas de
+simulacros grandes (93 preguntas / 30 temas ≈ 3 respuestas por tema), y el
+filtro `HEX_ID_RE.test(topic)` descartaba temas cuyo label seguía siendo hex
+porque no estaban resueltos. Además, temas con dominio alto seguían
+apareciendo como debilidades.
+
+- Umbral bajado a `total >= 2` (alineado con la vista SQL de patterns).
+- **Umbral de dominio `MASTERY_THRESHOLD = 80`**: temas con `domain >= 80%`
+  ya no aparecen como debilidad — pasan al tab nuevo "Dominados" (verde) y
+  no entran al test quirúrgico.
+- Tabs "Débiles · N / Dominados · N" con contador y colores propios
+  (morado para débiles, verde para dominados). Empty states contextuales.
+- Card expandida **contextual** según dominio: título ("Patrón de fallo
+  detectado" vs "Tema dominado"), icono (X rojo vs check verde), copy
+  ("Fallas el X%" vs "Aciertas el X%"), progress bar y porcentaje pintados
+  según categoría. La frase secundaria en dominados explica el mecanismo
+  ("Si vuelves a bajar del 80%, aparecerá otra vez en tus debilidades")
+  para que el usuario entienda que la clasificación es dinámica.
+- Los items del tab "Dominados" se ordenan por `domain DESC` (los mejores
+  primero — refuerzo positivo).
+
+### Test quirúrgico dinámico
+
+Antes era fijo: 15 preguntas repartidas entre los top-3 patrones. El resto de
+debilidades quedaba sin trabajar en ese ciclo y la app no lo comunicaba.
+Ahora:
+
+- `MAX_SUBTOPICS = 5` × `QUESTIONS_PER_TOPIC = 4` = **tope 20 preguntas**.
+- Si el usuario tiene menos temas débiles, el test es más corto (1 tema → 5
+  preguntas mínimo, 2 → 8, 3 → 12, 4 → 16, 5+ → 20).
+- Filtro previo `domain < 80` en el mobile — los temas dominados nunca
+  entran al test quirúrgico. Consistente con el tab del Laboratorio.
+- La UI muestra el desglose real ("QUÉ INCLUYE") con los temas y su count
+  de preguntas. Al terminar sube el dominio de los atacados → siguiente ciclo
+  ataca los que quedaron abajo. Iteración natural sin sesiones de 100 preguntas.
+
+### Documentación operativa
+
+- `apps/backend/supabase/bloque6_bank_mock_ids.sql` — ALTER de columna uuid
+  → text idempotente + vista de patterns recreada.
+- `apps/backend/supabase/bloque6_mock_progress_fix.sql` — reset de FK y
+  ALTER para `mock_exam_progress` (nombre real, no `training_mock_progress`).
+- `apps/backend/supabase/bloque6_dbclean_policia_galicia_only.sql` — cleanup
+  full-stack: user_metadata + profiles + training_courses + training_topics.
+- Todos son idempotentes con `RAISE NOTICE` para diagnóstico. Se recomienda
+  correr en orden en cualquier deploy nuevo.
+
+---
+
+## 2026-09-15 — Gaps del cliente: 10 correcciones + streaming + dark mode
+
+Rama: `fix/gaps-15-09-26` (parte de `fix/gaps-12-09-26`).
+
+Nuevo lote de gaps recogidos tras pruebas en dispositivo real. Se abordan los
+10 bugs y mejoras identificados en `gaps-15-09-26.md`, más dos ampliaciones
+aprobadas por el cliente: streaming de tests con job polling y modo oscuro global.
+
+### Correcciones puntuales (Fase 1)
+
+**Bloque 4 · Planificación**:
+- Rumbo a la plaza: al pulsar "Estudiar esta fase" el Generador Infinito ahora
+  pre-selecciona los temas que la fase indica. Antes el `topicId="id1,id2,id3"`
+  concatenado se metía como un único elemento en el Set y quedaba sin selección.
+- Redistribución en 5 fases fijas: temas 1-10 (Base), 11-20 (Profundización),
+  21-30 (Simulacros), 31-40 (Repaso final), + Fase 5 nueva "Repaso integral"
+  con TODOS los temas.
+- Agenda: purpose header con explicación ("Añade fechas clave: examen, repaso,
+  tutoría. Recibirás recordatorios 3 días, 2 días y el mismo día"), programación
+  de 3 notificaciones locales (T-3d, T-2d, T-0 a las 9:00 hora local) con
+  `expo-notifications` lazy require. Long-press sobre una fecha → confirmación
+  → borrado + cancelación de recordatorios. Nuevo endpoint `DELETE
+  /planning/agenda/:id`.
+
+**Bloque 5 · Motivación** (fix crítico):
+- Racha con hitos operativos por primera vez. Hasta hoy la app anunciaba
+  "+50 Opopoints por racha de 7 días" pero el backend nunca los otorgaba
+  — `registerActivity` no detectaba el cruce de hito. Añadido detector: si
+  `oldStreak < milestone.days <= newStreak`, suma `milestone.points` al bonus
+  del evento. Tabla `STREAK_MILESTONES` movida a `@opox/types` como fuente de
+  verdad compartida entre backend y `StreakDetailUseCase`; `MotivationHomeScreen`
+  y `StreakDetailScreen` la consumen desde `apps/mobile/src/lib/streakMilestones.js`.
+- `StreakDetailScreen` rediseñado alineado con `MotivationHomeScreen` (misma
+  llama Figma, mismo grid de pips, mismo hito). Antes usaba `ScreenHeader`
+  legacy, statusBar hardcoded y emoji 🏅 — salto brusco de estilo respecto al
+  hub que la origina.
+- Barra verde de reto completado: cuando `completedByMe=true` la barra ahora
+  refleja al menos `myShare = round(100/memberCount)`. Antes con 2 miembros y
+  solo el usuario terminado, el clan mostraba 50% correctamente pero otros
+  retos completados individualmente aparecían al 0%. Fórmula:
+  `percent = completedByMe ? max(clanPercent, myShare) : clanPercent`.
+
+**Bloque 6 · Entrenamiento**:
+- Laboratorio de errores ordenado por fecha DESC (más reciente arriba). Antes
+  se ordenaba solo por `failRate` — un tema recién estudiado quedaba debajo de
+  otro antiguo con peor tasa de fallo, contradiciendo la expectativa.
+- Test quirúrgico dinámico. Antes hardcoded 15 preguntas (8 plazos + 7 recursos)
+  y solicitaba 10 al backend. Ahora consume `trainingApi.listErrorPatterns()`,
+  toma los top-3 patrones más recientes, distribuye `TOTAL_QUESTIONS=15`
+  proporcionalmente al `failRate` de cada tema y renderiza "QUÉ INCLUYE" con
+  los temas reales. Si no hay patrones, muestra "Todo el temario · 15 preguntas".
+
+**Bloque 8 · Aula Virtual**:
+- Menú de "tres puntos" con estética Figma. Antes `Alert.alert('Opciones', ...)`
+  nativo (verde chillón, mayúsculas, se veía "muy desarrollador"). Ahora Modal
+  transparent con sheet blanco, filas con icono + label, botón Cancelar
+  separado. "Compartir chat" ya funciona: `Share.share` con la conversación
+  serializada como `[Tutor] ... / [Tú] ...`.
+- Respuestas del Tutor renderizadas como markdown (`react-native-markdown-display`).
+  Antes se veían `##`, backticks y bullets como texto crudo. Ahora encabezados
+  en SemiBold, listas con bullets, bloques de código con fondo tintado y
+  monoespaciada. Burbujas > 500 caracteres se colapsan con botón "Ver más" —
+  evita el "muro de scroll" reportado.
+
+**Bloque 12 · Configuración**:
+- Estadísticas Pro con "Dominio por tema" y "Tema N" real. Antes la sección
+  mostraba UUIDs hex crudos (`23116c4c10d3465a`) porque `getProStats` no
+  aplicaba el mapeo `topic_id → "Tema N"` que sí hace `listErrorPatterns`.
+  Extraído el helper compartido `enrichTopicsWithLabels` en
+  `infrastructure/shared/topicLabels.ts` y aplicado en ambos repositorios.
+  Título de sección cambiado a "DOMINIO POR TEMA" (era "DOMINIO POR LEY").
+
+### Fase 2 · Streaming de tests con job polling
+
+Nuevo pipeline asíncrono expuesto al mobile. El flujo síncrono actual bloqueaba
+la UI hasta que el Motor terminaba las N preguntas (16-30 s típicos). Ahora el
+mobile navega a `TrainingSession` con un `jobId` en cuanto el Motor arranca, y
+las preguntas van llegando incrementalmente — la primera se ve en ~5-8 s.
+
+4 endpoints proxy nuevos (`POST /training/generate-stream`, `GET /training/job/:jobId`,
+`GET /training/session/:sessionId`, `POST /training/session/:sessionId/answer`).
+Cuando el Motor no está configurado, devuelven 503 y el mobile cae al flujo
+síncrono legacy sin necesidad de feature flag.
+
+`useTestSession(jobId)` en mobile encapsula el polling cada 2.5 s. `QuestionActiveScreen`
+acepta `jobId` opcional junto al `questions[]` legacy; renderiza loader con
+"N de M preguntas listas" mientras espera la primera.
+
+### Fase 3 · Dark mode global
+
+Nueva paleta `darkColors` en `theme.js`, hook `useThemeColors()` reactivo al
+`AccessibilityContext.isDark`. `AppText` aplica color claro por defecto cuando
+el tema es oscuro y no hay `color` explícito en el estilo. `ThemedSafeArea`
+reusable para pantallas nuevas.
+
+Pantallas migradas en este PR (fondo + StatusBar dinámicos):
+`DashboardScreen`, `MotivationHomeScreen`, `SettingsScreen`,
+`ConfigAccessibilityScreen`, `StreakDetailScreen`. El resto de pantallas
+se ven en tema claro aunque el toggle esté ON — pendiente migración por
+pantalla en próximas iteraciones.
+
+---
+
 ## 2026-09-14 — Bloque 1 · Paridad biométrica multi-plataforma + tono WhatsApp
 
 Rama: `fix/gaps-12-09-26`.

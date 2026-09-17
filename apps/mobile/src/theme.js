@@ -1,4 +1,12 @@
-export const colors = {
+// Tokens de color OPOX. La paleta clara es la histórica de la marca; la paleta
+// oscura (Fase 3 · gaps-15-09-26) invierte los fondos y textos manteniendo los
+// acentos que funcionan en ambos temas (verde, naranja, morado).
+//
+// Uso: para pantallas migradas a dark mode, importar `useThemeColors()` desde
+// `hooks/useThemeColors`. Para el resto, `import { colors }` sigue devolviendo
+// la paleta clara — no rompe nada. La migración se hace por pantalla.
+
+export const lightColors = {
     // Marca OPOX
     primary: '#f26535',
     dark: '#0d1b2a',
@@ -38,6 +46,47 @@ export const colors = {
     purple: '#7241B8',
     purpleBg: '#F1ECFA',
 };
+
+// Paleta oscura — mapeo pragmático hasta que Figma entregue tokens definitivos
+// para dark mode. Se invierten los fondos (#0F0F14 casi negro) y textos (#F0F0F2
+// casi blanco). Los acentos (ctaGreen, accentOrange, purple, selectionBorder)
+// se mantienen — su contraste sobre fondo oscuro es adecuado según WCAG AA.
+export const darkColors = {
+    ...lightColors,
+
+    // Fondos / superficies
+    white: '#0F0F14',            // fondo principal (antes blanco)
+    grayLight: '#1A1A21',        // superficie secundaria
+    background: '#0F0F14',
+    card: '#1A1A21',
+    separator: '#2C2C33',
+
+    // Texto
+    textDark: '#F0F0F2',
+    textMuted: '#B0B0B8',
+    text: '#F0F0F2',
+    textSecondary: '#8E8E93',
+
+    // Colores que rompen sobre fondo oscuro (pardos)
+    grayMid: '#3F3F46',
+    grayText: '#8A9BB0',
+    neutralGray: '#8A8A8A',
+    gray: '#8A8A8A',
+    dark: '#F0F0F2',
+
+    // Backgrounds tintados — bajamos su alpha implícito con tonos más oscuros
+    greenLight: '#1F3D2E',
+    redSoft: '#3D1E1E',
+    successBg: '#1F3D2E',
+    warningBg: '#3D2E1E',
+    errorBg: '#3D1E1E',
+    purpleBg: '#2A1E3D',
+};
+
+// Alias por compatibilidad: cualquier `import { colors } from '../theme'` sigue
+// funcionando y devuelve la paleta clara. Las pantallas que quieran modo oscuro
+// dinámico deben usar `useThemeColors()` en su lugar.
+export const colors = lightColors;
 
 export const spacing = {
     xs: 4,

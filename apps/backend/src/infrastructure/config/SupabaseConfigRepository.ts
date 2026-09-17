@@ -11,6 +11,7 @@ import type {
     ReinforcementLevel,
 } from '../../domain/entities';
 import { logger } from '@opox/utils';
+import { enrichTopicsWithLabels, HEX_ID_RE } from '../shared/topicLabels';
 
 const DEFAULT_PREFS = {
     personality: 'cercano' as TonePersonality,
@@ -148,13 +149,22 @@ export class SupabaseConfigRepository implements IConfigRepository {
             byTopic.set(r.topic_id, existing);
         }
 
-        const topicBreakdown = Array.from(byTopic.entries()).map(([topicId, v]) => ({
-            topicId,
-            topic: v.topic,
-            total: v.total,
-            correct: v.correct,
-            accuracyPct: Math.round((v.correct / v.total) * 100),
-        }));
+        // Enriquecer con "Tema N" — mismo helper que listErrorPatterns. Antes de
+        // esto el mobile pintaba UUIDs hex crudos en la sección "Dominio por tema"
+        // porque el aggregate leía `training_attempt_responses.topic` que trae el ID.
+        const posMap = await enrichTopicsWithLabels(this.db, [...byTopic.keys()]);
+
+        const topicBreakdown = Array.from(byTopic.entries())
+            .map(([topicId, v]) => ({
+                topicId,
+                topic: posMap.get(topicId) ?? v.topic,
+                total: v.total,
+                correct: v.correct,
+                accuracyPct: Math.round((v.correct / v.total) * 100),
+            }))
+            // Filtrar hex IDs sin resolver — coincide con el filtro de listErrorPatterns
+            // para no mostrar "0acb39953a424c20" al usuario.
+            .filter((t) => !HEX_ID_RE.test(t.topic) && t.topicId !== 'all');
 
         const topicsAttempted = topicBreakdown.length;
         const topicsStrong = topicBreakdown.filter(t => t.accuracyPct >= 80).length;

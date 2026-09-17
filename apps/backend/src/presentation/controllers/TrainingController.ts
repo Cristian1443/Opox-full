@@ -22,6 +22,13 @@ import type {
     SaveMockProgressRequest,
     MockProgressDTO,
     SaveLawViewRequest,
+    BankExamDTO,
+    BankExamJobStatus,
+    StartBankMockRequest,
+    StartBankMockResponse,
+    UploadBankExamRequest,
+    UploadBankExamResponse,
+    BankMockResultDTO,
 } from '@opox/types';
 import type {
     ListMockExamsUseCase,
@@ -43,6 +50,15 @@ import type {
     SaveLawViewUseCase,
     ListTopicsUseCase,
     GetCursoIdUseCase,
+    StartTestJobUseCase,
+    GetJobStatusUseCase,
+    GetSessionQuestionsUseCase,
+    PostSessionAnswerUseCase,
+    ListBankExamsUseCase,
+    UploadBankExamUseCase,
+    GetBankExamJobUseCase,
+    StartBankMockUseCase,
+    GetBankMockResultUseCase,
 } from '../../application';
 import type { MockExamProgress } from '../../domain/entities/MockExam';
 import type { MockExamWithStatus } from '../../domain/entities/MockExam';
@@ -100,6 +116,17 @@ export class TrainingController {
             listTopics: ListTopicsUseCase;
             getCursoId: GetCursoIdUseCase;
             motorOnboarding?: MotorOnboardingClient;
+            // Streaming API (opcional — solo disponible cuando el Motor está configurado)
+            startTestJob?: StartTestJobUseCase;
+            getJobStatus?: GetJobStatusUseCase;
+            getSessionQuestions?: GetSessionQuestionsUseCase;
+            postSessionAnswer?: PostSessionAnswerUseCase;
+            // Bloque 6.6 · Banco de exámenes oficiales — opcional (requiere Motor)
+            listBankExams?: ListBankExamsUseCase;
+            uploadBankExam?: UploadBankExamUseCase;
+            getBankExamJob?: GetBankExamJobUseCase;
+            startBankMock?: StartBankMockUseCase;
+            getBankMockResult?: GetBankMockResultUseCase;
         },
     ) { }
 
@@ -261,6 +288,66 @@ export class TrainingController {
         } catch (err) { next(err); }
     };
 
+    // ─── Streaming (Fase 2 · gaps-15-09-26) ────────────────────────────────
+    // Proxies delgados al Motor. Si el Motor no está configurado, devuelven
+    // 503 SERVICE_UNAVAILABLE y el mobile cae al flujo síncrono legacy.
+
+    private motorUnavailable(res: Response): void {
+        res.status(503).json({
+            error: { code: 'MOTOR_UNAVAILABLE', message: 'Streaming no disponible. Usa /training/generate.' },
+        });
+    }
+
+    generateStream = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.startTestJob) { this.motorUnavailable(res); return; }
+            const body = req.body as { oposicion: string; count?: number; difficulty?: 'easy' | 'medium' | 'hard'; topicId?: string };
+            // topicId "id1,id2" desde PlanningMacro → array (temas específicos).
+            // 'all' o vacío → null (todo el temario).
+            const temaIds = !body.topicId || body.topicId === 'all'
+                ? null
+                : body.topicId.split(',').map((s) => s.trim()).filter(Boolean);
+            const result = await this.deps.startTestJob.execute({
+                userId: req.authUser!.id,
+                oposicion: body.oposicion,
+                temaIds,
+                count: body.count ?? 10,
+                difficulty: body.difficulty,
+            });
+            this.ok(res, 202, result);
+        } catch (err) { next(err); }
+    };
+
+    getJobStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.getJobStatus) { this.motorUnavailable(res); return; }
+            const result = await this.deps.getJobStatus.execute(String(req.params['jobId']));
+            this.ok(res, 200, result);
+        } catch (err) { next(err); }
+    };
+
+    getSessionQuestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.getSessionQuestions) { this.motorUnavailable(res); return; }
+            const result = await this.deps.getSessionQuestions.execute(String(req.params['sessionId']));
+            this.ok(res, 200, result);
+        } catch (err) { next(err); }
+    };
+
+    postSessionAnswer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.postSessionAnswer) { this.motorUnavailable(res); return; }
+            const body = req.body as { questionId: string; optionIndex: number };
+            const result = await this.deps.postSessionAnswer.execute({
+                userId: req.authUser!.id,
+                sessionId: String(req.params['sessionId']),
+                questionId: body.questionId,
+                optionIndex: body.optionIndex,
+            });
+            this.ok(res, 200, result);
+        } catch (err) { next(err); }
+    };
+
     saveAttempt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const body = req.body as SaveAttemptRequest;
@@ -419,5 +506,103 @@ export class TrainingController {
 
             this.ok<LevelTestQuestion[]>(res, 200, STATIC_LEVEL_TEST);
         } catch (err) { next(err); }
+    };
+
+    // ─── Bloque 6.6 · Banco de exámenes oficiales (Motor IA) ──────────────────
+    // Proxies delgados al MotorAiClient. Si el Motor no está configurado, el use
+    // case lanza 'MOTOR_UNAVAILABLE' → controller responde 503 y el móvil muestra
+    // empty-state (nunca cae a Supabase).
+
+    listBankExams = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.listBankExams) { this.motorUnavailable(res); return; }
+            const oposicion = req.authUser?.oposicion ?? null;
+            const limit = Number(req.query['limit'] ?? 100);
+            const offset = Number(req.query['offset'] ?? 0);
+            const data = await this.deps.listBankExams.execute({
+                userId: req.authUser!.id,
+                oposicion,
+                limit,
+                offset,
+            });
+            this.ok<BankExamDTO[]>(res, 200, data);
+        } catch (err) {
+            if (err instanceof Error && err.message === 'MOTOR_UNAVAILABLE') {
+                this.motorUnavailable(res);
+                return;
+            }
+            next(err);
+        }
+    };
+
+    uploadBankExam = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.uploadBankExam) { this.motorUnavailable(res); return; }
+            const body = req.body as UploadBankExamRequest;
+            const oposicion = req.authUser?.oposicion ?? null;
+            const { jobId } = await this.deps.uploadBankExam.execute({
+                userId: req.authUser!.id,
+                oposicion,
+                request: body,
+                isAdmin: false,
+            });
+            this.ok<UploadBankExamResponse>(res, 202, { jobId });
+        } catch (err) {
+            if (err instanceof Error && err.message === 'MOTOR_UNAVAILABLE') {
+                this.motorUnavailable(res);
+                return;
+            }
+            next(err);
+        }
+    };
+
+    getBankExamJob = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.getBankExamJob) { this.motorUnavailable(res); return; }
+            const jobId = String(req.params['jobId']);
+            const status = await this.deps.getBankExamJob.execute(jobId);
+            this.ok<BankExamJobStatus>(res, 200, status);
+        } catch (err) {
+            if (err instanceof Error && err.message === 'MOTOR_UNAVAILABLE') {
+                this.motorUnavailable(res);
+                return;
+            }
+            next(err);
+        }
+    };
+
+    startBankMock = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.startBankMock) { this.motorUnavailable(res); return; }
+            const body = req.body as StartBankMockRequest;
+            const oposicion = req.authUser?.oposicion ?? null;
+            const data = await this.deps.startBankMock.execute({
+                userId: req.authUser!.id,
+                oposicion,
+                request: body,
+            });
+            this.ok<StartBankMockResponse>(res, 200, data);
+        } catch (err) {
+            if (err instanceof Error && err.message === 'MOTOR_UNAVAILABLE') {
+                this.motorUnavailable(res);
+                return;
+            }
+            next(err);
+        }
+    };
+
+    getBankMockResult = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.getBankMockResult) { this.motorUnavailable(res); return; }
+            const sessionId = String(req.params['sessionId']);
+            const data = await this.deps.getBankMockResult.execute(sessionId);
+            this.ok<BankMockResultDTO>(res, 200, data);
+        } catch (err) {
+            if (err instanceof Error && err.message === 'MOTOR_UNAVAILABLE') {
+                this.motorUnavailable(res);
+                return;
+            }
+            next(err);
+        }
     };
 }

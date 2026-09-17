@@ -107,25 +107,46 @@ export default function MockInstructionsScreen({ navigation, route }) {
     const startExam = async () => {
         if (loading) return;
         setLoading(true);
-        const { data, error } = await trainingApi.getMockQuestions(safeExam.id);
+
+        // Simulacro real del Motor sobre el examen elegido: al pasar `examId`,
+        // el Motor sirve las preguntas de ESE examen concreto (verificado en su
+        // OpenAPI 2026-09-17). Excluye las que el usuario ya ha respondido y
+        // se corrigen pregunta a pregunta contra /training/session/:id/answer.
+        const totalSeconds = Math.max(60, safeExam.minutes * 60);
+        const { data, error } = await trainingApi.startBankMock({
+            examId: safeExam.id,
+            nPreguntas: safeExam.questions || 20,
+            contrarrelojSeg: totalSeconds,
+            soloOficiales: false,
+        });
         setLoading(false);
-        if (error || !Array.isArray(data) || data.length === 0) {
+
+        if (error) {
+            const code = error.code || '';
+            if (code === 'MOTOR_UNAVAILABLE') {
+                Alert.alert('Servicio no disponible', 'El banco de exámenes no está operativo ahora mismo. Inténtalo más tarde.');
+            } else {
+                Alert.alert('Simulacro no disponible', error.message || 'No pudimos arrancar el simulacro. Prueba con otro examen.');
+            }
+            return;
+        }
+        if (!data?.sesionId || !Array.isArray(data.questions) || data.questions.length === 0) {
             Alert.alert(
                 'Simulacro no disponible',
-                'Este examen no tiene preguntas cargadas todavía. Prueba con otro año o con el Generador Infinito.',
+                'Este examen no tiene preguntas disponibles todavía. Prueba con otro año o con el Generador Infinito.',
             );
             return;
         }
-        // Reparto uniforme del tiempo total del examen entre preguntas — el
-        // temporizador de la sesión funciona por-pregunta, no global.
-        const secondsPerQuestion = Math.max(
-            30,
-            Math.round((safeExam.minutes * 60) / data.length),
-        );
+
+        // El Motor no expone correctIndex en /bank/questions — el runner lo obtiene
+        // por pregunta al enviar la respuesta contra /answer.
+        const secondsPerQuestion = Math.max(30, Math.round(totalSeconds / data.questions.length));
         navigation.replace('TrainingSession', {
             source: 'official',
+            mode: 'bank_mock',
+            sesionId: data.sesionId,
             mockExamId: safeExam.id,
-            questions: adaptGeneratedQuestions(data),
+            questions: adaptGeneratedQuestions(data.questions),
             examTitle: safeExam.title,
             timedMode: true,
             secondsPerQuestion,

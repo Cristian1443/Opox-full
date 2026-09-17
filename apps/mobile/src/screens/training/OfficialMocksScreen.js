@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     TouchableOpacity,
@@ -9,10 +9,10 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../../theme';
-import { api } from '../../api/client';
 import { trainingApi } from '../../api/training';
 
 const COLORS = {
@@ -28,7 +28,20 @@ const COLORS = {
     subtitleGray: '#C4C4C4',
 };
 
-const EMPTY_COPY = 'Aún no hay simulacros disponibles para tu oposición.';
+const EMPTY_COPY = 'Este curso aún no tiene exámenes en el banco.\nSé el primero: sube uno con el botón "＋ Subir examen".';
+const MOTOR_UNAVAILABLE_COPY = 'El banco de exámenes no está disponible ahora mismo. Inténtalo más tarde.';
+
+// Filtros del listado — chips en cabecera. 'all' = sin filtro.
+const FILTERS = [
+    { key: 'all',      label: 'Todos' },
+    { key: 'oficial',  label: 'Oficiales' },
+    { key: 'profesor', label: 'De profesor' },
+    { key: 'otro',     label: 'Otros' },
+];
+
+// Heurística: el Motor no expone duración estimada — 0.9 minutos por pregunta,
+// mínimo 30 min. El usuario puede cerrar antes; solo se usa para el timer.
+const estimateMinutes = (nPreguntas) => Math.max(30, Math.round((nPreguntas || 20) * 0.9));
 
 // Iconos exactos exportados de Figma (antes Ionicons genéricos).
 function IconDiploma({ size = 64, color = colors.accentOrange }) {
@@ -90,44 +103,80 @@ function ExamCard({ exam, onPress }) {
     );
 }
 
-// ─── Pantalla 6.6 · Simulacros Oficiales · Listado ───────────────────────────
+// ─── Pantalla 6.6 · Banco de Exámenes Oficiales · Listado ────────────────────
+// Fuente: Motor IA (GET /training/bank/exams). Muestra los exámenes del curso
+// activo con filtro por procedencia. `saveMockProgress` (backend propio) sigue
+// marcando 'ongoing' solo el examen en el que el usuario dejó preguntas a medias.
 export default function OfficialMocksScreen({ navigation }) {
     const [mocks, setMocks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
+    const [motorDown, setMotorDown] = useState(false);
+    const [filter, setFilter] = useState('all');
 
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            const session = await api.loadSession();
-            const oposicion =
-                session?.user?.oposicion ??
-                session?.user?.user_metadata?.oposicion ??
-                'justicia-tramitacion';
-            const { data, error } = await trainingApi.listMocks(oposicion);
-            if (cancelled) return;
-            if (error) {
-                setLoadError(error.message);
+    const loadMocks = useCallback(async () => {
+        setLoading(true);
+        setLoadError(null);
+        setMotorDown(false);
+
+        // Cargamos banco + progreso en paralelo. El progreso local nos dice qué
+        // examen está 'ongoing' cuando el usuario dejó preguntas a medias.
+        const [examsRes, progressRes] = await Promise.all([
+            trainingApi.listBankExams(200, 0),
+            trainingApi.getMockProgress(),
+        ]);
+
+        if (examsRes.error) {
+            // 503 MOTOR_UNAVAILABLE = banco desactivado en backend. Mostramos
+            // un mensaje neutral y ocultamos el FAB de subir.
+            const code = examsRes.error.code || '';
+            if (code === 'MOTOR_UNAVAILABLE') {
+                setMotorDown(true);
             } else {
-                // El backend serializa MockExamWithStatus como un DTO plano
-                // (id/year/title/... y status/bestScore al mismo nivel), no
-                // anidado bajo `exam` — ver TrainingController.serializeMockExam.
-                setMocks((data ?? []).map((item) => ({
-                    id: item.id,
-                    year: String(item.year),
-                    title: item.title,
-                    category: item.category ?? item.oposicion,
-                    questions: item.questionCount,
-                    minutes: item.durationMinutes,
-                    status: item.status,
-                    score: item.bestScore !== null ? Math.round(item.bestScore * 10) : null,
-                    progress: item.status === 'completed' ? 100 : 0,
-                })));
+                setLoadError(examsRes.error.message || 'No pudimos cargar los exámenes.');
             }
             setLoading(false);
-        })();
-        return () => { cancelled = true; };
+            return;
+        }
+
+        const ongoingId = progressRes?.data?.mockExamId ?? null;
+        const list = (examsRes.data ?? []).map((item) => {
+            const nPreguntas = Number(item.nPreguntas ?? 0);
+            const isOngoing = ongoingId && ongoingId === item.id;
+            // Prioridad de estado: ongoing (a mitad) > completed (historial) > pending.
+            const backendStatus = item.status; // 'pending' | 'completed'
+            const uiStatus = isOngoing ? 'ongoing' : backendStatus;
+            // Progreso: ongoing usa currentIndex, completed 100%, pending 0%.
+            const progress = isOngoing && progressRes?.data
+                ? Math.min(100, Math.round(((progressRes.data.currentIndex + 1) / (progressRes.data.questionCount || nPreguntas || 1)) * 100))
+                : backendStatus === 'completed' ? 100 : 0;
+            // Score sobre 10 → mostrado como %  (bestScore es 0-10; ×10 = %).
+            const scorePct = item.bestScore !== null && item.bestScore !== undefined
+                ? Math.round(item.bestScore * 10)
+                : null;
+            return {
+                id: item.id,
+                year: String(item.anio ?? ''),
+                title: item.titulo || `Examen ${item.anio ?? ''}`.trim(),
+                fuente: item.fuente || 'otro',
+                category: item.fuente === 'oficial' ? 'Oficial' : item.fuente === 'profesor' ? 'De profesor' : 'Otro',
+                questions: nPreguntas,
+                minutes: estimateMinutes(nPreguntas),
+                status: uiStatus,
+                score: scorePct,
+                progress,
+                attemptCount: item.attemptCount ?? 0,
+            };
+        });
+
+        setMocks(list);
+        setLoading(false);
     }, []);
+
+    // Recarga cada vez que la pantalla vuelve a foco (post-upload, post-simulacro).
+    useFocusEffect(useCallback(() => { loadMocks(); }, [loadMocks]));
+
+    const filteredMocks = filter === 'all' ? mocks : mocks.filter((m) => m.fuente === filter);
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -139,28 +188,58 @@ export default function OfficialMocksScreen({ navigation }) {
                         <Ionicons name="chevron-back" size={24} color={COLORS.purple} />
                     </TouchableOpacity>
                     <View style={styles.navTitleWrap}>
-                        <Text style={styles.navTitle}>Simulacros</Text>
-                        <Text style={styles.navSubtitle}>Exámenes oficiales</Text>
+                        <Text style={styles.navTitle}>Banco de exámenes</Text>
+                        <Text style={styles.navSubtitle}>Oficiales y compartidos</Text>
                     </View>
                     <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
                         <Ionicons name="settings-outline" size={22} color={COLORS.purple} />
                     </TouchableOpacity>
                 </View>
 
+                {/* Chips de filtro por procedencia */}
+                {!loading && !motorDown && (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.chipsRow}
+                        contentContainerStyle={styles.chipsContent}
+                    >
+                        {FILTERS.map((f) => {
+                            const active = f.key === filter;
+                            return (
+                                <TouchableOpacity
+                                    key={f.key}
+                                    onPress={() => setFilter(f.key)}
+                                    style={[styles.chip, active && styles.chipActive]}
+                                    activeOpacity={0.85}
+                                >
+                                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                )}
+
                 {loading ? (
                     <View style={styles.empty}>
                         <ActivityIndicator color={COLORS.orange} />
+                    </View>
+                ) : motorDown ? (
+                    <View style={styles.empty}>
+                        <Text style={styles.emptyText}>{MOTOR_UNAVAILABLE_COPY}</Text>
                     </View>
                 ) : loadError ? (
                     <View style={styles.empty}>
                         <Text style={styles.emptyText}>{loadError}</Text>
                     </View>
-                ) : mocks.length === 0 ? (
+                ) : filteredMocks.length === 0 ? (
                     <View style={styles.empty}>
-                        <Text style={styles.emptyText}>{EMPTY_COPY}</Text>
+                        <Text style={styles.emptyText}>
+                            {mocks.length === 0 ? EMPTY_COPY : 'No hay exámenes con ese filtro.'}
+                        </Text>
                     </View>
                 ) : (
-                    mocks.map((exam) => (
+                    filteredMocks.map((exam) => (
                         <ExamCard
                             key={exam.id}
                             exam={exam}
@@ -168,28 +247,22 @@ export default function OfficialMocksScreen({ navigation }) {
                         />
                     ))
                 )}
-
-                <TouchableOpacity
-                    style={styles.banner}
-                    activeOpacity={0.85}
-                    onPress={() => navigation.navigate('ErrorLab')}
-                >
-                    <View style={styles.bannerTextWrap}>
-                        <View style={styles.bannerTitleRow}>
-                            <View style={{ marginRight: 6 }}>
-                                <IconSparkles size={20} color={COLORS.orange} />
-                            </View>
-                            <Text style={styles.bannerTitle}>Iniciar test quirúrgico</Text>
-                        </View>
-                        <Text style={styles.bannerSubtitle}>
-                            Haz clic en el botón para generar test de refuerzo
-                        </Text>
-                    </View>
-                    <View style={styles.playButton}>
-                        <Ionicons name="play" size={26} color={COLORS.white} />
-                    </View>
-                </TouchableOpacity>
+                {/* Banner "Iniciar test quirúrgico" retirado — el mismo botón
+                    ya vive en ErrorLab (Laboratorio de errores), donde tiene
+                    sentido contextual. Evita duplicación. */}
             </ScrollView>
+
+            {/* FAB "Subir examen" — oculto si el Motor no está disponible */}
+            {!motorDown && (
+                <TouchableOpacity
+                    style={styles.fab}
+                    onPress={() => navigation.navigate('ExamUpload')}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="cloud-upload-outline" size={22} color={COLORS.white} />
+                    <Text style={styles.fabLabel}>Subir examen</Text>
+                </TouchableOpacity>
+            )}
         </SafeAreaView>
     );
 }
@@ -337,4 +410,58 @@ const styles = StyleSheet.create({
 
     empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
     emptyText: { fontSize: 13, fontFamily: 'Poppins-Regular', color: COLORS.purple, opacity: 0.6, textAlign: 'center' },
+
+    // Chips de filtro por procedencia
+    chipsRow: {
+        marginBottom: 14,
+        marginHorizontal: -25,
+    },
+    chipsContent: {
+        paddingHorizontal: 25,
+        gap: 8,
+    },
+    chip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: COLORS.cardBorder,
+        backgroundColor: COLORS.white,
+    },
+    chipActive: {
+        backgroundColor: COLORS.purple,
+        borderColor: COLORS.purple,
+    },
+    chipText: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: 13,
+        color: COLORS.purple,
+    },
+    chipTextActive: {
+        color: COLORS.white,
+    },
+
+    // FAB "Subir examen"
+    fab: {
+        position: 'absolute',
+        right: 20,
+        bottom: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: COLORS.green,
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        borderRadius: 30,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    fabLabel: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: COLORS.white,
+    },
 });

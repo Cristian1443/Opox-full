@@ -20,4 +20,13 @@ config.resolver.nodeModulesPaths = [
 // 3. Deshabilitar hierarchical lookup para evitar resolver módulos duplicados
 config.resolver.disableHierarchicalLookup = true;
 
+// 4. Alias `punycode` → paquete npm (Fase 2 · gaps-15-09-26 · Tutor markdown).
+// `markdown-it` (dependencia interna de `react-native-markdown-display`) hace
+// `require('punycode')` esperando el built-in de Node — que no existe en RN.
+// Redirigimos al paquete npm homónimo que sí funciona en JS runtime móvil.
+config.resolver.extraNodeModules = {
+  ...(config.resolver.extraNodeModules ?? {}),
+  punycode: require.resolve('punycode/'),
+};
+
 module.exports = config;

@@ -16,13 +16,17 @@ export interface MacroResult {
     phases: MacroPhase[];
 }
 
-// Reparto proporcional simplificado (sin IA — ver AGENTS.md) para dar una
-// ruta por fases razonable con solo la fecha de examen como dato de entrada.
+// Reparto en 5 fases (sin IA — ver AGENTS.md). El temario típico de OPOX tiene
+// ~40 temas; el reparto asigna 10 temas por fase durante las 4 primeras y una
+// 5ª fase de repaso integral sobre TODOS los temas (peso más alto porque
+// concentra tests de repaso con el temario completo antes del examen).
+// Los pesos suman 1; se usan como referencia temporal para el status de fase.
 const PHASE_DEFS: Array<{ key: string; title: string; weight: number }> = [
-    { key: 'base', title: 'Fase 1 · Base del temario', weight: 0.35 },
-    { key: 'profundizacion', title: 'Fase 2 · Profundización', weight: 0.30 },
-    { key: 'simulacros', title: 'Fase 3 · Simulacros intensivos', weight: 0.25 },
-    { key: 'repaso', title: 'Fase 4 · Repaso final', weight: 0.10 },
+    { key: 'base',           title: 'Fase 1 · Base del temario',       weight: 0.20 },
+    { key: 'profundizacion', title: 'Fase 2 · Profundización',         weight: 0.20 },
+    { key: 'simulacros',     title: 'Fase 3 · Simulacros intensivos',  weight: 0.20 },
+    { key: 'repaso',         title: 'Fase 4 · Repaso final',           weight: 0.15 },
+    { key: 'integral',       title: 'Fase 5 · Repaso integral',        weight: 0.25 },
 ];
 
 export class GetMacroUseCase {

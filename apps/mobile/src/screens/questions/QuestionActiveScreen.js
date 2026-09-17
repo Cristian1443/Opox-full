@@ -7,12 +7,16 @@ import {
     Animated,
     Vibration,
     AccessibilityInfo,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
+import { useTestSession } from '../../hooks/useTestSession';
+import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
 // Iconos exactos exportados de Figma para la barra inferior de herramientas
 // (antes Ionicons genéricos: star/star-outline, warning-outline,
@@ -149,7 +153,7 @@ const MAX_HINTS = 3;
 
 export default function QuestionActiveScreen({ navigation, route }) {
   const {
-    questions = MOCK_QUESTIONS,
+    questions: paramQuestions = null,
     startIndex = 0,
     // Sources soportados: 'generator' | 'official' | 'surgical' | 'notes' (Bloque 9).
     // El runner es agnóstico al source; solo lo propaga a TrainingResult y usa
@@ -167,7 +171,37 @@ export default function QuestionActiveScreen({ navigation, route }) {
     // Respuestas ya dadas al retomar un simulacro — se restauran tal cual,
     // alineadas por índice con `questions` (mismo formato que produce este runner).
     resumeAnswers = null,
+    // Fase 2 · Streaming (gaps-15-09-26): si viene jobId, las preguntas llegan
+    // incrementalmente vía useTestSession. La primera se ve en ~5-8s.
+    jobId = null,
+    expectedTotal = null,
+    // Bloque 6.6 · Simulacro real del banco: mode='bank_mock' + sesionId.
+    // Las preguntas llegan SIN correctIndex; la corrección se resuelve pregunta
+    // a pregunta contra /training/session/:sessionId/answer del Motor.
+    mode = null,
+    sesionId = null,
   } = route?.params ?? {};
+
+  // Streaming: usa useTestSession cuando hay jobId. En caso contrario, se
+  // comporta como antes con las preguntas del route.params o los mocks.
+  const {
+    questions: streamedRaw,
+    progress: streamProgress,
+    status: streamStatus,
+  } = useTestSession(jobId, { expectedTotal });
+  const streamedQuestions = jobId && streamedRaw?.length
+    ? adaptGeneratedQuestions(streamedRaw)
+    : [];
+  // En modo bank_mock las preguntas son MUTABLES: al responder cada una, el
+  // backend devuelve correctIndex + explicación y hay que reflejarlo en la UI
+  // (verde/rojo, feedback). En el resto de modos las preguntas ya vienen con
+  // correctIndex resuelto y no hace falta estado local.
+  const isBankMock = mode === 'bank_mock' && !!sesionId;
+  const [bankQuestions, setBankQuestions] = useState(isBankMock ? (paramQuestions ?? []) : null);
+  const [isCorrectionLoading, setIsCorrectionLoading] = useState(false);
+  const questions = isBankMock
+    ? bankQuestions
+    : (jobId ? streamedQuestions : (paramQuestions ?? MOCK_QUESTIONS));
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [selectedOption, setSelectedOption] = useState(null);
@@ -197,8 +231,15 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const timerPulseAnim = useRef(new Animated.Value(1)).current;
   const pulseRef = useRef(null);
 
+  // Streaming: si aún no llega la primera pregunta, mostramos loader con el
+  // progreso del job. Se calcula ANTES del uso de `questions[currentIndex]`
+  // porque en modo stream ese array puede estar vacío en el primer render.
+  const streamStillLoading =
+    jobId && questions.length === 0 && streamStatus !== 'error';
+  const streamHasError = jobId && streamStatus === 'error';
+
   const question = questions[currentIndex];
-  const total = questions.length;
+  const total = jobId && expectedTotal ? expectedTotal : questions.length;
   const progress = total > 0 ? (currentIndex + 1) / total : 0;
 
   useEffect(() => {
@@ -278,8 +319,67 @@ export default function QuestionActiveScreen({ navigation, route }) {
     setSelectedOption(id);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedOption) return;
+
+    // Modo bank_mock (Bloque 6.6): la corrección la hace el Motor por pregunta.
+    // Bloqueamos la UI mientras esperamos la respuesta del /answer para no
+    // pintar verde/rojo con datos inventados.
+    if (isBankMock) {
+      if (isCorrectionLoading) return;
+      const optionIds = ['A', 'B', 'C', 'D'];
+      const optionIndex = optionIds.indexOf(selectedOption);
+      if (optionIndex < 0) return;
+
+      setIsCorrectionLoading(true);
+      const timeSecs = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
+      const { data, error } = await trainingApi.postSessionAnswer(sesionId, {
+        questionId: question.id,
+        optionIndex,
+      });
+      setIsCorrectionLoading(false);
+
+      if (error || !data) {
+        Alert.alert('Error', error?.message || 'No pudimos corregir la respuesta. Reintenta.');
+        return;
+      }
+
+      // Aplicar la corrección real a la pregunta activa: marca `correct` en la
+      // opción que devolvió el Motor y guarda la explicación/evidencia.
+      const correctIndex = typeof data.correctIndex === 'number' ? data.correctIndex : null;
+      const evidenceText = data.evidence?.cita ?? '';
+      const explanation = data.explanation ?? evidenceText ?? '';
+      const updatedQuestion = {
+        ...question,
+        options: question.options.map((o, i) => ({
+          ...o,
+          correct: correctIndex !== null ? i === correctIndex : o.correct,
+        })),
+        explanation: explanation || question.explanation,
+        explanationWrong: explanation || question.explanationWrong,
+        articleRef: evidenceText
+          ? { article: '', title: '', text: evidenceText, boeUrl: null }
+          : question.articleRef,
+      };
+      const updatedQuestions = [...bankQuestions];
+      updatedQuestions[currentIndex] = updatedQuestion;
+      setBankQuestions(updatedQuestions);
+
+      const isCorrect = Boolean(data.correct);
+      if (!isCorrect) Vibration.vibrate(80);
+      clearInterval(timerRef.current);
+      setIsSubmitted(true);
+      setAnswers(prev => [...prev, {
+        questionId: question.id,
+        selected: selectedOption,
+        isCorrect,
+        timeSecs,
+      }]);
+      animateFeedback();
+      return;
+    }
+
+    // Flujo original — preguntas con correctIndex ya resuelto en cliente.
     clearInterval(timerRef.current);
     const timeSecs = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
     const selected = question.options.find(o => o.id === selectedOption);
@@ -340,6 +440,42 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
   // Cuando el usuario ha respondido, se ocultan las opciones incorrectas no elegidas.
   // Correcta se muestra en verde, elegida (si fue mal) en rojo — mockup.
+  // Loader de streaming: se renderiza ANTES de que llegue la primera pregunta
+  // en modo stream — evita crash por `question.options` undefined.
+  if (streamStillLoading || streamHasError) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          {streamHasError ? (
+            <>
+              <Text style={{ fontSize: 15, color: colors.textDark, textAlign: 'center', marginBottom: 12 }}>
+                El motor está tardando más de lo normal.
+              </Text>
+              <TouchableOpacity
+                style={{ backgroundColor: colors.ctaGreen, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                onPress={() => navigation.goBack()}
+              >
+                <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Volver</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color={colors.selectionBorder} />
+              <Text style={{ fontSize: 14, color: colors.textDark, marginTop: 12 }}>
+                Preparando tu test…
+              </Text>
+              {streamProgress?.total > 0 && (
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
+                  {streamProgress.done} de {streamProgress.total} preguntas listas
+                </Text>
+              )}
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const visibleOptions = question.options.filter((opt) => {
     if (!isSubmitted) return true;
     if (opt.correct) return true;
@@ -538,12 +674,19 @@ export default function QuestionActiveScreen({ navigation, route }) {
         {/* ── CTA PRINCIPAL ── */}
         {!isSubmitted ? (
           <TouchableOpacity
-            style={[styles.mainBtn, !selectedOption && styles.mainBtnDisabled]}
+            style={[styles.mainBtn, (!selectedOption || isCorrectionLoading) && styles.mainBtnDisabled]}
             onPress={handleConfirm}
-            disabled={!selectedOption}
+            disabled={!selectedOption || isCorrectionLoading}
             activeOpacity={0.85}
           >
-            <Text style={styles.mainBtnText}>Confirmar respuesta</Text>
+            {isCorrectionLoading ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ActivityIndicator color={colors.white} size="small" />
+                <Text style={styles.mainBtnText}>Corrigiendo…</Text>
+              </View>
+            ) : (
+              <Text style={styles.mainBtnText}>Confirmar respuesta</Text>
+            )}
           </TouchableOpacity>
         ) : (
           <TouchableOpacity

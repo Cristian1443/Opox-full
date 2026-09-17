@@ -1,16 +1,12 @@
+import { STREAK_MILESTONES } from '@opox/types';
 import type { IDashboardRepository, IMotivationRepository } from '../../domain';
 
 const RECENT_DAYS = 14;
 
-// Escalera de hitos de racha. Sin IA: tabla fija (ver AGENTS.md).
-const STREAK_MILESTONES: Array<{ days: number; points: number }> = [
-    { days: 7, points: 50 },
-    { days: 14, points: 100 },
-    { days: 21, points: 200 },
-    { days: 30, points: 300 },
-    { days: 60, points: 500 },
-    { days: 100, points: 1000 },
-];
+// La escalera de hitos vive ahora en `@opox/types` para que backend, mobile y
+// SupabaseDashboardRepository.registerActivity compartan una sola fuente de
+// verdad — antes cada uno duplicaba la tabla y solo este use case la leía,
+// dejando la lógica de OTORGAR el premio sin implementar en registerActivity.
 
 export interface StreakDetail {
     currentStreak: number;

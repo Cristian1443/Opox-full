@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { STREAK_MILESTONES } from '@opox/types';
 import {
     Notification,
     UserGamification,
@@ -246,7 +247,21 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
             updatedAt: new Date(rawRow.updated_at),
         });
         const today = todayMadrid();
-        const next = current.withActivity(today, input.points);
+        // Primero simulamos la actividad SIN puntos para conocer `newStreak` y
+        // detectar el cruce de hito. Si la racha cruza un umbral (7/14/21/…),
+        // añadimos el bonus al `points` que ya venía. Antes de este cambio la
+        // app anunciaba "+50 Opopoints por racha de 7 días" en `MotivationHomeScreen`
+        // pero el backend nunca los otorgaba.
+        const preview = current.withActivity(today, 0);
+        const crossedMilestone = STREAK_MILESTONES.find(
+            (m) => current.currentStreak < m.days && m.days <= preview.currentStreak,
+        );
+        const milestoneBonus = crossedMilestone?.points ?? 0;
+        const totalPoints = input.points + milestoneBonus;
+        const effectiveReason = crossedMilestone
+            ? `${input.reason}+streak_milestone_${crossedMilestone.days}`
+            : input.reason;
+        const next = current.withActivity(today, totalPoints);
 
         const { data, error } = await this.supabaseAdmin
             .from('user_gamification')
@@ -266,7 +281,7 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
         // (ya persistido arriba), solo se pierde el registro histórico.
         const { error: ledgerError } = await this.supabaseAdmin
             .from('opopoints_ledger')
-            .insert({ user_id: input.userId, amount: input.points, reason: input.reason });
+            .insert({ user_id: input.userId, amount: totalPoints, reason: effectiveReason });
         if (ledgerError) {
             // eslint-disable-next-line no-console
             console.error('[dashboard registerActivity] ledger insert failed:', ledgerError.message);
@@ -274,10 +289,10 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
 
         // Puente earn → store ledger: getBalance() de la tienda lee user_opopoints_ledger
         // (solo recibe filas spend). Sin esta fila earn el saldo siempre sería 0.
-        if (input.points > 0) {
+        if (totalPoints > 0) {
             const { error: earnError } = await this.supabaseAdmin
                 .from('user_opopoints_ledger')
-                .insert({ user_id: input.userId, type: 'earn', amount: input.points, reason: input.reason, ref_id: null });
+                .insert({ user_id: input.userId, type: 'earn', amount: totalPoints, reason: effectiveReason, ref_id: null });
             if (earnError) {
                 // eslint-disable-next-line no-console
                 console.error('[dashboard registerActivity] earn ledger insert failed:', earnError.message);

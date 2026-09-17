@@ -129,6 +129,8 @@ import PhotoTestAnalysisScreen from '../screens/training/PhotoTestAnalysisScreen
 import PhotoTestResultScreen from '../screens/training/PhotoTestResultScreen';
 import OfficialMocksScreen from '../screens/training/OfficialMocksScreen';
 import MockInstructionsScreen from '../screens/training/MockInstructionsScreen';
+import ExamUploadScreen from '../screens/training/ExamUploadScreen';
+import ExamUploadJobScreen from '../screens/training/ExamUploadJobScreen';
 import ErrorLabScreen from '../screens/training/ErrorLabScreen';
 import SurgicalTestPreviewScreen from '../screens/training/SurgicalTestPreviewScreen';
 
@@ -267,6 +269,8 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="PhotoTestResult" component={PhotoTestResultScreen} />
             <Stack.Screen name="OfficialMocks" component={OfficialMocksScreen} />
             <Stack.Screen name="MockInstructions" component={MockInstructionsScreen} />
+            <Stack.Screen name="ExamUpload" component={ExamUploadScreen} />
+            <Stack.Screen name="ExamUploadJob" component={ExamUploadJobScreen} />
             <Stack.Screen name="ErrorLab" component={ErrorLabScreen} />
             <Stack.Screen name="SurgicalTestPreview" component={SurgicalTestPreviewScreen} />
         </Stack.Navigator>

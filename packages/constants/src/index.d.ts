@@ -45,6 +45,7 @@ declare const API_ROUTES: {
         readonly WEEK: string;
         readonly MACRO: string;
         readonly AGENDA: string;
+        readonly AGENDA_DELETE: string;
     };
 
     readonly TRAINING: {
@@ -52,6 +53,10 @@ declare const API_ROUTES: {
         readonly MOCK_DETAIL: string;
         readonly MOCK_QUESTIONS: string;
         readonly GENERATE: string;
+        readonly GENERATE_STREAM: string;
+        readonly JOB_STATUS: string;
+        readonly SESSION_QUESTIONS: string;
+        readonly SESSION_ANSWER: string;
         readonly PHOTO_TEST: string;
         readonly SURGICAL: string;
         readonly ATTEMPTS: string;
@@ -65,6 +70,11 @@ declare const API_ROUTES: {
         readonly LAW_VIEW: string;
         readonly TOPICS: string;
         readonly LEVEL_TEST: string;
+        readonly BANK_EXAMS: string;
+        readonly BANK_EXAM_UPLOAD: string;
+        readonly BANK_EXAM_JOB: string;
+        readonly BANK_MOCK_START: string;
+        readonly BANK_MOCK_RESULT: string;
     };
 
     readonly BOE: {

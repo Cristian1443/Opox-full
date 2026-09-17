@@ -260,9 +260,14 @@ export default function GeneratorConfigScreen({ navigation, route }) {
     const [count, setCount] = useState(clampToRange(challengeQuestionCount));
     const [fatigueMode, setFatigueMode] = useState(DEFAULTS.timed);
 
-    // Multi-selección de temas — 'all' es el valor especial "Todos los temas"
+    // Multi-selección de temas — 'all' es el valor especial "Todos los temas".
+    // `challengeTopicId` puede venir como "id1,id2,id3" desde `PlanningMacroScreen`
+    // (Rumbo a la plaza → "Estudiar esta fase") cuando la fase tiene varios temas —
+    // se separa por coma para pre-seleccionar todos los checkboxes.
     const [selectedTopicIds, setSelectedTopicIds] = useState(
-        challengeTopicId ? new Set([challengeTopicId]) : new Set(['all'])
+        challengeTopicId
+            ? new Set(String(challengeTopicId).split(',').map((s) => s.trim()).filter(Boolean))
+            : new Set(['all'])
     );
     const [topics, setTopics] = useState([]);
     const [topicOpen, setTopicOpen] = useState(!isLockedMode); // cerrado en modo bloqueado
@@ -375,6 +380,38 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                     ? 'all'
                     : [...selectedTopicIds].join(',');
 
+            // Fase 2 · Streaming (gaps-15-09-26): intentamos primero el flujo
+            // asíncrono con jobId. Si el Motor no está configurado, el backend
+            // responde 503 MOTOR_UNAVAILABLE y caemos al síncrono legacy.
+            const streamRes = await trainingApi.startTestJob({
+                oposicion,
+                topicId: backendTopicId,
+                difficulty,
+                count,
+            });
+
+            if (!streamRes?.error && streamRes?.data?.jobId) {
+                clearTimeout(warnTimerRef.current);
+                clearTimeout(killTimerRef.current);
+                if (cancelledRef.current) return;
+                setGenerating(false);
+                setSlowWarning(false);
+                allowExitRef.current = true;
+                navigation.replace('TrainingSession', {
+                    source: 'generator',
+                    jobId: streamRes.data.jobId,
+                    expectedTotal: count,
+                    examTitle: isChallengeMode ? 'Reto de clan' : 'Generador infinito',
+                    timedMode: fatigueMode,
+                    oposicion,
+                    ...(challengeId && { challengeId }),
+                    ...(challengeClanId && { clanId: challengeClanId }),
+                    ...(taskId && { taskId }),
+                });
+                return;
+            }
+
+            // Fallback síncrono cuando el Motor no está disponible (503).
             const { data, error } = await trainingApi.generateQuestions({
                 oposicion,
                 topicId: backendTopicId,

@@ -51,6 +51,13 @@ function IconCloseCircleRed({ size = 18 }) {
     );
 }
 
+// Check verde para temas dominados — reflejo positivo del IconCloseCircleRed.
+function IconCheckCircleGreen({ size = 18 }) {
+    return (
+        <Ionicons name="checkmark-circle" size={size} color={COLORS.green} />
+    );
+}
+
 // El SVG exportado apunta hacia abajo por defecto; para "right" (colapsado)
 // se rota -90°.
 function IconTriangle({ size = 16, direction = 'right', color = COLORS.orange }) {
@@ -75,46 +82,62 @@ function formatLastAttempt(iso) {
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 }
 
-// ─── Item de debilidad con expansión propia ──────────────────────────────────
+// ─── Item de tema (débil o dominado) con expansión propia ────────────────────
+// La misma card sirve para ambos tabs — cambia el tono según `item.isMastered`:
+// débil = rojo/naranja (patrón de fallo), dominado = verde (tema controlado).
 function WeaknessItem({ item }) {
     const [open, setOpen] = useState(false);
+    const isMastered = !!item.isMastered;
 
     const dateLabel = formatLastAttempt(item.lastAttemptDate);
+    const triangleColor = isMastered ? COLORS.green : COLORS.orange;
 
     return (
         <View style={styles.itemWrapper}>
             <TouchableOpacity style={styles.itemHeader} onPress={() => setOpen((v) => !v)} activeOpacity={0.7}>
                 <View style={{ marginRight: 10 }}>
-                    <IconTriangle size={16} direction={open ? 'down' : 'right'} />
+                    <IconTriangle size={16} direction={open ? 'down' : 'right'} color={triangleColor} />
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.itemTitle} numberOfLines={1}>{item.topic}</Text>
                     {dateLabel ? <Text style={styles.itemDate}>{dateLabel}</Text> : null}
                 </View>
-                <Text style={styles.itemPct}>{item.domain}%</Text>
+                <Text style={[styles.itemPct, isMastered && { color: COLORS.green }]}>{item.domain}%</Text>
             </TouchableOpacity>
 
             {open && (
                 <View style={styles.expandedCard}>
                     <View style={styles.warningRow}>
-                        <IconCloseCircleRed size={20} />
-                        <Text style={styles.warningText}>Patrón de fallo detectado</Text>
+                        {isMastered ? <IconCheckCircleGreen size={20} /> : <IconCloseCircleRed size={20} />}
+                        <Text style={[styles.warningText, isMastered && { color: COLORS.green }]}>
+                            {isMastered ? 'Tema dominado' : 'Patrón de fallo detectado'}
+                        </Text>
                     </View>
 
-                    <Text style={styles.paragraph}>{item.description}</Text>
+                    <Text style={styles.paragraph}>
+                        {isMastered
+                            ? `Aciertas el ${item.domain}% de las preguntas sobre ${item.topic}. Buen nivel de dominio.`
+                            : item.description}
+                    </Text>
                     {item.totalAnswered > 0 && (
                         <Text style={styles.basadoEn}>Basado en {item.totalAnswered} preguntas</Text>
                     )}
                     <Text style={[styles.paragraph, { marginTop: 8 }]}>
-                        La IA ha preparado un test quirúrgico para eliminar esta debilidad.
+                        {isMastered
+                            ? 'Mantén la práctica ocasional para no perder soltura. Si vuelves a bajar del 80%, aparecerá otra vez en tus debilidades.'
+                            : 'La IA ha preparado un test quirúrgico para eliminar esta debilidad.'}
                     </Text>
 
                     <View style={styles.dominioRow}>
                         <Text style={styles.dominioLabel}>Dominio actual del tema:</Text>
-                        <Text style={styles.dominioValue}>{item.domain}%</Text>
+                        <Text style={[styles.dominioValue, isMastered && { color: COLORS.green }]}>{item.domain}%</Text>
                     </View>
                     <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${item.domain}%` }]} />
+                        <View style={[
+                            styles.progressFill,
+                            { width: `${item.domain}%` },
+                            isMastered && { backgroundColor: COLORS.green },
+                        ]} />
                     </View>
                 </View>
             )}
@@ -129,10 +152,15 @@ function IconTargetBig({ color = colors.grayMid }) {
 }
 
 const MIN_QUESTIONS_FOR_PATTERNS = 30;
+// Umbral: un tema con domain >= MASTERY_THRESHOLD se considera "dominado" y
+// deja de contar como debilidad. Sube al tab "Dominados", ya no aparece en
+// "Débiles" ni entra al test quirúrgico.
+const MASTERY_THRESHOLD = 80;
 
 export default function ErrorLabScreen({ navigation }) {
     const [patterns, setPatterns] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState('weak'); // 'weak' | 'mastered'
 
     useFocusEffect(useCallback(() => {
         let cancelled = false;
@@ -147,7 +175,10 @@ export default function ErrorLabScreen({ navigation }) {
                 failRate: p.failRate,
                 totalAnswered: p.totalAnswered ?? 0,
                 lastAttemptDate: p.lastAttemptDate ?? null,
+                // Descripción neutra en el mapping — el WeaknessItem reescribe
+                // el copy según isMastered (débil vs dominado).
                 description: `Fallas el ${p.failRate}% de las preguntas sobre ${p.topic}.`,
+                isMastered: p.domain >= MASTERY_THRESHOLD,
                 isPrimary: i === 0,
             })));
             setLoading(false);
@@ -155,14 +186,19 @@ export default function ErrorLabScreen({ navigation }) {
         return () => { cancelled = true; };
     }, []));
 
-    const primary = patterns.find((p) => p.isPrimary);
+    // Separación en dos grupos por umbral de dominio.
+    const weak = patterns.filter((p) => p.domain < MASTERY_THRESHOLD);
+    const mastered = patterns.filter((p) => p.domain >= MASTERY_THRESHOLD)
+        .sort((a, b) => b.domain - a.domain); // más dominados primero
+    const visible = tab === 'weak' ? weak : mastered;
+    const primaryWeak = weak[0]; // el peor por fail_rate (backend ya ordena)
 
     const startSurgical = () => {
-        if (!primary) return;
+        if (!primaryWeak) return;
         navigation.navigate('SurgicalTestPreview', {
-            topicId: primary.topicId,
-            topic: primary.topic,
-            domain: primary.domain,
+            topicId: primaryWeak.topicId,
+            topic: primaryWeak.topic,
+            domain: primaryWeak.domain,
         });
     };
 
@@ -206,15 +242,47 @@ export default function ErrorLabScreen({ navigation }) {
                         </View>
                     </View>
 
-                    <Text style={styles.sectionLabel}>DEBILIDADES</Text>
+                    {/* Tabs: Débiles / Dominados con contador */}
+                    <View style={styles.tabsRow}>
+                        <TouchableOpacity
+                            onPress={() => setTab('weak')}
+                            style={[styles.tab, tab === 'weak' && styles.tabActive]}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={[styles.tabLabel, tab === 'weak' && styles.tabLabelActive]}>
+                                Débiles · {weak.length}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setTab('mastered')}
+                            style={[styles.tab, tab === 'mastered' && styles.tabActiveGreen]}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={[styles.tabLabel, tab === 'mastered' && styles.tabLabelActiveGreen]}>
+                                Dominados · {mastered.length}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
 
-                    {patterns.map((item) => (
-                        <WeaknessItem key={item.id} item={item} />
-                    ))}
+                    {visible.length === 0 ? (
+                        <View style={styles.tabEmptyWrap}>
+                            <Text style={styles.tabEmptyText}>
+                                {tab === 'weak'
+                                    ? '¡Sin debilidades detectadas! Sigue practicando para mantener el nivel.'
+                                    : 'Aún no dominas ningún tema al 80%. Sigue con los tests quirúrgicos.'}
+                            </Text>
+                        </View>
+                    ) : (
+                        visible.map((item) => (
+                            <WeaknessItem key={item.id} item={item} />
+                        ))
+                    )}
 
-                    <TouchableOpacity style={styles.boton} activeOpacity={0.85} onPress={startSurgical}>
-                        <Text style={styles.botonText}>Iniciar test quirúrgico</Text>
-                    </TouchableOpacity>
+                    {tab === 'weak' && weak.length > 0 && (
+                        <TouchableOpacity style={styles.boton} activeOpacity={0.85} onPress={startSurgical}>
+                            <Text style={styles.botonText}>Iniciar test quirúrgico</Text>
+                        </TouchableOpacity>
+                    )}
                 </ScrollView>
             )}
         </SafeAreaView>
@@ -269,6 +337,61 @@ const styles = StyleSheet.create({
         marginHorizontal: 25,
         marginTop: 24,
         marginBottom: 10,
+    },
+
+    tabsRow: {
+        flexDirection: 'row',
+        marginHorizontal: 25,
+        marginTop: 22,
+        marginBottom: 14,
+        gap: 10,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 11,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: COLORS.white,
+        alignItems: 'center',
+    },
+    tabActive: {
+        backgroundColor: COLORS.purple,
+        borderColor: COLORS.purple,
+    },
+    tabActiveGreen: {
+        backgroundColor: COLORS.green,
+        borderColor: COLORS.green,
+    },
+    tabLabel: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: 13,
+        color: COLORS.purple,
+    },
+    tabLabelActive: {
+        color: COLORS.white,
+    },
+    tabLabelActiveGreen: {
+        color: COLORS.white,
+    },
+    tabEmptyWrap: {
+        marginHorizontal: 25,
+        marginTop: 30,
+        paddingHorizontal: 20,
+        paddingVertical: 30,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderStyle: 'dashed',
+        alignItems: 'center',
+    },
+    tabEmptyText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: COLORS.purple,
+        opacity: 0.7,
+        textAlign: 'center',
+        lineHeight: 19,
     },
 
     itemWrapper: {
