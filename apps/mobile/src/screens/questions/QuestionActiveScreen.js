@@ -432,19 +432,10 @@ export default function QuestionActiveScreen({ navigation, route }) {
     return `${m}:${sec}`;
   };
 
-  if (!question) return null;
-
-  const isCorrectAnswer =
-    isSubmitted && question.options.find(o => o.id === selectedOption)?.correct === true;
-  const isTimeOut = isSubmitted && selectedOption === null;
-  const isLastQuestion = currentIndex + 1 >= total;
-  const hintsRemaining = MAX_HINTS - hintsUsed;
-  const isHintDisabled = isSubmitted || hintsRemaining <= 0;
-
-  // Cuando el usuario ha respondido, se ocultan las opciones incorrectas no elegidas.
-  // Correcta se muestra en verde, elegida (si fue mal) en rojo — mockup.
-  // Loader de streaming: se renderiza ANTES de que llegue la primera pregunta
-  // en modo stream — evita crash por `question.options` undefined.
+  // Loader de streaming: DEBE evaluarse ANTES del guard `if (!question)`,
+  // porque en modo stream `question` está undefined hasta que llega la
+  // primera pregunta del Motor. Sin este orden, el `return null` de abajo
+  // renderiza una pantalla en blanco durante toda la generación.
   if (streamStillLoading || streamHasError) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
@@ -478,6 +469,18 @@ export default function QuestionActiveScreen({ navigation, route }) {
       </SafeAreaView>
     );
   }
+
+  // Guard adicional: fuera del modo streaming, si por alguna razón no hay
+  // pregunta actual (edge case, currentIndex fuera de rango, etc.) evitamos
+  // el crash de `question.options` renderizando nada.
+  if (!question) return null;
+
+  const isCorrectAnswer =
+    isSubmitted && question.options.find(o => o.id === selectedOption)?.correct === true;
+  const isTimeOut = isSubmitted && selectedOption === null;
+  const isLastQuestion = currentIndex + 1 >= total;
+  const hintsRemaining = MAX_HINTS - hintsUsed;
+  const isHintDisabled = isSubmitted || hintsRemaining <= 0;
 
   const visibleOptions = question.options.filter((opt) => {
     if (!isSubmitted) return true;
