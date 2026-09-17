@@ -234,9 +234,12 @@ export default function QuestionActiveScreen({ navigation, route }) {
   // Streaming: si aún no llega la primera pregunta, mostramos loader con el
   // progreso del job. Se calcula ANTES del uso de `questions[currentIndex]`
   // porque en modo stream ese array puede estar vacío en el primer render.
+  // Si el job terminó ('done') pero no llegaron preguntas, tratamos como error
+  // para no dejar al usuario ante un spinner infinito.
   const streamStillLoading =
-    jobId && questions.length === 0 && streamStatus !== 'error';
-  const streamHasError = jobId && streamStatus === 'error';
+    jobId && questions.length === 0 && streamStatus !== 'error' && streamStatus !== 'done';
+  const streamHasError =
+    jobId && (streamStatus === 'error' || (streamStatus === 'done' && questions.length === 0));
 
   const question = questions[currentIndex];
   const total = jobId && expectedTotal ? expectedTotal : questions.length;

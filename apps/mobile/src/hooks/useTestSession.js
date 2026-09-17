@@ -58,9 +58,13 @@ export function useTestSession(jobId, opts = {}) {
             if (job?.progress) setProgress(job.progress);
             if (job?.sessionId && sessionId !== job.sessionId) setSessionId(job.sessionId);
 
-            // Cuando hay al menos 1 pregunta publicada y sessionId, refrescamos las preguntas.
+            // El Motor no siempre publica progreso incremental; `progress.done`
+            // puede quedarse en 0 hasta que el job termina. Refrescamos las
+            // preguntas cuando (a) hay progreso publicado ≥ 1, o (b) el job
+            // ya está en 'done' — en ambos casos el sessionId debe existir.
             const sid = job?.sessionId ?? sessionId;
-            if (sid && job?.progress?.done >= 1) {
+            const jobDone = job?.status === 'done';
+            if (sid && (job?.progress?.done >= 1 || jobDone)) {
                 const { data: sess } = await trainingApi.getSessionQuestions(sid);
                 if (!activeRef.current) return;
                 if (Array.isArray(sess?.questions)) {
@@ -70,7 +74,7 @@ export function useTestSession(jobId, opts = {}) {
                 }
             }
 
-            if (job?.status === 'done') {
+            if (jobDone) {
                 setStatus('done');
                 return;
             }

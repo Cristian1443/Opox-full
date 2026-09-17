@@ -15,11 +15,12 @@ export const tutorApi = {
         api.post(T.CONVERSATIONS, { title, topic }, { auth: true }),
 
     // tonePrefs = { personality, detailLevel, hintStyle, reinforcementLevel } de AsyncStorage
+    // Timeout explícito 60 s — evita hanging indefinido si el Motor tarda.
     sendMessage: (conversationId, content, tonePrefs = null) =>
         api.post(
             T.MESSAGES.replace(':id', conversationId),
             tonePrefs ? { content, tonePrefs } : { content },
-            { auth: true },
+            { auth: true, timeoutMs: 60_000 },
         ),
 
     deleteConversation: (id) =>
@@ -33,7 +34,7 @@ export const tutorApi = {
         api.get(T.DECK.replace(':id', id), { auth: true }),
 
     generateDeck: (topicId, topicTitle, oposicion) =>
-        api.post(T.DECKS, { topicId, topicTitle, oposicion }, { auth: true }),
+        api.post(T.DECKS, { topicId, topicTitle, oposicion }, { auth: true, timeoutMs: 60_000 }),
 
     deleteDeck: (id) =>
         api.delete(T.DECK.replace(':id', id), { auth: true }),
@@ -74,6 +75,6 @@ export const tutorApi = {
     getSummary: (topicId, oposicion, detailLevel = null) =>
         api.get(
             `${T.SUMMARY.replace(':topicId', topicId)}?oposicion=${encodeURIComponent(oposicion)}${detailLevel != null ? `&detailLevel=${detailLevel}` : ''}`,
-            { auth: true },
+            { auth: true, timeoutMs: 60_000 },
         ),
 };
