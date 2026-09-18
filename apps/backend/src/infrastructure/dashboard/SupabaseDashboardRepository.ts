@@ -64,11 +64,24 @@ function previousDayIso(isoDate: string): string {
     return d.toISOString().slice(0, 10);
 }
 
-function toDomainGamification(row: GamificationRow): UserGamification {
+// Valida un YYYY-MM-DD estricto — evita que un cliente malicioso mande
+// cualquier string y controle el corte de día. Regex pura para no arrastrar
+// nada más.
+const LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function normalizeLocalDate(localDate: string | undefined | null): string {
+    if (localDate && LOCAL_DATE_RE.test(localDate)) return localDate;
+    return todayMadrid();
+}
+
+function toDomainGamification(row: GamificationRow, localDate?: string): UserGamification {
     const last = row.last_activity_date;
-    const today = todayMadrid();
+    // El "hoy" para computar decay debe respetar la TZ del cliente. Antes
+    // usábamos siempre Madrid → para usuarios en Colombia (UTC-5) la ventana
+    // 17:00-23:59 hora local se solapa con la madrugada del día siguiente en
+    // Madrid, y toda la actividad de "ayer + hoy" quedaba registrada como
+    // "mismo día Madrid" → la racha nunca subía porque `last === today`.
+    const today = normalizeLocalDate(localDate);
     const yesterday = previousDayIso(today);
-    // La racha caduca si la última actividad no fue hoy ni ayer (Madrid).
     const effectiveStreak = (last === today || last === yesterday) ? row.current_streak : 0;
     return UserGamification.create({
         userId: row.user_id,
@@ -228,10 +241,14 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
         points: number;
         localDate?: string;
     }): Promise<UserGamification> {
-        // Racha global anclada a Europe/Madrid: no dependemos de la TZ del
-        // dispositivo (ignoramos `input.localDate`). Además leemos la fila
-        // cruda — no `getGamification`, que devolvería `effectiveStreak`
-        // caducado y romperia el +1 al escribir.
+        // La racha respeta la TZ del cliente vía `input.localDate`. Fallback a
+        // Madrid solo cuando el mobile no lo envía (código legado). Antes
+        // ignorábamos `input.localDate` y usábamos siempre Madrid — bug para
+        // opositores en TZs distantes (Colombia UTC-5, Canarias UTC+0): la
+        // actividad de "ayer noche" (Colombia) caía en el mismo día Madrid
+        // que "hoy mañana", y la racha nunca incrementaba.
+        // Además leemos la fila cruda — no `getGamification`, que devolvería
+        // `effectiveStreak` caducado y romperia el +1 al escribir.
         const { data: rawRow, error: readError } = await this.supabaseAdmin
             .from('user_gamification')
             .upsert({ user_id: input.userId }, { onConflict: 'user_id' })
@@ -246,7 +263,7 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
             lastActivityDate: rawRow.last_activity_date,
             updatedAt: new Date(rawRow.updated_at),
         });
-        const today = todayMadrid();
+        const today = normalizeLocalDate(input.localDate);
         // Primero simulamos la actividad SIN puntos para conocer `newStreak` y
         // detectar el cruce de hito. Si la racha cruza un umbral (7/14/21/…),
         // añadimos el bonus al `points` que ya venía. Antes de este cambio la
@@ -299,6 +316,6 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
             }
         }
 
-        return toDomainGamification(data as GamificationRow);
+        return toDomainGamification(data as GamificationRow, today);
     }
 }
