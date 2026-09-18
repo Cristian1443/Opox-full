@@ -34,6 +34,11 @@ const FIGMA = {
 
 const A11Y_KEY = 'opox.accessibility';
 
+// El dark mode global solo cubre un subconjunto de pantallas por ahora (ver
+// "Dark mode global — Fase 3" en CLAUDE.md) — se oculta el switch hasta que
+// el resto de la app quede migrada (fase 2 de este trabajo).
+const SHOW_DARK_MODE_TOGGLE = false;
+
 const DEFAULT = {
   theme: 'auto',       // 'claro' | 'auto' | 'oscuro'  (valores UI internos)
   fontSize: 'medio',   // 'pequeno' | 'medio' | 'grande'
@@ -98,6 +103,14 @@ export default function ConfigAccessibilityScreen({ navigation }) {
   // el toggle "Modo noche" — debe reflejar el cambio en tiempo real.
   const themeColors = useThemeColors();
   const isDark = themeColors.textDark === '#F0F0F2';
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+
+  // El gesto nativo de "volver deslizando" de iOS compite con el arrastre
+  // horizontal del slider de tamaño de fuente — se desactiva para esta
+  // pantalla (ya tiene botón de volver propio en el header).
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: false });
+  }, [navigation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,19 +187,29 @@ export default function ConfigAccessibilityScreen({ navigation }) {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollEnabled}
+      >
         {/* ── Modo noche ────────────────────────────────────────────── */}
-        <View style={styles.row}>
-          <MoonIcon />
-          <Text style={[styles.rowTitle, { flex: 1 }]}>Modo noche</Text>
-          <Switch
-            value={prefs.theme === 'oscuro'}
-            onValueChange={(v) => update({ theme: v ? 'oscuro' : 'claro' })}
-            trackColor={{ false: '#E2E2E6', true: colors.purple }}
-            thumbColor={colors.white}
-            accessibilityLabel={`Modo noche ${prefs.theme === 'oscuro' ? 'activado' : 'desactivado'}`}
-          />
-        </View>
+        {/* Oculto temporalmente: la migración a dark mode solo cubre un
+            subconjunto de pantallas (ver notas "Dark mode global — Fase 3"
+            en CLAUDE.md). Se reactiva cuando el resto de pantallas queden
+            migradas — fase 2 de este trabajo. Lógica de tema intacta. */}
+        {SHOW_DARK_MODE_TOGGLE && (
+          <View style={styles.row}>
+            <MoonIcon />
+            <Text style={[styles.rowTitle, { flex: 1 }]}>Modo noche</Text>
+            <Switch
+              value={prefs.theme === 'oscuro'}
+              onValueChange={(v) => update({ theme: v ? 'oscuro' : 'claro' })}
+              trackColor={{ false: '#E2E2E6', true: colors.purple }}
+              thumbColor={colors.white}
+              accessibilityLabel={`Modo noche ${prefs.theme === 'oscuro' ? 'activado' : 'desactivado'}`}
+            />
+          </View>
+        )}
 
         {/* ── Tamaño fuente ───────────────────────────────────────────── */}
         <Text style={styles.sectionLabel}>TAMAÑO FUENTE</Text>
@@ -201,6 +224,8 @@ export default function ConfigAccessibilityScreen({ navigation }) {
           onChange={(idx) => update({ fontSize: FONT_SIZE_OPTIONS[idx] })}
           accentColor={colors.accentOrange}
           trackColor={FIGMA.sliderTrack}
+          onDragStart={() => setScrollEnabled(false)}
+          onDragEnd={() => setScrollEnabled(true)}
         />
         {/* Vista previa — real, sin equivalente en Figma */}
         <Text style={[styles.previewText, { fontSize: PREVIEW_TEXT_SIZE[prefs.fontSize] }]}>

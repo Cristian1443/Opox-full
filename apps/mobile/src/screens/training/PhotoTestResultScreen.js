@@ -119,7 +119,6 @@ export default function PhotoTestResultScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
 
             {/* Back cierra todo el flujo Foto-Test → hub (evita volver a la cámara) */}
             <ScreenHeader title="Foto-Test" onBack={() => navigation.navigate('TrainingHome')} />
@@ -216,8 +215,6 @@ export default function PhotoTestResultScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 16, paddingBottom: 32 },
 

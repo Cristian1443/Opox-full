@@ -51,7 +51,7 @@ const DEFAULTS = { difficulty: 'medium', count: 30, timed: true };
 // cualquier punto salta directo ahí — antes solo se podía arrastrar agarrando
 // el círculo exacto del thumb, muy difícil de acertar cuando estaba lejos del
 // valor deseado.
-function StepSlider({ labels, index, onChange }) {
+function StepSlider({ labels, index, onChange, onDragStart, onDragEnd }) {
     const [width, setWidth] = useState(0);
     const usable = Math.max(width - THUMB, 1);
     const usableRef = useRef(usable);
@@ -73,6 +73,8 @@ function StepSlider({ labels, index, onChange }) {
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponderCapture: () => true,
+            onMoveShouldSetPanResponderCapture: () => true,
             onPanResponderGrant: () => {
                 // Iniciar desde la posición actual del thumb (no del toque) —
                 // locationX es inestable en algunos dispositivos Android y causa
@@ -80,6 +82,7 @@ function StepSlider({ labels, index, onChange }) {
                 const u = usableRef.current;
                 const n = labelsLenRef.current;
                 startX.current = indexRef.current * (u / Math.max(n - 1, 1));
+                onDragStart?.();
             },
             onPanResponderMove: (_, g) => {
                 const u = usableRef.current;
@@ -91,7 +94,9 @@ function StepSlider({ labels, index, onChange }) {
                 const next = Math.max(0, Math.min(u, startX.current + g.dx));
                 const idx = Math.round((next / u) * (labelsLenRef.current - 1));
                 onChange(idx);
+                onDragEnd?.();
             },
+            onPanResponderTerminate: () => onDragEnd?.(),
         })
     ).current;
 
@@ -123,7 +128,7 @@ function StepSlider({ labels, index, onChange }) {
 // ─── Slider numérico (Número de preguntas) ───────────────────────────────────
 // Mismo fix que StepSlider: área de arrastre en toda la barra + salto directo
 // al punto tocado, en vez de solo poder agarrar el thumb exacto.
-function RangeSlider({ min, max, step, value, onChange }) {
+function RangeSlider({ min, max, step, value, onChange, onDragStart, onDragEnd }) {
     const [width, setWidth] = useState(0);
     const usable = Math.max(width - THUMB, 1);
     const usableRef = useRef(usable);
@@ -152,11 +157,14 @@ function RangeSlider({ min, max, step, value, onChange }) {
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponderCapture: () => true,
+            onMoveShouldSetPanResponderCapture: () => true,
             onPanResponderGrant: () => {
                 // Mismo fix que StepSlider: iniciar desde la posición actual del thumb.
                 const u = usableRef.current;
                 const range = Math.max(maxRef.current - minRef.current, 1);
                 startX.current = ((valueRef.current - minRef.current) / range) * u;
+                onDragStart?.();
             },
             onPanResponderMove: (_, g) => {
                 const u = usableRef.current;
@@ -167,7 +175,9 @@ function RangeSlider({ min, max, step, value, onChange }) {
                 const u = usableRef.current;
                 const next = Math.max(0, Math.min(u, startX.current + g.dx));
                 onChange(posToValue(next));
+                onDragEnd?.();
             },
+            onPanResponderTerminate: () => onDragEnd?.(),
         })
     ).current;
 
@@ -271,6 +281,23 @@ export default function GeneratorConfigScreen({ navigation, route }) {
     );
     const [topics, setTopics] = useState([]);
     const [topicOpen, setTopicOpen] = useState(!isLockedMode); // cerrado en modo bloqueado
+
+    // Deshabilita el scroll del contenedor mientras se arrastra un slider —
+    // en iOS el gesto nativo de UIScrollView compite con el PanResponder y le
+    // "roba" el toque al slider si no se bloquea explícitamente el scroll.
+    const [scrollEnabled, setScrollEnabled] = useState(true);
+    const disableScroll = () => setScrollEnabled(false);
+    const enableScroll = () => setScrollEnabled(true);
+
+    // El gesto nativo de "volver deslizando" (swipe-back) de iOS compite con
+    // el arrastre horizontal de los sliders y gana la mayoría de las veces —
+    // activarlo/desactivarlo a mitad de gesto no llega a tiempo (el
+    // reconocedor nativo ya empezó a trackear el toque). Se desactiva de
+    // forma permanente para esta pantalla; ya existe el botón de volver del
+    // header (con su propia confirmación de cambios sin guardar).
+    useEffect(() => {
+        navigation.setOptions({ gestureEnabled: false });
+    }, [navigation]);
 
     const [exitOpen, setExitOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -473,7 +500,11 @@ export default function GeneratorConfigScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={scrollEnabled}
+            >
 
                 {/* Header */}
                 <View style={styles.headerRow}>
@@ -499,6 +530,8 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                         labels={DIFF_LABELS}
                         index={diffIdx}
                         onChange={(i) => setDifficulty(DIFF_STEPS[i])}
+                        onDragStart={disableScroll}
+                        onDragEnd={enableScroll}
                     />
                 </View>
 
@@ -526,6 +559,8 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                                 step={COUNT_STEP}
                                 value={count}
                                 onChange={setCount}
+                                onDragStart={disableScroll}
+                                onDragEnd={enableScroll}
                             />
                         </>
                     )}

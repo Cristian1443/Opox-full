@@ -15,11 +15,6 @@ export default function LevelTestProposalScreen({ navigation }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-            {/* Status bar */}
-            <View style={styles.statusBar}>
-                <Text style={styles.statusBarTime}>9:41</Text>
-            </View>
-
             {/* Contenido central */}
             <View style={styles.body}>
 
@@ -70,21 +65,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#FFFFFF',
-    },
-
-    // Status bar
-    statusBar: {
-        height: 30,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        flexShrink: 0,
-    },
-    statusBarTime: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#1B2A4A',
-        marginRight: 'auto', // en RN usar flex: 1 en un spacer si hace falta
     },
 
     // Cuerpo principal (padding: 16px 18px)
