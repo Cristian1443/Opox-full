@@ -60,11 +60,14 @@ function StepSlider({ labels, index, onChange, onDragStart, onDragEnd }) {
     const usable = Math.max(width - THUMB, 1);
     const usableRef = useRef(usable);
     const labelsLenRef = useRef(labels.length);
-    // Ref para el índice actual: PanResponder.create corre solo una vez,
-    // así que usamos refs para leer el valor más reciente dentro del gesture.
     const indexRef = useRef(index);
     const startX = useRef(0);
     const [pos, setPos] = useState(0);
+    const trackRef = useRef(null);
+    // Posición absoluta (page X) del track, medida con .measure() — más
+    // confiable que locationX, que puede quedar desfasado cuando el layout
+    // cambia (ej. thumb con left dinámico) y provocaba saltos al extremo.
+    const trackPageX = useRef(0);
 
     useEffect(() => {
         usableRef.current = usable;
@@ -79,14 +82,16 @@ function StepSlider({ labels, index, onChange, onDragStart, onDragEnd }) {
             onMoveShouldSetPanResponder: () => true,
             onStartShouldSetPanResponderCapture: () => true,
             onMoveShouldSetPanResponderCapture: () => true,
-            onPanResponderGrant: () => {
-                // Iniciar desde la posición actual del thumb (no del toque) —
-                // locationX es inestable en algunos dispositivos Android y causa
-                // saltos al extremo cuando el toque no es justo sobre el thumb.
-                const u = usableRef.current;
-                const n = labelsLenRef.current;
-                startX.current = indexRef.current * (u / Math.max(n - 1, 1));
+            onPanResponderGrant: (e) => {
                 onDragStart?.();
+                // Saltar directo al punto tocado (no solo arrastrar desde el
+                // valor actual): usable = touch en coordenadas absolutas de
+                // pantalla menos el offset absoluto del track.
+                const u = usableRef.current;
+                const touchX = e.nativeEvent.pageX - trackPageX.current;
+                const next = Math.max(0, Math.min(u, touchX - THUMB / 2));
+                startX.current = next;
+                setPos(next);
             },
             onPanResponderMove: (_, g) => {
                 const u = usableRef.current;
@@ -109,8 +114,14 @@ function StepSlider({ labels, index, onChange, onDragStart, onDragEnd }) {
     return (
         <View style={{ marginTop: 18 }}>
             <View
+                ref={trackRef}
                 style={[styles.trackWrapper, { width: '100%' }]}
-                onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+                onLayout={(e) => {
+                    setWidth(e.nativeEvent.layout.width);
+                    trackRef.current?.measure((x, y, w, h, pageX) => {
+                        trackPageX.current = pageX;
+                    });
+                }}
                 {...responder.panHandlers}
             >
                 <View style={styles.trackBg} />
@@ -142,6 +153,8 @@ function RangeSlider({ min, max, step, value, onChange, onDragStart, onDragEnd }
     const stepRef = useRef(step);
     const startX = useRef(0);
     const [pos, setPos] = useState(0);
+    const trackRef = useRef(null);
+    const trackPageX = useRef(0);
 
     const posToValue = (p) => {
         const raw = minRef.current + (p / usableRef.current) * (maxRef.current - minRef.current);
@@ -163,12 +176,15 @@ function RangeSlider({ min, max, step, value, onChange, onDragStart, onDragEnd }
             onMoveShouldSetPanResponder: () => true,
             onStartShouldSetPanResponderCapture: () => true,
             onMoveShouldSetPanResponderCapture: () => true,
-            onPanResponderGrant: () => {
-                // Mismo fix que StepSlider: iniciar desde la posición actual del thumb.
-                const u = usableRef.current;
-                const range = Math.max(maxRef.current - minRef.current, 1);
-                startX.current = ((valueRef.current - minRef.current) / range) * u;
+            onPanResponderGrant: (e) => {
                 onDragStart?.();
+                // Saltar directo al punto tocado (ver StepSlider para el
+                // razonamiento completo del cambio de locationX a pageX medido).
+                const u = usableRef.current;
+                const touchX = e.nativeEvent.pageX - trackPageX.current;
+                const next = Math.max(0, Math.min(u, touchX - THUMB / 2));
+                startX.current = next;
+                setPos(next);
             },
             onPanResponderMove: (_, g) => {
                 const u = usableRef.current;
@@ -190,8 +206,14 @@ function RangeSlider({ min, max, step, value, onChange, onDragStart, onDragEnd }
     return (
         <View style={styles.rangeRow}>
             <View
+                ref={trackRef}
                 style={[styles.trackWrapper, { flex: 1 }]}
-                onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+                onLayout={(e) => {
+                    setWidth(e.nativeEvent.layout.width);
+                    trackRef.current?.measure((x, y, w, h, pageX) => {
+                        trackPageX.current = pageX;
+                    });
+                }}
                 {...responder.panHandlers}
             >
                 <View style={styles.trackBg} />
