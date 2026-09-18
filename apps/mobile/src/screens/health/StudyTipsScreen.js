@@ -11,6 +11,7 @@ import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
 import { healthApi } from '../../api';
@@ -119,6 +120,23 @@ export default function StudyTipsScreen({ navigation }) {
                         <Text style={styles.recTitle}>{aiRec.tecnica}</Text>
                         <Text style={styles.recPorque}>{aiRec.porque}</Text>
                         <Text style={styles.recAdaptacion}>{aiRec.adaptacion}</Text>
+
+                        {aiRec.tema_sugerido && (
+                            <TouchableOpacity
+                                style={styles.temaCta}
+                                onPress={() => navigation.navigate('GeneratorConfig')}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons name="flash" size={16} color={colors.accentOrange} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.temaLabel}>PRACTICA AHORA</Text>
+                                    <Text style={styles.temaText} numberOfLines={2}>
+                                        {aiRec.tema_sugerido}
+                                    </Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color={colors.accentOrange} />
+                            </TouchableOpacity>
+                        )}
                     </View>
                 ) : recError ? (
                     <View style={[styles.recCard, { backgroundColor: 'rgba(65,41,80,0.15)' }]}>
@@ -128,6 +146,13 @@ export default function StudyTipsScreen({ navigation }) {
                         </Text>
                     </View>
                 ) : null}
+
+                {/* Título contextualizado: la lista siguiente es catálogo/referencia,
+                    no reemplaza a la recomendación de IA de arriba. */}
+                <Text style={styles.libraryHeader}>OTRAS TÉCNICAS · BIBLIOTECA</Text>
+                <Text style={styles.librarySubheader}>
+                    Métodos probados que puedes combinar con la recomendación de hoy.
+                </Text>
 
                 <View style={styles.list}>
                     {STUDY_TECHNIQUES.map((tech, index) => {
@@ -146,21 +171,30 @@ export default function StudyTipsScreen({ navigation }) {
                     })}
                 </View>
 
-                {/* Espacio grande antes del banner, tal como aparece en el frame de Figma */}
-                <View style={styles.bannerSpacer} />
+                <View style={{ height: spacing.lg }} />
 
-                {/* CTA final al Tutor IA */}
-                <View style={styles.ctaCard}>
-                    <View style={styles.ctaText}>
-                        <Text style={styles.ctaTitle}>¿Lo aplicamos a tu temario?</Text>
-                        <Text style={styles.ctaSubtitle}>El Tutor IA te hace un plan con estas técnicas</Text>
-                    </View>
+                {/* 2 CTAs en fila: acción rápida (test) + plan estratégico (Tutor).
+                    Antes solo había una card verde a Tutor IA — ahora el usuario
+                    puede saltar directo a practicar sin pasar por el planificador. */}
+                <View style={styles.ctaRow}>
                     <TouchableOpacity
-                        style={styles.ctaButton}
-                        activeOpacity={0.75}
-                        onPress={() => navigation.navigate('AITutor')}
+                        style={[styles.ctaCardCol, { backgroundColor: colors.accentOrange }]}
+                        onPress={() => navigation.navigate('GeneratorConfig')}
+                        activeOpacity={0.85}
                     >
-                        <Text style={styles.ctaButtonText}>Tutor IA</Text>
+                        <Ionicons name="flash-outline" size={26} color={colors.white} />
+                        <Text style={styles.ctaColTitle}>Practicar ahora</Text>
+                        <Text style={styles.ctaColSubtitle}>Test rápido de tu temario</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.ctaCardCol, { backgroundColor: colors.ctaGreen }]}
+                        onPress={() => navigation.navigate('AITutor')}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="chatbubbles-outline" size={26} color={colors.white} />
+                        <Text style={styles.ctaColTitle}>Plan con Tutor</Text>
+                        <Text style={styles.ctaColSubtitle}>Estrategia con IA</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -285,5 +319,74 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: 'rgba(245,245,245,0.85)',
         lineHeight: 18,
+    },
+
+    // CTA dentro de la card morada — enlaza la sugerencia de tema con el generador.
+    temaCta: {
+        marginTop: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.25)',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    },
+    temaLabel: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 10,
+        letterSpacing: 0.6,
+        color: colors.accentOrange,
+    },
+    temaText: {
+        marginTop: 2,
+        fontFamily: 'Poppins-Medium',
+        fontSize: 13,
+        color: colors.white,
+        lineHeight: 17,
+    },
+
+    // Título nuevo para contextualizar las 4 técnicas estáticas como biblioteca.
+    libraryHeader: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 12,
+        letterSpacing: 0.6,
+        color: colors.textDark,
+        marginTop: 4,
+    },
+    librarySubheader: {
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: FIGMA.textNote,
+        lineHeight: 16,
+    },
+
+    // Fila con 2 cards de acción — reemplaza la card verde única al final.
+    ctaRow: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    ctaCardCol: {
+        flex: 1,
+        borderRadius: 18,
+        padding: 18,
+        alignItems: 'flex-start',
+        gap: 6,
+        minHeight: 130,
+    },
+    ctaColTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.white,
+        marginTop: 6,
+    },
+    ctaColSubtitle: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.88)',
+        lineHeight: 16,
     },
 });

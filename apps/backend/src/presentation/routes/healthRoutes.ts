@@ -21,6 +21,9 @@ export function createHealthRouter(
         router.post(API_ROUTES.HEALTH_MENUS, authMiddleware, controller.generateMenus);
         router.post(API_ROUTES.HEALTH_MEDITATION, authMiddleware, controller.generateMeditation);
         router.post(API_ROUTES.HEALTH_STUDY_TECHNIQUE, authMiddleware, controller.recommendStudyTechnique);
+        // Check-in diario (fuente primaria de señales sin wearable)
+        router.post(API_ROUTES.HEALTH_CHECKIN, authMiddleware, controller.saveCheckin);
+        router.get(API_ROUTES.HEALTH_CHECKIN_GET, authMiddleware, controller.getCheckin);
     }
 
     return router;

@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
-import { healthApi } from '../../api';
+import { healthApi, dailyCheckInApi, moodLabel } from '../../api';
 
 export const FATIGUE_LEVEL_KEY = 'opox.health.fatigueLevel';
 
@@ -26,26 +26,32 @@ const FIGMA = {
     unknownBadge: '#A7ADB8',
 };
 
-// Construye las señales del motor con las métricas reales (HealthKit/Health
-// Connect) recibidas por params desde HomeHealthScreen. Sin dato disponible
-// se marca 'unknown' — un tercer estado real que Figma no contempla (solo
-// documenta activada/roja o resuelta/verde), así que se muestra en gris
-// neutro en vez de fingir que la señal está resuelta.
-function buildSignals(metrics) {
+// Construye las señales del motor combinando métricas del wearable (HealthKit/
+// Health Connect) con las señales manuales del check-in diario. Cuando NO hay
+// wearable, el check-in aporta mood y energía percibida — así el usuario ve
+// un diagnóstico real (no todo en gris "Sin datos").
+//
+// Sleep prefiere wearable > check-in.
+function buildSignals(metrics, checkin) {
     const hrv = metrics?.hrv;
     const restHr = metrics?.restingHeartRate;
     const spo2 = metrics?.spo2;
-    const sleep = metrics?.sleepHours;
+    const wearableSleep = metrics?.sleepHours;
+    const checkinSleep = checkin?.sleepHours != null ? Number(checkin.sleepHours) : null;
+    const sleep = wearableSleep ?? checkinSleep;
+    const mood = checkin?.moodScore != null ? Number(checkin.moodScore) : null;
+    const perceivedEnergy = checkin?.energyLevel ?? null;
+    const factors = Array.isArray(checkin?.factors) ? checkin.factors : [];
 
     const HRV_BASE = 50;
     const HR_BASE = 61;
 
-    return [
+    const signals = [
         {
             id: 1,
             label: 'HRV por debajo de tu base',
             note: 'Señal principal',
-            value: hrv != null ? `${hrv}/${HRV_BASE}` : 'Sin datos',
+            value: hrv != null ? `${hrv}/${HRV_BASE}` : 'Requiere wearable',
             status: hrv == null ? 'unknown' : hrv < HRV_BASE ? 'alert' : 'ok',
             severity: hrv == null ? 'unknown' : hrv < HRV_BASE * 0.8 ? 'critical' : hrv < HRV_BASE ? 'warning' : 'ok',
         },
@@ -53,32 +59,111 @@ function buildSignals(metrics) {
             id: 2,
             label: 'FC reposo elevada',
             note: 'Cuerpo no recuperado',
-            value: restHr != null ? `${restHr > HR_BASE ? '+' : ''}${restHr - HR_BASE}` : 'Sin datos',
+            value: restHr != null ? `${restHr > HR_BASE ? '+' : ''}${restHr - HR_BASE}` : 'Requiere wearable',
             status: restHr == null ? 'unknown' : restHr > HR_BASE ? 'alert' : 'ok',
             severity: restHr == null ? 'unknown' : restHr > HR_BASE + 6 ? 'critical' : restHr > HR_BASE ? 'warning' : 'ok',
         },
-        {
+    ];
+
+    // Estrés: HRV (wearable) prioritario; fallback al mood inverso del check-in.
+    if (hrv != null) {
+        signals.push({
             id: 3,
             label: 'Estrés sostenido en la sesión',
-            value: hrv == null ? 'Sin datos' : hrv < 40 ? 'Alto' : hrv < 55 ? 'Medio' : 'Bajo',
-            status: hrv == null ? 'unknown' : hrv < 55 ? 'alert' : 'ok',
-            severity: hrv == null ? 'unknown' : hrv < 40 ? 'critical' : hrv < 55 ? 'warning' : 'ok',
-        },
-        {
+            note: 'Derivado de HRV',
+            value: hrv < 40 ? 'Alto' : hrv < 55 ? 'Medio' : 'Bajo',
+            status: hrv < 55 ? 'alert' : 'ok',
+            severity: hrv < 40 ? 'critical' : hrv < 55 ? 'warning' : 'ok',
+        });
+    } else if (mood != null) {
+        signals.push({
+            id: 3,
+            label: 'Estrés estimado',
+            note: 'Según Estado del día',
+            value: mood <= 3 ? 'Alto' : mood <= 6 ? 'Medio' : 'Bajo',
+            status: mood <= 5 ? 'alert' : 'ok',
+            severity: mood <= 3 ? 'critical' : mood <= 5 ? 'warning' : 'ok',
+        });
+    } else {
+        signals.push({
+            id: 3,
+            label: 'Estrés sostenido',
+            value: 'Sin datos',
+            status: 'unknown',
+            severity: 'unknown',
+        });
+    }
+
+    // Energía: SpO2 (wearable) prioritario; fallback a energía percibida del check-in.
+    if (spo2 != null) {
+        signals.push({
             id: 4,
             label: 'Energía corporal',
-            value: spo2 == null ? 'Sin datos' : spo2 >= 95 ? 'OK' : 'Baja',
-            status: spo2 == null ? 'unknown' : spo2 >= 95 ? 'ok' : 'alert',
-            severity: spo2 == null ? 'unknown' : spo2 >= 95 ? 'ok' : 'warning',
-        },
-        {
-            id: 5,
-            label: 'Sueño noche anterior',
-            value: sleep != null ? `${sleep}h` : 'Sin datos',
-            status: sleep == null ? 'unknown' : sleep >= 7 ? 'ok' : 'alert',
-            severity: sleep == null ? 'unknown' : sleep >= 7 ? 'ok' : sleep >= 5.5 ? 'warning' : 'critical',
-        },
-    ];
+            note: 'Derivado de SpO₂',
+            value: spo2 >= 95 ? 'OK' : 'Baja',
+            status: spo2 >= 95 ? 'ok' : 'alert',
+            severity: spo2 >= 95 ? 'ok' : 'warning',
+        });
+    } else if (perceivedEnergy) {
+        const map = { low: 'Baja', medium: 'Media', high: 'Alta' };
+        const sev = perceivedEnergy === 'low' ? 'warning' : 'ok';
+        signals.push({
+            id: 4,
+            label: 'Energía percibida',
+            note: 'Según Estado del día',
+            value: map[perceivedEnergy] ?? '—',
+            status: perceivedEnergy === 'low' ? 'alert' : 'ok',
+            severity: sev,
+        });
+    } else {
+        signals.push({
+            id: 4,
+            label: 'Energía corporal',
+            value: 'Sin datos',
+            status: 'unknown',
+            severity: 'unknown',
+        });
+    }
+
+    // Sueño: wearable > check-in.
+    signals.push({
+        id: 5,
+        label: 'Sueño noche anterior',
+        note: wearableSleep == null && checkinSleep != null ? 'De tu Estado del día' : undefined,
+        value: sleep != null ? `${sleep}h` : 'Sin datos',
+        status: sleep == null ? 'unknown' : sleep >= 7 ? 'ok' : 'alert',
+        severity: sleep == null ? 'unknown' : sleep >= 7 ? 'ok' : sleep >= 5.5 ? 'warning' : 'critical',
+    });
+
+    // Cómo te sientes hoy — señal derivada exclusivamente del check-in.
+    if (mood != null) {
+        const { emoji, label } = moodLabel(mood);
+        signals.push({
+            id: 6,
+            label: 'Cómo te sientes hoy',
+            note: 'De tu Estado del día',
+            value: `${emoji} ${mood}/10`,
+            status: mood <= 4 ? 'alert' : 'ok',
+            severity: mood <= 3 ? 'critical' : mood <= 5 ? 'warning' : 'ok',
+            _customLabel: label,
+        });
+    }
+
+    // Factores negativos declarados en el check-in.
+    const NEGATIVE = new Set(['estres','mala_noche','ansiedad_examen','dolor_cabeza','vista_cansada','digestion']);
+    const negFactors = factors.filter((f) => NEGATIVE.has(f));
+    if (negFactors.length > 0) {
+        signals.push({
+            id: 7,
+            label: 'Factores que restan hoy',
+            note: 'De tu Estado del día',
+            value: `${negFactors.length} activo${negFactors.length === 1 ? '' : 's'}`,
+            status: 'alert',
+            severity: negFactors.length >= 3 ? 'critical' : negFactors.length >= 2 ? 'warning' : 'ok',
+        });
+    }
+
+    return signals;
 }
 
 function DotIcon({ size = 18, color = colors.white }) {
@@ -109,18 +194,37 @@ function SignalRow({ signal, isFirst }) {
                 <Text style={styles.signalLabel}>{signal.label}</Text>
                 {signal.note ? <Text style={styles.signalNote}>{signal.note}</Text> : null}
             </View>
-            <Text style={[styles.signalValue, { color: badgeColor }]}>{signal.value}</Text>
+            <Text style={[styles.signalValue, { color: badgeColor }]}>
+                {typeof signal.value === 'string' || typeof signal.value === 'number'
+                    ? String(signal.value)
+                    : stringifySignalValue(signal.value)}
+            </Text>
         </View>
     );
 }
 
 // Convierte las señales del Motor al shape que espera SignalRow.
+// `valor` puede venir como string ('8h') o como objeto complejo si el Motor
+// externo devuelve la métrica cruda. `stringifySignalValue` protege el render
+// para que nunca se muestre "[object Object]" en la UI.
+function stringifySignalValue(v) {
+    if (v == null) return '—';
+    if (typeof v === 'string' || typeof v === 'number') return String(v);
+    // Objeto: intentar campos comunes del Motor antes de rendirse.
+    if (typeof v === 'object') {
+        if (typeof v.valor === 'string' || typeof v.valor === 'number') return String(v.valor);
+        if (typeof v.value === 'string' || typeof v.value === 'number') return String(v.value);
+        if (typeof v.label === 'string') return v.label;
+    }
+    return '—';
+}
+
 function mapMotorSignals(motorSenales) {
     return motorSenales.map((s, i) => ({
         id: i + 1,
         label: s.label,
         note: s.nota,
-        value: s.valor,
+        value: stringifySignalValue(s.valor),
         status: s.estado === 'alerta' ? 'alert' : s.estado === 'desconocido' ? 'unknown' : 'ok',
         severity: s.severidad,
     }));
@@ -128,14 +232,42 @@ function mapMotorSignals(motorSenales) {
 
 export default function FatigueEngineScreen({ navigation, route }) {
     const metrics = route?.params?.metrics ?? null;
+    const [checkin, setCheckin] = useState(null);
     const [motorResult, setMotorResult] = useState(null);
+    const [loading, setLoading] = useState(true);
 
+    // Cargar el check-in del día en paralelo — es la fuente primaria de señales
+    // cuando no hay wearable. Sin esto, buildSignals recibía todo null y el motor
+    // devolvía siempre "Fatiga baja" con TODAS las señales grises.
     useEffect(() => {
-        if (!metrics) return;
         let cancelled = false;
-        healthApi.analyzeFatigue(metrics).then((res) => {
-            if (!cancelled && !res?.error && res?.data) setMotorResult(res.data);
-        }).catch(() => { /* fallback silencioso al cálculo local */ });
+        const today = new Date().toLocaleDateString('sv');
+        (async () => {
+            const checkinRes = await dailyCheckInApi.getForDate(today).catch(() => null);
+            const loadedCheckin = checkinRes?.data?.checkin ?? null;
+            if (cancelled) return;
+            setCheckin(loadedCheckin);
+
+            // Llamar al backend con TODAS las señales disponibles (wearable + manual).
+            // Aunque metrics sea null, si hay check-in tenemos datos que mandar.
+            const hasAnyInput = !!metrics || !!loadedCheckin;
+            if (!hasAnyInput) {
+                setLoading(false);
+                return;
+            }
+            const payload = {
+                ...(metrics ?? {}),
+                moodScore: loadedCheckin?.moodScore ?? null,
+                perceivedEnergy: loadedCheckin?.energyLevel ?? null,
+                factors: loadedCheckin?.factors ?? null,
+                // sleepHours: si el wearable no lo tiene, usar el del check-in.
+                sleepHours: metrics?.sleepHours ?? loadedCheckin?.sleepHours ?? null,
+            };
+            const res = await healthApi.analyzeFatigue(payload).catch(() => null);
+            if (cancelled) return;
+            if (res && !res.error && res.data) setMotorResult(res.data);
+            setLoading(false);
+        })();
         return () => { cancelled = true; };
     }, []);
 
@@ -145,19 +277,19 @@ export default function FatigueEngineScreen({ navigation, route }) {
         if (motorResult) {
             // El Motor ya da 'bajo'|'medio'|'alto'
             AsyncStorage.setItem(FATIGUE_LEVEL_KEY, motorResult.nivel ?? 'bajo');
-        } else if (metrics) {
-            const sigs = buildSignals(metrics);
+        } else if (metrics || checkin) {
+            const sigs = buildSignals(metrics, checkin);
             const crit = sigs.filter((s) => s.severity === 'critical').length;
             const warn = sigs.filter((s) => s.severity === 'warning').length;
             const level = crit >= 2 ? 'alto' : (crit === 1 || warn >= 2) ? 'medio' : 'bajo';
             AsyncStorage.setItem(FATIGUE_LEVEL_KEY, level);
         }
-    }, [motorResult, metrics]);
+    }, [motorResult, metrics, checkin]);
 
-    // Motor disponible → usa sus datos; sin Motor → cálculo local.
+    // Motor disponible → usa sus datos; sin Motor → cálculo local con check-in.
     const SIGNALS = motorResult
         ? mapMotorSignals(motorResult.senales ?? [])
-        : buildSignals(metrics);
+        : buildSignals(metrics, checkin);
 
     const motorFatigueLevel = motorResult
         ? ({ alto: 'high', medio: 'medium', bajo: 'low' }[motorResult.nivel] ?? 'low')
@@ -166,24 +298,39 @@ export default function FatigueEngineScreen({ navigation, route }) {
     const criticalCount = SIGNALS.filter((s) => s.severity === 'critical').length;
     const warningCount = SIGNALS.filter((s) => s.severity === 'warning').length;
     const activeSignalsCount = SIGNALS.filter((s) => s.status === 'alert').length;
+    const knownSignalsCount = SIGNALS.filter((s) => s.status !== 'unknown').length;
     const fatigueLevel = motorFatigueLevel
         ?? (criticalCount >= 2 ? 'high' : criticalCount === 1 || warningCount >= 2 ? 'medium' : 'low');
     const isHigh = fatigueLevel !== 'low';
+    // Sin ningún dato (ni wearable ni check-in) el motor no debe mentir con
+    // "Fatiga baja" — mostrar estado explícito.
+    const hasAnyData = !!metrics || !!checkin;
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <HealthScreenHeader title="Estado de fatiga" onBack={() => navigation.goBack()} />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Tarjeta destacada */}
-                <View style={[styles.featuredCard, { backgroundColor: isHigh ? FIGMA.featuredBgHigh : FIGMA.featuredBgLow }]}>
+                {/* Tarjeta destacada — 3 estados: sin datos / baja / media-alta */}
+                <View style={[
+                    styles.featuredCard,
+                    {
+                        backgroundColor: !hasAnyData
+                            ? FIGMA.unknownBadge
+                            : isHigh ? FIGMA.featuredBgHigh : FIGMA.featuredBgLow,
+                    },
+                ]}>
                     <Text style={styles.featuredTitle}>
-                        {isHigh ? 'Fatiga alta detectada' : 'Fatiga baja'}
+                        {!hasAnyData
+                            ? 'Sin datos suficientes'
+                            : fatigueLevel === 'high' ? 'Fatiga alta detectada'
+                            : fatigueLevel === 'medium' ? 'Fatiga media'
+                            : 'Fatiga baja'}
                     </Text>
                     <Text style={styles.featuredSubtitle}>
-                        {metrics
-                            ? `${activeSignalsCount} de ${SIGNALS.length} señales activadas`
-                            : 'Conecta un wearable para datos reales'}
+                        {!hasAnyData
+                            ? 'Guarda tu Estado del día o conecta un wearable.'
+                            : `${activeSignalsCount} de ${knownSignalsCount} señales activas${checkin && !metrics ? ' · según tu Estado del día' : ''}`}
                     </Text>
                 </View>
 

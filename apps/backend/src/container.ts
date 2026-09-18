@@ -146,10 +146,12 @@ import {
     GetProStatsUseCase,
     ExportProStatsUseCase,
     SubmitFeedbackUseCase,
-    // Bloque 3 · Salud — dispositivos
+    // Bloque 3 · Salud — dispositivos + check-in
     GetDevicesUseCase,
     RegisterDeviceUseCase,
     DeleteDeviceUseCase,
+    SaveDailyCheckinUseCase,
+    GetDailyCheckinUseCase,
     // Bloque 13 · Notificaciones
     RegisterPushTokenUseCase,
     SendBoeAlertUseCase,
@@ -173,6 +175,7 @@ import {
     SupabaseConfigRepository,
     SupabasePushRepository,
     SupabaseHealthRepository,
+    SupabaseHealthCheckinRepository,
     ExpoPushService,
     ClientApiClient,
     AiApiClient,
@@ -202,7 +205,7 @@ import {
     PushTokenController,
     createAuthMiddleware,
 } from './presentation';
-import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository, IConfigRepository, IPushRepository, IHealthRepository } from './domain';
+import type { IAuthRepository, IDashboardRepository, IPlanningRepository, IMotivationRepository, ITrainingRepository, ITutorRepository, INotesRepository, IBoeRepository, IStoreRepository, IConfigRepository, IPushRepository, IHealthRepository, IHealthCheckinRepository } from './domain';
 
 /**
  * Inyección de dependencias manual (sin framework).
@@ -261,6 +264,10 @@ export function buildContainer() {
     const healthRepo: IHealthRepository = isSupabaseConfigured
         ? new SupabaseHealthRepository(getSupabaseAdmin())
         : createStubHealthRepository();
+
+    const healthCheckinRepo: IHealthCheckinRepository = isSupabaseConfigured
+        ? new SupabaseHealthCheckinRepository(getSupabaseAdmin())
+        : createStubHealthCheckinRepository();
 
     if (!isSupabaseConfigured) {
         logger.warn(
@@ -592,6 +599,8 @@ export function buildContainer() {
         getHealthDevices:    new GetDevicesUseCase(healthRepo),
         registerHealthDevice: new RegisterDeviceUseCase(healthRepo),
         deleteHealthDevice:  new DeleteDeviceUseCase(healthRepo),
+        saveHealthCheckin:   new SaveDailyCheckinUseCase(healthCheckinRepo),
+        getHealthCheckin:    new GetDailyCheckinUseCase(healthCheckinRepo),
 
         // Bloque 13 · Notificaciones
         registerPushToken,
@@ -730,6 +739,8 @@ export function buildContainer() {
         getDevices:     useCases.getHealthDevices,
         registerDevice: useCases.registerHealthDevice,
         deleteDevice:   useCases.deleteHealthDevice,
+        saveCheckin:    useCases.saveHealthCheckin,
+        getCheckin:     useCases.getHealthCheckin,
         motorFatigue,
         healthAi: healthAiClient,
     });
@@ -896,4 +907,11 @@ function createStubHealthRepository(): IHealthRepository {
         throw new Error('[health] Supabase no configurado. Rellena .env y reinicia.');
     };
     return new Proxy({} as IHealthRepository, { get: () => notConfigured });
+}
+
+function createStubHealthCheckinRepository(): IHealthCheckinRepository {
+    const notConfigured = (): never => {
+        throw new Error('[health-checkin] Supabase no configurado. Rellena .env y reinicia.');
+    };
+    return new Proxy({} as IHealthCheckinRepository, { get: () => notConfigured });
 }

@@ -1423,4 +1423,188 @@ examen. Solución: cleanup full-stack `bloque6_dbclean_policia_galicia_only.sql`
 - Distribución proporcional al `failRate` mantiene: 1 tema débil → 5 preguntas,
   3 → 12, 5+ → 20 (top-5 por fail_rate).
 
+---
+
+## Gaps-18-09-26 · notas clave · Bloque 3 Salud
+
+### Check-in diario "Estado del día" (2026-09-18)
+
+Fuente primaria de señales del bloque Salud cuando el usuario no tiene wearable
+sincronizado con Health Connect / HealthKit. **Renombrado a "Estado del día"
+en toda la UI user-facing** por coherencia con "Estado de fatiga" (los
+identifiers de código siguen siendo `checkin` / `dailyCheckInApi` /
+`user_daily_checkins` — no romper).
+
+- **Tabla `user_daily_checkins`**: `mood_score smallint 1-10`, `sleep_hours
+  numeric(3,1) 0-24`, `energy_level text low|medium|high`, `factors text[]`.
+  UNIQUE `(user_id, local_date)` → 1 check-in por día. RLS owner + trigger
+  `touch_updated_at`. SQL en `apps/backend/supabase/bloque3_checkin.sql`.
+- **Endpoints**: `POST /health/checkin` (upsert idempotente, devuelve
+  `{checkin, created:boolean}`) y `GET /health/checkin?localDate=YYYY-MM-DD`
+  (404 si no existe). Constantes `HEALTH_CHECKIN` y `HEALTH_CHECKIN_GET`.
+- **8 factores** (con las 2 nuevas señales específicas del opositor):
+  `estres`, `cafeina`, `ejercicio`, `mala_noche`, `digestion`,
+  **`ansiedad_examen`**, `dolor_cabeza`, **`vista_cansada`**.
+- **Motor de fatiga extendido**: `HealthController.analyzeFatigue` acepta
+  ahora `moodScore`, `perceivedEnergy`, `factors` además de las biométricas.
+  **Decisión Motor externo vs fallback local**: `hasWearableBiometric = hrv
+  || fc_reposo || spo2` (sleep NO cuenta porque también viene del check-in).
+  Solo se llama al Motor externo si hay al menos una biométrica pura de
+  wearable. Sin esto, un usuario con solo sleep=8h disparaba el Motor y
+  recibía "Fatiga baja" con 1 señal. Nuevo branch `!hasAnyInput` devuelve
+  `{sin_datos:true, nivel:'bajo', recomendaciones:['Guarda tu Estado del día
+  o conecta un wearable']}` en lugar de mentir con "Fatiga baja".
+- **`buildFatigueLocally` con señales derivadas**: añade `mood` (crítica si
+  ≤3, warning si ≤5) y `factores` (crítica ≥3 negativos, warning ≥2).
+  Override de nivel según `perceivedEnergy`: "baja" sube un escalón, "alta"
+  sin críticas puede bajar. Persistido en `AsyncStorage(FATIGUE_LEVEL_KEY)`
+  para que `StudyTipsScreen` lo lea automáticamente.
+- **Fusión wearable + check-in en el hub** (`combineEnergy(metrics, checkin)`):
+  media ponderada 60/40 wearable/manual si hay ambos, si no el que exista.
+  `effectiveSleep = wearableSleep ?? checkinSleep`. **Nivel de estrés en
+  HubSalud** deriva del mood inverso del check-in cuando no hay HRV (mood
+  ≤3 → alto, ≤6 → medio) con caption "Según Estado del día".
+- **Widget Salud del Dashboard · Opción A tipográfica** (revisión 2026-09-18):
+  el emoji del mood se descartó por look "IA fitness genérica". Priorización:
+  `HR real` (wearable) → `moodScore/10` (Estado del día, misma jerarquía que
+  `72 ppm` — número grande + unidad pequeña) → `—`. Subtítulo cambia según
+  fuente: "Energía buena · según tu Estado del día" vs "Energía buena"
+  (wearable) vs "Estado del día pendiente · 20 s". Tap → `DailyCheckIn` si
+  pendiente, `HomeHealth` si ya lo hizo.
+
+### Onboarding wearable "menor ruido" (2026-09-18)
+
+Modelo decisión-primero-guía-después para no molestar al 90% que no tiene
+wearable premium sincronizado con HC. Flag persistente
+`opox.health.wearableDecision = 'yes'|'no'|null`.
+
+- `WearableOnboardingScreen` (paso 1): 2 líneas de copy + Sí/No. Al pulsar
+  "No" persiste el flag y el teaser desaparece del hub para siempre.
+- `WearableSelectScreen` (paso 2): 7 marcas Android (WearOS / Xiaomi / Amazfit-
+  Zepp / Fitbit / Garmin / Samsung / Otro) o 2 iOS (Apple Watch pairing
+  directo / Otro). `directPair: true` en Apple Watch salta la guía y va
+  directo al Pairing HealthKit.
+- `WearableGuideScreen` (paso 3): mini-guía de exactamente 3 pasos por
+  marca con la ruta real dentro de la app oficial hasta activar Health
+  Connect. `packageName` por marca abre Play Store con `market://` +
+  fallback web. Actualizar aquí si cambian los menús de las apps oficiales.
+- **Teaser dismissible en `HomeHealthScreen`**: fila al final del hub
+  "¿Tienes un wearable? Conéctalo para leer HR y HRV automáticamente" con
+  `showWearableTeaser = !hasWearableData && wearableDecision !== 'no'`.
+
+### Recordatorio del Estado del día configurable (2026-09-18)
+
+Notificación local diaria a la hora elegida por el usuario. Default `09:00`
+hora local. Persistido en AsyncStorage:
+- `opox.health.checkinReminderTime = 'HH:MM' | null` (null = desactivado)
+- `opox.health.checkinReminderId = string` (id de expo-notifications)
+
+`lib/checkinReminder.js` — schedule/cancel/ensure idempotentes.
+`ensureCheckinReminderScheduled()` corre al arranque de `App.js` para
+re-programar tras reinstall / limpieza de datos si el ID se perdió.
+
+Sección "RECORDATORIO DEL ESTADO DEL DÍA" en `ConfigAccessibilityScreen`
+con toggle + `DateTimePicker` (spinner iOS, dropdown Android). Título de la
+push "📝 Tu Estado del día" con `data: { screen: 'DailyCheckIn' }` — el
+listener existente en `App.js` navega automáticamente al tocar.
+
+**No-op en Expo Go** (SDK 53+): `scheduleNotificationAsync` requiere dev
+build. El toggle se puede activar en Expo Go pero no schedule.
+
+### 4 fixes técnicos del bloque Salud (2026-09-18)
+
+- **SpO₂ jamás mostrada**: `_readAndroidMetrics` leía `spo2Record.percentage.value`
+  cuando el tipo real de `react-native-health-connect@3.1.0` es
+  `percentage: number` directo. Fix con defensa: `typeof p === 'number' ? p :
+  p?.value`.
+- **Diagnóstico de reads fallidos**: `Promise.allSettled` en
+  `_readAndroidMetrics` ahora recorre resultados y `console.warn` con label
+  del recordType para cada `status: 'rejected'`. Visible en
+  `adb logcat -s ReactNativeJS`.
+- **Bucle "Health Connect conectado" ↔ hub**: `PairingScreen` disparaba el
+  modal siempre en mount si los permisos ya estaban concedidos, aunque el
+  usuario no acabara de hacer nada. Fix: `alreadyGranted === true` →
+  `navigation.goBack()` silencioso en lugar de `setPhase('complete')`. El
+  modal solo aparece cuando el usuario ACABA de conceder permisos.
+- **CTA smart en HubSalud**: 3 estados según flags — `pairingSkipped &&
+  !permissionsGranted` → "Activa permisos en Ajustes"; `permissionsGranted
+  && !hasWearableData` → tarjeta informativa morada "Health Connect no
+  tiene datos vitales" con explicación; normal → sin CTA.
+
+### FatigueEngine reescrito (2026-09-18)
+
+- Carga `dailyCheckInApi.getForDate(today)` en paralelo al mount. Sin este
+  cambio, el análisis siempre enviaba solo métricas biométricas (todas
+  null si no hay wearable) al backend → siempre "Fatiga baja".
+- `buildSignals(metrics, checkin)` con cascada por señal: HRV / SpO₂ /
+  sueño priorizan wearable con fallback al check-in. Nuevas señales "Cómo
+  te sientes hoy" (emoji + mood/10) y "Factores que restan hoy" (count de
+  negativos). Notas "De tu Estado del día" para las derivadas del check-in.
+- **`stringifySignalValue` defensivo** en `mapMotorSignals` y `SignalRow`:
+  evita "[object Object]" cuando el Motor externo devuelve `valor` como
+  estructura anidada `{valor: '8h'}` en vez de string. Doble red: primero
+  al mapear del Motor, luego en el render por si viene por otra vía.
+- Tarjeta destacada con 4 estados: sin datos (gris) / Fatiga baja (verde)
+  / Fatiga media (naranja) / Fatiga alta (rojo). Subtítulo dinámico
+  `X de N señales activas · según tu Estado del día`.
+
+### StudyTips rediseñado (2026-09-18)
+
+- **`aiRec.tema_sugerido` ya no se descarta**: nueva línea CTA "PRACTICA
+  AHORA" dentro de la card morada cuando el prompt de `HealthAiClient`
+  devuelve tema recomendado. Tap → `GeneratorConfig`.
+- Título **"OTRAS TÉCNICAS · BIBLIOTECA"** sobre las 4 técnicas estáticas
+  (Pomodoro, Repetición espaciada, Active recall, Curva del olvido) para
+  contextualizar que son catálogo, no reemplazan a la recomendación IA.
+- Card verde única "Tutor IA" reemplazada por **2 cards en fila**: naranja
+  "Practicar ahora · Test rápido" → `GeneratorConfig`, verde "Plan con
+  Tutor · Estrategia con IA" → `AITutor`. Usuario decide entre acción
+  rápida o planificación estratégica.
+
+### Convergencia flujos wearable + info tool OPOX (2026-09-18)
+
+- **`NoDataHintModal`** (`apps/mobile/src/components/NoDataHintModal.js`) —
+  modal custom on-brand (card blanca 14px, Poppins, icono reloj morado en
+  círculo, CTA verde "Ver cómo conectar" + secundario "Cerrar"). Sustituye
+  al `Alert.alert` nativo que rompía la línea Figma en `HomeHealthScreen`
+  cuando el usuario tocaba una card de wearable sin datos. También se
+  quitaron los `Ionicons information-circle-outline` que se veían
+  "developer" al lado del label — la caption "Requiere wearable" bajo el
+  número + el hecho de que la card sea tappable es suficiente pista.
+- **Flujo único de conexión wearable** — antes había dos entradas
+  independientes: `ConnectDeviceScreen` (técnica, chequea HC status) y
+  `WearableOnboardingScreen` (educacional, guía por marca). Se
+  encadenaron sin duplicar código:
+  ```
+  HubSalud (icono reloj / teaser)
+      → WearableOnboarding (¿Tienes uno?)
+      → WearableSelect (marca)
+      → WearableGuide (3 pasos configurar app fuente)
+      → ConnectDevice (verifica HC instalado/actualizado, ofrece Play Store)
+      → Pairing (permisos HC)
+  ```
+  Cambios concretos: `HomeHealthScreen.wearableIndicator.onPress` ahora
+  navega a `WearableOnboarding` (antes `ConnectDevice`);
+  `WearableGuideScreen.handleConnect` navega a `ConnectDevice` (antes
+  `Pairing` directo — se saltaba la verificación de HC). Apple Watch iOS
+  sigue yendo directo a `Pairing` desde `WearableSelectScreen` porque
+  HealthKit siempre está disponible en iOS y `ConnectDevice` no aporta
+  chequeo útil ahí.
+
+### Fixes del Banco de Exámenes (2026-09-18)
+
+- **`Missing 'READ' permission for accessing the file`** al subir PDF
+  (segundo intento tras hot reload): el URI `content://` del picker pierde
+  permisos entre `pickFile` y `handleUpload`. Fix en 2 capas: (a) leer
+  `arrayBuffer()` INMEDIATAMENTE tras el pick (patrón `NotesUploadScreen`);
+  (b) `copyToCacheDirectory: false` para replicar exactamente el patrón
+  del Bloque 9 que sí funciona con SAF de Android SDK 57.
+- **"0 preguntas detectadas"** cuando se sube texto de ley en vez de examen
+  tipo test: nuevo estado `noQuestionsDetected` en `ExamUploadJobScreen`
+  (rama entre `error` y `success`) con card naranja informativa
+  explicativa. Antes mostraba checkmark verde de éxito que confundía.
+- **Copy preventivo en `ExamUploadScreen`**: card naranja con 2 ✅ y 1 ❌
+  antes del formulario — "❌ Textos de leyes, BOE consolidado, temario o
+  apuntes" evita que el usuario pierda 90 s subiendo el archivo equivocado.
+
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

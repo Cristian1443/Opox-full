@@ -102,6 +102,11 @@ export default function ExamUploadJobScreen({ navigation, route }) {
     const sinTemaHigh = (result?.sinTema ?? 0) > 0
         && (result?.guardadas ?? 0) > 0
         && (result?.sinTema ?? 0) / (result?.guardadas ?? 1) > 0.5;
+    // El Motor detectó 0 preguntas — casi siempre significa que el archivo NO era
+    // un examen tipo test (era un texto de ley, un temario, un BOE consolidado…).
+    // No mostrar checkmark verde porque el usuario cree que fue éxito.
+    const noQuestionsDetected =
+        status === 'done' && !yaIncorporado && (result?.extraidas ?? 0) === 0;
 
     return (
         <SafeAreaView style={styles.safe}>
@@ -135,6 +140,27 @@ export default function ExamUploadJobScreen({ navigation, route }) {
                         <Text style={styles.errorDesc}>{errorMsg || 'Ha ocurrido un error inesperado.'}</Text>
                         <TouchableOpacity style={styles.primaryBtn} onPress={retry} activeOpacity={0.85}>
                             <Text style={styles.primaryBtnLabel}>Reintentar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.secondaryBtn} onPress={goBank} activeOpacity={0.85}>
+                            <Text style={styles.secondaryBtnLabel}>Volver al banco</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : noQuestionsDetected ? (
+                    <View style={styles.noQuestionsCard}>
+                        <Ionicons name="document-text-outline" size={44} color={COLORS.orange} />
+                        <Text style={styles.noQuestionsTitle}>No detectamos preguntas tipo test</Text>
+                        <Text style={styles.noQuestionsDesc}>
+                            El archivo que subiste no parece contener preguntas con opciones a/b/c/d.
+                            Suele pasar cuando se sube un texto de ley, temario o BOE consolidado.
+                        </Text>
+                        <View style={styles.tipBlock}>
+                            <Text style={styles.tipTitle}>Prueba con:</Text>
+                            <Text style={styles.tipItem}>• Simulacros oficiales de convocatorias anteriores.</Text>
+                            <Text style={styles.tipItem}>• Tests preparados por una academia o docente.</Text>
+                            <Text style={styles.tipItem}>• Preguntas numeradas con al menos 3-4 opciones.</Text>
+                        </View>
+                        <TouchableOpacity style={styles.primaryBtn} onPress={retry} activeOpacity={0.85}>
+                            <Text style={styles.primaryBtnLabel}>Subir otro archivo</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.secondaryBtn} onPress={goBank} activeOpacity={0.85}>
                             <Text style={styles.secondaryBtnLabel}>Volver al banco</Text>
@@ -320,6 +346,53 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(214,69,80,0.25)',
         gap: 10,
+    },
+
+    // Estado "0 preguntas detectadas" — naranja informativo, ni éxito ni error.
+    noQuestionsCard: {
+        alignItems: 'center',
+        padding: 24,
+        borderRadius: 18,
+        backgroundColor: 'rgba(246,150,36,0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(246,150,36,0.35)',
+        gap: 10,
+    },
+    noQuestionsTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 17,
+        color: COLORS.purple,
+        marginTop: 8,
+        textAlign: 'center',
+    },
+    noQuestionsDesc: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: COLORS.purple,
+        opacity: 0.75,
+        textAlign: 'center',
+        lineHeight: 19,
+    },
+    tipBlock: {
+        alignSelf: 'stretch',
+        padding: 12,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.5)',
+        borderWidth: 1,
+        borderColor: 'rgba(246,150,36,0.2)',
+        marginTop: 6,
+    },
+    tipTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 12,
+        color: COLORS.purple,
+        marginBottom: 6,
+    },
+    tipItem: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: COLORS.purple,
+        lineHeight: 18,
     },
     errorTitle: {
         fontFamily: 'Poppins-SemiBold',

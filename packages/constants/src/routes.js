@@ -11,6 +11,8 @@ export const API_ROUTES = {
     HEALTH_MENUS: '/health/menus',
     HEALTH_MEDITATION: '/health/meditation',
     HEALTH_STUDY_TECHNIQUE: '/health/study-technique',
+    HEALTH_CHECKIN: '/health/checkin',                // POST · guardar check-in del día (upsert)
+    HEALTH_CHECKIN_GET: '/health/checkin',            // GET  · check-in del día (?localDate=YYYY-MM-DD)
 
     AUTH: {
         REGISTER: '/auth/register',
