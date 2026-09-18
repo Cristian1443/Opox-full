@@ -431,6 +431,9 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                     examTitle: isChallengeMode ? 'Reto de clan' : 'Generador infinito',
                     timedMode: fatigueMode,
                     oposicion,
+                    // TopicId solicitado — fallback para el Laboratorio cuando
+                    // Motor no puebla `tema_id` en las preguntas del SesionOut.
+                    requestedTopicId: backendTopicId,
                     ...(challengeId && { challengeId }),
                     ...(challengeClanId && { clanId: challengeClanId }),
                     ...(taskId && { taskId }),
@@ -668,8 +671,9 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                     </View>
                 )}
 
-                {/* Botón generar / estado error */}
-                {generateError ? (
+                {/* Error de generación queda dentro del scroll — es un estado
+                    transitorio con card visual grande, no un CTA. */}
+                {generateError && (
                     <View style={styles.errorCard}>
                         <Ionicons name="alert-circle-outline" size={22} color="#C0392B" />
                         <Text style={styles.errorText}>
@@ -683,39 +687,51 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                             <Text style={styles.retryBtnText}>Reintentar</Text>
                         </TouchableOpacity>
                     </View>
-                ) : (
-                    <>
-                        <TouchableOpacity
-                            style={[styles.button, generating && { opacity: 0.7 }]}
-                            onPress={generate}
-                            activeOpacity={0.85}
-                            disabled={generating}
-                        >
-                            {generating ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <ActivityIndicator color="#fff" size="small" />
-                                    <Text style={styles.buttonText}>
-                                        {slowWarning ? 'La IA está pensando…' : 'Generando preguntas…'}
-                                    </Text>
-                                </View>
-                            ) : (
-                                <Text style={styles.buttonText}>
-                                {challengeId ? 'Empezar reto' : taskId ? 'Empezar tarea' : 'Generar test'}
-                            </Text>
-                            )}
-                        </TouchableOpacity>
-
-                        {slowWarning && (
-                            <View style={styles.slowWarningRow}>
-                                <Ionicons name="time-outline" size={14} color={COLORS.grayText} />
-                                <Text style={styles.slowWarningText}>
-                                    Generando con varios temas puede tardar hasta 90 s. Por favor espera…
-                                </Text>
-                            </View>
-                        )}
-                    </>
                 )}
             </ScrollView>
+
+            {/* Footer fijo con el CTA — siempre visible, sin obligar al usuario
+                a scrollear hasta abajo tras seleccionar temas. Se oculta cuando
+                hay error de generación (la tarjeta de error ya expone el retry). */}
+            {!generateError && (
+                <View style={styles.footer}>
+                    <TouchableOpacity
+                        style={[styles.button, generating && { opacity: 0.7 }]}
+                        onPress={generate}
+                        activeOpacity={0.85}
+                        disabled={generating}
+                    >
+                        {generating ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <ActivityIndicator color="#fff" size="small" />
+                                <Text style={styles.buttonText}>
+                                    {slowWarning ? 'La IA está pensando…' : 'Generando preguntas…'}
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={{ alignItems: 'center' }}>
+                                <Text style={styles.buttonText}>
+                                    {challengeId ? 'Empezar reto' : taskId ? 'Empezar tarea' : 'Generar test'}
+                                </Text>
+                                {!isLockedMode && (
+                                    <Text style={styles.buttonSubtext}>
+                                        {selectionLabel} · {count} preguntas
+                                    </Text>
+                                )}
+                            </View>
+                        )}
+                    </TouchableOpacity>
+
+                    {slowWarning && (
+                        <View style={styles.slowWarningRow}>
+                            <Ionicons name="time-outline" size={14} color={COLORS.grayText} />
+                            <Text style={styles.slowWarningText}>
+                                Generando con varios temas puede tardar hasta 90 s. Por favor espera…
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            )}
 
             <ConfirmExitModal
                 visible={exitOpen}
@@ -752,7 +768,9 @@ const FONTS = {
 
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: COLORS.white },
-    scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+    // paddingBottom aumentado para que el footer sticky no tape el último
+    // tema seleccionable ni la card de error de generación cuando aparecen.
+    scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 140 },
 
     headerRow: {
         flexDirection: 'row',
@@ -977,9 +995,28 @@ const styles = StyleSheet.create({
         color: COLORS.purple,
     },
 
+    /* Footer sticky con el CTA — sombra sutil arriba para separar del scroll. */
+    footer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 20,
+        backgroundColor: COLORS.white,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.divider,
+        // elevation solo aplica en Android; iOS usa shadow*.
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: -2 },
+    },
+
     /* Botón */
     button: {
-        marginTop: 28,
         height: 56,
         borderRadius: 16,
         backgroundColor: COLORS.green,
@@ -990,6 +1027,13 @@ const styles = StyleSheet.create({
         fontFamily: FONTS.semiBold,
         fontSize: 16,
         color: COLORS.white,
+    },
+    buttonSubtext: {
+        fontFamily: FONTS.regular,
+        fontSize: 11,
+        color: COLORS.white,
+        opacity: 0.85,
+        marginTop: 2,
     },
 
     /* TTL — aviso de lentitud */

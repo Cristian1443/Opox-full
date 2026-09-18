@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { RetoRecibidoModal } from '../../components/MotivationModals';
 import { api, motivationApi, boeApi } from '../../api';
@@ -117,10 +118,16 @@ export default function ChallengesScreen({ navigation, route }) {
     const [creating, setCreating] = useState(false);
 
     const load = useCallback(() => {
+        // Refresca lista + `completedByMe` de cada reto. Se re-ejecuta cada
+        // vez que la pantalla recibe foco — por ejemplo al volver de
+        // TrainingResult tras completar un reto — para que la barra
+        // individual y el porcentaje del clan reflejen la nueva progresión
+        // sin necesidad de refresh manual.
         motivationApi.listClanChallenges(clanId).then(({ data }) => { if (data) setChallenges(data); });
     }, [clanId]);
 
     useEffect(() => { load(); }, [load]);
+    useFocusEffect(useCallback(() => { load(); }, [load]));
 
     const openWizard = async () => {
         setWizardStep(1);

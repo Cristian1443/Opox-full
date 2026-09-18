@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
+import { getCachedSummary, setCachedSummary } from '../../lib/tutorCache';
 import { useFocusEffect } from '@react-navigation/native';
 
 // Colores confirmados contra Figma (frame RESUMEN INTELIGENTE, Bloque 8)
@@ -220,17 +221,31 @@ export default function TutorSummariesScreen({ navigation, route }) {
     const [isLoading, setIsLoading]   = useState(!!topicId && !paramSections);
     const [detailLevel, setDetailLevel] = useState(1); // 0=Esquema, 1=Medio, 2=Profundo
 
-    // Hooks siempre antes de cualquier return condicional
+    // Cache-first (Bloque 8): si tenemos un resumen previo en AsyncStorage lo
+    // pintamos al instante y disparamos el refresh en background. La latencia
+    // percibida cae de 15-60 s a 0 en la mayoría de reaperturas.
     useEffect(() => {
         if (!topicId) return;
-        setIsLoading(true);
-        setSummary(null);
-        tutorApi.getSummary(topicId, oposicion, detailLevel)
-            .then((res) => {
-                if (!res?.error && res?.data) setSummary(res.data);
-            })
-            .catch(() => {})
-            .finally(() => setIsLoading(false));
+        let cancelled = false;
+        (async () => {
+            setSummary(null);
+            const cached = await getCachedSummary(topicId, detailLevel);
+            if (cancelled) return;
+            if (cached) {
+                setSummary(cached);
+                setIsLoading(false); // fresco viene después sin bloquear la UI
+            } else {
+                setIsLoading(true);
+            }
+            const res = await tutorApi.getSummary(topicId, oposicion, detailLevel).catch(() => null);
+            if (cancelled) return;
+            if (res && !res.error && res.data) {
+                setSummary(res.data);
+                setCachedSummary(topicId, detailLevel, res.data);
+            }
+            setIsLoading(false);
+        })();
+        return () => { cancelled = true; };
     }, [topicId, oposicion, detailLevel]);
 
     // Muestra el selector si aún no hay tema elegido

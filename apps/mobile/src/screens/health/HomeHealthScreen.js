@@ -1,5 +1,5 @@
 // Bloque 3 · Salud — Pantalla 3.1 · Home de Salud
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     View,
     ScrollView,
@@ -8,6 +8,7 @@ import {
     StatusBar,
     ActivityIndicator,
     Linking,
+    AppState,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -157,6 +158,19 @@ export default function HomeHealthScreen({ navigation }) {
     }, []);
 
     useFocusEffect(loadMetrics);
+
+    // Cuando el usuario vuelve de Ajustes → Health Connect tras conceder
+    // permisos, el screen ya estaba "focused" en términos de navegación
+    // (nunca dejó de estarlo — fue el proceso quien se pausó), así que
+    // useFocusEffect no dispara. Refrescamos también en AppState 'active'.
+    const loadMetricsRef = useRef(loadMetrics);
+    loadMetricsRef.current = loadMetrics;
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', (state) => {
+            if (state === 'active') loadMetricsRef.current();
+        });
+        return () => sub.remove();
+    }, []);
 
     const energyPct = calcEnergy(metrics);
     const { title: energyTitle, subtitle: energySubtitle } = energyLabel(energyPct);

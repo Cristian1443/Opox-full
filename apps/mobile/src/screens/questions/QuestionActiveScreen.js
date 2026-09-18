@@ -175,6 +175,10 @@ export default function QuestionActiveScreen({ navigation, route }) {
     // incrementalmente vía useTestSession. La primera se ve en ~5-8s.
     jobId = null,
     expectedTotal = null,
+    // Fallback de topicId cuando el Motor no puebla `tema_id` en las preguntas.
+    // Sin esto la persistencia en training_attempt_responses fallaría por Zod
+    // (topicId: min length 1) y el Laboratorio mostraría 0%.
+    requestedTopicId = null,
     // Bloque 6.6 · Simulacro real del banco: mode='bank_mock' + sesionId.
     // Las preguntas llegan SIN correctIndex; la corrección se resuelve pregunta
     // a pregunta contra /training/session/:sessionId/answer del Motor.
@@ -188,10 +192,22 @@ export default function QuestionActiveScreen({ navigation, route }) {
     questions: streamedRaw,
     progress: streamProgress,
     status: streamStatus,
+    sessionId: streamSessionId,
   } = useTestSession(jobId, { expectedTotal });
-  const streamedQuestions = jobId && streamedRaw?.length
-    ? adaptGeneratedQuestions(streamedRaw)
-    : [];
+  // Preguntas del stream: mutables porque las que vienen con correctIndex: -1
+  // (Motor generó nuevas, no están en el banco) reciben corrección diferida
+  // vía POST /training/session/:sessionId/answer al responder cada una.
+  const [streamQuestionsState, setStreamQuestionsState] = useState([]);
+  useEffect(() => {
+    if (!jobId || !streamedRaw?.length) return;
+    const adapted = adaptGeneratedQuestions(streamedRaw);
+    // Merge preservando ediciones locales (correctIndex resuelto por answer).
+    setStreamQuestionsState((prev) => {
+      const byId = new Map(prev.map((q) => [q.id, q]));
+      return adapted.map((q) => byId.get(q.id) ?? q);
+    });
+  }, [jobId, streamedRaw]);
+
   // En modo bank_mock las preguntas son MUTABLES: al responder cada una, el
   // backend devuelve correctIndex + explicación y hay que reflejarlo en la UI
   // (verde/rojo, feedback). En el resto de modos las preguntas ya vienen con
@@ -201,7 +217,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const [isCorrectionLoading, setIsCorrectionLoading] = useState(false);
   const questions = isBankMock
     ? bankQuestions
-    : (jobId ? streamedQuestions : (paramQuestions ?? MOCK_QUESTIONS));
+    : (jobId ? streamQuestionsState : (paramQuestions ?? MOCK_QUESTIONS));
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [selectedOption, setSelectedOption] = useState(null);
@@ -234,9 +250,12 @@ export default function QuestionActiveScreen({ navigation, route }) {
   // Streaming: si aún no llega la primera pregunta, mostramos loader con el
   // progreso del job. Se calcula ANTES del uso de `questions[currentIndex]`
   // porque en modo stream ese array puede estar vacío en el primer render.
+  // Si el job terminó ('done') pero no llegaron preguntas, tratamos como error
+  // para no dejar al usuario ante un spinner infinito.
   const streamStillLoading =
-    jobId && questions.length === 0 && streamStatus !== 'error';
-  const streamHasError = jobId && streamStatus === 'error';
+    jobId && questions.length === 0 && streamStatus !== 'error' && streamStatus !== 'done';
+  const streamHasError =
+    jobId && (streamStatus === 'error' || (streamStatus === 'done' && questions.length === 0));
 
   const question = questions[currentIndex];
   const total = jobId && expectedTotal ? expectedTotal : questions.length;
@@ -322,10 +341,19 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const handleConfirm = async () => {
     if (!selectedOption) return;
 
-    // Modo bank_mock (Bloque 6.6): la corrección la hace el Motor por pregunta.
-    // Bloqueamos la UI mientras esperamos la respuesta del /answer para no
-    // pintar verde/rojo con datos inventados.
-    if (isBankMock) {
+    // Corrección diferida por Motor: cubre dos escenarios equivalentes:
+    //   - bank_mock (Bloque 6.6) → sesión Motor + sesionId en params
+    //   - streaming (Bloque 6.2) → sesión Motor + streamSessionId del hook,
+    //     preguntas con correctIndex: -1 (ninguna opción marcada correct=true)
+    //     porque son preguntas nuevas del Motor no presentes en el banco.
+    // Ambos flujos comparten POST /training/session/:sessionId/answer para
+    // que el Motor devuelva el correcta_idx real + explicación + evidencia.
+    const needsMotorCorrection =
+      isBankMock
+      || (jobId && streamSessionId && question && !question.options.some((o) => o.correct));
+    const motorSessionId = isBankMock ? sesionId : streamSessionId;
+
+    if (needsMotorCorrection && motorSessionId) {
       if (isCorrectionLoading) return;
       const optionIds = ['A', 'B', 'C', 'D'];
       const optionIndex = optionIds.indexOf(selectedOption);
@@ -333,7 +361,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
       setIsCorrectionLoading(true);
       const timeSecs = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
-      const { data, error } = await trainingApi.postSessionAnswer(sesionId, {
+      const { data, error } = await trainingApi.postSessionAnswer(motorSessionId, {
         questionId: question.id,
         optionIndex,
       });
@@ -344,8 +372,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
         return;
       }
 
-      // Aplicar la corrección real a la pregunta activa: marca `correct` en la
-      // opción que devolvió el Motor y guarda la explicación/evidencia.
       const correctIndex = typeof data.correctIndex === 'number' ? data.correctIndex : null;
       const evidenceText = data.evidence?.cita ?? '';
       const explanation = data.explanation ?? evidenceText ?? '';
@@ -361,9 +387,17 @@ export default function QuestionActiveScreen({ navigation, route }) {
           ? { article: '', title: '', text: evidenceText, boeUrl: null }
           : question.articleRef,
       };
-      const updatedQuestions = [...bankQuestions];
-      updatedQuestions[currentIndex] = updatedQuestion;
-      setBankQuestions(updatedQuestions);
+      if (isBankMock) {
+        const updatedQuestions = [...bankQuestions];
+        updatedQuestions[currentIndex] = updatedQuestion;
+        setBankQuestions(updatedQuestions);
+      } else {
+        setStreamQuestionsState((prev) => {
+          const next = [...prev];
+          next[currentIndex] = updatedQuestion;
+          return next;
+        });
+      }
 
       const isCorrect = Boolean(data.correct);
       if (!isCorrect) Vibration.vibrate(80);
@@ -399,7 +433,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
       if (source === 'official' && mockExamId) {
         trainingApi.clearMockProgress().catch(() => {});
       }
-      navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId });
+      navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId, requestedTopicId });
       return;
     }
     // Autoguardado del progreso de simulacros oficiales — permite retomar
@@ -429,34 +463,34 @@ export default function QuestionActiveScreen({ navigation, route }) {
     return `${m}:${sec}`;
   };
 
-  if (!question) return null;
-
-  const isCorrectAnswer =
-    isSubmitted && question.options.find(o => o.id === selectedOption)?.correct === true;
-  const isTimeOut = isSubmitted && selectedOption === null;
-  const isLastQuestion = currentIndex + 1 >= total;
-  const hintsRemaining = MAX_HINTS - hintsUsed;
-  const isHintDisabled = isSubmitted || hintsRemaining <= 0;
-
-  // Cuando el usuario ha respondido, se ocultan las opciones incorrectas no elegidas.
-  // Correcta se muestra en verde, elegida (si fue mal) en rojo — mockup.
-  // Loader de streaming: se renderiza ANTES de que llegue la primera pregunta
-  // en modo stream — evita crash por `question.options` undefined.
+  // Loader de streaming: DEBE evaluarse ANTES del guard `if (!question)`,
+  // porque en modo stream `question` está undefined hasta que llega la
+  // primera pregunta del Motor. Sin este orden, el `return null` de abajo
+  // renderiza una pantalla en blanco durante toda la generación.
   if (streamStillLoading || streamHasError) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           {streamHasError ? (
             <>
-              <Text style={{ fontSize: 15, color: colors.textDark, textAlign: 'center', marginBottom: 12 }}>
-                El motor está tardando más de lo normal.
+              <Text style={{ fontSize: 15, color: colors.textDark, textAlign: 'center', marginBottom: 16, paddingHorizontal: 20 }}>
+                El motor está tardando más de lo normal.{'\n'}
+                Prueba con menos preguntas o vuelve a intentar.
               </Text>
-              <TouchableOpacity
-                style={{ backgroundColor: colors.ctaGreen, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
-                onPress={() => navigation.goBack()}
-              >
-                <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Volver</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.ctaGreen, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                  onPress={() => navigation.goBack()}
+                >
+                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Volver</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.selectionBorder, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                  onPress={() => navigation.replace('GeneratorConfig')}
+                >
+                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Reintentar</Text>
+                </TouchableOpacity>
+              </View>
             </>
           ) : (
             <>
@@ -464,9 +498,14 @@ export default function QuestionActiveScreen({ navigation, route }) {
               <Text style={{ fontSize: 14, color: colors.textDark, marginTop: 12 }}>
                 Preparando tu test…
               </Text>
-              {streamProgress?.total > 0 && (
+              {streamProgress?.total > 0 ? (
                 <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
                   {streamProgress.done} de {streamProgress.total} preguntas listas
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, textAlign: 'center', paddingHorizontal: 20 }}>
+                  El Motor extrae cada pregunta del temario oficial.{'\n'}
+                  Puede tardar hasta 2 minutos.
                 </Text>
               )}
             </>
@@ -475,6 +514,18 @@ export default function QuestionActiveScreen({ navigation, route }) {
       </SafeAreaView>
     );
   }
+
+  // Guard adicional: fuera del modo streaming, si por alguna razón no hay
+  // pregunta actual (edge case, currentIndex fuera de rango, etc.) evitamos
+  // el crash de `question.options` renderizando nada.
+  if (!question) return null;
+
+  const isCorrectAnswer =
+    isSubmitted && question.options.find(o => o.id === selectedOption)?.correct === true;
+  const isTimeOut = isSubmitted && selectedOption === null;
+  const isLastQuestion = currentIndex + 1 >= total;
+  const hintsRemaining = MAX_HINTS - hintsUsed;
+  const isHintDisabled = isSubmitted || hintsRemaining <= 0;
 
   const visibleOptions = question.options.filter((opt) => {
     if (!isSubmitted) return true;
@@ -851,7 +902,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
           if (source === 'official' && mockExamId) {
             trainingApi.clearMockProgress().catch(() => {});
           }
-          navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId });
+          navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId, requestedTopicId });
         }}
       />
 

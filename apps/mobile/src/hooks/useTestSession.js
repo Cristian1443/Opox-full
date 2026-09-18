@@ -16,8 +16,14 @@ import { trainingApi } from '../api';
 // El hook expone `postAnswer(questionId, optionIndex)` para enviar respuestas
 // mientras el motor sigue generando (postSessionAnswer del backend).
 
-const DEFAULT_INTERVAL_MS = 2500;
-const DEFAULT_TIMEOUT_MS = 90_000;
+// Intervalo bajado a 1.5 s (antes 2.5 s) — el contador "N de M preguntas"
+// avanza ~40 % más rápido, reduce la sensación de "no pasa nada".
+// Timeout subido a 180 s (antes 90 s) — el Motor tarda 60-120 s en generar
+// 30 preguntas RAG con evidencia verbatim; 90 s cortaba antes de terminar
+// y el usuario veía "El motor está tardando más de lo normal" aunque el
+// job estaba a punto de completar.
+const DEFAULT_INTERVAL_MS = 1500;
+const DEFAULT_TIMEOUT_MS = 180_000;
 
 export function useTestSession(jobId, opts = {}) {
     const intervalMs = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
@@ -58,9 +64,13 @@ export function useTestSession(jobId, opts = {}) {
             if (job?.progress) setProgress(job.progress);
             if (job?.sessionId && sessionId !== job.sessionId) setSessionId(job.sessionId);
 
-            // Cuando hay al menos 1 pregunta publicada y sessionId, refrescamos las preguntas.
+            // El Motor no siempre publica progreso incremental; `progress.done`
+            // puede quedarse en 0 hasta que el job termina. Refrescamos las
+            // preguntas cuando (a) hay progreso publicado ≥ 1, o (b) el job
+            // ya está en 'done' — en ambos casos el sessionId debe existir.
             const sid = job?.sessionId ?? sessionId;
-            if (sid && job?.progress?.done >= 1) {
+            const jobDone = job?.status === 'done';
+            if (sid && (job?.progress?.done >= 1 || jobDone)) {
                 const { data: sess } = await trainingApi.getSessionQuestions(sid);
                 if (!activeRef.current) return;
                 if (Array.isArray(sess?.questions)) {
@@ -70,7 +80,7 @@ export function useTestSession(jobId, opts = {}) {
                 }
             }
 
-            if (job?.status === 'done') {
+            if (jobDone) {
                 setStatus('done');
                 return;
             }

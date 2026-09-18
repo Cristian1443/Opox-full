@@ -28,25 +28,62 @@ export interface MotorFatigueResult {
 }
 
 // Motor API real response (POST /v1/fatigue/biometrics)
+// Schema verificado contra https://ia.opox.ai/openapi.json (EstadoFatigaOut).
+// `nivel` es 'verde' | 'ambar' | 'rojo' (NO 'amarillo' como creíamos).
+// `metricas` y `baseline` son Record<string, number> — valores directos, sin
+// wrapper { valor, nivel }.
 interface MotorFatiguaApiResponse {
     user_id: string;
-    nivel: 'verde' | 'amarillo' | 'rojo';
+    nivel: 'verde' | 'ambar' | 'rojo';
     mensaje?: string;
-    metricas?: Record<string, { valor: number | null; nivel: string }>;
-    baseline?: Record<string, unknown>;
-    historico?: Array<{ fecha: string; hrv_ms?: number; fc_reposo?: number; horas_sueno?: number; nivel: string }>;
+    metricas?: Record<string, number>;
+    baseline?: Record<string, number>;
+    historico?: Array<{
+        fecha: string;
+        nivel: 'verde' | 'ambar' | 'rojo';
+        metricas?: Record<string, number>;
+    }>;
 }
 
+// Mantenemos el semáforo interno con 'amarillo' porque toda la UI del mobile
+// ya está construida sobre ese vocabulario. Mapeamos 'ambar' → 'amarillo' aquí.
 const COLOR_TO_NIVEL: Record<string, 'bajo' | 'medio' | 'alto'> = {
     verde: 'bajo',
-    amarillo: 'medio',
+    ambar: 'medio',
+    amarillo: 'medio', // tolerancia por si el Motor vuelve al valor antiguo
     rojo: 'alto',
 };
 const COLOR_TO_SEMAFORO: Record<string, 'verde' | 'amarillo' | 'rojo'> = {
     verde: 'verde',
+    ambar: 'amarillo',
     amarillo: 'amarillo',
     rojo: 'rojo',
 };
+
+// Etiquetas legibles por metric_id (evita que la UI muestre "hrv_ms" crudo).
+const METRIC_LABELS: Record<string, string> = {
+    hrv_ms: 'Variabilidad cardíaca (HRV)',
+    fc_reposo: 'Frecuencia cardíaca en reposo',
+    horas_sueno: 'Horas de sueño',
+    spo2: 'Saturación de oxígeno',
+};
+
+// Umbrales de desviación vs baseline para asignar severidad por señal.
+// Métricas donde subir el valor es MEJOR (HRV, sueño, SpO2): rojo cuando ≤ 70 %
+// del baseline; amarillo cuando ≤ 85 %. FC reposo es al revés (más alto = peor).
+function computeSeverity(metricId: string, value: number, baseline?: number):
+    'ok' | 'warning' | 'critical' {
+    if (baseline == null || baseline === 0) return 'ok';
+    const ratio = value / baseline;
+    if (metricId === 'fc_reposo') {
+        if (ratio >= 1.15) return 'critical';
+        if (ratio >= 1.05) return 'warning';
+        return 'ok';
+    }
+    if (ratio <= 0.70) return 'critical';
+    if (ratio <= 0.85) return 'warning';
+    return 'ok';
+}
 
 export class MotorFatigueClient {
     private readonly http: AxiosInstance;
@@ -78,10 +115,13 @@ export class MotorFatigueClient {
             user_id: input.userId ?? 'opox-backend',
             ts: input.fecha,
         };
+        // Body validado contra el schema real BiometriaIn: user_id + al menos
+        // uno de {hrv_ms, fc_reposo, horas_sueno}. `spo2` NO está en el schema
+        // — enviarlo puede provocar 422 en modo strict; el mobile lo usa en
+        // el fallback local del HealthController.
         if (input.hrv != null) body.hrv_ms = input.hrv;
         if (input.fc_reposo != null) body.fc_reposo = input.fc_reposo;
         if (input.sueno_horas != null) body.horas_sueno = input.sueno_horas;
-        if (input.spo2 != null) body.spo2 = input.spo2;
 
         const { data } = await this.http.post<MotorFatiguaApiResponse>('/v1/fatigue/biometrics', body);
 
@@ -89,14 +129,25 @@ export class MotorFatigueClient {
         const nivel = COLOR_TO_NIVEL[data.nivel] ?? 'bajo';
         const semaforo = COLOR_TO_SEMAFORO[data.nivel] ?? 'verde';
 
-        // Build senales from metricas
-        const senales: MotorFatigueSignal[] = Object.entries(data.metricas ?? {}).map(([key, m]) => ({
-            id: key,
-            label: key.replace(/_/g, ' '),
-            valor: m.valor != null ? String(m.valor) : 'Sin datos',
-            estado: m.nivel === 'verde' ? 'ok' : m.nivel === 'rojo' ? 'alerta' : 'ok',
-            severidad: m.nivel === 'rojo' ? 'critical' : m.nivel === 'amarillo' ? 'warning' : 'ok',
-        }));
+        // Construimos las señales a partir de `metricas` (Record<string, number>).
+        // La severidad por señal se deriva comparando contra `baseline` — el Motor
+        // no expone severidad por métrica, solo un `nivel` global.
+        const metricas = data.metricas ?? {};
+        const baseline = data.baseline ?? {};
+        const senales: MotorFatigueSignal[] = Object.entries(metricas).map(([key, value]) => {
+            // Convención del Motor: baselines suelen exponerse con sufijo `_promedio`.
+            const baseValue = baseline[key] ?? baseline[`${key}_promedio`];
+            const severidad = typeof value === 'number'
+                ? computeSeverity(key, value, typeof baseValue === 'number' ? baseValue : undefined)
+                : 'ok';
+            return {
+                id: key,
+                label: METRIC_LABELS[key] ?? key.replace(/_/g, ' '),
+                valor: value != null ? String(value) : 'Sin datos',
+                estado: severidad === 'critical' ? 'alerta' : 'ok',
+                severidad,
+            };
+        });
 
         const historial_7_dias = (data.historico ?? []).slice(0, 7).map((h) => ({
             fecha: typeof h.fecha === 'string' ? (h.fecha.split('T')[0] ?? h.fecha) : String(h.fecha ?? ''),

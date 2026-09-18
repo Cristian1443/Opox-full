@@ -56,6 +56,32 @@ export function isHealthAvailable() {
     return false;
 }
 
+// El módulo nativo Kotlin (HealthConnectManager.kt) exige que se haya llamado
+// a initialize() antes de getGrantedPermissions / readRecords / requestPermission
+// — todos comparten `throwUnlessClientIsAvailable` que rechaza con
+// ClientNotInitialized si no se hizo. Sin esto, cada llamada falla silenciosa
+// desde el punto de vista JS (try/catch → devuelve false / null).
+// La inicialización es idempotente y rápida (HealthConnectClient.getOrCreate).
+let _hcInitPromise = null;
+async function ensureHealthConnectInitialized() {
+    if (Platform.OS !== 'android' || !HealthConnect) return false;
+    if (!_hcInitPromise) {
+        _hcInitPromise = (async () => {
+            try {
+                const status = await HealthConnect.getSdkStatus();
+                if (status !== 3) return false; // SDK no disponible / requiere update
+                const ok = await HealthConnect.initialize();
+                return ok !== false;
+            } catch (err) {
+                console.warn('[HealthService] HC initialize error:', err?.message ?? String(err));
+                _hcInitPromise = null; // permitir reintento
+                return false;
+            }
+        })();
+    }
+    return _hcInitPromise;
+}
+
 /**
  * En Android, comprueba si Health Connect está instalado en el dispositivo.
  * Devuelve uno de: 'available' | 'not_installed' | 'update_required' | 'not_supported' | 'not_android'.
@@ -90,6 +116,8 @@ export async function getHealthConnectStatus() {
 export async function hasAllHealthPermissions() {
     if (!isHealthAvailable() || Platform.OS !== 'android' || !HealthConnect) return false;
     try {
+        const initialized = await ensureHealthConnectInitialized();
+        if (!initialized) return false;
         const granted = (await HealthConnect.getGrantedPermissions()) ?? [];
         return ANDROID_PERMISSIONS.every((required) =>
             granted.some(
@@ -143,6 +171,11 @@ export async function requestHealthPermissions() {
                 console.warn('[HealthService] Health Connect no disponible:', status);
                 return false;
             }
+            // El módulo nativo v3 exige initialize() ANTES de getGrantedPermissions,
+            // requestPermission y readRecords — sin él todas rechazan con
+            // ClientNotInitialized. Es idempotente (HealthConnectClient.getOrCreate).
+            const initialized = await ensureHealthConnectInitialized();
+            if (!initialized) return false;
             // Si ya tiene todos los permisos, no abrir el diálogo de nuevo.
             // requestPermission llamado sobre permisos ya concedidos puede abrir
             // el diálogo de HC de nuevo (molestia) o devolver [] silenciosamente
@@ -156,9 +189,6 @@ export async function requestHealthPermissions() {
                 ),
             );
             if (allGranted) return true;
-            // v3: no se llama initialize() — requestPermission() directamente.
-            // initialize() en v3 lanza excepción nativa desde ciertos contextos
-            // de Activity de Expo, que JS try/catch no intercepta → crash.
             const granted = await HealthConnect.requestPermission(ANDROID_PERMISSIONS);
             return Array.isArray(granted) && granted.length > 0;
         } catch (err) {
@@ -281,7 +311,11 @@ async function _readAppleMetrics(startDate, endDate) {
 // ─── Lectura Android Health Connect ─────────────────────────────────────────
 
 async function _readAndroidMetrics(startTime, endTime) {
-    // v3: initialize() fue eliminado — llamarlo causa crash nativo en Activity de Expo.
+    // El módulo nativo exige initialize() antes de readRecords — sin él la
+    // llamada rechaza con ClientNotInitialized y devolvíamos null aunque los
+    // permisos estuvieran concedidos correctamente.
+    const initialized = await ensureHealthConnectInitialized();
+    if (!initialized) return null;
     const filter = { timeRangeFilter: { operator: 'between', startTime, endTime } };
 
     const [hrRes, restHrRes, hrvRes, spo2Res, sleepRes, stepsRes] = await Promise.allSettled([

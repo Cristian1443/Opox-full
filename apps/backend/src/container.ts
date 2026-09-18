@@ -320,6 +320,14 @@ export function buildContainer() {
             '[container] Motor de IA activo — generateQuestions y generateSurgicalTest ' +
             'usarán RAG con evidencia verbatim del temario oficial.',
         );
+        // Precargar el banco de preguntas del curso en background para que la
+        // primera llamada de streaming no espere ~3 s a cargar 336+ preguntas.
+        // Sin await — el server queda listo para atender requests inmediatamente.
+        motorAiClient!.preloadQuestionBank().catch((err) => {
+            logger.warn('[container] precarga del banco falló', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        });
     }
 
     // Servicio de auto-sync de curso Motor ↔ Supabase (Fase 4 · gaps-15-09-26).

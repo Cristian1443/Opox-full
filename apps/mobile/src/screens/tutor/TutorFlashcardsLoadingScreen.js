@@ -12,6 +12,7 @@ import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import FlashcardsSuccessModal from '../../components/FlashcardsSuccessModal';
 import { tutorApi, api } from '../../api';
+import { setCachedDeck } from '../../lib/tutorCache';
 
 // Colores confirmados contra Figma (frame GENERANDO FLASHCARDS, Bloque 8)
 // sin equivalente exacto en theme.js. Mismo patrón de overlay + tarjeta
@@ -99,7 +100,11 @@ export default function TutorFlashcardsLoadingScreen({ navigation, route }) {
         // Llamada a la API — se corre en paralelo con la animación
         const apiPromise = tutorApi
             .generateDeck(topicId, topicTitle, oposicion)
-            .then((res) => (!res?.error && res?.data ? res.data : null))
+            .then((res) => {
+                const data = !res?.error && res?.data ? res.data : null;
+                if (data) setCachedDeck(topicId, data);
+                return data;
+            })
             .catch(() => null);
 
         // Espera a que AMBAS terminen para mostrar el modal de éxito
