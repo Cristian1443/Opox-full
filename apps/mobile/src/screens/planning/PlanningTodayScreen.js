@@ -342,7 +342,7 @@ export default function PlanningTodayScreen({ navigation }) {
                                     <Text style={styles.stepValue}>{questionCount}</Text>
                                     <TouchableOpacity
                                         style={styles.stepBtn}
-                                        onPress={() => setQuestionCount((c) => Math.min(50, c + 5))}
+                                        onPress={() => setQuestionCount((c) => Math.min(30, c + 5))}
                                         activeOpacity={0.7}
                                     >
                                         <Text style={styles.stepBtnText}>+</Text>

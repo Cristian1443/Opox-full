@@ -24,10 +24,15 @@ export const listClanMessagesQuerySchema = z.object({
 export const createClanChallengeSchema = z.object({
     title: z.string().min(1).max(120),
     subtitle: z.string().min(1).max(160).optional(),
-    questionCount: z.coerce.number().int().min(1).max(500),
+    // Alineado con el generador (30) — el Motor rechaza n>50 con 422 y n>30
+    // tarda >300s en el mejor caso (ver INFORME_GENERADOR_INFINITO.md · G09).
+    // Defensa en profundidad además del cap del picker en ChallengesScreen.
+    questionCount: z.coerce.number().int().min(1).max(30),
     rewardPoints: z.coerce.number().int().min(0).max(5000),
     expiresAt: z.string().datetime().optional(),
-    topicId: z.string().min(1).max(80).optional(),
+    // topicId puede llegar como CSV de hex del Motor (varios temas). El
+    // generador acepta max(200); mantenemos consistencia.
+    topicId: z.string().min(1).max(200).optional(),
 });
 
 export const completeChallengeSchema = z.object({
