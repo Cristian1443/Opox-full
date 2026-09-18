@@ -16,10 +16,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 
-// 4 segmentos: uno por cada criterio cumplido. Colores por segmento — Figma:
-// verde/verde/rojo/verde (statGreen / statRed), gris cuando no se cumple aún.
-const SEGMENT_COLORS = [colors.statGreen, colors.statGreen, colors.statRed, colors.statGreen];
-
 const evaluarFuerza = (pass) => {
     if (!pass) return { fuerza: '', mensaje: '', segments: [false, false, false, false] };
 
@@ -186,7 +182,9 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
                             onChangeText={handleConfirmChange}
                         />
 
-                        {/* Barra de fuerza segmentada — Figma: 4 tramos verde/verde/rojo/gris */}
+                        {/* Barra de fuerza segmentada: 4 tramos, uno por criterio cumplido.
+                            Verde cuando el criterio se cumple, gris cuando no — nunca rojo,
+                            un criterio cumplido nunca es un estado de error. */}
                         {password.length > 0 && (
                             <View>
                                 <View style={s.segmentBar}>
@@ -197,7 +195,7 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
                                                 s.segment,
                                                 {
                                                     backgroundColor: filled
-                                                        ? SEGMENT_COLORS[i]
+                                                        ? colors.statGreen
                                                         : colors.separator,
                                                 },
                                             ]}

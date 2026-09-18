@@ -16,6 +16,8 @@ export default function AccentSlider({
     onChange,
     accentColor = colors.primary,
     trackColor = '#E5E7EB',
+    onDragStart,
+    onDragEnd,
 }) {
     const [trackWidth, setTrackWidth] = useState(0);
     const tw = useRef(0);
@@ -31,7 +33,14 @@ export default function AccentSlider({
     const panResponder = useRef(PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
+        // Captura el gesto antes de que gestos nativos padres (scroll de
+        // iOS, swipe-back de react-navigation) lo intercepten — sin esto,
+        // en iOS un arrastre horizontal puede interpretarse como "volver de
+        // pantalla" en vez de mover el slider.
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
         onPanResponderGrant: (e) => {
+            onDragStart?.();
             const lx = e.nativeEvent.locationX;
             const w = tw.current;
             if (!w) return;
@@ -46,6 +55,8 @@ export default function AccentSlider({
             const ci = Math.max(0, Math.min(steps - 1, Math.round((nx / w) * (steps - 1))));
             if (ci !== valRef.current) { valRef.current = ci; onChange(ci); }
         },
+        onPanResponderRelease: () => onDragEnd?.(),
+        onPanResponderTerminate: () => onDragEnd?.(),
     })).current;
 
     return (

@@ -108,6 +108,14 @@ function SegmentControl({ options, value, onChange }) {
 
 export default function ConfigToneScreen({ navigation }) {
   const [tone, setTone] = useState(DEFAULT_TONE);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+
+  // El gesto nativo de "volver deslizando" de iOS compite con el arrastre
+  // horizontal del slider — se desactiva para esta pantalla (ya tiene botón
+  // de volver propio en el header).
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: false });
+  }, [navigation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,7 +174,11 @@ export default function ConfigToneScreen({ navigation }) {
         <View style={styles.iconButton} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollEnabled}
+      >
 
         {/* ── Personalidad ─────────────────────────────────────────── */}
         <Text style={styles.sectionLabel}>PERSONALIDAD</Text>
@@ -184,6 +196,8 @@ export default function ConfigToneScreen({ navigation }) {
           onChange={(idx) => update({ detailLevel: idx })}
           accentColor={colors.accentOrange}
           trackColor={FIGMA.sliderTrack}
+          onDragStart={() => setScrollEnabled(false)}
+          onDragEnd={() => setScrollEnabled(true)}
         />
         <View style={styles.sliderLabelsRow}>
           {DETAIL_LABELS.map((label, idx) => (

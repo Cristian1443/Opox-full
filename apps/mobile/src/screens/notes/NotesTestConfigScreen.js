@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     View,
     StyleSheet,
@@ -71,6 +71,14 @@ export default function NotesTestConfigScreen({ navigation, route }) {
     const [stepIdx, setStepIdx] = useState(DEFAULT_STEP_IDX);
     const [starting, setStarting] = useState(false);
     const [onlyTaggedTopics, setOnlyTaggedTopics] = useState(true);
+    const [scrollEnabled, setScrollEnabled] = useState(true);
+
+    // El gesto nativo de "volver deslizando" de iOS compite con el arrastre
+    // horizontal de los sliders — se desactiva para esta pantalla (ya tiene
+    // botón de volver propio en el header).
+    useEffect(() => {
+        navigation.setOptions({ gestureEnabled: false });
+    }, [navigation]);
 
     // Cap del número de preguntas al techo real del documento.
     const questionCount = useMemo(() => {
@@ -129,6 +137,7 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                 style={styles.scroll}
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
+                scrollEnabled={scrollEnabled}
             >
                 <View style={styles.badge}>
                     <Text style={styles.badgeLine1}>Basado en:</Text>
@@ -145,6 +154,8 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                     onChange={setDificultadIdx}
                     accentColor={colors.accentOrange}
                     trackColor={FIGMA.accentOrangeTrack}
+                    onDragStart={() => setScrollEnabled(false)}
+                    onDragEnd={() => setScrollEnabled(true)}
                 />
                 <View style={styles.sliderLabelsRow}>
                     {DIFFICULTY_LABELS.map((label, i) => (
@@ -167,6 +178,8 @@ export default function NotesTestConfigScreen({ navigation, route }) {
                             onChange={setStepIdx}
                             accentColor={colors.accentOrange}
                             trackColor={FIGMA.accentOrangeTrack}
+                            onDragStart={() => setScrollEnabled(false)}
+                            onDragEnd={() => setScrollEnabled(true)}
                         />
                     </View>
                     <View style={styles.valueBox}>

@@ -45,7 +45,6 @@ export default function GloryWallScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <View style={styles.statusBar}><Text style={styles.statusBarTime}>9:41</Text></View>
             <ScreenHeader title="Muro de la Gloria" onBack={() => navigation.goBack()} dark />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -90,8 +89,6 @@ export default function GloryWallScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F4F6FA' },
-    statusBar: { height: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16 },
-    statusBarTime: { fontSize: 10, fontWeight: '700', color: '#1B2A4A', marginRight: 'auto' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 16, paddingBottom: 24 },
     hero: { backgroundColor: '#1B2A4A', borderRadius: 14, alignItems: 'center', padding: 16, marginBottom: 11 },
