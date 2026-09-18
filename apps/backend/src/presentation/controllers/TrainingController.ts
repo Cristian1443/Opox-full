@@ -67,6 +67,7 @@ import type { TrainingBookmark } from '../../domain/entities/TrainingBookmark';
 import type { ErrorPattern } from '../../domain/entities/MockExam';
 import { MockExamNotFoundError } from '../../domain';
 import type { MotorOnboardingClient, LevelTestQuestion } from '../../infrastructure/clients/MotorOnboardingClient';
+import { parseTemaIds } from '../../infrastructure/clients/MotorAiClient';
 
 // ─── Preguntas de nivel estáticas (fallback sin Motor) ────────────────────────
 // Solo las primeras 20 — misma distribución que LevelTestInProgressScreen.js
@@ -302,16 +303,15 @@ export class TrainingController {
         try {
             if (!this.deps.startTestJob) { this.motorUnavailable(res); return; }
             const body = req.body as { oposicion: string; count?: number; difficulty?: 'easy' | 'medium' | 'hard'; topicId?: string };
-            // topicId "id1,id2" desde PlanningMacro → array (temas específicos).
-            // 'all' o vacío → null (todo el temario).
-            const temaIds = !body.topicId || body.topicId === 'all'
-                ? null
-                : body.topicId.split(',').map((s) => s.trim()).filter(Boolean);
+            // Cap defensivo: el Motor rechaza n_preguntas > 50 con 422 opaco
+            // (G04). El picker del mobile ya cap a 30 (G09) pero validamos
+            // aquí por defensa en profundidad.
+            const requestedCount = Math.max(1, Math.min(50, body.count ?? 10));
             const result = await this.deps.startTestJob.execute({
                 userId: req.authUser!.id,
                 oposicion: body.oposicion,
-                temaIds,
-                count: body.count ?? 10,
+                temaIds: parseTemaIds(body.topicId),
+                count: requestedCount,
                 difficulty: body.difficulty,
             });
             this.ok(res, 202, result);
