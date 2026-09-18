@@ -33,6 +33,7 @@ const HK_READ_TYPES = [
     'HKQuantityTypeIdentifierRestingHeartRate',
     'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
     'HKQuantityTypeIdentifierOxygenSaturation',
+    'HKQuantityTypeIdentifierRespiratoryRate',
     'HKCategoryTypeIdentifierSleepAnalysis',
     'HKQuantityTypeIdentifierStepCount',
 ];
@@ -42,6 +43,7 @@ const ANDROID_PERMISSIONS = [
     { accessType: 'read', recordType: 'RestingHeartRate' },
     { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
     { accessType: 'read', recordType: 'OxygenSaturation' },
+    { accessType: 'read', recordType: 'RespiratoryRate' },
     { accessType: 'read', recordType: 'SleepSession' },
     { accessType: 'read', recordType: 'Steps' },
 ];
@@ -205,23 +207,29 @@ export async function requestHealthPermissions() {
 }
 
 /**
- * Lee métricas de las últimas 24 h desde la plataforma de salud del SO.
+ * Lee métricas desde la plataforma de salud del SO.
  * Retorna null si no hay permisos o los módulos no están disponibles.
  *
- * @returns {{ heartRate, restingHeartRate, hrv, spo2, sleepHours, steps } | null}
+ * Ventana temporal: 72 h por defecto. Motivo: los wearables (Xiaomi, Amazfit,
+ * Fitbit, Garmin…) sincronizan a Health Connect por lotes, no en tiempo real —
+ * si el usuario abrió la app justo tras sincronizar puede que la última
+ * escritura sea de hace 25 h. Con 24 h veíamos "Sin datos" en casos reales
+ * en los que HC sí tenía el dato.
+ *
+ * @returns {{ heartRate, restingHeartRate, hrv, spo2, respiratoryRate, sleepHours, steps } | null}
  */
 export async function getHealthMetrics() {
     if (!isHealthAvailable()) return null;
 
     const now = new Date();
-    const past24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const past72h = new Date(now.getTime() - 72 * 60 * 60 * 1000);
 
     try {
         if (Platform.OS === 'ios') {
-            return await _readAppleMetrics(past24h.toISOString(), now.toISOString());
+            return await _readAppleMetrics(past72h.toISOString(), now.toISOString());
         }
         if (Platform.OS === 'android') {
-            return await _readAndroidMetrics(past24h.toISOString(), now.toISOString());
+            return await _readAndroidMetrics(past72h.toISOString(), now.toISOString());
         }
     } catch (err) {
         console.warn('[HealthService] getHealthMetrics error:', err);
@@ -256,12 +264,13 @@ async function _hkQueryCategory(typeIdentifier, { from, to } = {}) {
 async function _readAppleMetrics(startDate, endDate) {
     const opts = { from: new Date(startDate), to: new Date(endDate) };
 
-    const [hrSamples, restHrSamples, hrvSamples, spo2Samples, sleepSamples, stepSamples] =
+    const [hrSamples, restHrSamples, hrvSamples, spo2Samples, respSamples, sleepSamples, stepSamples] =
         await Promise.all([
             _hkQuery('HKQuantityTypeIdentifierHeartRate', { ...opts, limit: 1, ascending: false }),
             _hkQuery('HKQuantityTypeIdentifierRestingHeartRate', { ...opts, limit: 1, ascending: false }),
             _hkQuery('HKQuantityTypeIdentifierHeartRateVariabilitySDNN', { ...opts, limit: 1, ascending: false }),
             _hkQuery('HKQuantityTypeIdentifierOxygenSaturation', { ...opts, limit: 1, ascending: false }),
+            _hkQuery('HKQuantityTypeIdentifierRespiratoryRate', { ...opts, limit: 1, ascending: false }),
             _hkQueryCategory('HKCategoryTypeIdentifierSleepAnalysis', opts),
             _hkQuery('HKQuantityTypeIdentifierStepCount', { ...opts, limit: 100, ascending: false }),
         ]);
@@ -288,6 +297,11 @@ async function _readAppleMetrics(startDate, endDate) {
         ? Math.round(spo2Raw <= 1 ? spo2Raw * 100 : spo2Raw)
         : null;
 
+    // Respiración: HealthKit devuelve respiraciones por minuto (Number).
+    const respiratoryRate = lastQuantity(respSamples) != null
+        ? Math.round(lastQuantity(respSamples))
+        : null;
+
     // Sueño: sumar fases de sueño real (categoryValue 0=InBed, 1=Asleep, 2=Awake; HKSleepAnalysis)
     // En la API de kingstinct las fases son 'ASLEEP_CORE', 'ASLEEP_DEEP', 'ASLEEP_REM', 'ASLEEP'
     let sleepHours = null;
@@ -305,7 +319,7 @@ async function _readAppleMetrics(startDate, endDate) {
         ? stepSamples.reduce((acc, s) => acc + (s.quantity?.doubleValue ?? 0), 0)
         : null;
 
-    return { heartRate, restingHeartRate, hrv, spo2, sleepHours, steps };
+    return { heartRate, restingHeartRate, hrv, spo2, respiratoryRate, sleepHours, steps };
 }
 
 // ─── Lectura Android Health Connect ─────────────────────────────────────────
@@ -318,11 +332,12 @@ async function _readAndroidMetrics(startTime, endTime) {
     if (!initialized) return null;
     const filter = { timeRangeFilter: { operator: 'between', startTime, endTime } };
 
-    const [hrRes, restHrRes, hrvRes, spo2Res, sleepRes, stepsRes] = await Promise.allSettled([
+    const [hrRes, restHrRes, hrvRes, spo2Res, respRes, sleepRes, stepsRes] = await Promise.allSettled([
         HealthConnect.readRecords('HeartRate', filter),
         HealthConnect.readRecords('RestingHeartRate', filter),
         HealthConnect.readRecords('HeartRateVariabilityRmssd', filter),
         HealthConnect.readRecords('OxygenSaturation', filter),
+        HealthConnect.readRecords('RespiratoryRate', filter),
         HealthConnect.readRecords('SleepSession', filter),
         HealthConnect.readRecords('Steps', filter),
     ]);
@@ -330,31 +345,61 @@ async function _readAndroidMetrics(startTime, endTime) {
     // Observabilidad: sin este log, si HC rechaza un tipo (SecurityException,
     // RemoteException, tipo no soportado), Promise.allSettled se lo tragaba
     // y el usuario veía "Sin datos" sin diagnóstico posible.
-    const labels = ['HeartRate', 'RestingHeartRate', 'HRV', 'SpO2', 'SleepSession', 'Steps'];
-    [hrRes, restHrRes, hrvRes, spo2Res, sleepRes, stepsRes].forEach((r, i) => {
+    const labels = ['HeartRate', 'RestingHeartRate', 'HRV', 'SpO2', 'RespiratoryRate', 'SleepSession', 'Steps'];
+    const results = [hrRes, restHrRes, hrvRes, spo2Res, respRes, sleepRes, stepsRes];
+    results.forEach((r, i) => {
         if (r.status === 'rejected') {
             console.warn(`[HealthService] readRecords(${labels[i]}) rechazado:`,
                 r.reason?.message ?? String(r.reason));
+        } else {
+            const count = r.value?.records?.length ?? 0;
+            if (count === 0) console.log(`[HealthService] readRecords(${labels[i]}) vacío`);
         }
     });
 
-    const lastRecord = (settled) => {
+    // Extrae la muestra o el record más reciente por timestamp, recorriendo
+    // TODAS las páginas devueltas por HC. Antes usábamos `records[length-1]`,
+    // que asume que HC devuelve orden ascendente por tiempo. En la práctica
+    // v3 no lo garantiza (algunos providers, p.ej. Zepp/Amazfit, escriben
+    // fuera de orden) y podíamos coger un dato viejo aunque hubiera uno más
+    // reciente en el batch.
+    const pickNewestRecord = (settled, timeField = 'time') => {
         const records = settled?.value?.records ?? [];
-        return records.length > 0 ? records[records.length - 1] : null;
+        if (records.length === 0) return null;
+        let best = records[0];
+        let bestTs = new Date(best?.[timeField] ?? best?.startTime ?? 0).getTime();
+        for (let i = 1; i < records.length; i++) {
+            const ts = new Date(records[i]?.[timeField] ?? records[i]?.startTime ?? 0).getTime();
+            if (ts > bestTs) { best = records[i]; bestTs = ts; }
+        }
+        return best;
     };
 
-    const hrRecord = lastRecord(hrRes);
-    const heartRate = hrRecord?.samples?.[0]?.beatsPerMinute != null
-        ? Math.round(hrRecord.samples[0].beatsPerMinute)
-        : null;
+    // HR: cada `HeartRateRecord` contiene un array `samples[]` con múltiples
+    // lecturas y su timestamp propio. Debemos buscar la MUESTRA más reciente
+    // entre TODAS las filas — no la primera muestra de la última fila, que
+    // suele ser la más antigua del batch.
+    const hrRecords = hrRes?.value?.records ?? [];
+    let hrLatest = null;
+    let hrLatestTs = 0;
+    for (const rec of hrRecords) {
+        for (const s of rec.samples ?? []) {
+            const ts = new Date(s.time ?? 0).getTime();
+            if (ts > hrLatestTs && s.beatsPerMinute != null) {
+                hrLatest = s.beatsPerMinute;
+                hrLatestTs = ts;
+            }
+        }
+    }
+    const heartRate = hrLatest != null ? Math.round(hrLatest) : null;
 
-    const restHrRecord = lastRecord(restHrRes);
+    const restHrRecord = pickNewestRecord(restHrRes, 'time');
     const restingHeartRate = restHrRecord?.beatsPerMinute != null
         ? Math.round(restHrRecord.beatsPerMinute)
         : null;
 
     // HRV en Android: recordType HeartRateVariabilityRmssd, campo heartRateVariabilityMillis.
-    const hrvRecord = lastRecord(hrvRes);
+    const hrvRecord = pickNewestRecord(hrvRes, 'time');
     const hrv = hrvRecord?.heartRateVariabilityMillis != null
         ? Math.round(hrvRecord.heartRateVariabilityMillis)
         : null;
@@ -362,14 +407,23 @@ async function _readAndroidMetrics(startTime, endTime) {
     // Health Connect v3: OxygenSaturationRecord.percentage es un NUMBER directo
     // (revisado en records.types.d.ts:percentage: number), NO un objeto
     // { value: number }. Con el acceso anterior `.percentage.value` la SpO₂
-    // era null aunque el wearable la escribiera correctamente.
-    const spo2Record = lastRecord(spo2Res);
+    // era null aunque el wearable la escribiera correctamente. Defensa doble
+    // por si un provider antiguo devuelve el shape viejo.
+    const spo2Record = pickNewestRecord(spo2Res, 'time');
     const spo2Raw = typeof spo2Record?.percentage === 'number'
         ? spo2Record.percentage
         : spo2Record?.percentage?.value;
     const spo2 = spo2Raw != null ? Math.round(spo2Raw) : null;
 
-    const sleepRecord = lastRecord(sleepRes);
+    // RespiratoryRate: campo `rate` en respiraciones por minuto.
+    const respRecord = pickNewestRecord(respRes, 'time');
+    const respiratoryRate = respRecord?.rate != null
+        ? Math.round(respRecord.rate)
+        : null;
+
+    // Sueño: elegir el `SleepSessionRecord` con endTime más reciente. Es
+    // resiliente al orden y a sesiones fragmentadas (siestas cortas + noche).
+    const sleepRecord = pickNewestRecord(sleepRes, 'endTime');
     let sleepHours = null;
     if (sleepRecord) {
         const ms = new Date(sleepRecord.endTime) - new Date(sleepRecord.startTime);
@@ -379,7 +433,7 @@ async function _readAndroidMetrics(startTime, endTime) {
     const stepsRecords = stepsRes?.value?.records ?? [];
     const steps = stepsRecords.reduce((acc, r) => acc + (r.count ?? 0), 0) || null;
 
-    return { heartRate, restingHeartRate, hrv, spo2, sleepHours, steps };
+    return { heartRate, restingHeartRate, hrv, spo2, respiratoryRate, sleepHours, steps };
 }
 
 // ─── Historial de métricas ────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
@@ -22,6 +22,18 @@ import {
     getHealthConnectStatus,
     openHealthConnectPlayStore,
 } from '../../services/HealthService';
+
+// Colapsa el flujo wearable (WearableSelect/ConnectDevice) hasta HomeHealth.
+// Sin esto quedan pantallas intermedias en el stack y el back del hub podría
+// devolver al usuario a mitad del flujo educacional en vez de al Dashboard.
+function collapseToHomeHealth(navigation) {
+    navigation.dispatch((state) => {
+        const homeIdx = state.routes.findIndex((r) => r.name === 'HomeHealth');
+        if (homeIdx < 0) return CommonActions.navigate({ name: 'HomeHealth' });
+        const routes = state.routes.slice(0, homeIdx + 1);
+        return CommonActions.reset({ index: routes.length - 1, routes });
+    });
+}
 
 // Colores confirmados contra Figma (frame CONEXION DISPOSITIVO, Bloque 3)
 // sin equivalente exacto en theme.js.
@@ -80,7 +92,7 @@ export default function ConnectDeviceScreen({ navigation }) {
                             name="Solo smartphone"
                             sublabel="Sensores del móvil (limitado)"
                             actionText="Usar"
-                            onPress={() => navigation.navigate('HomeHealth')}
+                            onPress={() => collapseToHomeHealth(navigation)}
                         />
                     </View>
                 </ScrollView>
@@ -159,7 +171,7 @@ export default function ConnectDeviceScreen({ navigation }) {
                             name="Solo smartphone"
                             sublabel="Sensores del móvil (limitado)"
                             actionText="Usar"
-                            onPress={() => navigation.navigate('HomeHealth')}
+                            onPress={() => collapseToHomeHealth(navigation)}
                         />
                     </View>
                 )}

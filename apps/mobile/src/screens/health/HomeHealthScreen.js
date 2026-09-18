@@ -234,12 +234,13 @@ export default function HomeHealthScreen({ navigation }) {
     const restHr = metrics?.restingHeartRate ?? null;
     const hrv = metrics?.hrv ?? null;
     const spo2 = metrics?.spo2 ?? null;
+    const resp = metrics?.respiratoryRate ?? null;
     const sleep = effectiveSleep;
     // hasData: hay al menos UNA métrica con valor real (del wearable o del check-in).
     // Con esto el hub deja de mostrarse vacío para el 90% de usuarios sin wearable.
     const hasWearableData = isHealthAvailable()
         && !!metrics
-        && [hr, restHr, hrv, spo2, wearableSleep].some((v) => v != null);
+        && [hr, restHr, hrv, spo2, resp, wearableSleep].some((v) => v != null);
     const hasCheckin = !!checkin;
     const hasData = hasWearableData || hasCheckin;
     const showWearableTeaser = !hasWearableData && wearableDecision !== 'no';
@@ -516,10 +517,22 @@ export default function HomeHealthScreen({ navigation }) {
 
                         <TouchableOpacity
                             style={styles.breathColumn}
-                            onPress={() => showNoDataHint('Ritmo respiratorio')}
+                            onPress={() => resp != null
+                                ? navigation.navigate('MetricDetail', {
+                                    title: 'Ritmo respiratorio',
+                                    currentValue: resp,
+                                    unit: 'rpm',
+                                    baseValue: 15,
+                                    description: 'Respiraciones por minuto. En reposo, un valor estable entre 12 y 20 rpm es normal para adultos.',
+                                    trend: 'stable',
+                                })
+                                : showNoDataHint('Ritmo respiratorio')
+                            }
                         >
                             <Text style={styles.metricLabelSmall}>Resp.</Text>
-                            <Text style={styles.metricValueSmall}>{FALLBACK}</Text>
+                            <Text style={styles.metricValueSmall}>
+                                {resp != null ? resp : FALLBACK}{resp != null && <Text style={styles.unitSmall}>rpm</Text>}
+                            </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
