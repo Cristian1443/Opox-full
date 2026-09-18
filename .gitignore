@@ -65,3 +65,11 @@ TESTING_*.md
 
 # Capturas de pantalla de sesiones de testing (referencia local, no commitear)
 screenshots/
+
+# Resultados JSON de los scripts de perf (se regeneran corriendo el script)
+apps/backend/scripts/perf_*.json
+apps/backend/scripts/perf_*.log
+# OpenAPI del Motor cacheado durante exploración (regenerable con curl)
+apps/mobile/motor_openapi.json
+# Materiales legales sueltos que caen a la raíz sin querer
+BOE-A-*.pdf
