@@ -52,4 +52,11 @@ export interface ITutorRepository {
     // ── Resúmenes ─────────────────────────────────────────────────────────────
     listSummaries(oposicion: string): Promise<TutorSummary[]>;
     getSummary(topicId: string, oposicion: string): Promise<TutorSummary | null>;
+
+    // ── Utilidades de chat ────────────────────────────────────────────────────
+    // Traduce menciones a "Tema N" en un mensaje de chat al título real del
+    // temario (que el Motor sí conoce). El resultado se envía al Motor RAG;
+    // el mensaje original se persiste en la conversación tal cual lo escribió
+    // el usuario.
+    resolveTopicReferences(oposicion: string | null | undefined, message: string): Promise<string>;
 }

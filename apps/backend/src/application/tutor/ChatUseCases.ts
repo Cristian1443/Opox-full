@@ -69,12 +69,16 @@ export class SendMessageUseCase {
         userId: string;
         content: string;
         cursoId?: string;
+        oposicion?: string | null;
         personality?: string;
         toneProfile?: ToneProfile;
     }): Promise<{ userMessage: TutorMessage; aiMessage: TutorMessage }> {
         const conversation = await this.tutorRepo.getConversation(params.conversationId, params.userId);
         if (!conversation) throw new ConversationNotFoundError();
 
+        // Persistimos SIEMPRE el mensaje original tal cual lo escribió el usuario
+        // — el enriquecimiento "Tema N → título real" es solo para dar contexto al
+        // Motor RAG, no debe aparecer en el histórico visible del chat.
         const userMessage = await this.tutorRepo.addMessage({
             conversationId: params.conversationId,
             userId: params.userId,
@@ -87,6 +91,14 @@ export class SendMessageUseCase {
 
         if (this.tutorAi) {
             try {
+                // Traduce "Tema 5" → "Tema 5 («título real del temario»)" antes de
+                // mandar al Motor. Sin esto, el RAG busca literal "Tema 5" en el
+                // corpus del curso y devuelve "no puedo asegurar cuál es".
+                const enrichedForAi = await this.tutorRepo.resolveTopicReferences(
+                    params.oposicion,
+                    params.content,
+                );
+
                 // Obtener historial reciente para dar contexto al Motor
                 const allMessages = await this.tutorRepo.listMessages(params.conversationId, params.userId);
                 const history = allMessages
@@ -94,7 +106,7 @@ export class SendMessageUseCase {
                     .map((m) => ({ role: m.isAI ? 'assistant' as const : 'user' as const, content: m.content }));
 
                 const result = await this.tutorAi.chat({
-                    message: params.content,
+                    message: enrichedForAi,
                     userId: params.userId,
                     cursoId: params.cursoId,
                     toneProfile: params.toneProfile,

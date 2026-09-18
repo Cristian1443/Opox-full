@@ -19,6 +19,7 @@ import HealthScreenHeader from '../../components/HealthScreenHeader';
 import ConnectionSuccessModal from '../../components/ConnectionSuccessModal';
 import ConnectionErrorModal from '../../components/ConnectionErrorModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 import {
     requestHealthPermissions,
     hasAllHealthPermissions,
@@ -29,6 +30,22 @@ import {
 } from '../../services/HealthService';
 import { healthApi } from '../../api';
 import { Platform } from 'react-native';
+
+// Cierra el flujo wearable (WearableSelect/ConnectDevice/Pairing) y deja el
+// stack colapsado hasta HomeHealth. Sin esto, `navigate('HomeHealth')` sobre
+// native-stack v7 en combinación con los `replace()` intermedios podía dejar
+// Pairing "colgado" con phase='complete' — al pulsar back en el hub reaparecía
+// el modal de éxito y el usuario quedaba atrapado en el bucle 18↔19.
+function collapseToHomeHealth(navigation) {
+    navigation.dispatch((state) => {
+        const homeIdx = state.routes.findIndex((r) => r.name === 'HomeHealth');
+        if (homeIdx < 0) {
+            return CommonActions.navigate({ name: 'HomeHealth' });
+        }
+        const routes = state.routes.slice(0, homeIdx + 1);
+        return CommonActions.reset({ index: routes.length - 1, routes });
+    });
+}
 
 // Colores confirmados contra Figma (frame EMPAREJANDO, Bloque 3) sin
 // equivalente exacto en theme.js.
@@ -271,7 +288,7 @@ export default function PairingScreen({ navigation, route }) {
                         style={styles.skipButton}
                         onPress={() => {
                             AsyncStorage.setItem(HEALTH_PAIRING_SKIPPED_KEY, '1').catch(() => {});
-                            navigation.navigate('HomeHealth');
+                            collapseToHomeHealth(navigation);
                         }}
                         activeOpacity={0.7}
                     >
@@ -303,7 +320,7 @@ export default function PairingScreen({ navigation, route }) {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.skipButton}
-                        onPress={() => navigation.navigate('HomeHealth')}
+                        onPress={() => collapseToHomeHealth(navigation)}
                         activeOpacity={0.7}
                     >
                         <Text style={styles.skipButtonText}>Continuar sin datos</Text>
@@ -327,7 +344,7 @@ export default function PairingScreen({ navigation, route }) {
                     </Text>
                     <TouchableOpacity
                         style={styles.primaryButton}
-                        onPress={() => navigation.navigate('HomeHealth')}
+                        onPress={() => collapseToHomeHealth(navigation)}
                         activeOpacity={0.85}
                     >
                         <Text style={styles.primaryButtonText}>Volver al inicio</Text>
@@ -391,7 +408,7 @@ export default function PairingScreen({ navigation, route }) {
             <ConnectionSuccessModal
                 visible={isComplete}
                 deviceName={deviceName}
-                onClose={() => navigation.navigate('HomeHealth')}
+                onClose={() => collapseToHomeHealth(navigation)}
             />
 
             <ConnectionErrorModal
