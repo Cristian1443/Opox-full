@@ -87,14 +87,18 @@ export default function ExamUploadScreen({ navigation }) {
     const [titulo, setTitulo] = useState('');
     const [anio, setAnio] = useState('');
     const [fuente, setFuente] = useState('profesor');
-    const [asset, setAsset] = useState(null); // { name, size, mimeType, uri }
+    const [asset, setAsset] = useState(null); // { name, size, mimeType, base64 }
     const [uploading, setUploading] = useState(false);
+    const [reading, setReading] = useState(false);
 
     const pickFile = async () => {
         try {
             const res = await DocumentPicker.getDocumentAsync({
                 type: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-                copyToCacheDirectory: true,
+                // false replica el patrón de NotesUploadScreen (Bloque 9) que sí
+                // funciona en SDK 57. Con true el picker devuelve un URI de cache
+                // que en algunos dispositivos pierde permisos entre pick y read.
+                copyToCacheDirectory: false,
                 multiple: false,
             });
             if (res.canceled || !res.assets?.length) return;
@@ -111,39 +115,49 @@ export default function ExamUploadScreen({ navigation }) {
                 );
                 return;
             }
-            setAsset({
-                name: picked.name || `examen.${mimeType === 'application/pdf' ? 'pdf' : 'docx'}`,
-                size: picked.size ?? 0,
-                mimeType,
-                uri: picked.uri,
-            });
+            // Leer el arrayBuffer INMEDIATAMENTE tras el pick — mismo patrón que
+            // NotesUploadScreen. Si se lee más tarde (en handleUpload), el URI
+            // content:// puede haber perdido permisos de lectura por hot reload,
+            // reciclaje de cache o simplemente por el paso del tiempo → error
+            // "Missing 'READ' permission for accessing the file".
+            setReading(true);
+            try {
+                const buf = await new FSFile(picked.uri).arrayBuffer();
+                const base64 = bufferToBase64(buf);
+                setAsset({
+                    name: picked.name || `examen.${mimeType === 'application/pdf' ? 'pdf' : 'docx'}`,
+                    size: picked.size ?? 0,
+                    mimeType,
+                    base64,
+                });
+            } finally {
+                setReading(false);
+            }
         } catch (err) {
+            setReading(false);
             Alert.alert('Error', err?.message || 'No se pudo abrir el archivo.');
         }
     };
 
     const canSubmit =
         !uploading &&
+        !reading &&
         titulo.trim().length >= 1 &&
         /^\d{4}$/.test(anio) &&
         Number(anio) >= 1900 && Number(anio) <= 2100 &&
-        !!asset;
+        !!asset?.base64;
 
     const handleUpload = async () => {
         if (!canSubmit) return;
         setUploading(true);
         try {
-            // Leer archivo → ArrayBuffer → base64. `FSFile.arrayBuffer` funciona
-            // también con URIs `content://` de Android (patrón Bloque 9).
-            const buf = await new FSFile(asset.uri).arrayBuffer();
-            const base64 = bufferToBase64(buf);
-
+            // El base64 ya se leyó en pickFile — aquí solo lo enviamos.
             const { data, error } = await trainingApi.uploadBankExam({
                 titulo: titulo.trim(),
                 anio: Number(anio),
                 fuente,
                 file: {
-                    base64,
+                    base64: asset.base64,
                     mimeType: asset.mimeType,
                     fileName: asset.name,
                 },
@@ -204,6 +218,34 @@ export default function ExamUploadScreen({ navigation }) {
                         añade al banco del curso. Todos los usuarios podrán practicar con ellas.
                     </Text>
 
+                    {/* Bloque preventivo — evita que el usuario suba textos de leyes/temario
+                        y luego vea "0 preguntas detectadas" sin entender por qué. */}
+                    <View style={styles.formatCard}>
+                        <View style={styles.formatHeader}>
+                            <Ionicons name="information-circle" size={18} color={COLORS.orange} />
+                            <Text style={styles.formatTitle}>Qué debe contener el archivo</Text>
+                        </View>
+                        <View style={styles.formatRow}>
+                            <Text style={styles.formatCheck}>✅</Text>
+                            <Text style={styles.formatText}>
+                                Examen tipo test con preguntas numeradas y opciones a/b/c/d.
+                            </Text>
+                        </View>
+                        <View style={styles.formatRow}>
+                            <Text style={styles.formatCheck}>✅</Text>
+                            <Text style={styles.formatText}>
+                                Simulacros oficiales de convocatorias anteriores o test de academia.
+                            </Text>
+                        </View>
+                        <View style={styles.formatRow}>
+                            <Text style={styles.formatCross}>❌</Text>
+                            <Text style={styles.formatText}>
+                                Textos de leyes, BOE consolidado, temario o apuntes — el sistema no puede
+                                convertirlos en preguntas automáticamente.
+                            </Text>
+                        </View>
+                    </View>
+
                     {/* Título */}
                     <Text style={styles.fieldLabel}>Título del examen</Text>
                     <TextInput
@@ -255,10 +297,19 @@ export default function ExamUploadScreen({ navigation }) {
 
                     {/* Archivo */}
                     <Text style={styles.fieldLabel}>Archivo</Text>
-                    <TouchableOpacity style={styles.pickBtn} onPress={pickFile} activeOpacity={0.85}>
-                        <Ionicons name="document-attach-outline" size={22} color={COLORS.purple} />
+                    <TouchableOpacity
+                        style={styles.pickBtn}
+                        onPress={pickFile}
+                        activeOpacity={0.85}
+                        disabled={reading}
+                    >
+                        {reading ? (
+                            <ActivityIndicator size="small" color={COLORS.purple} />
+                        ) : (
+                            <Ionicons name="document-attach-outline" size={22} color={COLORS.purple} />
+                        )}
                         <Text style={styles.pickBtnLabel}>
-                            {asset ? 'Cambiar archivo' : 'Seleccionar PDF o Word'}
+                            {reading ? 'Leyendo archivo…' : asset ? 'Cambiar archivo' : 'Seleccionar PDF o Word'}
                         </Text>
                     </TouchableOpacity>
                     {asset && (
@@ -331,7 +382,48 @@ const styles = StyleSheet.create({
         color: COLORS.purple,
         opacity: 0.75,
         lineHeight: 19,
-        marginBottom: 20,
+        marginBottom: 12,
+    },
+
+    formatCard: {
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(246,150,36,0.35)',
+        backgroundColor: 'rgba(246,150,36,0.08)',
+        marginBottom: 16,
+        gap: 8,
+    },
+    formatHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 2,
+    },
+    formatTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: COLORS.purple,
+    },
+    formatRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+    },
+    formatCheck: {
+        fontSize: 13,
+        marginTop: 1,
+    },
+    formatCross: {
+        fontSize: 13,
+        marginTop: 1,
+    },
+    formatText: {
+        flex: 1,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        lineHeight: 17,
+        color: COLORS.purple,
     },
 
     fieldLabel: {
