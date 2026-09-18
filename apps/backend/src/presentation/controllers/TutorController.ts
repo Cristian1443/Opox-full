@@ -132,6 +132,7 @@ export class TutorController {
                 userId: req.authUser!.id,
                 content,
                 cursoId,
+                oposicion: req.authUser!.oposicion,
                 personality,
                 toneProfile,
             });

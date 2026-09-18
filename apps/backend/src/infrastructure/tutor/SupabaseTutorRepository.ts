@@ -10,6 +10,7 @@ import type {
     TutorSummary,
 } from '../../domain/entities';
 import { logger } from '@opox/utils';
+import { resolveTopicReferencesInMessage } from '../shared/topicLabels';
 
 export class SupabaseTutorRepository implements ITutorRepository {
     constructor(private readonly db: SupabaseClient) {}
@@ -266,6 +267,15 @@ export class SupabaseTutorRepository implements ITutorRepository {
             .maybeSingle();
         if (error) { logger.error('[tutor-repo] getSummary', { error }); return null; }
         return data ? mapSummary(data) : null;
+    }
+
+    async resolveTopicReferences(oposicion: string | null | undefined, message: string): Promise<string> {
+        try {
+            return await resolveTopicReferencesInMessage(this.db, oposicion, message);
+        } catch (err) {
+            logger.warn('[tutor-repo] resolveTopicReferences falló, devolvemos mensaje sin tocar', { err: String(err) });
+            return message;
+        }
     }
 }
 
