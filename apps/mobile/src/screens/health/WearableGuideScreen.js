@@ -110,9 +110,12 @@ export default function WearableGuideScreen({ navigation, route }) {
     };
 
     const handleConnect = () => {
-        navigation.replace('Pairing', {
-            device: { name: 'Health Connect', platform: 'health_connect', icon: 'fitness-outline' },
-        });
+        // Va a ConnectDeviceScreen (paso final del flujo educacional) en vez
+        // de Pairing directo. ConnectDevice verifica que HC esté instalado y
+        // actualizado antes de lanzar el pairing; si falta, ofrece Play Store.
+        // Sin este paso el usuario podría llegar a Pairing con HC no
+        // instalado y ver un error nativo confuso.
+        navigation.replace('ConnectDevice');
     };
 
     return (

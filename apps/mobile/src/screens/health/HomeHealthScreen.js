@@ -9,7 +9,6 @@ import {
     ActivityIndicator,
     Linking,
     AppState,
-    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +18,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import NoDataHintModal from '../../components/NoDataHintModal';
 import { Platform } from 'react-native';
 import { getHealthMetrics, isHealthAvailable, hasAllHealthPermissions, HEALTH_PAIRING_SKIPPED_KEY } from '../../services/HealthService';
 import { dailyCheckInApi, moodLabel } from '../../api';
@@ -244,29 +244,33 @@ export default function HomeHealthScreen({ navigation }) {
     const hasData = hasWearableData || hasCheckin;
     const showWearableTeaser = !hasWearableData && wearableDecision !== 'no';
 
+    // Icono reloj superior. Único entry point del hub al flujo educacional
+    // de wearable (Onboarding → Select → Guide → ConnectDevice → Pairing).
+    // Antes iba directo a ConnectDevice — ahora pasa por el onboarding para
+    // no saltarse la parte educacional (configurar la app fuente primero).
     const wearableIndicator = (
         <TouchableOpacity
             style={styles.watchIconWrap}
-            onPress={() => navigation.navigate('ConnectDevice')}
+            onPress={() => navigation.navigate('WearableOnboarding')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
             <IconWatch size={30} />
         </TouchableOpacity>
     );
 
-    // Ayuda contextual cuando una métrica de wearable no tiene datos. Explica
-    // por qué está en "—" y ofrece navegar al onboarding de wearable — que
-    // sigue accesible aunque el usuario haya dicho "No" antes desde el teaser.
+    // Ayuda contextual cuando una métrica de wearable no tiene datos.
+    // Modal custom (NoDataHintModal) en lugar de Alert.alert nativo — respeta
+    // la línea Figma OPOX (esquinas 14, Poppins, morado suave).
+    const [hintMetric, setHintMetric] = useState(null); // string | null
     const showNoDataHint = useCallback((metricName) => {
-        Alert.alert(
-            `${metricName} sin datos`,
-            `Este dato solo se puede medir con un wearable (reloj o pulsera) sincronizado con Health Connect. Sin sensor físico no hay forma de calcularlo.\n\nSi tienes uno, te guiamos paso a paso para conectarlo.`,
-            [
-                { text: 'Cerrar', style: 'cancel' },
-                { text: 'Ver cómo conectar', onPress: () => navigation.navigate('WearableOnboarding') },
-            ],
-            { cancelable: true },
-        );
+        setHintMetric(metricName);
+    }, []);
+    const closeHint = useCallback(() => setHintMetric(null), []);
+    const openWearableGuideFromHint = useCallback(() => {
+        setHintMetric(null);
+        // Navigate en el siguiente tick para que el modal cierre suave antes
+        // de la transición de pantalla.
+        setTimeout(() => navigation.navigate('WearableOnboarding'), 150);
     }, [navigation]);
 
     return (
@@ -385,12 +389,11 @@ export default function HomeHealthScreen({ navigation }) {
                             <View style={styles.metricTop}>
                                 <IconPulse size={24} />
                                 <Text style={styles.metricLabel}>Ritmo cardíaco</Text>
-                                {hr == null && <Ionicons name="information-circle-outline" size={13} color={FIGMA.subtitleMuted} style={{ marginLeft: 'auto' }} />}
                             </View>
                             <Text style={styles.metricValue}>
                                 {hr != null ? hr : FALLBACK} {hr != null && <Text style={styles.unit}>ppm</Text>}
                             </Text>
-                            <Text style={[styles.metricCaption, { color: colors.ctaGreen }]}>
+                            <Text style={[styles.metricCaption, { color: hr != null ? colors.ctaGreen : FIGMA.subtitleMuted }]}>
                                 {hr != null ? 'En reposo · normal' : 'Requiere wearable'}
                             </Text>
                         </TouchableOpacity>
@@ -413,12 +416,11 @@ export default function HomeHealthScreen({ navigation }) {
                             <View style={styles.metricTop}>
                                 <IconPulse size={24} />
                                 <Text style={styles.metricLabel}>FC reposo</Text>
-                                {restHr == null && <Ionicons name="information-circle-outline" size={13} color={FIGMA.subtitleMuted} style={{ marginLeft: 'auto' }} />}
                             </View>
                             <Text style={styles.metricValue}>
                                 {restHr != null ? restHr : FALLBACK} {restHr != null && <Text style={styles.unit}>ppm</Text>}
                             </Text>
-                            <Text style={styles.metricCaption}>
+                            <Text style={[styles.metricCaption, restHr == null && { color: FIGMA.subtitleMuted }]}>
                                 {restHr != null ? 'Tu media: 61' : 'Requiere wearable'}
                             </Text>
                         </TouchableOpacity>
@@ -443,12 +445,15 @@ export default function HomeHealthScreen({ navigation }) {
                         >
                             <View style={styles.metricTop}>
                                 <Text style={styles.metricLabel}>HRV</Text>
-                                {hrv == null && <Ionicons name="information-circle-outline" size={13} color={FIGMA.subtitleMuted} style={{ marginLeft: 'auto' }} />}
                             </View>
                             <Text style={styles.metricValue}>
                                 {hrv != null ? hrv : FALLBACK} {hrv != null && <Text style={styles.unit}>ms</Text>}
                             </Text>
-                            <Text style={[styles.metricCaption, { color: hrv != null && hrv < 50 ? colors.statRed : colors.ctaGreen }]}>
+                            <Text style={[styles.metricCaption, {
+                                color: hrv == null
+                                    ? FIGMA.subtitleMuted
+                                    : hrv < 50 ? colors.statRed : colors.ctaGreen,
+                            }]}>
                                 {hrv != null ? (hrv < 50 ? `−${50 - hrv} vs tu base` : 'Dentro de rango') : 'Requiere wearable'}
                             </Text>
                         </TouchableOpacity>
@@ -503,10 +508,7 @@ export default function HomeHealthScreen({ navigation }) {
                                 : showNoDataHint('SpO₂')
                             }
                         >
-                            <View style={styles.smallHeader}>
-                                <Text style={styles.metricLabelSmall}>SpO₂</Text>
-                                {spo2 == null && <Ionicons name="information-circle-outline" size={12} color={FIGMA.subtitleMuted} style={{ marginLeft: 4 }} />}
-                            </View>
+                            <Text style={styles.metricLabelSmall}>SpO₂</Text>
                             <Text style={styles.metricValueSmall}>
                                 {spo2 != null ? spo2 : FALLBACK}{spo2 != null && <Text style={styles.unitSmall}>%</Text>}
                             </Text>
@@ -516,10 +518,7 @@ export default function HomeHealthScreen({ navigation }) {
                             style={styles.breathColumn}
                             onPress={() => showNoDataHint('Ritmo respiratorio')}
                         >
-                            <View style={styles.smallHeader}>
-                                <Text style={styles.metricLabelSmall}>Resp.</Text>
-                                <Ionicons name="information-circle-outline" size={12} color={FIGMA.subtitleMuted} style={{ marginLeft: 4 }} />
-                            </View>
+                            <Text style={styles.metricLabelSmall}>Resp.</Text>
                             <Text style={styles.metricValueSmall}>{FALLBACK}</Text>
                         </TouchableOpacity>
 
@@ -558,7 +557,8 @@ export default function HomeHealthScreen({ navigation }) {
                     </TouchableOpacity>
 
                     {/* Wearable como enriquecimiento opcional — nunca gate. Se oculta
-                        con "No, gracias" y ya no vuelve a aparecer. */}
+                        con "No, gracias" y ya no vuelve a aparecer. Ya iba a
+                        WearableOnboarding, no cambia con la convergencia. */}
                     {showWearableTeaser && (
                         <TouchableOpacity
                             style={styles.wearableTeaser}
@@ -579,6 +579,13 @@ export default function HomeHealthScreen({ navigation }) {
                     <View style={{ height: spacing.lg }} />
                 </ScrollView>
             )}
+
+            <NoDataHintModal
+                visible={!!hintMetric}
+                metricName={hintMetric}
+                onClose={closeHint}
+                onGuide={openWearableGuideFromHint}
+            />
         </SafeAreaView>
     );
 }
@@ -780,16 +787,12 @@ const styles = StyleSheet.create({
     breathColumn: {
         alignItems: 'flex-start',
     },
-    smallHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
     metricLabelSmall: {
         fontSize: 10.5,
         letterSpacing: 0.4,
         fontFamily: 'Poppins-Light',
         color: colors.textDark,
+        marginBottom: 4,
     },
     metricValueSmall: {
         fontSize: 31,

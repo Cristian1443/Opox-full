@@ -1561,6 +1561,36 @@ build. El toggle se puede activar en Expo Go pero no schedule.
   Tutor · Estrategia con IA" → `AITutor`. Usuario decide entre acción
   rápida o planificación estratégica.
 
+### Convergencia flujos wearable + info tool OPOX (2026-09-18)
+
+- **`NoDataHintModal`** (`apps/mobile/src/components/NoDataHintModal.js`) —
+  modal custom on-brand (card blanca 14px, Poppins, icono reloj morado en
+  círculo, CTA verde "Ver cómo conectar" + secundario "Cerrar"). Sustituye
+  al `Alert.alert` nativo que rompía la línea Figma en `HomeHealthScreen`
+  cuando el usuario tocaba una card de wearable sin datos. También se
+  quitaron los `Ionicons information-circle-outline` que se veían
+  "developer" al lado del label — la caption "Requiere wearable" bajo el
+  número + el hecho de que la card sea tappable es suficiente pista.
+- **Flujo único de conexión wearable** — antes había dos entradas
+  independientes: `ConnectDeviceScreen` (técnica, chequea HC status) y
+  `WearableOnboardingScreen` (educacional, guía por marca). Se
+  encadenaron sin duplicar código:
+  ```
+  HubSalud (icono reloj / teaser)
+      → WearableOnboarding (¿Tienes uno?)
+      → WearableSelect (marca)
+      → WearableGuide (3 pasos configurar app fuente)
+      → ConnectDevice (verifica HC instalado/actualizado, ofrece Play Store)
+      → Pairing (permisos HC)
+  ```
+  Cambios concretos: `HomeHealthScreen.wearableIndicator.onPress` ahora
+  navega a `WearableOnboarding` (antes `ConnectDevice`);
+  `WearableGuideScreen.handleConnect` navega a `ConnectDevice` (antes
+  `Pairing` directo — se saltaba la verificación de HC). Apple Watch iOS
+  sigue yendo directo a `Pairing` desde `WearableSelectScreen` porque
+  HealthKit siempre está disponible en iOS y `ConnectDevice` no aporta
+  chequeo útil ahí.
+
 ### Fixes del Banco de Exámenes (2026-09-18)
 
 - **`Missing 'READ' permission for accessing the file`** al subir PDF
