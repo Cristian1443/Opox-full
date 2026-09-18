@@ -12,12 +12,18 @@ export const healthApi = {
         api.delete(API_ROUTES.HEALTH_DEVICE.replace(':deviceId', deviceId), { auth: true }),
 
     // Análisis de fatiga via Motor IA (Bloque 3). Acepta métricas de HealthKit/Health Connect.
-    analyzeFatigue: ({ hrv, restingHeartRate, spo2, sleepHours } = {}) =>
+    // Además señales manuales del check-in diario (moodScore, perceivedEnergy, factors) — el
+    // fallback local del backend las mezcla con las biométricas para un diagnóstico útil
+    // aunque no haya wearable.
+    analyzeFatigue: ({ hrv, restingHeartRate, spo2, sleepHours, moodScore, perceivedEnergy, factors } = {}) =>
         api.post(API_ROUTES.HEALTH_FATIGUE, {
             hrv: hrv ?? null,
             fc_reposo: restingHeartRate ?? null,
             spo2: spo2 ?? null,
             sueno_horas: sleepHours ?? null,
+            moodScore: moodScore ?? null,
+            perceivedEnergy: perceivedEnergy ?? null,
+            factors: Array.isArray(factors) ? factors : null,
         }, { auth: true }),
 
     // Tarea 2 — Menús de estudio personalizados

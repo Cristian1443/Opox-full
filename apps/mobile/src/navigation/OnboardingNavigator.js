@@ -44,6 +44,10 @@ import MenusScreen from '../screens/health/MenusScreen';
 import MenuDetailScreen from '../screens/health/MenuDetailScreen';
 import MeditationListScreen from '../screens/health/MeditationListScreen';
 import MeditationPlayerScreen from '../screens/health/MeditationPlayerScreen';
+import DailyCheckInScreen from '../screens/health/DailyCheckInScreen';
+import WearableOnboardingScreen from '../screens/health/WearableOnboardingScreen';
+import WearableSelectScreen from '../screens/health/WearableSelectScreen';
+import WearableGuideScreen from '../screens/health/WearableGuideScreen';
 // AITutorPlaceholderScreen reemplazado por el bloque 8 real
 import TutorHomeScreen from '../screens/tutor/TutorHomeScreen';
 import TutorChatScreen from '../screens/tutor/TutorChatScreen';
@@ -184,6 +188,10 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="MenuDetail" component={MenuDetailScreen} />
             <Stack.Screen name="MeditationList" component={MeditationListScreen} />
             <Stack.Screen name="MeditationPlayer" component={MeditationPlayerScreen} />
+            <Stack.Screen name="DailyCheckIn" component={DailyCheckInScreen} />
+            <Stack.Screen name="WearableOnboarding" component={WearableOnboardingScreen} />
+            <Stack.Screen name="WearableSelect" component={WearableSelectScreen} />
+            <Stack.Screen name="WearableGuide" component={WearableGuideScreen} />
             {/* Bloque 8 · Aula Virtual / Tutor IA */}
             <Stack.Screen name="AITutor" component={TutorHomeScreen} />
             <Stack.Screen name="TutorChat" component={TutorChatScreen} />

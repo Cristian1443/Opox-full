@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     Linking,
     AppState,
+    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +19,9 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import HealthScreenHeader from '../../components/HealthScreenHeader';
+import { Platform } from 'react-native';
 import { getHealthMetrics, isHealthAvailable, hasAllHealthPermissions, HEALTH_PAIRING_SKIPPED_KEY } from '../../services/HealthService';
+import { dailyCheckInApi, moodLabel } from '../../api';
 
 // Colores confirmados contra Figma (frame DASHBOARD SALUD, Bloque 3) sin
 // equivalente exacto en theme.js.
@@ -119,6 +122,35 @@ function calcEnergy(metrics) {
     return Math.round((score / parts) * 100);
 }
 
+// Energía combinada: wearable + check-in. Si sólo hay wearable → misma fórmula
+// que calcEnergy. Si sólo hay check-in → mood + horas de sueño + energía
+// percibida. Si hay ambos → media ponderada 60/40 (wearable pesa más porque
+// las señales son objetivas).
+function combineEnergy(metrics, checkin) {
+    const wearable = calcEnergy(metrics);
+    const manual = calcCheckinEnergy(checkin);
+    if (wearable != null && manual != null) return Math.round(wearable * 0.6 + manual * 0.4);
+    return wearable ?? manual;
+}
+
+function calcCheckinEnergy(checkin) {
+    if (!checkin) return null;
+    const mood = Number(checkin.moodScore);   // 1-10
+    const sleep = Number(checkin.sleepHours); // 4-10
+    const energy = checkin.energyLevel;       // low|medium|high
+    let score = 0;
+    let parts = 0;
+    if (Number.isFinite(mood)) { score += (mood / 10) * 45; parts += 45; }
+    if (Number.isFinite(sleep)) { score += Math.min(1, sleep / 8) * 35; parts += 35; }
+    if (energy) {
+        const map = { low: 0.3, medium: 0.6, high: 0.95 };
+        score += (map[energy] ?? 0.5) * 20;
+        parts += 20;
+    }
+    if (parts === 0) return null;
+    return Math.round((score / parts) * 100);
+}
+
 function energyLabel(pct) {
     if (pct == null) return { title: 'Sin datos', subtitle: 'Conecta un wearable para ver tu energía.' };
     if (pct >= 75) return { title: 'Energía buena', subtitle: 'Estás listo para una sesión exigente.' };
@@ -126,26 +158,41 @@ function energyLabel(pct) {
     return { title: 'Energía baja', subtitle: 'Descansa antes de una sesión larga.' };
 }
 
+const WEARABLE_DECISION_KEY = 'opox.health.wearableDecision';
+
+function todayLocalIso() {
+    return new Date().toLocaleDateString('sv');
+}
+
 export default function HomeHealthScreen({ navigation }) {
     const [metrics, setMetrics] = useState(null);
     const [loading, setLoading] = useState(true);
     const [pairingSkipped, setPairingSkipped] = useState(false);
+    const [permissionsGranted, setPermissionsGranted] = useState(false);
+    const [checkin, setCheckin] = useState(null);
+    const [wearableDecision, setWearableDecision] = useState(null); // 'yes'|'no'|null
 
     // Recargar datos y estado de pairing cada vez que la pantalla recibe foco
     const loadMetrics = useCallback(() => {
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const [data, skipped, permissionsGranted] = await Promise.all([
+            const today = todayLocalIso();
+            const [data, skipped, granted, checkinRes, decision] = await Promise.all([
                 getHealthMetrics(),
                 AsyncStorage.getItem(HEALTH_PAIRING_SKIPPED_KEY).catch(() => null),
                 hasAllHealthPermissions(),
+                dailyCheckInApi.getForDate(today).catch(() => null),
+                AsyncStorage.getItem(WEARABLE_DECISION_KEY).catch(() => null),
             ]);
             if (!cancelled) {
                 setMetrics(data);
+                setPermissionsGranted(granted);
+                setCheckin(checkinRes?.data?.checkin ?? null);
+                setWearableDecision(decision);
                 // Si el usuario fue a Ajustes y concedió permisos, limpiar el flag
                 // para que el CTA vuelva a mostrar "conecta tu wearable" (ya no aplica "ajustes").
-                if (skipped && permissionsGranted) {
+                if (skipped && granted) {
                     AsyncStorage.removeItem(HEALTH_PAIRING_SKIPPED_KEY).catch(() => {});
                     setPairingSkipped(false);
                 } else {
@@ -172,19 +219,30 @@ export default function HomeHealthScreen({ navigation }) {
         return () => sub.remove();
     }, []);
 
-    const energyPct = calcEnergy(metrics);
+    // Sueño: prefer wearable > check-in. Mood: solo del check-in.
+    const wearableSleep = metrics?.sleepHours ?? null;
+    const checkinSleep  = checkin?.sleepHours ?? null;
+    const effectiveSleep = wearableSleep ?? checkinSleep;
+
+    // Energía: combinamos las señales biométricas del wearable + señales manuales
+    // del check-in. Si sólo hay check-in, el mood + sleep + energía percibida ya
+    // producen un % útil.
+    const energyPct = combineEnergy(metrics, checkin);
     const { title: energyTitle, subtitle: energySubtitle } = energyLabel(energyPct);
 
     const hr = metrics?.heartRate ?? null;
     const restHr = metrics?.restingHeartRate ?? null;
     const hrv = metrics?.hrv ?? null;
     const spo2 = metrics?.spo2 ?? null;
-    const sleep = metrics?.sleepHours ?? null;
-    // hasData: hay al menos UNA métrica con valor real. `!!metrics` sin esto
-    // devolvía true aunque todos los campos vinieran null (wearable no vinculado).
-    const hasData = isHealthAvailable()
+    const sleep = effectiveSleep;
+    // hasData: hay al menos UNA métrica con valor real (del wearable o del check-in).
+    // Con esto el hub deja de mostrarse vacío para el 90% de usuarios sin wearable.
+    const hasWearableData = isHealthAvailable()
         && !!metrics
-        && [hr, restHr, hrv, spo2, sleep].some((v) => v != null);
+        && [hr, restHr, hrv, spo2, wearableSleep].some((v) => v != null);
+    const hasCheckin = !!checkin;
+    const hasData = hasWearableData || hasCheckin;
+    const showWearableTeaser = !hasWearableData && wearableDecision !== 'no';
 
     const wearableIndicator = (
         <TouchableOpacity
@@ -195,6 +253,21 @@ export default function HomeHealthScreen({ navigation }) {
             <IconWatch size={30} />
         </TouchableOpacity>
     );
+
+    // Ayuda contextual cuando una métrica de wearable no tiene datos. Explica
+    // por qué está en "—" y ofrece navegar al onboarding de wearable — que
+    // sigue accesible aunque el usuario haya dicho "No" antes desde el teaser.
+    const showNoDataHint = useCallback((metricName) => {
+        Alert.alert(
+            `${metricName} sin datos`,
+            `Este dato solo se puede medir con un wearable (reloj o pulsera) sincronizado con Health Connect. Sin sensor físico no hay forma de calcularlo.\n\nSi tienes uno, te guiamos paso a paso para conectarlo.`,
+            [
+                { text: 'Cerrar', style: 'cancel' },
+                { text: 'Ver cómo conectar', onPress: () => navigation.navigate('WearableOnboarding') },
+            ],
+            { cancelable: true },
+        );
+    }, [navigation]);
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -225,33 +298,71 @@ export default function HomeHealthScreen({ navigation }) {
                         </View>
                     </TouchableOpacity>
 
-                    {/* Si no hay datos: CTA para conectar o recuperar permisos */}
-                    {!hasData && (
-                        pairingSkipped ? (
-                            <TouchableOpacity
-                                style={styles.connectCta}
-                                onPress={() => Linking.openSettings()}
-                                activeOpacity={0.85}
-                            >
-                                <Ionicons name="settings-outline" size={20} color={colors.accentOrange} />
-                                <Text style={styles.connectCtaText}>
-                                    Activa permisos de salud en Ajustes del dispositivo
-                                </Text>
-                                <Ionicons name="chevron-forward" size={16} color={colors.accentOrange} />
-                            </TouchableOpacity>
+                    {/* Card de check-in: pendiente (naranja) o hecho (verde). Es lo primero
+                        que ve el usuario después de la energía — la vía más rápida a un
+                        diagnóstico útil. */}
+                    <TouchableOpacity
+                        style={[styles.checkinCard, checkin ? styles.checkinCardDone : styles.checkinCardPending]}
+                        onPress={() => navigation.navigate('DailyCheckIn')}
+                        activeOpacity={0.85}
+                    >
+                        {checkin ? (
+                            <>
+                                <View style={styles.checkinLeft}>
+                                    <Ionicons name="checkmark-circle" size={20} color={colors.ctaGreen} />
+                                    <Text style={styles.checkinTitle}>Estado del día</Text>
+                                </View>
+                                <View style={styles.checkinRight}>
+                                    <Text style={styles.checkinMood}>
+                                        {moodLabel(Number(checkin.moodScore)).emoji}  {checkin.moodScore}/10
+                                    </Text>
+                                    <Text style={styles.checkinEdit}>Editar</Text>
+                                </View>
+                            </>
                         ) : (
-                            <TouchableOpacity
-                                style={styles.connectCta}
-                                onPress={() => navigation.navigate('ConnectDevice')}
-                                activeOpacity={0.85}
-                            >
-                                <Ionicons name="watch-outline" size={20} color={colors.accentOrange} />
-                                <Text style={styles.connectCtaText}>
-                                    Conecta tu wearable para ver datos reales
+                            <>
+                                <View style={styles.checkinLeft}>
+                                    <Ionicons name="create-outline" size={20} color={colors.accentOrange} />
+                                    <View>
+                                        <Text style={styles.checkinTitle}>Estado del día</Text>
+                                        <Text style={styles.checkinSubtitlePending}>Pendiente · 20 segundos</Text>
+                                    </View>
+                                </View>
+                                <Ionicons name="chevron-forward" size={18} color={colors.accentOrange} />
+                            </>
+                        )}
+                    </TouchableOpacity>
+
+                    {/* CTA de permisos solo si el usuario los denegó explícitamente (skip). */}
+                    {pairingSkipped && !permissionsGranted && (
+                        <TouchableOpacity
+                            style={styles.connectCta}
+                            onPress={() => Linking.openSettings()}
+                            activeOpacity={0.85}
+                        >
+                            <Ionicons name="settings-outline" size={20} color={colors.accentOrange} />
+                            <Text style={styles.connectCtaText}>
+                                Activa permisos de salud en Ajustes del dispositivo
+                            </Text>
+                            <Ionicons name="chevron-forward" size={16} color={colors.accentOrange} />
+                        </TouchableOpacity>
+                    )}
+
+                    {/* Permisos concedidos pero HC vacío — el problema no es OPOX, es que
+                        ninguna app está escribiendo señales vitales a Health Connect.
+                        Copy explicativo + botón discreto para verificar en HC. */}
+                    {permissionsGranted && !hasWearableData && !pairingSkipped && (
+                        <View style={[styles.connectCta, { alignItems: 'flex-start' }]}>
+                            <Ionicons name="information-circle-outline" size={20} color={colors.bannerPurple} style={{ marginTop: 2 }} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.connectCtaText, { fontFamily: 'Poppins-SemiBold' }]}>
+                                    Health Connect no tiene datos vitales
                                 </Text>
-                                <Ionicons name="chevron-forward" size={16} color={colors.accentOrange} />
-                            </TouchableOpacity>
-                        )
+                                <Text style={styles.connectCtaHint}>
+                                    Abre tu app de wearable (Fit, Mi Fitness, Zepp, Garmin…) y activa la sincronización de HR y sueño con Health Connect. Mientras tanto, tu Estado del día ya alimenta el motor de fatiga.
+                                </Text>
+                            </View>
+                        </View>
                     )}
 
                     {/* CARDIOVASCULAR (2 columnas) */}
@@ -259,48 +370,56 @@ export default function HomeHealthScreen({ navigation }) {
                     <View style={styles.rowTwo}>
                         <TouchableOpacity
                             style={styles.metricCard}
-                            onPress={() => navigation.navigate('MetricDetail', {
-                                title: 'Ritmo cardíaco',
-                                currentValue: hr ?? 0,
-                                unit: 'ppm',
-                                baseValue: 65,
-                                description: 'El ritmo cardíaco en reposo refleja tu carga cardiovascular en el momento. Valores dentro de tu rango habitual indican estado normal.',
-                                trend: 'stable',
-                            })}
+                            onPress={() => hr != null
+                                ? navigation.navigate('MetricDetail', {
+                                    title: 'Ritmo cardíaco',
+                                    currentValue: hr,
+                                    unit: 'ppm',
+                                    baseValue: 65,
+                                    description: 'El ritmo cardíaco en reposo refleja tu carga cardiovascular en el momento. Valores dentro de tu rango habitual indican estado normal.',
+                                    trend: 'stable',
+                                })
+                                : showNoDataHint('Ritmo cardíaco')
+                            }
                         >
                             <View style={styles.metricTop}>
                                 <IconPulse size={24} />
                                 <Text style={styles.metricLabel}>Ritmo cardíaco</Text>
+                                {hr == null && <Ionicons name="information-circle-outline" size={13} color={FIGMA.subtitleMuted} style={{ marginLeft: 'auto' }} />}
                             </View>
                             <Text style={styles.metricValue}>
                                 {hr != null ? hr : FALLBACK} {hr != null && <Text style={styles.unit}>ppm</Text>}
                             </Text>
                             <Text style={[styles.metricCaption, { color: colors.ctaGreen }]}>
-                                {hr != null ? 'En reposo · normal' : 'Sin datos'}
+                                {hr != null ? 'En reposo · normal' : 'Requiere wearable'}
                             </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.metricCard}
-                            onPress={() => navigation.navigate('MetricDetail', {
-                                title: 'FC reposo',
-                                currentValue: restHr ?? 0,
-                                unit: 'ppm',
-                                baseValue: 61,
-                                description: 'Una FC en reposo baja respecto a tu media suele reflejar buena recuperación cardiovascular. Cambios bruscos merecen atención.',
-                                trend: restHr != null && restHr < 61 ? 'down' : 'stable',
-                                lowerIsBetter: true,
-                            })}
+                            onPress={() => restHr != null
+                                ? navigation.navigate('MetricDetail', {
+                                    title: 'FC reposo',
+                                    currentValue: restHr,
+                                    unit: 'ppm',
+                                    baseValue: 61,
+                                    description: 'Una FC en reposo baja respecto a tu media suele reflejar buena recuperación cardiovascular. Cambios bruscos merecen atención.',
+                                    trend: restHr < 61 ? 'down' : 'stable',
+                                    lowerIsBetter: true,
+                                })
+                                : showNoDataHint('FC en reposo')
+                            }
                         >
                             <View style={styles.metricTop}>
                                 <IconPulse size={24} />
                                 <Text style={styles.metricLabel}>FC reposo</Text>
+                                {restHr == null && <Ionicons name="information-circle-outline" size={13} color={FIGMA.subtitleMuted} style={{ marginLeft: 'auto' }} />}
                             </View>
                             <Text style={styles.metricValue}>
                                 {restHr != null ? restHr : FALLBACK} {restHr != null && <Text style={styles.unit}>ppm</Text>}
                             </Text>
                             <Text style={styles.metricCaption}>
-                                {restHr != null ? 'Tu media: 61' : 'Sin datos'}
+                                {restHr != null ? 'Tu media: 61' : 'Requiere wearable'}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -310,37 +429,61 @@ export default function HomeHealthScreen({ navigation }) {
                     <View style={styles.rowTwo}>
                         <TouchableOpacity
                             style={styles.metricCard}
-                            onPress={() => navigation.navigate('MetricDetail', {
-                                title: 'HRV',
-                                currentValue: hrv ?? 0,
-                                unit: 'ms',
-                                baseValue: 50,
-                                description: 'Una HRV baja respecto a tu media suele indicar fatiga o estrés acumulado. Es la señal principal del motor de fatiga.',
-                                trend: hrv != null && hrv < 50 ? 'down' : 'stable',
-                            })}
+                            onPress={() => hrv != null
+                                ? navigation.navigate('MetricDetail', {
+                                    title: 'HRV',
+                                    currentValue: hrv,
+                                    unit: 'ms',
+                                    baseValue: 50,
+                                    description: 'Una HRV baja respecto a tu media suele indicar fatiga o estrés acumulado. Es la señal principal del motor de fatiga.',
+                                    trend: hrv < 50 ? 'down' : 'stable',
+                                })
+                                : showNoDataHint('HRV')
+                            }
                         >
                             <View style={styles.metricTop}>
                                 <Text style={styles.metricLabel}>HRV</Text>
+                                {hrv == null && <Ionicons name="information-circle-outline" size={13} color={FIGMA.subtitleMuted} style={{ marginLeft: 'auto' }} />}
                             </View>
                             <Text style={styles.metricValue}>
                                 {hrv != null ? hrv : FALLBACK} {hrv != null && <Text style={styles.unit}>ms</Text>}
                             </Text>
                             <Text style={[styles.metricCaption, { color: hrv != null && hrv < 50 ? colors.statRed : colors.ctaGreen }]}>
-                                {hrv != null ? (hrv < 50 ? `−${50 - hrv} vs tu base` : 'Dentro de rango') : 'Sin datos'}
+                                {hrv != null ? (hrv < 50 ? `−${50 - hrv} vs tu base` : 'Dentro de rango') : 'Requiere wearable'}
                             </Text>
                         </TouchableOpacity>
 
-                        <View style={styles.metricCard}>
-                            <View style={styles.metricTop}>
-                                <Text style={styles.metricLabel}>Nivel de estrés</Text>
-                            </View>
-                            <Text style={styles.metricValue}>
-                                {hrv != null ? (hrv < 40 ? 'Alto' : hrv < 55 ? 'Medio' : 'Bajo') : FALLBACK}
-                            </Text>
-                            <Text style={[styles.metricCaption, { color: hrv != null && hrv < 40 ? colors.statRed : colors.textDark }]}>
-                                {hrv != null ? 'Basado en HRV' : 'Sin datos'}
-                            </Text>
-                        </View>
+                        {(() => {
+                            // Nivel de estrés: prioriza HRV (wearable); si no hay, deriva
+                            // del mood del check-in (mood bajo → estrés alto). Solo cae
+                            // a "Sin datos" cuando no hay ninguna de las dos fuentes.
+                            let stressLabel = FALLBACK;
+                            let stressCaption = 'Sin datos';
+                            let stressColor = colors.textDark;
+                            if (hrv != null) {
+                                stressLabel = hrv < 40 ? 'Alto' : hrv < 55 ? 'Medio' : 'Bajo';
+                                stressCaption = 'Basado en HRV';
+                                stressColor = hrv < 40 ? colors.statRed : colors.textDark;
+                            } else if (checkin) {
+                                const mood = Number(checkin.moodScore);
+                                if (Number.isFinite(mood)) {
+                                    stressLabel = mood <= 3 ? 'Alto' : mood <= 6 ? 'Medio' : 'Bajo';
+                                    stressCaption = 'Según Estado del día';
+                                    stressColor = mood <= 3 ? colors.statRed : colors.textDark;
+                                }
+                            }
+                            return (
+                                <View style={styles.metricCard}>
+                                    <View style={styles.metricTop}>
+                                        <Text style={styles.metricLabel}>Nivel de estrés</Text>
+                                    </View>
+                                    <Text style={styles.metricValue}>{stressLabel}</Text>
+                                    <Text style={[styles.metricCaption, { color: stressColor }]}>
+                                        {stressCaption}
+                                    </Text>
+                                </View>
+                            );
+                        })()}
                     </View>
 
                     {/* RESPIRACIÓN Y SUEÑO (3 columnas, sin tarjetas — solo texto) */}
@@ -348,25 +491,37 @@ export default function HomeHealthScreen({ navigation }) {
                     <View style={styles.rowThree}>
                         <TouchableOpacity
                             style={styles.breathColumn}
-                            onPress={() => navigation.navigate('MetricDetail', {
-                                title: 'SpO₂',
-                                currentValue: spo2 ?? 0,
-                                unit: '%',
-                                baseValue: 98,
-                                description: 'La saturación de oxígeno mide el % de hemoglobina que transporta oxígeno. Valores estables por encima de 95% son normales.',
-                                trend: 'stable',
-                            })}
+                            onPress={() => spo2 != null
+                                ? navigation.navigate('MetricDetail', {
+                                    title: 'SpO₂',
+                                    currentValue: spo2,
+                                    unit: '%',
+                                    baseValue: 98,
+                                    description: 'La saturación de oxígeno mide el % de hemoglobina que transporta oxígeno. Valores estables por encima de 95% son normales.',
+                                    trend: 'stable',
+                                })
+                                : showNoDataHint('SpO₂')
+                            }
                         >
-                            <Text style={styles.metricLabelSmall}>SpO₂</Text>
+                            <View style={styles.smallHeader}>
+                                <Text style={styles.metricLabelSmall}>SpO₂</Text>
+                                {spo2 == null && <Ionicons name="information-circle-outline" size={12} color={FIGMA.subtitleMuted} style={{ marginLeft: 4 }} />}
+                            </View>
                             <Text style={styles.metricValueSmall}>
                                 {spo2 != null ? spo2 : FALLBACK}{spo2 != null && <Text style={styles.unitSmall}>%</Text>}
                             </Text>
                         </TouchableOpacity>
 
-                        <View style={styles.breathColumn}>
-                            <Text style={styles.metricLabelSmall}>Resp.</Text>
+                        <TouchableOpacity
+                            style={styles.breathColumn}
+                            onPress={() => showNoDataHint('Ritmo respiratorio')}
+                        >
+                            <View style={styles.smallHeader}>
+                                <Text style={styles.metricLabelSmall}>Resp.</Text>
+                                <Ionicons name="information-circle-outline" size={12} color={FIGMA.subtitleMuted} style={{ marginLeft: 4 }} />
+                            </View>
                             <Text style={styles.metricValueSmall}>{FALLBACK}</Text>
-                        </View>
+                        </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.breathColumn}
@@ -401,6 +556,25 @@ export default function HomeHealthScreen({ navigation }) {
                         </View>
                         <Ionicons name="chevron-forward" size={20} color={colors.textDark} />
                     </TouchableOpacity>
+
+                    {/* Wearable como enriquecimiento opcional — nunca gate. Se oculta
+                        con "No, gracias" y ya no vuelve a aparecer. */}
+                    {showWearableTeaser && (
+                        <TouchableOpacity
+                            style={styles.wearableTeaser}
+                            onPress={() => navigation.navigate('WearableOnboarding')}
+                            activeOpacity={0.85}
+                        >
+                            <Ionicons name="watch-outline" size={22} color={colors.accentOrange} />
+                            <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                                <Text style={styles.wearableTeaserTitle}>¿Tienes un wearable?</Text>
+                                <Text style={styles.wearableTeaserSubtitle}>
+                                    Conéctalo para leer HR y HRV automáticamente. Opcional.
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={16} color={FIGMA.subtitleMuted} />
+                        </TouchableOpacity>
+                    )}
 
                     <View style={{ height: spacing.lg }} />
                 </ScrollView>
@@ -445,6 +619,82 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-Medium',
         fontSize: 12.5,
         color: colors.textDark,
+    },
+    connectCtaHint: {
+        marginTop: 4,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.5,
+        lineHeight: 15,
+        color: FIGMA.subtitleMuted,
+    },
+    checkinCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: spacing.md,
+        borderRadius: 14,
+        borderWidth: 1,
+        marginBottom: spacing.md,
+    },
+    checkinCardPending: {
+        borderColor: 'rgba(246,150,36,0.35)',
+        backgroundColor: 'rgba(246,150,36,0.08)',
+    },
+    checkinCardDone: {
+        borderColor: 'rgba(36,189,144,0.35)',
+        backgroundColor: 'rgba(36,189,144,0.08)',
+    },
+    checkinLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        flex: 1,
+    },
+    checkinRight: {
+        alignItems: 'flex-end',
+    },
+    checkinTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+    },
+    checkinSubtitlePending: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11.5,
+        color: colors.accentOrange,
+        marginTop: 2,
+    },
+    checkinMood: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+    },
+    checkinEdit: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: 11,
+        color: colors.ctaGreen,
+        marginTop: 2,
+    },
+    wearableTeaser: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.md,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: FIGMA.cardBorder,
+        backgroundColor: FIGMA.cardFill,
+        marginTop: spacing.md,
+    },
+    wearableTeaserTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.textDark,
+    },
+    wearableTeaserSubtitle: {
+        marginTop: 2,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 11,
+        color: FIGMA.subtitleMuted,
     },
     energyCard: {
         flexDirection: 'row',
@@ -530,12 +780,16 @@ const styles = StyleSheet.create({
     breathColumn: {
         alignItems: 'flex-start',
     },
+    smallHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
     metricLabelSmall: {
         fontSize: 10.5,
         letterSpacing: 0.4,
         fontFamily: 'Poppins-Light',
         color: colors.textDark,
-        marginBottom: 4,
     },
     metricValueSmall: {
         fontSize: 31,

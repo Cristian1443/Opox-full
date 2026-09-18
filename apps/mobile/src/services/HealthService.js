@@ -327,6 +327,17 @@ async function _readAndroidMetrics(startTime, endTime) {
         HealthConnect.readRecords('Steps', filter),
     ]);
 
+    // Observabilidad: sin este log, si HC rechaza un tipo (SecurityException,
+    // RemoteException, tipo no soportado), Promise.allSettled se lo tragaba
+    // y el usuario veía "Sin datos" sin diagnóstico posible.
+    const labels = ['HeartRate', 'RestingHeartRate', 'HRV', 'SpO2', 'SleepSession', 'Steps'];
+    [hrRes, restHrRes, hrvRes, spo2Res, sleepRes, stepsRes].forEach((r, i) => {
+        if (r.status === 'rejected') {
+            console.warn(`[HealthService] readRecords(${labels[i]}) rechazado:`,
+                r.reason?.message ?? String(r.reason));
+        }
+    });
+
     const lastRecord = (settled) => {
         const records = settled?.value?.records ?? [];
         return records.length > 0 ? records[records.length - 1] : null;
@@ -348,10 +359,15 @@ async function _readAndroidMetrics(startTime, endTime) {
         ? Math.round(hrvRecord.heartRateVariabilityMillis)
         : null;
 
+    // Health Connect v3: OxygenSaturationRecord.percentage es un NUMBER directo
+    // (revisado en records.types.d.ts:percentage: number), NO un objeto
+    // { value: number }. Con el acceso anterior `.percentage.value` la SpO₂
+    // era null aunque el wearable la escribiera correctamente.
     const spo2Record = lastRecord(spo2Res);
-    const spo2 = spo2Record?.percentage?.value != null
-        ? Math.round(spo2Record.percentage.value)
-        : null;
+    const spo2Raw = typeof spo2Record?.percentage === 'number'
+        ? spo2Record.percentage
+        : spo2Record?.percentage?.value;
+    const spo2 = spo2Raw != null ? Math.round(spo2Raw) : null;
 
     const sleepRecord = lastRecord(sleepRes);
     let sleepHours = null;

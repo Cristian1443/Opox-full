@@ -22,6 +22,7 @@ import { pushApi } from './src/api';
 import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 import { supabase } from './src/lib/supabase';
 import { AccessibilityProvider, AccessibilityContext } from './src/contexts/AccessibilityContext';
+import { ensureCheckinReminderScheduled } from './src/lib/checkinReminder';
 
 // Tipografía de marca OPOX
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -236,6 +237,13 @@ export default function App() {
   });
 
   const [banner, setBanner] = useState(null);
+
+  // Re-programa el recordatorio diario del check-in al arrancar la app —
+  // idempotente: si nunca se configuró, no hace nada; si sí, se asegura de que
+  // exista tras un reinstall/limpieza de datos.
+  useEffect(() => {
+    ensureCheckinReminderScheduled().catch(() => {});
+  }, []);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) await SplashScreen.hideAsync();

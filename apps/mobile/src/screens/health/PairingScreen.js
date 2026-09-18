@@ -189,8 +189,14 @@ export default function PairingScreen({ navigation, route }) {
             const alreadyGranted = await hasAllHealthPermissions();
             if (cancelled) return;
             if (alreadyGranted) {
-                setStepIdx(STEPS.length);
-                setPhase('complete');
+                // Bucle roto: si el usuario ya tenía los permisos concedidos
+                // no tiene sentido mostrarle el modal "Health Connect conectado"
+                // — no acaba de hacer nada. Antes rebotaba HomeHealth →
+                // ConnectDevice → Pairing → modal → HomeHealth sin fin porque
+                // HomeHealth seguía sin datos y ofrecía "Conecta wearable".
+                // Ahora volvemos silenciosamente al hub, donde el CTA smart
+                // muestra qué hacer según el estado real de HC.
+                navigation.goBack();
                 return;
             }
 

@@ -11,4 +11,5 @@ export { storeApi } from './store';
 export { settingsApi } from './settings';
 export { pushApi } from './push';
 export { healthApi } from './health';
+export { dailyCheckInApi, CHECKIN_FACTORS, CHECKIN_FACTOR_LABELS, moodLabel } from './dailyCheckIn';
 export { API_BASE_URL } from './config';

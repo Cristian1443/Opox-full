@@ -14,7 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import NudgeModal from '../components/NudgeModal';
 import BoeAlertBanner from '../components/BoeAlertBanner';
 import AlertCardModal from '../components/AlertCardModal';
-import { dashboardApi, planningApi, boeApi, trainingApi } from '../api';
+import { dashboardApi, planningApi, boeApi, trainingApi, dailyCheckInApi } from '../api';
 import { colors } from '../theme';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { getHealthMetrics, isHealthAvailable } from '../services/HealthService';
@@ -35,10 +35,36 @@ function calcHealthEnergy(metrics) {
 }
 
 function healthStatusLabel(pct) {
-    if (pct == null) return 'Sin datos de wearable';
+    if (pct == null) return 'Sin datos';
     if (pct >= 75) return 'Energía buena';
     if (pct >= 50) return 'Energía media';
     return 'Nivel de fatiga elevado';
+}
+
+// Combina energía del wearable con la del check-in — misma ponderación que
+// HomeHealth (60/40). Si sólo hay uno, devuelve ese.
+function combineDashEnergy(metrics, checkin) {
+    const wearable = calcHealthEnergy(metrics);
+    const manual = calcCheckinEnergyDash(checkin);
+    if (wearable != null && manual != null) return Math.round(wearable * 0.6 + manual * 0.4);
+    return wearable ?? manual;
+}
+
+function calcCheckinEnergyDash(checkin) {
+    if (!checkin) return null;
+    const mood = Number(checkin.moodScore);
+    const sleep = Number(checkin.sleepHours);
+    const energy = checkin.energyLevel;
+    let score = 0;
+    let parts = 0;
+    if (Number.isFinite(mood))  { score += (mood / 10) * 45; parts += 45; }
+    if (Number.isFinite(sleep)) { score += Math.min(1, sleep / 8) * 35; parts += 35; }
+    if (energy) {
+        const map = { low: 0.3, medium: 0.6, high: 0.95 };
+        score += (map[energy] ?? 0.5) * 20; parts += 20;
+    }
+    if (parts === 0) return null;
+    return Math.round((score / parts) * 100);
 }
 
 // Evita mostrar la alerta BOE más de una vez por sesión de app
@@ -495,6 +521,7 @@ export default function DashboardScreen({ navigation }) {
     const [summary, setSummary] = useState(null);
     const [planSummary, setPlanSummary] = useState(null);
     const [healthMetrics, setHealthMetrics] = useState(null);
+    const [healthCheckin, setHealthCheckin] = useState(null);
     const [realNudgeVisible, setRealNudgeVisible] = useState(false);
     const [isResumingMock, setIsResumingMock] = useState(false);
     const nudgeShownRef = useRef(false);
@@ -516,6 +543,11 @@ export default function DashboardScreen({ navigation }) {
         if (isHealthAvailable()) {
             getHealthMetrics().then((m) => { if (!cancelled) setHealthMetrics(m); });
         }
+        // Check-in diario — fuente primaria si el usuario no tiene wearable.
+        const today = new Date().toLocaleDateString('sv');
+        dailyCheckInApi.getForDate(today).then((res) => {
+            if (!cancelled) setHealthCheckin(res?.data?.checkin ?? null);
+        }).catch(() => {});
         boeApi.getFeed().then(res => {
             if (cancelled || res?.error || !res?.data) return;
             const unread = res.data.totalUnread ?? 0;
@@ -584,8 +616,19 @@ export default function DashboardScreen({ navigation }) {
 
     // Widget de salud — datos reales del wearable o fallback "—"
     const healthHr = healthMetrics?.heartRate ?? healthMetrics?.restingHeartRate ?? null;
-    const healthEnergy = calcHealthEnergy(healthMetrics);
-    const healthStatus = healthStatusLabel(healthEnergy);
+    const healthEnergy = combineDashEnergy(healthMetrics, healthCheckin);
+    const healthCheckinPending = !healthCheckin;
+    // Subtítulo del widget: prioriza wearable > check-in > pendiente.
+    let healthStatus;
+    if (healthCheckinPending) {
+        healthStatus = 'Estado del día pendiente · 20 s';
+    } else if (healthHr != null) {
+        healthStatus = healthStatusLabel(healthEnergy);
+    } else {
+        // Sin wearable pero con Estado del día → describir la fuente.
+        const label = healthStatusLabel(healthEnergy);
+        healthStatus = `${label} · según tu Estado del día`;
+    }
     const healthRingPct = healthEnergy != null ? healthEnergy : 0;
     // Rojo si fatiga alta (<50%), verde si energía buena (≥75%), morado por defecto
     const healthRingColor = healthEnergy == null
@@ -646,7 +689,9 @@ export default function DashboardScreen({ navigation }) {
                 {/* ── 2.1 Widgets vivos ── */}
                 <TouchableOpacity
                     style={styles.widget}
-                    onPress={() => navigation.navigate('HomeHealth')}
+                    onPress={() => navigation.navigate(
+                        healthCheckinPending ? 'DailyCheckIn' : 'HomeHealth'
+                    )}
                     activeOpacity={0.85}
                 >
                     <View style={styles.widgetHead}>
@@ -655,9 +700,22 @@ export default function DashboardScreen({ navigation }) {
                     </View>
                     <View style={styles.healthRow}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.healthValue}>
-                                {healthHr != null ? healthHr : '—'} <Text style={styles.healthUnit}>ppm</Text>
-                            </Text>
+                            {/* Opción A · tipografía consistente con `72 ppm`:
+                               HR real cuando hay wearable, score /10 del Estado del día
+                               si no. Sin emoji para mantener el look OPOX. */}
+                            {healthHr != null ? (
+                                <Text style={styles.healthValue}>
+                                    {healthHr} <Text style={styles.healthUnit}>ppm</Text>
+                                </Text>
+                            ) : healthCheckin ? (
+                                <Text style={styles.healthValue}>
+                                    {healthCheckin.moodScore}<Text style={styles.healthUnit}>/10</Text>
+                                </Text>
+                            ) : (
+                                <Text style={styles.healthValue}>
+                                    — <Text style={styles.healthUnit}>ppm</Text>
+                                </Text>
+                            )}
                             <Text style={styles.healthStatus}>{healthStatus}</Text>
                         </View>
                         <View style={styles.ringWrap}>

@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
-  View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch,
+  View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import AccentSlider from '../../components/AccentSlider';
 import Text from '../../components/AppText';
 import { colors, spacing } from '../../theme';
 import { settingsApi } from '../../api';
 import { AccessibilityContext } from '../../contexts/AccessibilityContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import {
+  DEFAULT_CHECKIN_REMINDER_TIME,
+  getCheckinReminderTime,
+  scheduleCheckinReminder,
+  disableCheckinReminder,
+} from '../../lib/checkinReminder';
 
 // ─── 12.5 · Accesibilidad ───────────────────────────────────────────────────
 // Fiel al Figma (AccesibilidadScreen.tsx). "Modo noche" es un switch binario
@@ -93,6 +100,8 @@ function MoonIcon({ size = 24, color = colors.accentOrange }) {
 
 export default function ConfigAccessibilityScreen({ navigation }) {
   const [prefs, setPrefs] = useState(DEFAULT);
+  const [checkinReminderTime, setCheckinReminderTimeState] = useState(null); // 'HH:MM' | null
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const { setFontSize: applyFontSizeGlobally, setTheme: applyThemeGlobally } = useContext(AccessibilityContext);
   // Fase 3 · dark mode. Esta pantalla es especialmente crítica porque contiene
   // el toggle "Modo noche" — debe reflejar el cambio en tiempo real.
@@ -129,6 +138,37 @@ export default function ConfigAccessibilityScreen({ navigation }) {
     }
     load();
     return () => { cancelled = true; };
+  }, []);
+
+  // Cargar la hora del recordatorio del check-in al montar
+  useEffect(() => {
+    let cancelled = false;
+    getCheckinReminderTime().then((t) => {
+      if (!cancelled) setCheckinReminderTimeState(t);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggleCheckinReminder = useCallback(async (enabled) => {
+    if (enabled) {
+      const ok = await scheduleCheckinReminder(DEFAULT_CHECKIN_REMINDER_TIME);
+      setCheckinReminderTimeState(ok ? DEFAULT_CHECKIN_REMINDER_TIME : null);
+    } else {
+      await disableCheckinReminder();
+      setCheckinReminderTimeState(null);
+    }
+  }, []);
+
+  const handleTimeChange = useCallback(async (event, selectedDate) => {
+    // iOS: el picker es modal — cerrar solo en 'set'
+    if (Platform.OS === 'android') setShowTimePicker(false);
+    if (event?.type === 'dismissed' || !selectedDate) return;
+    const hh = String(selectedDate.getHours()).padStart(2, '0');
+    const mm = String(selectedDate.getMinutes()).padStart(2, '0');
+    const time = `${hh}:${mm}`;
+    const ok = await scheduleCheckinReminder(time);
+    if (ok) setCheckinReminderTimeState(time);
+    if (Platform.OS === 'ios') setShowTimePicker(false);
   }, []);
 
   const update = useCallback((patch) => {
@@ -230,9 +270,52 @@ export default function ConfigAccessibilityScreen({ navigation }) {
             accessibilityLabel={`Reducir animaciones ${prefs.reduceAnimations ? 'activado' : 'desactivado'}`}
           />
         </View>
+
+        {/* ── Recordatorio del Estado del día ────────────────────────── */}
+        <Text style={styles.sectionLabel}>RECORDATORIO DEL ESTADO DEL DÍA</Text>
+
+        <View style={[styles.row, styles.rowBorder]}>
+          <Text style={[styles.rowTitle, { flex: 1 }]}>Activar recordatorio diario</Text>
+          <Switch
+            value={!!checkinReminderTime}
+            onValueChange={toggleCheckinReminder}
+            trackColor={{ false: '#E2E2E6', true: colors.purple }}
+            thumbColor={colors.white}
+            accessibilityLabel={`Recordatorio del Estado del día ${checkinReminderTime ? 'activado' : 'desactivado'}`}
+          />
+        </View>
+
+        {checkinReminderTime && (
+          <TouchableOpacity
+            style={[styles.row, styles.rowBorder]}
+            onPress={() => setShowTimePicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.rowTitle, { flex: 1 }]}>Hora del recordatorio</Text>
+            <Text style={styles.timeValue}>{checkinReminderTime}</Text>
+          </TouchableOpacity>
+        )}
+
+        {showTimePicker && (
+          <DateTimePicker
+            value={parseTimeToDate(checkinReminderTime ?? DEFAULT_CHECKIN_REMINDER_TIME)}
+            mode="time"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            is24Hour
+            onChange={handleTimeChange}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+// Convierte 'HH:MM' a Date (fecha de hoy con esa hora) para inicializar el picker.
+function parseTimeToDate(hhmm) {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  const d = new Date();
+  d.setHours(Number.isFinite(h) ? h : 9, Number.isFinite(m) ? m : 0, 0, 0);
+  return d;
 }
 
 const styles = StyleSheet.create({
@@ -287,6 +370,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     fontSize: 14,
     color: colors.textDark,
+  },
+  timeValue: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 18,
+    color: colors.accentOrange,
   },
 
   // ── Tamaño fuente ─────────────────────────────────────────────
