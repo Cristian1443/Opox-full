@@ -584,13 +584,15 @@ export default function DashboardScreen({ navigation }) {
                 Alert.alert('No se pudo retomar', 'Inténtalo de nuevo más tarde.');
                 return;
             }
-            const secondsPerQuestion = Math.max(30, Math.round((exam.durationMinutes * 60) / questions.length));
+            const totalTimeSeconds = Math.max(60, exam.durationMinutes * 60);
+            const secondsPerQuestion = Math.max(30, Math.round(totalTimeSeconds / questions.length));
             navigation.navigate('TrainingSession', {
                 source: 'official',
                 mockExamId: mockInProgress.mockExamId,
                 questions: adaptGeneratedQuestions(questions),
                 examTitle: exam.title,
                 timedMode: true,
+                totalTimeSeconds,
                 secondsPerQuestion,
                 startIndex: progress.currentIndex,
                 resumeAnswers: progress.answers,

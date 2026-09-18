@@ -116,6 +116,7 @@ function IconTimerClock({ size = 14, color = '#FFFFFF' }) {
 }
 import AbandonTestModal from '../../components/AbandonTestModal';
 import TimeUpModal from '../../components/TimeUpModal';
+import DeficitWarningModal from '../../components/DeficitWarningModal';
 import ToastNotification from '../../components/ToastNotification';
 import HintBottomSheet from '../../components/HintBottomSheet';
 import LawReferenceBottomSheet from '../../components/LawReferenceBottomSheet';
@@ -147,9 +148,21 @@ const MOCK_QUESTIONS = [
   },
 ];
 
-const TIMER_WARNING = 30;
-const TIMER_DANGER = 10;
+// Umbrales del cronómetro GLOBAL: se pintan proporcionales al total del test
+// para que un simulacro de 90 min avise a los 15 min restantes y un test de
+// 10 preguntas × 60 s = 10 min avise a los 2 min. Fallback fijo si el total
+// es demasiado corto para que la proporción tenga sentido.
+const timerWarningThreshold = (total) => Math.max(60, Math.round(total * 0.2));
+const timerDangerThreshold  = (total) => Math.max(15, Math.round(total * 0.05));
 const MAX_HINTS = 3;
+const DEFAULT_SECONDS_PER_QUESTION = 60;
+
+// Status de cada entrada del array `answers[i]`:
+//   'answered'          — el usuario confirmó respuesta (correcta o no).
+//   'skipped'           — el usuario pasó sin responder; puede volver a hacerla.
+//   'timed_out_global'  — se acabó el cronómetro global y quedó sin responder.
+// Nota: 'skipped' y 'timed_out_global' cuentan como fallo en resultados.
+const isAnswerSealed = (entry) => !!entry && entry.status === 'answered';
 
 export default function QuestionActiveScreen({ navigation, route }) {
   const {
@@ -160,7 +173,13 @@ export default function QuestionActiveScreen({ navigation, route }) {
     // examTitle para el subtítulo del header.
     source = 'generator',
     timedMode = true,
-    secondsPerQuestion = 60,
+    // secondsPerQuestion: presupuesto medio por pregunta. Se usa para calcular
+    // totalTimeSeconds cuando este no viene explícito (retrocompat).
+    secondsPerQuestion = DEFAULT_SECONDS_PER_QUESTION,
+    // Cronómetro GLOBAL para todo el test. Si no viene, se calcula al arrancar
+    // como `questionCount * secondsPerQuestion`. Simulacros oficiales lo fijan
+    // via MockInstructions (contrarrelojSeg).
+    totalTimeSeconds = null,
     examTitle = 'Examen oficial 2021',
     challengeId = null,
     clanId = null,
@@ -193,7 +212,16 @@ export default function QuestionActiveScreen({ navigation, route }) {
     progress: streamProgress,
     status: streamStatus,
     sessionId: streamSessionId,
+    deficit: streamDeficit,
   } = useTestSession(jobId, { expectedTotal });
+  // Cuando el Motor entrega menos preguntas de las pedidas (G08), mostramos
+  // un modal antes de arrancar el test. Se rearma solo cuando llega un
+  // deficit nuevo, no en cada re-render.
+  const [showDeficitModal, setShowDeficitModal] = useState(false);
+  const [deficitAcknowledged, setDeficitAcknowledged] = useState(false);
+  useEffect(() => {
+    if (streamDeficit && !deficitAcknowledged) setShowDeficitModal(true);
+  }, [streamDeficit, deficitAcknowledged]);
   // Preguntas del stream: mutables porque las que vienen con correctIndex: -1
   // (Motor generó nuevas, no están en el banco) reciben corrección diferida
   // vía POST /training/session/:sessionId/answer al responder cada una.
@@ -223,10 +251,18 @@ export default function QuestionActiveScreen({ navigation, route }) {
   const [selectedOption, setSelectedOption] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(secondsPerQuestion);
-  const [answers, setAnswers] = useState(resumeAnswers ?? []);
+  // Cronómetro GLOBAL (todo el test), no por pregunta. Se inicializa al montar
+  // desde totalTimeSeconds o desde questionCount × secondsPerQuestion.
+  const [globalTimeLeft, setGlobalTimeLeft] = useState(0);
+  const [globalTimeInitialized, setGlobalTimeInitialized] = useState(false);
+  // `answers` es un array por ÍNDICE de pregunta (mismo length que `questions`),
+  // no un array append-only. Permite navegar libremente y saber en cada índice
+  // si esa pregunta está respondida, saltada o timed_out. Al retomar simulacros
+  // (resumeAnswers), se normaliza para garantizar el length correcto.
+  const [answers, setAnswers] = useState(() => resumeAnswers ?? []);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [showTimeUpModal, setShowTimeUpModal] = useState(false);
+  const [showFinishConfirmModal, setShowFinishConfirmModal] = useState(false);
   const [toast, setToast] = useState(null);
   const [showHintSheet, setShowHintSheet] = useState(false);
   const [showLawSheet, setShowLawSheet] = useState(false);
@@ -250,21 +286,85 @@ export default function QuestionActiveScreen({ navigation, route }) {
   // Streaming: si aún no llega la primera pregunta, mostramos loader con el
   // progreso del job. Se calcula ANTES del uso de `questions[currentIndex]`
   // porque en modo stream ese array puede estar vacío en el primer render.
-  // Si el job terminó ('done') pero no llegaron preguntas, tratamos como error
-  // para no dejar al usuario ante un spinner infinito.
   const streamStillLoading =
     jobId && questions.length === 0 && streamStatus !== 'error' && streamStatus !== 'done';
+  // Solo tratamos como error TOTAL si NO llegó NINGUNA pregunta. Si el usuario
+  // ya está respondiendo (tiene 23 preguntas y el Motor timeoutea o falla),
+  // NO cortamos la sesión — se re-cierra el total al `questions.length` real y
+  // dejamos que termine con lo que hay. Bug reportado: el hook llegaba a
+  // TIMEOUT (360 s) mientras el usuario iba por la pregunta 23 → toda la
+  // sesión se cortaba con la pantalla "Motor tarda · Reintentar/Volver".
   const streamHasError =
-    jobId && (streamStatus === 'error' || (streamStatus === 'done' && questions.length === 0));
+    jobId && questions.length === 0 && (streamStatus === 'error' || streamStatus === 'done');
+  // Marca "el stream se cortó pero ya hay preguntas útiles" — usamos esto para
+  // acotar `total` a lo cargado y evitar que el usuario navegue a una pregunta
+  // que ya no va a llegar.
+  const streamStoppedWithData =
+    jobId && questions.length > 0 && (streamStatus === 'error' || streamStatus === 'done');
 
   const question = questions[currentIndex];
-  const total = jobId && expectedTotal ? expectedTotal : questions.length;
+  // Total mostrado: cuando hay deficit (G08) usar el `delivered`. Si el stream
+  // se cortó por error o timeout con preguntas ya cargadas, usar `questions.length`
+  // real (no `expectedTotal`) para que el usuario no vea "Pregunta 1 de 30"
+  // cuando solo hay 23. Si el stream sigue corriendo, mostrar `expectedTotal`
+  // para que la barra de progreso refleje el objetivo.
+  const effectiveExpected = streamDeficit?.delivered
+    ?? (streamStoppedWithData ? questions.length : expectedTotal);
+  const total = jobId && effectiveExpected ? effectiveExpected : questions.length;
   const progress = total > 0 ? (currentIndex + 1) / total : 0;
+  // Índice máximo navegable: nunca más allá de las preguntas realmente
+  // cargadas. Si el usuario pidió 30 pero el stream va por la 20, el
+  // chevron `>` se deshabilita en la 20 hasta que llegue la 21.
+  const maxNavigableIndex = Math.max(0, questions.length - 1);
+  const canGoForward = currentIndex < maxNavigableIndex;
+  // El cronómetro NO debe correr mientras el stream aún no tiene preguntas.
+  // Antes podía consumir tiempo (o incluso agotarse) mientras el Motor
+  // generaba, terminando el test antes de que el usuario viera la primera.
+  const testReady = !streamStillLoading && !streamHasError && questions.length > 0;
 
+  // Inicialización del cronómetro global — se hace UNA vez cuando ya sabemos
+  // cuántas preguntas hay Y el stream (si aplica) ha entregado la primera.
+  // Antes se inicializaba con `total = expectedTotal` en cuanto el jobId
+  // llegaba, y podía consumirse todo mientras el Motor generaba — el test
+  // terminaba antes de que el usuario viera la primera pregunta.
   useEffect(() => {
-    setTimeLeft(secondsPerQuestion);
+    if (globalTimeInitialized || total === 0 || !testReady) return;
+    const seconds = totalTimeSeconds && totalTimeSeconds > 0
+      ? totalTimeSeconds
+      : total * (secondsPerQuestion || DEFAULT_SECONDS_PER_QUESTION);
+    setGlobalTimeLeft(seconds);
+    setGlobalTimeInitialized(true);
+  }, [total, totalTimeSeconds, secondsPerQuestion, globalTimeInitialized, testReady]);
+
+  // Normalizamos `answers` a array indexado del length de `questions`. Preserva
+  // resumeAnswers (retomar simulacros) y rellena con null los huecos.
+  useEffect(() => {
+    if (total === 0) return;
+    setAnswers((prev) => {
+      if (prev.length === total) return prev;
+      const next = new Array(total).fill(null);
+      for (let i = 0; i < Math.min(prev.length, total); i++) next[i] = prev[i] ?? null;
+      return next;
+    });
+  }, [total]);
+
+  // Al cambiar de pregunta actual, restaurar el estado UI desde answers[i].
+  // Si esa pregunta ya está sellada (answered), pintar en modo consulta:
+  // opción seleccionada + feedback visible sin permitir modificar.
+  useEffect(() => {
+    const entry = answers[currentIndex] ?? null;
+    if (isAnswerSealed(entry)) {
+      setSelectedOption(entry.selected ?? null);
+      setIsSubmitted(true);
+      feedbackAnim.setValue(1);
+    } else {
+      setSelectedOption(null);
+      setIsSubmitted(false);
+      feedbackAnim.setValue(0);
+    }
     questionStartTimeRef.current = Date.now();
-  }, [currentIndex, secondsPerQuestion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex]);
 
   useEffect(() => {
     if (isPaused) return;
@@ -272,23 +372,30 @@ export default function QuestionActiveScreen({ navigation, route }) {
     return () => clearInterval(id);
   }, [isPaused]);
 
+  // Cronómetro GLOBAL — corre continuamente mientras esté en modo contrarreloj,
+  // el test esté listo (streaming completado) y no esté pausado.
+  // Usamos ref para evitar stale closure: si el stream sigue trayendo preguntas
+  // mientras el timer corre, `handleGlobalTimeout` debe ver la lista actualizada.
+  const handleGlobalTimeoutRef = useRef(handleGlobalTimeout);
+  handleGlobalTimeoutRef.current = handleGlobalTimeout;
   useEffect(() => {
-    if (!timedMode || isSubmitted || isPaused) return;
+    if (!timedMode || !globalTimeInitialized || isPaused || !testReady) return;
     timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
+      setGlobalTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current);
-          handleTimeout();
+          handleGlobalTimeoutRef.current?.();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [currentIndex, isSubmitted, timedMode, isPaused]);
+  }, [timedMode, globalTimeInitialized, isPaused, testReady]);
 
   useEffect(() => {
-    const shouldPulse = timedMode && !isSubmitted && timeLeft <= TIMER_DANGER && timeLeft > 0;
+    const danger = timerDangerThreshold(totalTimeSeconds || total * secondsPerQuestion);
+    const shouldPulse = timedMode && globalTimeLeft <= danger && globalTimeLeft > 0;
     if (shouldPulse) {
       if (!pulseRef.current) {
         pulseRef.current = Animated.loop(
@@ -306,16 +413,18 @@ export default function QuestionActiveScreen({ navigation, route }) {
       }
       timerPulseAnim.setValue(1);
     }
-  }, [timeLeft, isSubmitted, timedMode]);
+  }, [globalTimeLeft, timedMode, total, totalTimeSeconds, secondsPerQuestion, timerPulseAnim]);
 
   useEffect(() => {
-    if (!timedMode) return;
-    if (timeLeft === TIMER_WARNING) {
-      AccessibilityInfo.announceForAccessibility(`Atención: quedan ${TIMER_WARNING} segundos.`);
-    } else if (timeLeft === TIMER_DANGER) {
-      AccessibilityInfo.announceForAccessibility(`¡Urgente! Quedan ${TIMER_DANGER} segundos.`);
+    if (!timedMode || !globalTimeInitialized) return;
+    const warn = timerWarningThreshold(totalTimeSeconds || total * secondsPerQuestion);
+    const danger = timerDangerThreshold(totalTimeSeconds || total * secondsPerQuestion);
+    if (globalTimeLeft === warn) {
+      AccessibilityInfo.announceForAccessibility(`Atención: quedan ${Math.round(warn / 60)} minutos del cronómetro global.`);
+    } else if (globalTimeLeft === danger) {
+      AccessibilityInfo.announceForAccessibility('¡Urgente! El cronómetro global está a punto de agotarse.');
     }
-  }, [timeLeft, timedMode]);
+  }, [globalTimeLeft, timedMode, globalTimeInitialized, total, totalTimeSeconds, secondsPerQuestion]);
 
   const animateFeedback = useCallback(() => {
     feedbackAnim.setValue(0);
@@ -327,10 +436,30 @@ export default function QuestionActiveScreen({ navigation, route }) {
     }).start();
   }, [feedbackAnim]);
 
-  const handleTimeout = useCallback(() => {
-    setAnswers(prev => [...prev, { questionId: question?.id, selected: null, isCorrect: false, timeSecs: secondsPerQuestion }]);
+  // Se acabó el cronómetro GLOBAL — marca todas las preguntas cargadas sin
+  // sellar como timed_out_global (cuentan como fallo) y muestra el modal.
+  // Iteramos hasta `questions.length` (no `total`) para no crear entradas
+  // fantasma de preguntas que el stream aún no ha entregado.
+  const handleGlobalTimeout = useCallback(() => {
+    setAnswers(prev => {
+      const length = Math.max(prev.length, questions.length);
+      const next = new Array(length).fill(null);
+      for (let i = 0; i < prev.length; i++) next[i] = prev[i] ?? null;
+      for (let i = 0; i < questions.length; i++) {
+        if (!isAnswerSealed(next[i])) {
+          next[i] = {
+            questionId: questions[i]?.id,
+            selected: null,
+            isCorrect: false,
+            timeSecs: null,
+            status: 'timed_out_global',
+          };
+        }
+      }
+      return next;
+    });
     setShowTimeUpModal(true);
-  }, [question, secondsPerQuestion]);
+  }, [questions]);
 
   const handleSelectOption = (id) => {
     if (isSubmitted) return;
@@ -401,44 +530,53 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
       const isCorrect = Boolean(data.correct);
       if (!isCorrect) Vibration.vibrate(80);
-      clearInterval(timerRef.current);
       setIsSubmitted(true);
-      setAnswers(prev => [...prev, {
-        questionId: question.id,
-        selected: selectedOption,
-        isCorrect,
-        timeSecs,
-      }]);
+      setAnswers(prev => {
+        const next = prev.length === total ? [...prev] : new Array(total).fill(null);
+        for (let i = 0; i < prev.length; i++) next[i] = prev[i] ?? null;
+        next[currentIndex] = {
+          questionId: question.id,
+          selected: selectedOption,
+          isCorrect,
+          timeSecs,
+          status: 'answered',
+        };
+        return next;
+      });
       animateFeedback();
       return;
     }
 
     // Flujo original — preguntas con correctIndex ya resuelto en cliente.
-    clearInterval(timerRef.current);
     const timeSecs = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
     const selected = question.options.find(o => o.id === selectedOption);
     const isCorrect = selected?.correct ?? false;
     if (!isCorrect) Vibration.vibrate(80);
     setIsSubmitted(true);
-    setAnswers(prev => [...prev, { questionId: question.id, selected: selectedOption, isCorrect, timeSecs }]);
+    setAnswers(prev => {
+      const next = prev.length === total ? [...prev] : new Array(total).fill(null);
+      for (let i = 0; i < prev.length; i++) next[i] = prev[i] ?? null;
+      next[currentIndex] = {
+        questionId: question.id,
+        selected: selectedOption,
+        isCorrect,
+        timeSecs,
+        status: 'answered',
+      };
+      return next;
+    });
     animateFeedback();
   };
 
+  // Navegación libre: siguiente pregunta sin exigir respuesta previa.
+  // Si el usuario no confirmó, la pregunta queda como pendiente (answers[i] = null)
+  // y puede volver desde el chevron ‹ o desde el navegador de progreso.
+  // Protección extra: si el stream aún no entregó la pregunta N+1, no avanzar
+  // (bloquea el edge case "pantalla en blanco" cuando el usuario iba más rápido
+  // que el Motor).
   const handleNext = () => {
-    const isLast = currentIndex + 1 >= total;
-    if (isLast) {
-      // Simulacro terminado — ya no está "en curso", limpiamos el progreso
-      // guardado (red de seguridad; el backend también lo limpia al guardar
-      // el intento, pero esto evita un parpadeo de "reanudar" si tarda).
-      if (source === 'official' && mockExamId) {
-        trainingApi.clearMockProgress().catch(() => {});
-      }
-      navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId, requestedTopicId });
-      return;
-    }
-    // Autoguardado del progreso de simulacros oficiales — permite retomar
-    // exactamente en esta pregunta desde la tarjeta "¿Seguimos con el
-    // simulacro?" del dashboard. Fire-and-forget: no bloquea la navegación.
+    if (currentIndex + 1 >= total) return; // última: usar "Terminar test"
+    if (currentIndex + 1 >= questions.length) return; // aún no cargó la siguiente
     if (source === 'official' && mockExamId) {
       trainingApi.saveMockProgress({
         mockExamId,
@@ -449,12 +587,38 @@ export default function QuestionActiveScreen({ navigation, route }) {
       }).catch(() => {});
     }
     setCurrentIndex(prev => prev + 1);
-    setSelectedOption(null);
-    setIsSubmitted(false);
     setIsBookmarked(false);
     setIsReported(false);
     setUserRating(0);
-    feedbackAnim.setValue(0);
+  };
+
+  const handlePrev = () => {
+    if (currentIndex === 0) return;
+    setCurrentIndex(prev => prev - 1);
+    setIsBookmarked(false);
+    setIsReported(false);
+    setUserRating(0);
+  };
+
+  // "Terminar test" — solo permite pasar a resultados si todas las preguntas
+  // están respondidas. Si hay pendientes, abre modal de confirmación.
+  const goToResults = () => {
+    if (source === 'official' && mockExamId) {
+      trainingApi.clearMockProgress().catch(() => {});
+    }
+    navigation.replace('TrainingResult', {
+      source, mockExamId, answers, questions, elapsedSeconds,
+      challengeId, clanId, taskId, requestedTopicId,
+    });
+  };
+
+  const handleFinish = () => {
+    const pendingCount = answers.filter((a) => !isAnswerSealed(a)).length;
+    if (pendingCount > 0) {
+      setShowFinishConfirmModal(true);
+      return;
+    }
+    goToResults();
   };
 
   const formatTime = (s) => {
@@ -515,17 +679,41 @@ export default function QuestionActiveScreen({ navigation, route }) {
     );
   }
 
-  // Guard adicional: fuera del modo streaming, si por alguna razón no hay
-  // pregunta actual (edge case, currentIndex fuera de rango, etc.) evitamos
-  // el crash de `question.options` renderizando nada.
-  if (!question) return null;
+  // Guard adicional: si el usuario navegó a una pregunta que aún no cargó
+  // (edge case del streaming — usuario más rápido que el Motor) mostramos
+  // un loader in-place en vez de "pantalla en blanco" con `return null`.
+  if (!question) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <ActivityIndicator size="large" color={colors.selectionBorder} />
+          <Text style={{ fontSize: 14, color: colors.textDark, marginTop: 12, textAlign: 'center' }}>
+            Cargando pregunta {currentIndex + 1}…
+          </Text>
+          <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 6, textAlign: 'center' }}>
+            El Motor sigue generando. Espera unos segundos.
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: 20, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: colors.selectionBorder, borderRadius: 10 }}
+            onPress={() => setCurrentIndex(Math.max(0, questions.length - 1))}
+          >
+            <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Ir a la última cargada</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
+  const currentAnswerEntry = answers[currentIndex] ?? null;
+  const isSealed = isAnswerSealed(currentAnswerEntry);
   const isCorrectAnswer =
     isSubmitted && question.options.find(o => o.id === selectedOption)?.correct === true;
-  const isTimeOut = isSubmitted && selectedOption === null;
   const isLastQuestion = currentIndex + 1 >= total;
   const hintsRemaining = MAX_HINTS - hintsUsed;
   const isHintDisabled = isSubmitted || hintsRemaining <= 0;
+  const answeredCount = answers.filter((a) => isAnswerSealed(a)).length;
+  const allAnswered = total > 0 && answeredCount === total;
+  const dangerThreshold = timerDangerThreshold(totalTimeSeconds || total * secondsPerQuestion);
 
   const visibleOptions = question.options.filter((opt) => {
     if (!isSubmitted) return true;
@@ -569,14 +757,8 @@ export default function QuestionActiveScreen({ navigation, route }) {
           <TouchableOpacity
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             disabled={currentIndex === 0}
-            onPress={() => {
-              if (currentIndex > 0) {
-                setCurrentIndex(prev => prev - 1);
-                setSelectedOption(null);
-                setIsSubmitted(false);
-                feedbackAnim.setValue(0);
-              }
-            }}
+            onPress={handlePrev}
+            accessibilityLabel="Pregunta anterior"
           >
             <Ionicons
               name="chevron-back"
@@ -585,9 +767,28 @@ export default function QuestionActiveScreen({ navigation, route }) {
             />
           </TouchableOpacity>
 
-          <Text style={styles.progressLabel}>Pregunta {currentIndex + 1} de {total}</Text>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={styles.progressLabel}>Pregunta {currentIndex + 1} de {total}</Text>
+            <Text style={styles.progressSubLabel}>
+              {answeredCount} de {total} respondidas
+              {streamStoppedWithData && expectedTotal > questions.length
+                ? ` · Motor entregó ${questions.length} de ${expectedTotal}`
+                : ''}
+            </Text>
+          </View>
 
-          <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.25)" />
+          <TouchableOpacity
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            disabled={isLastQuestion || !canGoForward}
+            onPress={handleNext}
+            accessibilityLabel="Pregunta siguiente"
+          >
+            <Ionicons
+              name="chevron-forward"
+              size={22}
+              color={(isLastQuestion || !canGoForward) ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.85)'}
+            />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.progressTrackRow}>
@@ -598,11 +799,11 @@ export default function QuestionActiveScreen({ navigation, route }) {
             <TouchableOpacity
               activeOpacity={0.7}
               onLongPress={() => {
-                // Dev: long-press en el timer fuerza el "tiempo agotado" para poder
-                // ver el TimeUpModal sin tener que esperar los 60 s reales.
-                setTimeLeft(0);
+                // Dev: long-press en el timer fuerza el "tiempo agotado" global
+                // para poder ver el TimeUpModal sin esperar el minutero real.
+                setGlobalTimeLeft(0);
                 clearInterval(timerRef.current);
-                handleTimeout();
+                handleGlobalTimeout();
               }}
               delayLongPress={600}
             >
@@ -611,13 +812,13 @@ export default function QuestionActiveScreen({ navigation, route }) {
               >
                 <IconTimerClock
                   size={14}
-                  color={timeLeft <= TIMER_DANGER ? colors.statRed : '#FFFFFF'}
+                  color={globalTimeLeft <= dangerThreshold ? colors.statRed : '#FFFFFF'}
                 />
                 <Text style={[
                   styles.timerText,
-                  timeLeft <= TIMER_DANGER && { color: colors.statRed },
+                  globalTimeLeft <= dangerThreshold && { color: colors.statRed },
                 ]}>
-                  {formatTime(timeLeft)}
+                  {formatTime(globalTimeLeft)}
                 </Text>
               </Animated.View>
             </TouchableOpacity>
@@ -704,7 +905,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
                 styles.feedbackTitle,
                 { color: isCorrectAnswer ? colors.statGreen : colors.statRed },
               ]}>
-                {isTimeOut ? 'Tiempo agotado' : isCorrectAnswer ? '¡Correcto!' : 'Incorrecto'}
+                {isCorrectAnswer ? '¡Correcto!' : 'Incorrecto'}
               </Text>
             </View>
 
@@ -712,7 +913,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
               {isCorrectAnswer ? question.explanation : question.explanationWrong}
             </Text>
 
-            {!isCorrectAnswer && !isTimeOut && (
+            {!isCorrectAnswer && (
               <Text style={styles.errorLabLink}>
                 + Esta pregunta irá a tu Laboratorio de Errores
               </Text>
@@ -722,31 +923,66 @@ export default function QuestionActiveScreen({ navigation, route }) {
 
         <View style={{ height: spacing.md }} />
 
-        {/* ── CTA PRINCIPAL ── */}
-        {!isSubmitted ? (
+        {/* ── CTA PRINCIPAL ──
+            - Sin respuesta sellada: mostrar "Confirmar" (deshabilitado sin selección)
+              + link "Saltar por ahora" que pasa a la siguiente sin marcar.
+            - Con respuesta sellada + no es la última: "Siguiente pregunta".
+            - Con TODAS respondidas + es la última: "Terminar test".
+            - Con respuesta sellada + es la última pero falta alguna pendiente atrás:
+              "Volver a pendientes" (navega a la primera pendiente).
+        */}
+        {!isSealed ? (
+          <>
+            <TouchableOpacity
+              style={[styles.mainBtn, (!selectedOption || isCorrectionLoading) && styles.mainBtnDisabled]}
+              onPress={handleConfirm}
+              disabled={!selectedOption || isCorrectionLoading}
+              activeOpacity={0.85}
+            >
+              {isCorrectionLoading ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator color={colors.white} size="small" />
+                  <Text style={styles.mainBtnText}>Corrigiendo…</Text>
+                </View>
+              ) : (
+                <Text style={styles.mainBtnText}>Confirmar respuesta</Text>
+              )}
+            </TouchableOpacity>
+            {!isLastQuestion && (
+              <TouchableOpacity onPress={handleNext} style={styles.skipLink} activeOpacity={0.7}>
+                <Text style={styles.skipLinkText}>Saltar por ahora →</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        ) : allAnswered ? (
           <TouchableOpacity
-            style={[styles.mainBtn, (!selectedOption || isCorrectionLoading) && styles.mainBtnDisabled]}
-            onPress={handleConfirm}
-            disabled={!selectedOption || isCorrectionLoading}
+            style={styles.mainBtn}
+            onPress={handleFinish}
             activeOpacity={0.85}
           >
-            {isCorrectionLoading ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <ActivityIndicator color={colors.white} size="small" />
-                <Text style={styles.mainBtnText}>Corrigiendo…</Text>
-              </View>
-            ) : (
-              <Text style={styles.mainBtnText}>Confirmar respuesta</Text>
-            )}
+            <Text style={styles.mainBtnText}>Terminar test</Text>
           </TouchableOpacity>
-        ) : (
+        ) : !isLastQuestion ? (
           <TouchableOpacity
             style={styles.mainBtn}
             onPress={handleNext}
             activeOpacity={0.85}
           >
+            <Text style={styles.mainBtnText}>Siguiente pregunta</Text>
+          </TouchableOpacity>
+        ) : (
+          // Última pregunta ya respondida pero quedan pendientes atrás
+          <TouchableOpacity
+            style={styles.mainBtn}
+            onPress={() => {
+              const firstPending = answers.findIndex((a) => !isAnswerSealed(a));
+              if (firstPending >= 0) setCurrentIndex(firstPending);
+              else handleFinish();
+            }}
+            activeOpacity={0.85}
+          >
             <Text style={styles.mainBtnText}>
-              {isLastQuestion ? 'Ver resultados' : 'Siguiente pregunta'}
+              Ir a la primera pendiente ({total - answeredCount})
             </Text>
           </TouchableOpacity>
         )}
@@ -895,8 +1131,23 @@ export default function QuestionActiveScreen({ navigation, route }) {
         }}
       />
 
+      <DeficitWarningModal
+        visible={showDeficitModal}
+        deficit={streamDeficit}
+        onProceed={() => {
+          setShowDeficitModal(false);
+          setDeficitAcknowledged(true);
+        }}
+        onCancel={() => {
+          setShowDeficitModal(false);
+          setDeficitAcknowledged(true);
+          navigation.goBack();
+        }}
+      />
+
       <TimeUpModal
         visible={showTimeUpModal}
+        pendingCount={total - answeredCount}
         onContinue={() => {
           setShowTimeUpModal(false);
           if (source === 'official' && mockExamId) {
@@ -905,6 +1156,66 @@ export default function QuestionActiveScreen({ navigation, route }) {
           navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId, requestedTopicId });
         }}
       />
+
+      {showFinishConfirmModal && (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <Ionicons name="alert-circle-outline" size={44} color={colors.accentOrange} />
+            <Text style={styles.confirmTitle}>Aún tienes preguntas pendientes</Text>
+            <Text style={styles.confirmBody}>
+              Te quedan {total - answeredCount} preguntas por responder. Si terminas ahora contarán como fallo.
+            </Text>
+            <TouchableOpacity
+              style={[styles.mainBtn, { alignSelf: 'stretch' }]}
+              onPress={() => {
+                setShowFinishConfirmModal(false);
+                const firstPending = answers.findIndex((a) => !isAnswerSealed(a));
+                if (firstPending >= 0) setCurrentIndex(firstPending);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.mainBtnText}>Volver a las pendientes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setShowFinishConfirmModal(false);
+                // Marcar todas las pendientes como skipped antes de ir a resultados
+                setAnswers(prev => {
+                  const length = Math.max(prev.length, questions.length);
+                  const next = new Array(length).fill(null);
+                  for (let i = 0; i < prev.length; i++) next[i] = prev[i] ?? null;
+                  for (let i = 0; i < questions.length; i++) {
+                    if (!isAnswerSealed(next[i])) {
+                      next[i] = {
+                        questionId: questions[i]?.id,
+                        selected: null,
+                        isCorrect: false,
+                        timeSecs: null,
+                        status: 'skipped',
+                      };
+                    }
+                  }
+                  // Ir a resultados con el array ya actualizado
+                  setTimeout(() => {
+                    if (source === 'official' && mockExamId) {
+                      trainingApi.clearMockProgress().catch(() => {});
+                    }
+                    navigation.replace('TrainingResult', {
+                      source, mockExamId, answers: next, questions, elapsedSeconds,
+                      challengeId, clanId, taskId, requestedTopicId,
+                    });
+                  }, 0);
+                  return next;
+                });
+              }}
+              style={styles.skipLink}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.skipLinkText}>Terminar de todos modos</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <ReportQuestionModal
         visible={showReportModal}
@@ -938,7 +1249,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
         visible={showPauseModal}
         currentIndex={currentIndex}
         total={total}
-        correctAnswers={answers.filter(a => a.isCorrect).length}
+        correctAnswers={answers.filter((a) => a?.isCorrect).length}
         elapsedSeconds={elapsedSeconds}
         onResume={() => {
           setShowPauseModal(false);
@@ -1022,6 +1333,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.white,
     fontWeight: '700',
+  },
+  progressSubLabel: {
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.65)',
+    fontFamily: 'Poppins-Regular',
+    marginTop: 1,
+  },
+  skipLink: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  skipLinkText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontFamily: 'Poppins-Medium',
+  },
+  confirmOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    zIndex: 100,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: 12,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.textDark,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  confirmBody: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 8,
   },
   progressTrackRow: {
     flexDirection: 'row',
