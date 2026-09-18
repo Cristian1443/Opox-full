@@ -6,6 +6,8 @@ declare const API_ROUTES: {
     readonly HEALTH_MENUS: string;
     readonly HEALTH_MEDITATION: string;
     readonly HEALTH_STUDY_TECHNIQUE: string;
+    readonly HEALTH_CHECKIN: string;
+    readonly HEALTH_CHECKIN_GET: string;
 
     readonly AUTH: {
         readonly REGISTER: string;

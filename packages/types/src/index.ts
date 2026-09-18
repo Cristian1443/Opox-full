@@ -11,3 +11,4 @@ export * from './boe';
 export * from './store';
 export * from './config';
 export * from './notifications';
+export * from './health';

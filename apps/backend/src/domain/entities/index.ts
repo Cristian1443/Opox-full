@@ -23,3 +23,4 @@ export * from './UserPreferences';
 export * from './ProStats';
 export * from './PushToken';
 export * from './UserDevice';
+export * from './DailyCheckin';
