@@ -140,6 +140,9 @@ export default function MockInstructionsScreen({ navigation, route }) {
 
         // El Motor no expone correctIndex en /bank/questions — el runner lo obtiene
         // por pregunta al enviar la respuesta contra /answer.
+        // Simulacro oficial: el tiempo lo marca `totalSeconds` (cronómetro GLOBAL,
+        // no por pregunta). `secondsPerQuestion` sigue enviándose como fallback
+        // por si el runner necesita calcular algo pero el master es totalTimeSeconds.
         const secondsPerQuestion = Math.max(30, Math.round(totalSeconds / data.questions.length));
         navigation.replace('TrainingSession', {
             source: 'official',
@@ -149,6 +152,7 @@ export default function MockInstructionsScreen({ navigation, route }) {
             questions: adaptGeneratedQuestions(data.questions),
             examTitle: safeExam.title,
             timedMode: true,
+            totalTimeSeconds: totalSeconds,
             secondsPerQuestion,
         });
     };

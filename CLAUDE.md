@@ -1607,4 +1607,177 @@ build. El toggle se puede activar en Expo Go pero no schedule.
   antes del formulario — "❌ Textos de leyes, BOE consolidado, temario o
   apuntes" evita que el usuario pierda 90 s subiendo el archivo equivocado.
 
+## Gaps-18-09-26 · notas clave · Runner + Generador Infinito + Racha (bloque 2)
+
+### Runner rediseñado · timer global + navegación libre (2026-09-18)
+
+Antes: cronómetro POR pregunta (60 s); al agotarse cerraba TODO el test. Ahora:
+cronómetro GLOBAL con navegación libre entre preguntas. Ver
+`project_runner_timer_model` en memoria para el modelo completo.
+
+- `QuestionActiveScreen.answers` cambió de array append-only a **array indexado
+  por pregunta** (length = `questions.length`, entradas `null` = pendiente).
+  Cada entrada: `{ questionId, selected, isCorrect, timeSecs, status }` con
+  `status ∈ { 'answered', 'skipped', 'timed_out_global' }`. NUNCA hacer
+  `setAnswers(prev => [...prev, x])` — usar asignación por índice.
+- **Nueva prop `totalTimeSeconds`**: cronómetro global de todo el test. Fallback:
+  `total × secondsPerQuestion`. Los callers deben pasarlo cuando conocen el
+  tiempo real (`MockInstructionsScreen` con `contrarrelojSeg`, `DashboardScreen`
+  al retomar con `exam.durationMinutes * 60`).
+- `useAnswerSealed(entry)` — preguntas `answered` se abren en modo consulta
+  (opciones deshabilitadas, feedback visible, no modificable). `skipped` y
+  `timed_out_global` cuentan como fallo pero permiten revisitar.
+- CTA contextual: `Confirmar` / `Saltar por ahora →` (link secundario si no
+  es la última) / `Siguiente` / `Terminar test` (si `allAnswered`) / `Ir a la
+  primera pendiente (N)` (si es la última pero quedan pendientes).
+- `TrainingResultScreen` tolera nulls (`a?.isCorrect`) y separa
+  `answered && !isCorrect` de `skipped/timed_out_global` para stats
+  informativas ("N preguntas quedaron sin responder y se cuentan como fallo").
+- Sin cambios de schema en el backend — `userAnswerIndex: null` ya era válido.
+
+### Generador Infinito · 5 fixes P0 tras auditoría de rendimiento (2026-09-18)
+
+Ver `INFORME_GENERADOR_INFINITO.md` para los 10 gaps + datos del barrido +
+recomendaciones priorizadas. Scripts en `apps/backend/scripts/perf_generator_infinito*.js`.
+
+- **G01 · `MotorAiClient` mapea `topicId → tema_ids`**. Antes había un ternario
+  tautológico (`topicId === 'all' ? null : null`) que descartaba la selección
+  del usuario — el picker de temas era cosmético. Fix de 3 líneas: helper
+  `parseTemaIds(topicId)` exportado, usado en `generateQuestions` (sync) y en
+  `generateStream` del controller. Los `topic_id` que envía el mobile ya son
+  hex del Motor — no requiere consulta extra a Supabase.
+- **G02(A) · Progreso simulado en `useTestSession`**. El `JobOut.progreso.done`
+  del Motor a veces publica incremental pero muchas veces se queda en 0 hasta
+  el final. Nuevo state `simulatedDone` que incrementa 1 cada 7 s hasta
+  `total - 1`. El `progress.done` expuesto es `max(realDone, simulatedDone)`.
+  Al `status: 'done'` se completa al 100%.
+- **G04 · Validador alineado con Motor**. `trainingValidators.generateQuestionsSchema.count`
+  bajado de 100 → 50 (Motor: `n_preguntas ≤ 50`, antes 422 opaco).
+  `topicId.max(60) → max(200)` para permitir CSV de temas. `generateStream`
+  con cap defensivo a 50.
+- **G08 · `deficitDetail` propagado al mobile**. `MotorAiClient.getSessionQuestions`
+  devuelve `deficitDetail: { requested, delivered, reason, motivos } | null`.
+  `useTestSession` expone `deficit`. `DeficitWarningModal` — nuevo componente
+  que se muestra ANTES de arrancar el test si `delivered < requested` con opción
+  "Empezar con las {delivered}" o "Volver al generador". `QuestionActiveScreen
+  .effectiveExpected` usa `streamDeficit.delivered` como `total`.
+- **G09 · Cap picker + timeout hook**. `useTestSession.DEFAULT_TIMEOUT_MS: 180 → 360 s`.
+  `GeneratorConfigScreen.COUNT_MAX: 100 → 30` (n=50 tardaba >300 s en el
+  barrido, el hook mataba antes). Bajar el timeout requiere subir el cap
+  simultáneamente.
+- **G10 · Cap dinámico según temas seleccionados**. Barrido replay demostró
+  que restringir a 5 temas hace al Motor 2× más lento por pregunta
+  (`hecho_ya_preguntado: 86` en 5 temas × 20 preg vs 10 en null × 30 preg).
+  Fórmula: `dynamicCap = min(30, num_temas × 6)` en el picker. Mensaje "Con
+  N temas seleccionados, el máximo es X. Amplía la selección para pedir más
+  preguntas". Aplicado en `GeneratorConfigScreen`.
+
+### Runner · bugs de UX del streaming (2026-09-18)
+
+Reportados tras aplicar los 5 fixes P0 anteriores.
+
+- **`streamHasError` solo dispara con `questions.length === 0`**. Si el stream
+  muere con 23 preguntas ya cargadas → nuevo estado `streamStoppedWithData`
+  → el `total` se recorta a `questions.length` real → el usuario termina el
+  test con lo que hay, no pierde progreso. Antes: TIMEOUT del hook a los 360 s
+  cortaba TODO el test aunque hubiera 23/30 respondidas.
+- **Guard `if (!question)`** ahora muestra loader amigable "Cargando pregunta
+  N…" con botón "Ir a la última cargada" en vez de pantalla en blanco. Bug
+  observado al navegar más rápido que el Motor genera.
+- **Chevron `>` deshabilitado si `currentIndex + 1 >= questions.length`**.
+  Bloquea el edge case "usuario más rápido que el Motor". `handleNext` también
+  bloquea. `canGoForward = currentIndex < maxNavigableIndex`.
+- Chip informativo en la barra navy: "N de M respondidas · Motor entregó X de Y"
+  cuando `streamStoppedWithData && expectedTotal > questions.length`.
+
+### Bloque 3 · Bucle navegación tras pairing HC (2026-09-18)
+
+`navigation.navigate('HomeHealth')` en native-stack v7 combinado con los
+`replace()` intermedios del flujo wearable (WearableOnboarding →
+WearableSelect → WearableGuide → ConnectDevice → Pairing) dejaba `Pairing`
+"colgado" con `phase: 'complete'` conservado. El back del hub reactivaba
+`Pairing` con su estado y el modal aparecía otra vez.
+
+**Fix**: helper `collapseToHomeHealth(navigation)` que hace
+`dispatch(CommonActions.reset)` truncando el stack exactamente hasta
+`HomeHealth`. Aplicado en las 4 salidas de `PairingScreen` y las 2 de
+`ConnectDeviceScreen`.
+
+### HealthService robustez · Android (2026-09-18)
+
+- Ventana temporal `getHealthMetrics` 24 h → **72 h** — los wearables
+  sincronizan por lotes; con 24 h aparecían falsos "sin datos".
+- `pickNewestRecord(records, timeField)` — recorre TODAS las filas y coge la
+  más reciente por timestamp. Antes usaba `records[length-1]` asumiendo orden
+  ascendente — Zepp/Amazfit escriben fuera de orden.
+- HR: busca la muestra más reciente entre TODOS los `samples[]` de TODAS las
+  filas (antes cogía `samples[0]` de la última fila, normalmente la más antigua).
+- Añadido **RespiratoryRate** (`ANDROID_PERMISSIONS`, `HK_READ_TYPES`, columna
+  "Resp." del hub ya muestra dato real con unidad rpm). **Rebuild EAS
+  necesario** para el permiso extra; el resto de fixes son JS puro.
+
+### Tutor IA · "Tema N" → título real antes del Motor RAG (2026-09-18)
+
+El label `Tema N` es un remapeo del cliente (`ListTopicsUseCase` re-etiqueta
+todos los `label` a `Tema ${i+1}` para uniformar los pickers). El corpus RAG
+del Motor conoce los temas por su título original ("Régimen local"…). Cuando
+el usuario escribe "Tema 5", el Motor busca literalmente esa cadena y falla.
+
+**Fix**: `resolveTopicReferencesInMessage(supabase, oposicion, message)` en
+`apps/backend/src/infrastructure/shared/topicLabels.ts`. Regex
+`\btema\s+(\d{1,2})\b` case-insensitive, máx 2 dígitos (evita capturar
+"Ley 39/2015"). Sustituye cada "Tema N" por `Tema N («título real»)`. Fuera
+de rango u oposición sin temas → mensaje sin tocar.
+
+- Nuevo método `resolveTopicReferences` en `ITutorRepository` +
+  `SupabaseTutorRepository` (delega en el helper con try/catch defensivo).
+- `SendMessageUseCase` acepta `oposicion?: string | null`. Separa
+  `params.content` (se persiste en la conversación) de `enrichedForAi` (va
+  al Motor). El histórico del chat sigue mostrando lo que escribió el usuario.
+- `TutorController.sendMessage` pasa `req.authUser!.oposicion` al use case.
+
+### Racha · TZ del cliente en vez de Madrid (2026-09-18)
+
+**Bug crítico** confirmado con `scripts/diag_streak.js`: `registerActivity`
+en `SupabaseDashboardRepository` estaba anclado a `Europe/Madrid` e IGNORABA
+el `input.localDate` que el mobile envía desde hace meses. Para usuarios en
+Colombia (UTC-5), la ventana 17:00-23:59 hora local se solapa con la
+madrugada del día siguiente Madrid → toda la actividad de "ayer noche" +
+"hoy mañana" quedaba registrada como "mismo día Madrid" → `last === today`
+→ la racha NUNCA incrementaba.
+
+**Fix**:
+- `normalizeLocalDate(localDate)` — helper que valida YYYY-MM-DD estricto
+  con regex; fallback a `todayMadrid()` si no viene o no valida (código legacy).
+- `registerActivity` usa `normalizeLocalDate(input.localDate)` como `today`
+  en vez de `todayMadrid()`.
+- `toDomainGamification` acepta `localDate` opcional para calcular el
+  `effectiveStreak` decay con la TZ del cliente. Cuando se llama desde
+  `registerActivity`, se pasa el `today` recién calculado.
+
+**Comportamiento tras el fix**: los usuarios en cualquier TZ verán la racha
+basada en su día local — no en el corte de Madrid. Los que están en Madrid
+siguen viendo lo mismo (localDate y Madrid coinciden). El mobile ya enviaba
+`localDate` correctamente (documentado en el flujo `saveAttempt`,
+`toggleTask`, `completeChallenge`, `registerActivity`), solo faltaba que el
+backend lo respetase.
+
+### Scripts nuevos de rendimiento y diagnóstico
+
+Todos leen `apps/backend/.env` y no requieren backend corriendo.
+
+- `apps/backend/scripts/perf_generator_infinito.js` — barrido completo
+  cantidad × dificultad × temas (~48 casos, ~90 min, ~$1-3 en OpenAI).
+- `apps/backend/scripts/perf_generator_infinito_quick.js` — barrido
+  quirúrgico (5 casos, ~10 min).
+- `apps/backend/scripts/perf_generator_infinito_extra.js` — n=20/30/50/100
+  con retry tolerante a fallos DNS (usa user_id aleatorio para evitar
+  `hecho_ya_preguntado` acumulado).
+- `apps/backend/scripts/perf_generator_infinito_replay.js` — replay del
+  escenario reportado por el usuario (5 temas × 30 preguntas).
+- `apps/backend/scripts/diag_streak.js` — diagnóstico de racha por email
+  del usuario. Muestra estado real de `user_gamification`, últimos ledger
+  entries y últimos training_attempts con formato Madrid. Detecta el bug
+  de "last === today Madrid pero != today Colombia".
+
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.

@@ -10,9 +10,13 @@ export const listMocksQuerySchema = z.object({
 
 export const generateQuestionsSchema = z.object({
     oposicion: z.string().min(1).max(60),
-    topicId: z.string().min(1).max(60).optional(),
+    // Antes 60. Con G01 el mobile envía CSV de hex de 16 chars — 3 temas ya
+    // superan los 60. Ampliado a 200 para permitir hasta ~10 temas simultáneos.
+    topicId: z.string().min(1).max(200).optional(),
     difficulty: difficultySchema.optional(),
-    count: z.coerce.number().int().min(1).max(100).optional(),
+    // El Motor tiene n_preguntas.maximum: 50. Antes aceptábamos 100 y el Motor
+    // rechazaba con 422 opaco (INFORME_GENERADOR_INFINITO.md · G04).
+    count: z.coerce.number().int().min(1).max(50).optional(),
 });
 
 export const analyzePhotoSchema = z.object({

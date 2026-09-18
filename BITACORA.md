@@ -5,6 +5,256 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-18 (bloque 2) — Runner rediseñado + Generador Infinito auditado + Racha con TZ
+
+Rama: `fix/generador-infinito-2026-09-17`.
+
+Segunda sesión del día, después del bloque de Salud. Rediseño del runner de
+tests (cronómetro global + navegación libre), auditoría de rendimiento del
+Generador Infinito con 8 gaps confirmados y 5 fixes aplicados, y fix crítico
+de la racha que no incrementaba para usuarios en zonas horarias distintas de
+Madrid.
+
+### Rediseño del runner del test (Bloque 7 · `QuestionActiveScreen`)
+
+**Bug reportado**: al agotarse el tiempo de UNA pregunta, la app mostraba modal
+"¡Se acabó el tiempo!" y mandaba directo a resultados — perdiendo el resto del
+test. El texto además mentía técnicamente: "En modo contrarreloj el test se
+cierra al agotar el cronómetro" pero el cronómetro era POR PREGUNTA, no global.
+
+**Solución** (usuario eligió opción A tras propuesta): cronómetro **global** +
+navegación libre entre preguntas, respondidas se abren en modo consulta.
+
+Cambios en `QuestionActiveScreen.js`:
+- `totalTimeSeconds` param nuevo (fallback: `total × secondsPerQuestion`).
+  El timer global NO se resetea al cambiar de pregunta.
+- `answers` cambia de array append-only a **array indexado por pregunta**
+  (length = `questions.length`, entradas `null` = pendiente). Cada entrada:
+  `{ questionId, selected, isCorrect, timeSecs, status }` con
+  `status ∈ { 'answered', 'skipped', 'timed_out_global' }`.
+- Guard `testReady = !streamStillLoading && questions.length > 0` — el
+  cronómetro NO empieza hasta que llegue la primera pregunta. Antes podía
+  agotarse mientras el Motor generaba.
+- Chevrones ‹ › del navy bar navegan libremente entre preguntas cargadas.
+- Preguntas ya `answered` se abren en modo consulta (opciones deshabilitadas,
+  feedback visible sin permitir modificar).
+- Botón CTA contextual: `Confirmar` / `Saltar por ahora →` / `Siguiente` /
+  `Terminar test` (todas respondidas) / `Ir a la primera pendiente (N)`.
+- Modal `Terminar con pendientes` — confirmación cuando el usuario intenta
+  terminar sin responder todas: `Volver a las pendientes` (recomendado) o
+  `Terminar de todos modos` (marca pendientes como `skipped`).
+- `TimeUpModal` reescrito: texto ahora refleja la realidad ("Se acabó el
+  cronómetro del test. Las N preguntas sin responder cuentan como fallo").
+
+Callers actualizados para pasar `totalTimeSeconds`:
+- `MockInstructionsScreen` (simulacros oficiales · usa `contrarrelojSeg`).
+- `DashboardScreen` (retomar simulacro · `exam.durationMinutes * 60`).
+
+`TrainingResultScreen`:
+- Tolera nulls en `answers` (`a?.isCorrect`).
+- Nueva sección "N preguntas quedaron sin responder y se cuentan como fallo"
+  cuando hay `skipped` o `timed_out_global`.
+
+Sin cambios de schema en el backend: `userAnswerIndex: null` ya era válido.
+
+### Bloque 3 · Bucle 18↔19 tras pairing + robustez lectura de métricas
+
+**Bug reportado**: tras completar el pairing con Health Connect (modal
+"Health Connect conectado", screenshot 18.png) y volver al hub (screenshot
+19.png), al pulsar el back del hub para ir al Dashboard, la app reabría el
+modal de éxito en un bucle infinito.
+
+**Causa**: `navigation.navigate('HomeHealth')` en native-stack v7 combinado
+con los `replace()` intermedios del flujo wearable
+(WearableOnboarding → WearableSelect → WearableGuide → ConnectDevice →
+Pairing) dejaba `Pairing` "colgado" con `phase: 'complete'` conservado. El
+back del hub reactivaba `Pairing` con su estado y el modal aparecía otra vez.
+
+**Fix**: helper `collapseToHomeHealth(navigation)` que hace
+`dispatch(CommonActions.reset)` truncando el stack exactamente hasta
+`HomeHealth`. Aplicado en las 4 salidas de `PairingScreen` y las 2 de
+`ConnectDeviceScreen`.
+
+**Bonus robustez** en `HealthService.js` (Android):
+- Ventana temporal 24h → **72h** (los wearables sincronizan por lotes; con
+  24h aparecían falsos "sin datos").
+- `pickNewestRecord(records, timeField)` — recorre TODAS las filas y coge la
+  más reciente por timestamp. Antes usaba `records[length-1]` asumiendo
+  orden ascendente — Zepp/Amazfit escriben fuera de orden.
+- HR: busca la muestra más reciente entre TODOS los `samples[]` de TODAS
+  las filas (antes cogía `samples[0]` de la última fila, normalmente la más
+  antigua del batch).
+- Añadido **RespiratoryRate** (`ANDROID_PERMISSIONS`, `HK_READ_TYPES`,
+  columna "Resp." del hub ya muestra dato real con unidad rpm).
+- Log de conteo por métrica — cada `readRecords` con 0 filas queda en consola.
+
+Rebuild EAS necesario para el permiso extra de RespiratoryRate; el resto de
+fixes son JS puro.
+
+### Tutor IA · Traducir "Tema N" al título real antes del Motor
+
+**Bug reportado**: el usuario escribió "Puedes darme una breve explicación
+del Tema 5 de mi temario" y el Tutor respondió "no puedo asegurar cuál es
+el Tema 5". Sin embargo "Explícame más sobre derecho" funcionó bien.
+
+**Causa**: el label `Tema N` es un remapeo del cliente (`ListTopicsUseCase`
+en el backend re-etiqueta todos los `label` a `Tema ${i+1}` para uniformar
+los pickers). Pero el corpus RAG del Motor conoce los temas por su título
+original ("Régimen local", "Ley 39/2015"…). Cuando el usuario escribe
+"Tema 5", el Motor busca literalmente esa cadena en el corpus y falla.
+
+**Fix**: `resolveTopicReferencesInMessage(supabase, oposicion, message)` en
+`topicLabels.ts`. Regex `\btema\s+(\d{1,2})\b` case-insensitive, máx 2
+dígitos (para no capturar "Ley 39/**2015**"). Consulta `training_topics`
+una vez, sustituye cada "Tema N" por `Tema N («título real»)`. Rango fuera
+del temario u oposición sin temas → mensaje sin tocar.
+
+Cambios:
+- Nuevo método `resolveTopicReferences` en `ITutorRepository` +
+  `SupabaseTutorRepository` (delega en el helper con try/catch defensivo).
+- `SendMessageUseCase` acepta `oposicion?: string | null`. Separa dos
+  strings: `params.content` (se persiste tal cual en la conversación) y
+  `enrichedForAi` (el que va al Motor). El histórico del chat sigue
+  mostrando lo que escribió el usuario.
+- `TutorController.sendMessage` pasa `req.authUser!.oposicion` al use case.
+
+### Generador Infinito · Auditoría de rendimiento + 5 fixes P0
+
+**Motivación**: el usuario reportó que el Generador tardaba mucho y a veces
+cortaba el test. Se hizo barrido de rendimiento contra `ia.opox.ai` con
+scripts nuevos (`apps/backend/scripts/perf_generator_infinito*.js`) y se
+documentó todo en el nuevo `INFORME_GENERADOR_INFINITO.md`.
+
+**Barrido inicial · casos ejecutados**:
+
+| n | dificultad | temas | tiempo | devueltas | notas |
+|--|--|--|--|--|--|
+| 10 | fácil | null | 113 s | 10/10 | 9 descartes internos |
+| 10 | media | null | 73 s | 10/10 | 5 descartes |
+| 10 | difícil | null | 122 s | 10/10 | 7× l1_no_entailment |
+| 10 | media | 3 temas | 153 s | **3/10** | corte `tope_minado`, 90 descartes |
+| 20 | media | null | 135 s | 20/20 | – |
+| 30 | media | null | 191 s | 30/30 | – |
+| 50 | media | null | **>300 s TIMEOUT** | – | – |
+| 100 | media | null | **422** | – | Motor rechaza n>50 |
+
+Escala lineal `t ≈ 20 + 6·n` para dificultad media sin filtro de temas.
+
+**10 gaps identificados**, 5 aplicados (P0):
+
+- **G01 · Selector de temas era cosmético**. `MotorAiClient.generateQuestions`
+  tenía un ternario tautológico (`topicId === 'all' ? null : null`) que
+  descartaba la selección del usuario. Fix de 3 líneas: helper
+  `parseTemaIds(topicId)` exportado y usado en `generateQuestions` sync +
+  `generateStream` del controller. Los `topic_id` que envía el mobile ya
+  son hex del Motor — no requiere consulta extra a Supabase.
+- **G04 · Validador desalineado**. Backend aceptaba `count.max(100)`, Motor
+  solo `max(50)` → 422 opaco para el usuario. `trainingValidators.ts`
+  bajado a 50; `topicId.max(60)→max(200)` para permitir CSV de temas.
+  `generateStream` cap defensivo a 50.
+- **G08 · Motor entrega menos preguntas de las pedidas silenciosamente**.
+  Reproducido: `n=10 media 3_temas → 3/10` con `deficit.publicadas: 3`,
+  `corte: tope_minado`. Backend leía `deficit` pero no lo propagaba al
+  mobile (grep en mobile: 0 matches). Fix: `MotorAiClient.getSessionQuestions`
+  devuelve `deficitDetail: { requested, delivered, reason, motivos } | null`.
+  `useTestSession` expone `deficit`. Nuevo `DeficitWarningModal` — "Solo
+  pudimos preparar N de M preguntas" con motivo principal ("Se agotaron
+  los ejercicios disponibles para tu selección") + opción "Empezar con
+  las {delivered}" o "Volver al generador y probar con más temas".
+  `QuestionActiveScreen.effectiveExpected` usa `streamDeficit.delivered`
+  como `total` para que el contador no engañe.
+- **G09 · Timeout del hook no cabía con n=50**. `useTestSession
+  .DEFAULT_TIMEOUT_MS: 180 → 360 s`. `GeneratorConfigScreen.COUNT_MAX:
+  100 → 30` (n=50 tardaba >300 s en el barrido, `useTestSession` mataba
+  antes). Bajar timeout NO se puede sin subir simultáneamente el cap.
+- **G02(A) · Progreso simulado**. El `JobOut.progreso.done` del Motor
+  A VECES publica incremental, pero muchas veces se queda en 0 hasta el
+  final → el usuario veía "0 de 30 preguntas" durante 3 min. Nuevo state
+  `simulatedDone` que incrementa 1 cada 7 s hasta `total - 1`. El
+  `progress.done` expuesto es `max(realDone, simulatedDone)`. Al
+  `status: 'done'` se completa al 100% de golpe.
+
+**Bugs de UX que salieron al probar los fixes** (segundo reporte del
+usuario: "iba a la 20, pantalla en blanco, corte a la 23"):
+
+- `streamHasError` solo dispara ahora con `questions.length === 0`. Si el
+  stream muere con 23 preguntas ya cargadas → nuevo estado
+  `streamStoppedWithData` → el `total` se recorta a `questions.length`
+  real → el usuario termina el test con lo que hay, sin perder progreso.
+- Guard `if (!question)` ahora muestra loader amigable "Cargando pregunta
+  N…" con botón "Ir a la última cargada" en vez de pantalla en blanco.
+- Chevron `>` deshabilitado si `currentIndex + 1 >= questions.length`
+  — bloquea el edge case "usuario más rápido que el Motor".
+- Chip informativo en la barra navy: "N de M respondidas · Motor entregó
+  X de Y" cuando el stream se cortó con preguntas ya cargadas.
+
+**G10 · Cap dinámico según temas seleccionados** (descubierto al replicar
+el escenario reportado). Barrido replay:
+
+| escenario | tiempo | devueltas | ratio |
+|---|---|---|---|
+| 5 temas × 30 preg | **>360 s TIMEOUT** | 27/30 | 12+ s/pregunta |
+| 5 temas × 20 preg | 291 s | 20/20 | 14.5 s/pregunta (**86× hecho_ya_preguntado**) |
+| null × 30 preg | 217 s | 30/30 | 7 s/pregunta |
+
+Restringir temas hace al Motor 2× más lento por pregunta (mismo patrón
+observado en el reporte de Santi: 5 temas × 30 → corte a los 23-27).
+Fix: `dynamicCap = min(30, num_temas_seleccionados × 6)` en el picker.
+Mensaje "Con N temas seleccionados, el máximo es X. Amplía la selección
+para pedir más preguntas".
+
+### Racha · TZ del cliente en vez de Madrid
+
+**Bug reportado**: "ayer decía 4 y hoy sigue diciendo 4, aunque he hecho
+tests". Diagnóstico con `scripts/diag_streak.js` mostró:
+- `current_streak: 4, last_activity_date: '2026-09-18'` (Madrid)
+- Última actividad: 22:44 Madrid = 15:44 Colombia del 18 sept
+- Actividades del 18 Colombia y noche del 17 Colombia caían todas en el
+  mismo día Madrid → `last === today` → nunca incrementaba.
+
+**Causa** (comentario explícito en el código): la racha estaba anclada a
+`Europe/Madrid` e IGNORABA el `input.localDate` que el mobile enviaba.
+Para usuarios en Colombia (UTC-5), la ventana 17:00-23:59 hora local se
+solapa con la madrugada del día siguiente Madrid — actividad de "ayer
+noche" + "hoy mañana" quedaban registradas como "mismo día Madrid".
+
+**Fix** en `SupabaseDashboardRepository.ts`:
+- `normalizeLocalDate(localDate)` — helper que valida YYYY-MM-DD estricto
+  con regex; fallback a Madrid si no viene o no valida.
+- `registerActivity` usa `normalizeLocalDate(input.localDate)` como
+  `today` en vez de `todayMadrid()`. El mobile ya lo enviaba desde hace
+  meses (documentado en CLAUDE.md), solo faltaba que el backend lo
+  respetase.
+- `toDomainGamification` acepta `localDate` opcional para calcular el
+  `effectiveStreak` decay con la TZ del cliente.
+
+**Reset manual aplicado a la cuenta de Santi** (con service role):
+`last_activity_date: '2026-09-18' → '2026-09-17'`. Al hacer el próximo
+test hoy con `localDate='2026-09-18'` Colombia, el backend calcula
+`last === yesterday → +1 = 5`. Sin este reset, tendría que esperar hasta
+mañana para ver el efecto.
+
+### Archivos añadidos
+
+- `INFORME_GENERADOR_INFINITO.md` — informe de 200+ líneas con 10 gaps
+  identificados, datos del barrido, escala latencia y quick-win priorizado.
+- `apps/backend/scripts/perf_generator_infinito.js` — barrido completo (48
+  casos, ~90 min).
+- `apps/backend/scripts/perf_generator_infinito_quick.js` — barrido
+  quirúrgico (5 casos, ~10 min).
+- `apps/backend/scripts/perf_generator_infinito_extra.js` — n=20/30/50/100
+  con retry tolerante a fallos DNS.
+- `apps/backend/scripts/perf_generator_infinito_replay.js` — replay del
+  caso reportado por el usuario (5 temas × 30 preguntas) con retry.
+- `apps/backend/scripts/diag_streak.js` — diagnóstico de racha por email
+  del usuario. Muestra estado real de `user_gamification`, últimos ledger
+  entries y últimos training_attempts con formato Madrid.
+- `apps/mobile/src/components/DeficitWarningModal.js` — modal on-brand que
+  se muestra antes de arrancar el test cuando el Motor entregó menos
+  preguntas de las pedidas.
+
+---
+
 ## 2026-09-18 — Bloque 3 Salud: Estado del día + onboarding wearable + fixes
 
 Rama: `fix/generador-infinito-2026-09-17`.

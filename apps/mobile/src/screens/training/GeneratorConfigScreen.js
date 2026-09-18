@@ -37,7 +37,11 @@ const DIFF_STEPS = ['easy', 'medium', 'hard'];
 const DIFF_LABELS = ['Fácil', 'Medio', 'Difícil'];
 
 const COUNT_MIN = 5;
-const COUNT_MAX = 100;
+// Cap a 30 tras el barrido de rendimiento (INFORME_GENERADOR_INFINITO.md · G09):
+// n=50 tarda >300 s en el Motor y el mobile timeoutea en useTestSession antes
+// de que termine. n=30 tarda ~191 s, dentro del techo actualizado a 360 s.
+// Subir cuando se paralelice la generación en jobs de 10-15 preguntas.
+const COUNT_MAX = 30;
 const COUNT_STEP = 5;
 
 const THUMB = 30;
@@ -299,6 +303,22 @@ export default function GeneratorConfigScreen({ navigation, route }) {
         navigation.setOptions({ gestureEnabled: false });
     }, [navigation]);
 
+    // Cap dinámico según nº de temas seleccionados (G10 · INFORME_GENERADOR_INFINITO.md).
+    // Barrido: 5 temas × 30 preguntas NO completa en 360s (>12s/pregunta), vs
+    // null × 30 preguntas en 217s (7s/pregunta). El Motor descarta agresivamente
+    // por `hecho_ya_preguntado` cuando restringes temas — cada tema aporta ~6
+    // preguntas confortablemente. Fórmula: max = min(COUNT_MAX, temas * 6).
+    // Con "all" o todos los temas → max = COUNT_MAX (30).
+    const numTopicsSelected = selectedTopicIds.has('all') || selectedTopicIds.size === topics.length
+        ? topics.length || 40  // fallback si aún no cargaron los topics
+        : selectedTopicIds.size;
+    const dynamicCap = Math.max(COUNT_MIN, Math.min(COUNT_MAX, numTopicsSelected * 6));
+    // Si el cap dinámico baja por debajo del count actual, recortar.
+    useEffect(() => {
+        if (count > dynamicCap) setCount(dynamicCap);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dynamicCap]);
+
     const [exitOpen, setExitOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
     const [slowWarning, setSlowWarning] = useState(false);
@@ -558,13 +578,19 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                             <Text style={styles.sectionDesc}>Selecciona el número de preguntas por test</Text>
                             <RangeSlider
                                 min={COUNT_MIN}
-                                max={COUNT_MAX}
+                                max={dynamicCap}
                                 step={COUNT_STEP}
                                 value={count}
                                 onChange={setCount}
                                 onDragStart={disableScroll}
                                 onDragEnd={enableScroll}
                             />
+                            {dynamicCap < COUNT_MAX && (
+                                <Text style={{ fontSize: 11, color: '#8B7B9A', marginTop: 8, textAlign: 'center' }}>
+                                    Con {numTopicsSelected} tema{numTopicsSelected === 1 ? '' : 's'} seleccionado{numTopicsSelected === 1 ? '' : 's'}, el máximo es {dynamicCap}.
+                                    Amplía la selección de temas para pedir más preguntas.
+                                </Text>
+                            )}
                         </>
                     )}
                 </View>

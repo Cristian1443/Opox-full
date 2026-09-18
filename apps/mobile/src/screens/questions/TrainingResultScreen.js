@@ -178,7 +178,16 @@ export default function TrainingResultScreen({ navigation, route }) {
   } = route?.params ?? {};
 
   const total = questions.length;
-  const correct = answers.filter(a => a.isCorrect).length;
+  const correct = answers.filter(a => a?.isCorrect).length;
+  // Desglose de "no correctas": respondidas mal, saltadas y timed_out globales.
+  // Con navegación libre, las saltadas y las de tiempo agotado cuentan como
+  // fallo pero conviene mostrarlas por separado para que el usuario entienda
+  // cuántas ni siquiera intentó vs. cuántas erró.
+  const answeredWrong = answers.filter(a => a?.status === 'answered' && !a.isCorrect).length;
+  const skipped = answers.filter(a => a?.status === 'skipped' || a?.status === 'timed_out_global').length;
+  // Fallback para intentos legacy (sin campo status): todo lo que no es correcto
+  // y no tiene status se cuenta como fallo simple.
+  const legacyWrong = answers.filter(a => a && !a.isCorrect && !a.status).length;
   const incorrect = total - correct;
   const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
   const isHighScore = percentage >= 90;
@@ -292,7 +301,7 @@ export default function TrainingResultScreen({ navigation, route }) {
             <Text style={styles.statLabel}>Aciertos</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: colors.statRed }]}>{incorrect}</Text>
+            <Text style={[styles.statValue, { color: colors.statRed }]}>{answeredWrong + legacyWrong}</Text>
             <Text style={styles.statLabel}>Fallos</Text>
           </View>
           <View style={styles.statBox}>
@@ -300,6 +309,16 @@ export default function TrainingResultScreen({ navigation, route }) {
             <Text style={styles.statLabel}>Tiempo</Text>
           </View>
         </View>
+
+        {skipped > 0 && (
+          <View style={styles.skippedNote}>
+            <Text style={styles.skippedNoteText}>
+              {skipped === 1
+                ? '1 pregunta quedó sin responder y se cuenta como fallo.'
+                : `${skipped} preguntas quedaron sin responder y se cuentan como fallo.`}
+            </Text>
+          </View>
+        )}
 
         {needsLab && (
           <View style={styles.errorChipWrap}>
@@ -442,6 +461,20 @@ const styles = StyleSheet.create({
 
   errorChipWrap: {
     marginBottom: spacing.lg,
+  },
+  skippedNote: {
+    backgroundColor: 'rgba(246,150,36,0.12)',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accentOrange,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: spacing.md,
+  },
+  skippedNoteText: {
+    fontSize: 12.5,
+    fontFamily: 'Poppins-Medium',
+    color: colors.textDark,
+    lineHeight: 17,
   },
   errorChipPointer: {
     alignSelf: 'center',

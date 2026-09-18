@@ -14,7 +14,7 @@ import { colors, spacing } from '../theme';
 const { width } = Dimensions.get('window');
 
 /**
- * Modal de sesión terminada por tiempo agotado (solo en timedMode).
+ * Modal de sesión terminada por CRONÓMETRO GLOBAL agotado.
  *
  * Diseño deliberado:
  *   - El backdrop NO se puede tocar para cerrar — el usuario debe reconocer el evento.
@@ -22,10 +22,11 @@ const { width } = Dimensions.get('window');
  *   - El icono usa paleta warning (ámbar) por el mismo motivo.
  *
  * Props:
- *   visible     — controla visibilidad
- *   onContinue  — navega a la pantalla de resultados
+ *   visible       — controla visibilidad
+ *   pendingCount  — nº de preguntas que quedaron sin responder (opcional, para el texto)
+ *   onContinue    — navega a la pantalla de resultados
  */
-export default function TimeUpModal({ visible, onContinue }) {
+export default function TimeUpModal({ visible, pendingCount = 0, onContinue }) {
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -76,12 +77,15 @@ export default function TimeUpModal({ visible, onContinue }) {
           </View>
 
           {/* Título */}
-          <Text style={styles.title}>¡Se acabó el tiempo!</Text>
+          <Text style={styles.title}>¡Tiempo agotado!</Text>
 
-          {/* Explicación */}
+          {/* Explicación — refleja la realidad del cronómetro GLOBAL:
+              solo se cierra el test cuando se acaba el minutero de todo el test,
+              no el de una pregunta puntual. Las pendientes cuentan como fallo. */}
           <Text style={styles.subtitle}>
-            En modo contrarreloj el test se cierra al agotar el cronómetro.
-            Vamos a revisar cómo lo hiciste.
+            {pendingCount > 0
+              ? `Se acabó el cronómetro del test. Las ${pendingCount} preguntas sin responder cuentan como fallo. Vamos a revisar cómo lo hiciste.`
+              : 'Se acabó el cronómetro del test. Vamos a revisar cómo lo hiciste.'}
           </Text>
 
           {/* CTA único — naranja, no rojo */}
@@ -98,7 +102,7 @@ export default function TimeUpModal({ visible, onContinue }) {
           {/* Nota contextual */}
           <View style={styles.note}>
             <Ionicons name="information-circle-outline" size={13} color={colors.textSecondary} />
-            <Text style={styles.noteText}>Solo en modo contrarreloj</Text>
+            <Text style={styles.noteText}>Solo cuando se agota el tiempo global</Text>
           </View>
         </Animated.View>
       </View>

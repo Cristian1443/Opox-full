@@ -99,6 +99,18 @@ const DIFF_FROM_MOTOR: Record<string, 'easy' | 'medium' | 'hard'> = {
     dificil: 'hard',
 };
 
+// Convierte el `topicId` que envía el mobile a `tema_ids` que espera el Motor.
+// - 'all' o vacío → null (todo el temario)
+// - CSV de hex → array
+// El mobile ya envía los hex del Motor directamente (training_topics.topic_id
+// es el hex, y GeneratorConfigScreen los concatena con coma). No necesitamos
+// consultar Supabase para resolver semantic→hex.
+export function parseTemaIds(topicId: string | null | undefined): string[] | null {
+    if (!topicId || topicId === 'all') return null;
+    const ids = topicId.split(',').map((s) => s.trim()).filter(Boolean);
+    return ids.length > 0 ? ids : null;
+}
+
 /**
  * Cliente HTTP para el Motor de IA del cliente (RAG + generación con
  * evidencia verbatim del temario oficial). URL de producción:
@@ -181,20 +193,13 @@ export class MotorAiClient implements AiApiContract {
             );
         }
 
-        // 'all' → null (todo el temario). Múltiple selección separada por coma → array.
-        // Nota: los topicIds de OPOX son semánticos ('constitucion', 'ley-39') pero
-        // los tema_ids del Motor son UUIDs del PDF parseado. Hasta que exista la tabla
-        // training_courses_topics con el mapeo, enviamos null (all) y el Motor elige.
-        const temaIds: string[] | null =
-            params.topicId === 'all'
-                ? null
-                : null; // TODO(motor-topics): mapear topicId → tema_ids del Motor
-
-        if (params.topicId !== 'all') {
-            logger.warn('[motor-ai] topicId ignorado — mapeo de temas pendiente', {
-                topicId: params.topicId,
-            });
-        }
+        // 'all' → null (todo el temario). El mobile ya envía los tema_ids como
+        // hex del Motor (training_topics.topic_id guarda el hex directamente,
+        // y GeneratorConfigScreen los concatena con coma). Antes tirábamos esta
+        // selección a la basura y siempre pedíamos "de todo el temario" al Motor
+        // — el picker del mobile era cosmético (ver INFORME_GENERADOR_INFINITO.md
+        // GAP-01).
+        const temaIds: string[] | null = parseTemaIds(params.topicId);
 
         const body = {
             curso_id: cursoId,
@@ -467,6 +472,19 @@ export class MotorAiClient implements AiApiContract {
     async getSessionQuestions(sessionId: string): Promise<{
         questions: GeneratedQuestion[];
         deficit: number | null;
+        /**
+         * Metadata del `deficit` cuando el Motor NO puede entregar todas las
+         * preguntas pedidas (G08 · INFORME_GENERADOR_INFINITO.md). El mobile
+         * usa esto para avisar al usuario ("solo pudimos generar 3 de 10").
+         * `reason: 'tope_minado'` = el Motor agotó los candidatos internos,
+         * típicamente por selección de temas muy específica o historial largo.
+         */
+        deficitDetail: {
+            requested: number;
+            delivered: number;
+            reason: string | null;
+            motivos: Record<string, number>;
+        } | null;
     }> {
         const res = await this.http.get<Record<string, unknown>>(`/v1/tests/${sessionId}`);
         const data = res.data;
@@ -508,13 +526,37 @@ export class MotorAiClient implements AiApiContract {
         }
         // El deficit real del Motor: qué preguntas se pidieron / publicaron / descarte.
         const deficitRaw = data.deficit as
-            | { pedidas?: number; publicadas?: number; motivos_descarte?: Record<string, number> }
+            | { pedidas?: number; publicadas?: number; motivos_descarte?: Record<string, number>; corte?: string }
             | number | null | undefined;
         const deficitCount = typeof deficitRaw === 'number'
             ? deficitRaw
             : (deficitRaw?.pedidas != null && deficitRaw?.publicadas != null
                 ? deficitRaw.pedidas - deficitRaw.publicadas
                 : null);
+
+        // Estructurado para el mobile (G08). Solo devolvemos deficitDetail
+        // cuando efectivamente falta ≥1 pregunta — sirve como flag.
+        let deficitDetail: {
+            requested: number;
+            delivered: number;
+            reason: string | null;
+            motivos: Record<string, number>;
+        } | null = null;
+        if (
+            typeof deficitRaw === 'object'
+            && deficitRaw !== null
+            && typeof deficitRaw.pedidas === 'number'
+            && typeof deficitRaw.publicadas === 'number'
+            && deficitRaw.publicadas < deficitRaw.pedidas
+        ) {
+            deficitDetail = {
+                requested: deficitRaw.pedidas,
+                delivered: deficitRaw.publicadas,
+                reason: deficitRaw.corte ?? null,
+                motivos: deficitRaw.motivos_descarte ?? {},
+            };
+        }
+
         logger.info('[motor-ai][stream] getSessionQuestions', {
             sessionId,
             preguntasMotor: preguntas.length,
@@ -523,10 +565,12 @@ export class MotorAiClient implements AiApiContract {
             deferred,
             bankSize: this.questionBankCache.size,
             deficit: deficitRaw,
+            deficitDetail,
         });
         return {
             questions: mapped,
             deficit: deficitCount,
+            deficitDetail,
         };
     }
 
