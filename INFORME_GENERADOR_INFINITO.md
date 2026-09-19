@@ -170,7 +170,14 @@ Estos descartes explican por qué el Motor tarda mucho: genera 15–20 preguntas
 - Si `deficit > 0`, considerar reintentar con un `hecho_ya_preguntado` reducido (limpiar historial de sesión) o disparar un batch adicional.
 - A medio plazo: reportar al equipo IA cuál es el ratio de descartes y pedir optimización.
 
-### G10 · CRÍTICO · Restringir temas amplifica la latencia y provoca timeouts
+### G10 · CRÍTICO · Restringir temas amplifica la latencia · REVERTIDO 2026-09-18
+
+> **Estado**: cap dinámico implementado y REVERTIDO tras feedback del usuario. Se
+> conserva la sección por su valor diagnóstico y para el equipo IA.
+> El picker vuelve a permitir hasta 30 preguntas sin importar la selección de
+> temas. El `DeficitWarningModal` (G08) sigue activo y avisa cuando el Motor
+> no puede completar. El problema es del corpus del Motor — se reporta al
+> equipo IA en `INFORME_MOTOR_TEAM.md`.
 
 **Reproducido exactamente el bug reportado por Santi**: seleccionó 5 temas y pidió ~30 preguntas, la sesión se cortó a los ~360 s con 23 preguntas (nuestro replay dio 27, mismo patrón). Datos comparativos:
 

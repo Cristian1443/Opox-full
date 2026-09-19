@@ -273,7 +273,7 @@ export default function ChallengesScreen({ navigation, route }) {
                                     label="Preguntas"
                                     value={form.questionCount}
                                     min={5}
-                                    max={100}
+                                    max={30}
                                     step={5}
                                     onChange={(v) => setForm((f) => ({ ...f, questionCount: v }))}
                                 />

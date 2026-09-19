@@ -325,21 +325,15 @@ export default function GeneratorConfigScreen({ navigation, route }) {
         navigation.setOptions({ gestureEnabled: false });
     }, [navigation]);
 
-    // Cap dinámico según nº de temas seleccionados (G10 · INFORME_GENERADOR_INFINITO.md).
-    // Barrido: 5 temas × 30 preguntas NO completa en 360s (>12s/pregunta), vs
-    // null × 30 preguntas en 217s (7s/pregunta). El Motor descarta agresivamente
-    // por `hecho_ya_preguntado` cuando restringes temas — cada tema aporta ~6
-    // preguntas confortablemente. Fórmula: max = min(COUNT_MAX, temas * 6).
-    // Con "all" o todos los temas → max = COUNT_MAX (30).
-    const numTopicsSelected = selectedTopicIds.has('all') || selectedTopicIds.size === topics.length
-        ? topics.length || 40  // fallback si aún no cargaron los topics
-        : selectedTopicIds.size;
-    const dynamicCap = Math.max(COUNT_MIN, Math.min(COUNT_MAX, numTopicsSelected * 6));
-    // Si el cap dinámico baja por debajo del count actual, recortar.
-    useEffect(() => {
-        if (count > dynamicCap) setCount(dynamicCap);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dynamicCap]);
+    // Nota (2026-09-18, revisión post-G10): antes había un cap dinámico
+    // `max = temas * 6` para evitar que el usuario pidiera más de lo que el
+    // Motor puede entregar por selección restringida. Se revirtió porque:
+    // (a) es problema del corpus del Motor, no del cliente — nos avisan al
+    // equipo IA con INFORME_MOTOR_TEAM.md; (b) el DeficitWarningModal (G08)
+    // ya avisa al usuario cuando el Motor entrega menos preguntas de las
+    // pedidas, con opción "Empezar con las N disponibles" o "Volver al
+    // generador". El picker deja pedir hasta COUNT_MAX independientemente
+    // de la selección de temas.
 
     const [exitOpen, setExitOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -600,19 +594,13 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                             <Text style={styles.sectionDesc}>Selecciona el número de preguntas por test</Text>
                             <RangeSlider
                                 min={COUNT_MIN}
-                                max={dynamicCap}
+                                max={COUNT_MAX}
                                 step={COUNT_STEP}
                                 value={count}
                                 onChange={setCount}
                                 onDragStart={disableScroll}
                                 onDragEnd={enableScroll}
                             />
-                            {dynamicCap < COUNT_MAX && (
-                                <Text style={{ fontSize: 11, color: '#8B7B9A', marginTop: 8, textAlign: 'center' }}>
-                                    Con {numTopicsSelected} tema{numTopicsSelected === 1 ? '' : 's'} seleccionado{numTopicsSelected === 1 ? '' : 's'}, el máximo es {dynamicCap}.
-                                    Amplía la selección de temas para pedir más preguntas.
-                                </Text>
-                            )}
                         </>
                     )}
                 </View>

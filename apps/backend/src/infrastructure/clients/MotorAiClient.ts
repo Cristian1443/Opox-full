@@ -273,6 +273,29 @@ export class MotorAiClient implements AiApiContract {
             });
         }
 
+        // Fill from bank (2026-09-18, recomendación del equipo IA): si el
+        // Motor entregó menos preguntas de las pedidas (por descartes internos
+        // o pool minado), rellenamos aleatoriamente del banco cacheado. Mismo
+        // patrón que en el flujo streaming (getSessionQuestions).
+        const missing = Math.max(0, params.count - mapped.length);
+        if (missing > 0 && mapped.length > 0) {
+            const usedIds = new Set(mapped.map((q) => q.id));
+            const topicsInResult = [...new Set(mapped.map((q) => q.topicId).filter(Boolean))];
+            const filled = await this.fillFromBank(
+                missing,
+                topicsInResult.length > 0 ? topicsInResult : temaIds,
+                usedIds,
+            );
+            mapped.push(...filled);
+            if (filled.length > 0) {
+                logger.info('[motor-ai] generateQuestions relleno desde banco', {
+                    requested: params.count,
+                    fromMotor: mapped.length - filled.length,
+                    fromBank: filled.length,
+                });
+            }
+        }
+
         if (mapped.length === 0) {
             throw new Error(
                 '[MotorAiClient] el Motor devolvió 0 preguntas con correcta_idx conocido (INC-04). ' +
@@ -534,24 +557,47 @@ export class MotorAiClient implements AiApiContract {
                 ? deficitRaw.pedidas - deficitRaw.publicadas
                 : null);
 
+        // Fill from bank (2026-09-18, recomendación del equipo IA): cuando el
+        // Motor entrega menos preguntas de las pedidas, rellenamos aleatoria-
+        // mente del banco cacheado. Filtramos por los mismos `tema_id` que
+        // aparecen en las preguntas ya entregadas para respetar la selección
+        // original del usuario. Excluimos ids ya presentes para no duplicar.
+        const requestedCount = typeof deficitRaw === 'object' && deficitRaw?.pedidas != null
+            ? deficitRaw.pedidas
+            : mapped.length;
+        const missing = Math.max(0, requestedCount - mapped.length);
+        let filledCount = 0;
+        if (missing > 0 && mapped.length > 0) {
+            const usedIds = new Set(mapped.map((q) => q.id));
+            const topicsInResult = [...new Set(mapped.map((q) => q.topicId).filter(Boolean))];
+            const filled = await this.fillFromBank(
+                missing,
+                topicsInResult.length > 0 ? topicsInResult : null,
+                usedIds,
+            );
+            mapped.push(...filled);
+            filledCount = filled.length;
+        }
+
         // Estructurado para el mobile (G08). Solo devolvemos deficitDetail
-        // cuando efectivamente falta ≥1 pregunta — sirve como flag.
+        // cuando, TRAS el fill from bank, sigue faltando ≥1 pregunta.
+        // Si el fill rellenó todo, el usuario no ve modal — todo transparente.
         let deficitDetail: {
             requested: number;
             delivered: number;
             reason: string | null;
             motivos: Record<string, number>;
         } | null = null;
+        const finalDelivered = mapped.length;
         if (
             typeof deficitRaw === 'object'
             && deficitRaw !== null
             && typeof deficitRaw.pedidas === 'number'
-            && typeof deficitRaw.publicadas === 'number'
-            && deficitRaw.publicadas < deficitRaw.pedidas
+            && finalDelivered < deficitRaw.pedidas
         ) {
             deficitDetail = {
                 requested: deficitRaw.pedidas,
-                delivered: deficitRaw.publicadas,
+                delivered: finalDelivered,
                 reason: deficitRaw.corte ?? null,
                 motivos: deficitRaw.motivos_descarte ?? {},
             };
@@ -563,6 +609,7 @@ export class MotorAiClient implements AiApiContract {
             mapped: mapped.length,
             fromBank,
             deferred,
+            filledFromBank: filledCount,
             bankSize: this.questionBankCache.size,
             deficit: deficitRaw,
             deficitDetail,
@@ -902,6 +949,60 @@ export class MotorAiClient implements AiApiContract {
                 error: err instanceof Error ? err.message : String(err),
             });
         }
+    }
+
+    /**
+     * Rellena hasta `needed` preguntas cogiendo aleatoriamente del banco
+     * cacheado (`/v1/courses/{id}/questions`). Diseñado para completar el
+     * `deficit` cuando el Motor no puede entregar todas las preguntas
+     * pedidas — el equipo IA lo recomendó explícitamente cuando reportamos
+     * "descartes agresivos por hecho_ya_preguntado" (2026-09-18).
+     *
+     * - `temaIds` (opcional): filtra por temas concretos. Null/vacío = todo el banco.
+     * - `excludeIds`: excluye preguntas ya presentes en el resultado del job.
+     * - Fisher-Yates shuffle → aleatorio real, no `sort()` con random.
+     *
+     * Devuelve `GeneratedQuestion[]` ya mapeadas con `correctIndex` real
+     * (el banco siempre trae `correcta_idx`, resolviendo también INC-04).
+     */
+    private async fillFromBank(
+        needed: number,
+        temaIds: string[] | null,
+        excludeIds: Set<string>,
+    ): Promise<GeneratedQuestion[]> {
+        if (needed <= 0) return [];
+        await this.ensureQuestionBank();
+        if (this.questionBankCache.size === 0) return [];
+
+        const wantedTopics = temaIds && temaIds.length > 0 ? new Set(temaIds) : null;
+        const candidates: MotorPreguntaFull[] = [];
+        for (const p of this.questionBankCache.values()) {
+            if (excludeIds.has(p.id)) continue;
+            if (wantedTopics && !wantedTopics.has(p.tema_id)) continue;
+            if (typeof p.correcta_idx !== 'number') continue;
+            candidates.push(p);
+        }
+
+        // Fisher-Yates parcial: solo permutamos los primeros `needed` para no
+        // recorrer el array entero cuando el banco es grande.
+        const take = Math.min(needed, candidates.length);
+        for (let i = 0; i < take; i++) {
+            const j = i + Math.floor(Math.random() * (candidates.length - i));
+            const tmp = candidates[i]!;
+            candidates[i] = candidates[j]!;
+            candidates[j] = tmp;
+        }
+        const picked = candidates.slice(0, take);
+
+        logger.info('[motor-ai] fillFromBank', {
+            needed,
+            available: candidates.length,
+            picked: picked.length,
+            wantedTopics: wantedTopics ? [...wantedTopics] : null,
+            excluded: excludeIds.size,
+        });
+
+        return picked.map((full) => this.mapPregunta(full, full));
     }
 
     private mapPregunta(p: MotorPreguntaJob, full: MotorPreguntaFull): GeneratedQuestion {
