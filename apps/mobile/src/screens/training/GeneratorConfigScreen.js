@@ -100,8 +100,15 @@ function StepSlider({ labels, index, onChange, onDragStart, onDragEnd }) {
             },
             onPanResponderRelease: (_, g) => {
                 const u = usableRef.current;
+                const n = labelsLenRef.current;
                 const next = Math.max(0, Math.min(u, startX.current + g.dx));
-                const idx = Math.round((next / u) * (labelsLenRef.current - 1));
+                const idx = Math.round((next / u) * (n - 1));
+                // Forzar el snap visual del thumb al paso exacto — si idx no
+                // cambia respecto al valor anterior, el useEffect que
+                // sincroniza `pos` desde `index` no se dispara y el thumb se
+                // quedaba "flotando" en el punto donde se soltó el dedo en
+                // vez de volver a su posición de paso.
+                setPos((idx / Math.max(n - 1, 1)) * u);
                 onChange(idx);
                 onDragEnd?.();
             },
@@ -194,7 +201,12 @@ function RangeSlider({ min, max, step, value, onChange, onDragStart, onDragEnd }
             onPanResponderRelease: (_, g) => {
                 const u = usableRef.current;
                 const next = Math.max(0, Math.min(u, startX.current + g.dx));
-                onChange(posToValue(next));
+                const val = posToValue(next);
+                // Mismo fix que StepSlider: forzar el snap visual del thumb
+                // al valor exacto en vez de dejarlo donde se soltó el dedo.
+                const range = Math.max(maxRef.current - minRef.current, 1);
+                setPos(((val - minRef.current) / range) * u);
+                onChange(val);
                 onDragEnd?.();
             },
             onPanResponderTerminate: () => onDragEnd?.(),
