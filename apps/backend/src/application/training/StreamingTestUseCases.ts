@@ -51,9 +51,9 @@ export class GetJobStatusUseCase {
 export class GetSessionQuestionsUseCase {
     constructor(private readonly motor: MotorAiClient | undefined) {}
 
-    execute(sessionId: string) {
+    execute(sessionId: string, opts?: { requestedTemaIds?: string[]; jobDone?: boolean }) {
         if (!this.motor) throw new Error('MOTOR_UNAVAILABLE');
-        return this.motor.getSessionQuestions(sessionId);
+        return this.motor.getSessionQuestions(sessionId, opts);
     }
 }
 

@@ -492,7 +492,7 @@ export class MotorAiClient implements AiApiContract {
     }
 
     /** Devuelve las preguntas publicadas hasta el momento en la sesión. */
-    async getSessionQuestions(sessionId: string): Promise<{
+    async getSessionQuestions(sessionId: string, opts?: { requestedTemaIds?: string[]; jobDone?: boolean }): Promise<{
         questions: GeneratedQuestion[];
         deficit: number | null;
         /**
@@ -557,22 +557,33 @@ export class MotorAiClient implements AiApiContract {
                 ? deficitRaw.pedidas - deficitRaw.publicadas
                 : null);
 
-        // Fill from bank (2026-09-18, recomendación del equipo IA): cuando el
-        // Motor entrega menos preguntas de las pedidas, rellenamos aleatoria-
-        // mente del banco cacheado. Filtramos por los mismos `tema_id` que
-        // aparecen en las preguntas ya entregadas para respetar la selección
-        // original del usuario. Excluimos ids ya presentes para no duplicar.
+        // Fill from bank: cuando el Motor entrega menos de lo pedido, completamos
+        // desde el banco cacheado (/v1/courses/{id}/questions).
+        //
+        // CONDICIÓN DOBLE para evitar inflar el test con preguntas de banco en
+        // llamadas intermedias (progress.done >= 1 pero job no terminado):
+        //   1. opts.jobDone === true  — el mobile solo lo manda en la llamada final.
+        //   2. deficit.pedidas presente — el Motor declara explícitamente el shortfall.
+        // Sin (1) el Motor podría declarar deficit mid-stream → fill → luego más
+        // preguntas del Motor como "fresh" → total > pedidas (bug: 18 en vez de 10).
+        //
+        // Fix topic filter (2026-09-20): opts.requestedTemaIds (selección original
+        // del usuario) en vez de topicsInResult, que puede ser más estrecho cuando
+        // el Motor concentró todo en 1 de los N temas seleccionados.
         const requestedCount = typeof deficitRaw === 'object' && deficitRaw?.pedidas != null
             ? deficitRaw.pedidas
             : mapped.length;
         const missing = Math.max(0, requestedCount - mapped.length);
         let filledCount = 0;
-        if (missing > 0 && mapped.length > 0) {
+        if (missing > 0 && opts?.jobDone) {
             const usedIds = new Set(mapped.map((q) => q.id));
             const topicsInResult = [...new Set(mapped.map((q) => q.topicId).filter(Boolean))];
+            const temaIdsForFill = opts?.requestedTemaIds?.length
+                ? opts.requestedTemaIds
+                : (topicsInResult.length > 0 ? topicsInResult : null);
             const filled = await this.fillFromBank(
                 missing,
-                topicsInResult.length > 0 ? topicsInResult : null,
+                temaIdsForFill,
                 usedIds,
             );
             mapped.push(...filled);
@@ -582,6 +593,8 @@ export class MotorAiClient implements AiApiContract {
         // Estructurado para el mobile (G08). Solo devolvemos deficitDetail
         // cuando, TRAS el fill from bank, sigue faltando ≥1 pregunta.
         // Si el fill rellenó todo, el usuario no ve modal — todo transparente.
+        // El Motor siempre incluye deficit.pedidas cuando entrega menos de lo
+        // pedido (campo DeficitOut requerido en su schema /openapi.json).
         let deficitDetail: {
             requested: number;
             delivered: number;
@@ -598,13 +611,15 @@ export class MotorAiClient implements AiApiContract {
             deficitDetail = {
                 requested: deficitRaw.pedidas,
                 delivered: finalDelivered,
-                reason: deficitRaw.corte ?? null,
+                // DeficitOut no tiene campo "corte" en el schema del Motor.
+                reason: null,
                 motivos: deficitRaw.motivos_descarte ?? {},
             };
         }
 
         logger.info('[motor-ai][stream] getSessionQuestions', {
             sessionId,
+            jobDone: opts?.jobDone ?? false,
             preguntasMotor: preguntas.length,
             mapped: mapped.length,
             fromBank,

@@ -213,7 +213,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
     status: streamStatus,
     sessionId: streamSessionId,
     deficit: streamDeficit,
-  } = useTestSession(jobId, { expectedTotal });
+  } = useTestSession(jobId, { expectedTotal, requestedTopicId });
   // Cuando el Motor entrega menos preguntas de las pedidas (G08), mostramos
   // un modal antes de arrancar el test. Se rearma solo cuando llega un
   // deficit nuevo, no en cada re-render.

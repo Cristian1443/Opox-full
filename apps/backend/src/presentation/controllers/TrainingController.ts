@@ -329,7 +329,14 @@ export class TrainingController {
     getSessionQuestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             if (!this.deps.getSessionQuestions) { this.motorUnavailable(res); return; }
-            const result = await this.deps.getSessionQuestions.execute(String(req.params['sessionId']));
+            const temaIds = req.query['temaIds']
+                ? String(req.query['temaIds']).split(',').map((s) => s.trim()).filter(Boolean)
+                : undefined;
+            const jobDone = req.query['done'] === '1';
+            const result = await this.deps.getSessionQuestions.execute(
+                String(req.params['sessionId']),
+                { requestedTemaIds: temaIds, jobDone },
+            );
             this.ok(res, 200, result);
         } catch (err) { next(err); }
     };

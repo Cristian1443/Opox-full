@@ -5,6 +5,63 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-20 — Generador Infinito · 3 bugs en fillFromBank (pool minado, temas estrechos, overflow)
+
+Rama: `fix/generador-infinito-2026-09-17`.
+
+Causa raíz del síntoma "1-3 temas × 10 preguntas → solo 3-6 entregadas": el
+Motor agota el pool de candidatos (`hecho_ya_preguntado: 89` en logs) cuando
+el usuario selecciona pocos temas y ya ha hecho sesiones previas. `fillFromBank`
+existe exactamente para cubrir ese déficit con el banco cacheado, pero tres bugs
+encadenados lo bloqueaban o lo hacían explotar.
+
+### Bug 1 — guard `mapped.length > 0` bloqueaba el caso pool-minado
+
+`fillFromBank` tenía la condición `if (missing > 0 && mapped.length > 0)`.
+Cuando el Motor entrega 0 preguntas por pool agotado, `mapped.length === 0` → el
+fill nunca corría. El `deficitDetail` mostraba `{ requested: 10, delivered: 0 }`
+pero el backend devolvía 0 preguntas al mobile sin ningún intento de rescate.
+
+**Fix**: reemplazado `mapped.length > 0` por `opts?.jobDone`. El fill solo corre
+cuando el job ha terminado — que es el momento en que el déficit es definitivo.
+
+### Bug 2 — fill usaba `topicsInResult` en vez de los temas del usuario
+
+`temaIdsForFill` se derivaba de los temas presentes en las preguntas que el Motor
+SÍ entregó (`topicsInResult`). Con 0 entregadas, `topicsInResult = []` → el fill
+buscaba en TODOS los temas del banco, ignorando la selección del usuario. Con 1-2
+entregadas de 5 seleccionados, el banco se filtraba por los 1-2 temas recibidos,
+perdiendo las preguntas disponibles de los 3-4 restantes.
+
+**Fix**: prioridad `opts.requestedTemaIds` (IDs originales del usuario, propagados
+desde el mobile) sobre `topicsInResult`. Solo cae a `topicsInResult` si no vienen
+los requestedTemaIds, y a null (todos) si tampoco hay topicsInResult.
+
+### Bug 3 — fill se disparaba mid-stream → overflow (18 en vez de 10)
+
+`useTestSession` llama `getSessionQuestions` en cada tick donde
+`progress.done >= 1`, no solo al `jobDone`. Si el Motor publicaba un déficit
+parcial a mitad del stream y el fill añadía preguntas del banco, luego las
+preguntas reales del Motor llegaban como "fresh" (IDs nuevos) → total final > N
+pedidas.
+
+**Fix**: el fill está gateado en `opts.jobDone === true`. Ningún call mid-stream
+puede activarlo. El mobile ya pasaba `done: jobDone` en la query string (código
+previo de la Fase 2), el backend ahora lo honra.
+
+### Archivos modificados (6)
+
+| Archivo | Cambio |
+|---|---|
+| `MotorAiClient.ts` | guard→jobDone, temaIdsForFill con requestedTemaIds, deficitDetail sin corte |
+| `TrainingController.ts` | lee `?temaIds=` y `?done=1`, pasa al use case |
+| `StreamingTestUseCases.ts` | firma `execute(id, opts?)` con `requestedTemaIds` y `jobDone` |
+| `useTestSession.js` | acepta `requestedTopicId` en opts, lo pasa a `getSessionQuestions` |
+| `training.js` (api) | `getSessionQuestions(sessionId, opts)` construye query string |
+| `QuestionActiveScreen.js` | pasa `requestedTopicId` al hook |
+
+---
+
 ## 2026-09-18 (bloque 2) — Runner rediseñado + Generador Infinito auditado + Racha con TZ
 
 Rama: `fix/generador-infinito-2026-09-17`.

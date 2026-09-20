@@ -83,8 +83,14 @@ export const trainingApi = {
         api.post(API_ROUTES.TRAINING.GENERATE_STREAM, body, { auth: true }),
     getJobStatus: (jobId) =>
         api.get(API_ROUTES.TRAINING.JOB_STATUS.replace(':jobId', jobId), { auth: true }),
-    getSessionQuestions: (sessionId) =>
-        api.get(API_ROUTES.TRAINING.SESSION_QUESTIONS.replace(':sessionId', sessionId), { auth: true }),
+    getSessionQuestions: (sessionId, opts = {}) => {
+        let url = API_ROUTES.TRAINING.SESSION_QUESTIONS.replace(':sessionId', sessionId);
+        const qs = [];
+        if (opts.temaIds) qs.push(`temaIds=${encodeURIComponent(opts.temaIds)}`);
+        if (opts.done) qs.push('done=1');
+        if (qs.length) url += `?${qs.join('&')}`;
+        return api.get(url, { auth: true });
+    },
     postSessionAnswer: (sessionId, body) =>
         api.post(API_ROUTES.TRAINING.SESSION_ANSWER.replace(':sessionId', sessionId), body, { auth: true }),
 
