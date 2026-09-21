@@ -9,7 +9,6 @@ import Text from '../../components/AppText';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OpoxWordmark from '../../../assets/opoxLogo';
-import MasCopLogo from '../../../assets/masCopLogo';
 import camoImg from '../../imports/CargaInicial/3e43d7dd7590060c7fd1b2f8e506e66fc41fe1d7.jpg';
 import { api, authApi } from '../../api';
 import { PENDING_OPOSICION_KEY } from './OppositionSelectorScreen';
@@ -90,18 +89,6 @@ async function resolveOnboardingEntryRoute() {
     return 'OnboardingSlider';
 }
 
-// ─── MásCOP badge ──────────────────────────────────────────────────────────────
-// Lockup vectorizado real "MásCOP · Formación Policial" (paths exactos extraídos
-// de Figma vía API REST — ver apps/mobile/assets/masCopLogo.js).
-function MascopBadge() {
-    return (
-        <View style={s.badgeRow}>
-            <Text style={s.badgeLabel}>La APP de</Text>
-            <MasCopLogo width={80} />
-        </View>
-    );
-}
-
 // ─── SplashScreen ─────────────────────────────────────────────────────────────
 export default function SplashScreen({ navigation }) {
     useEffect(() => {
@@ -161,11 +148,6 @@ export default function SplashScreen({ navigation }) {
                 <OpoxWordmark width={260} />
                 <Text style={s.tagline}>Tu plaza más cerca</Text>
             </View>
-
-            {/* Footer: badge MásCOP */}
-            <View style={s.footer}>
-                <MascopBadge />
-            </View>
         </View>
     );
 }
@@ -199,20 +181,5 @@ const s = StyleSheet.create({
         letterSpacing: 0.2,
         textAlign: 'center',
         marginTop: 14,
-    },
-    footer: {
-        position: 'absolute',
-        bottom: 36,
-        zIndex: 1,
-    },
-    badgeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    badgeLabel: {
-        fontWeight: '700',
-        fontSize: 13,
-        color: '#412950',
     },
 });
