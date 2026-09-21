@@ -1781,3 +1781,50 @@ Todos leen `apps/backend/.env` y no requieren backend corriendo.
   de "last === today Madrid pero != today Colombia".
 
 Ver `BITACORA.md` para el diario por fecha. Ver `AGENTS.md` para los roles de cada agente.
+
+---
+
+## Gaps-20-09-26 · notas clave · Generador Infinito — fill desde banco
+
+### `MotorAiClient.getSessionQuestions` — 3 bugs en el fill from bank (2026-09-20)
+
+Verificado con logs reales del Motor (OpenAPI `https://ia.opox.ai/openapi.json`).
+`DeficitOut: { pedidas, publicadas, motivos_descarte }` — sin campo `corte`.
+El Motor SÍ manda `deficit` cuando entrega menos; `null` cuando entrega todo.
+
+**Bug 1 — `mapped.length > 0` bloqueaba el fill con pool minado**:
+Cuando el Motor agota todos los candidatos para 1-2 temas (`hecho_ya_preguntado: 89`,
+`publicadas: 0`), `mapped = []`. El guard `missing > 0 && mapped.length > 0` impedía
+el fill aunque `deficit.pedidas = 10`. Corregido: `if (missing > 0 && opts?.jobDone)`.
+
+**Bug 2 — `topicsInResult` más estrecho que la selección del usuario**:
+Cuando el Motor concentra las preguntas en 1 de los N temas seleccionados,
+`topicsInResult` solo contiene ese 1 tema → el fill busca candidatos únicamente ahí.
+Corregido: `temaIdsForFill = opts.requestedTemaIds ?? topicsInResult ?? null`.
+`opts.requestedTemaIds` viene de `?temaIds=...` en el query string, enviado por el
+hook con la selección original del usuario.
+
+**Bug 3 — fill prematuro mid-stream → N + M preguntas en vez de N**:
+`getSessionQuestions` se llama en cada tick de polling mientras `progress.done >= 1`,
+no solo al terminar. Si el Motor declaraba `deficit` mid-stream, el fill añadía
+preguntas del banco; luego el Motor terminaba y esas preguntas llegaban como "fresh"
+al hook → overflow (ej. 18 preguntas pedidas 10). Corregido: nuevo flag `opts.jobDone`
+que se manda solo en la llamada final del hook (`done=1` en query string). El fill
+solo corre cuando `opts.jobDone === true`.
+
+**Pipeline del fix (6 archivos)**:
+- `trainingApi.js` — `getSessionQuestions(sessionId, { temaIds, done })` → query string.
+- `useTestSession.js` — acepta `requestedTopicId` en opts; pasa `temaIds` y `done=jobDone`.
+- `QuestionActiveScreen.js` — pasa `requestedTopicId` al hook.
+- `TrainingController.ts` — lee `?temaIds` y `?done=1` del query.
+- `StreamingTestUseCases.ts` — propaga `opts: { requestedTemaIds, jobDone }`.
+- `MotorAiClient.ts` — usa `opts.requestedTemaIds` para el fill + guard `opts.jobDone`.
+
+**Tabla de comportamiento post-fix**:
+- Motor entrega 0 (pool minado, `jobDone`) → fill 10 del banco de los N temas del usuario ✓
+- Motor entrega 6 de 10 (`jobDone`) → fill 4 del banco de los N temas del usuario ✓
+- Motor entrega 10 de 10 (`jobDone`, `deficit=null`) → sin fill ✓
+- Llamada mid-stream (`done=false`) → sin fill (Motor sigue generando) ✓
+
+**Campo `corte` eliminado del código**: `deficitRaw.corte` siempre devolvía `undefined`
+porque `DeficitOut` no lo define en el schema. Hardcoded `reason: null` en `deficitDetail`.

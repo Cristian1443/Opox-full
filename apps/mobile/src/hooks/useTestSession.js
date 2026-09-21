@@ -41,6 +41,8 @@ export function useTestSession(jobId, opts = {}) {
     const intervalMs = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const expectedTotal = opts.expectedTotal ?? 0;
+    // Temas solicitados por el usuario — usados para el fill del banco en el backend.
+    const requestedTopicId = opts.requestedTopicId ?? null;
 
     const [questions, setQuestions] = useState([]);
     // Progreso real del Motor (rara vez se actualiza incremental).
@@ -94,7 +96,10 @@ export function useTestSession(jobId, opts = {}) {
             const sid = job?.sessionId ?? sessionIdRef.current;
             const jobDone = job?.status === 'done';
             if (sid && (job?.progress?.done >= 1 || jobDone)) {
-                const { data: sess } = await trainingApi.getSessionQuestions(sid);
+                const { data: sess } = await trainingApi.getSessionQuestions(sid, {
+                    temaIds: requestedTopicId || undefined,
+                    done: jobDone,
+                });
                 if (!activeRef.current) return;
                 if (Array.isArray(sess?.questions)) {
                     const fresh = sess.questions.filter((q) => !knownIdsRef.current.has(q.id));
