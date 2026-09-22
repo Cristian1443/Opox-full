@@ -81,6 +81,17 @@ export const trainingApi = {
             { auth: false },
         ),
 
+    // ─── Cache-first (estrategia B · gaps-22-09-26) ────────────────────────
+    // Endpoint prioritario: intenta armar el test desde preguntas cacheadas del
+    // Motor (~3 s para 10 preguntas). Devuelve:
+    //   { questions, sessionId, jobId, pedidas, publicadas }
+    // - pure hit  → questions.length === pedidas && !jobId (navegar sync)
+    // - partial   → questions.length > 0 && jobId (navegar streaming con seed)
+    // - miss      → questions.length === 0 && jobId (navegar streaming sin seed)
+    // - 503       → cae a generateQuestions síncrono legacy
+    getFromCache: (body) =>
+        api.post(API_ROUTES.TRAINING.FROM_CACHE, body, { auth: true }),
+
     // ─── Streaming (Fase 2 · gaps-15-09-26) ────────────────────────────────
     // Devuelven 503 { code:'MOTOR_UNAVAILABLE' } cuando el Motor no está configurado.
     // El caller debe detectarlo para caer al flujo síncrono (`generateQuestions`).

@@ -65,6 +65,7 @@ import {
     GetSessionQuestionsUseCase,
     PostSessionAnswerUseCase,
     GetTopicsInventoryUseCase,
+    GetCachedTestUseCase,
     // Bloque 6.6 · Banco de exámenes oficiales
     ListBankExamsUseCase,
     UploadBankExamUseCase,
@@ -496,6 +497,9 @@ export function buildContainer() {
         getSessionQuestions: new GetSessionQuestionsUseCase(motorAiClient),
         postSessionAnswer: new PostSessionAnswerUseCase(motorAiClient),
         getTopicsInventory: new GetTopicsInventoryUseCase(motorAiClient, getCursoIdUseCase),
+        // Cache-first (estrategia B · gaps-22-09-26). Devuelve preguntas cacheadas
+        // al instante y, si faltan, arranca un job para completar el resto.
+        getCachedTest: new GetCachedTestUseCase(motorAiClient, getCursoIdUseCase),
         // Bloque 6.6 · Banco de exámenes oficiales (Motor IA). Todos aceptan
         // motorAiClient=undefined y lanzan MOTOR_UNAVAILABLE si es null → 503.
         listBankExams: new ListBankExamsUseCase(motorAiClient, getCursoIdUseCase, trainingRepo),
@@ -666,6 +670,8 @@ export function buildContainer() {
         getSessionQuestions: useCases.getSessionQuestions,
         postSessionAnswer: useCases.postSessionAnswer,
         getTopicsInventory: useCases.getTopicsInventory,
+        // Cache-first (estrategia B · gaps-22-09-26)
+        getCachedTest: useCases.getCachedTest,
         // Bloque 6.6 · Banco de exámenes oficiales
         listBankExams: useCases.listBankExams,
         uploadBankExam: useCases.uploadBankExam,

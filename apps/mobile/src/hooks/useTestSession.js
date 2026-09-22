@@ -26,6 +26,9 @@ import { trainingApi } from '../api';
 // paralelice) para no dejar al usuario esperando 6 minutos.
 const DEFAULT_INTERVAL_MS = 1500;
 const DEFAULT_TIMEOUT_MS = 360_000;
+// Referencia estable para el default de initialQuestions — evita re-render loops
+// si el caller no pasa opts.initialQuestions.
+const EMPTY_ARRAY = Object.freeze([]);
 
 export function useTestSession(jobId, opts = {}) {
     const intervalMs = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
@@ -33,8 +36,15 @@ export function useTestSession(jobId, opts = {}) {
     const expectedTotal = opts.expectedTotal ?? 0;
     // Temas solicitados por el usuario — usados para el fill del banco en el backend.
     const requestedTopicId = opts.requestedTopicId ?? null;
+    // Semilla de preguntas del cache (estrategia B · gaps-22-09-26). Cuando el
+    // endpoint /training/from-cache devuelve preguntas + jobId (hit parcial),
+    // el runner pinta estas al instante y useTestSession añade las nuevas del
+    // job conforme llegan. Los ids se registran en knownIdsRef para dedupe.
+    // Debe ser estable entre renders — usar useMemo/useState en el caller si
+    // se construye dinámicamente.
+    const initialQuestions = opts.initialQuestions ?? EMPTY_ARRAY;
 
-    const [questions, setQuestions] = useState([]);
+    const [questions, setQuestions] = useState(initialQuestions);
     // Progreso real del Motor (rara vez se actualiza incremental — se guarda
     // solo por si el caller lo necesita, pero el "done" que se EXPONE al
     // usuario es `questions.length`, ver más abajo).
@@ -46,7 +56,10 @@ export function useTestSession(jobId, opts = {}) {
     // (G08 · INFORME_GENERADOR_INFINITO.md). Ver getSessionQuestions del backend.
     const [deficit, setDeficit] = useState(null);
 
-    const knownIdsRef = useRef(new Set());
+    // Precargamos los ids de la semilla en knownIdsRef para que el polling
+    // del job no vuelva a añadirlas si el Motor las repite (raro pero posible
+    // con el cache: el Motor podría regenerar internamente algo ya cacheado).
+    const knownIdsRef = useRef(new Set(initialQuestions.map((q) => q.id)));
     const activeRef = useRef(true);
     const sessionIdRef = useRef(null);
     sessionIdRef.current = sessionId;

@@ -652,6 +652,119 @@ export class MotorAiClient implements AiApiContract {
         };
     }
 
+    /**
+     * Arma un test SOLO desde preguntas ya generadas y cacheadas en SQL del
+     * Motor (sin llamar al LLM). Retorno síncrono ~3 s para 10 preguntas
+     * vs ~25 s de la primera pregunta del generador live.
+     *
+     * Endpoint: POST /v1/tests/from-cache (schema ArmarDesdeCacheIn/SesionOut).
+     *
+     * Cache miss NO devuelve 404 — el Motor responde 200 con
+     * `deficit.publicadas < deficit.pedidas` (o array vacío + deficit).
+     * Devolvemos `pedidas`/`publicadas` para que el use case decida si el
+     * cliente arranca sync, mixto (cache seed + job para el resto) o cae
+     * directo al generador.
+     *
+     * Las preguntas del cache llegan sin `correcta_idx` (PreguntaOut del
+     * Motor). Aplicamos el workaround INC-04 vía banco cacheado — las
+     * cacheadas son casi por definición del banco.
+     */
+    async generateFromCache(input: {
+        userId: string;
+        cursoId: string;
+        temaIds?: string[] | null;
+        count: number;
+        difficulty?: 'easy' | 'medium' | 'hard';
+    }): Promise<{
+        questions: GeneratedQuestion[];
+        sessionId: string | null;
+        pedidas: number;
+        publicadas: number;
+    }> {
+        const body = {
+            curso_id: input.cursoId,
+            user_id: input.userId,
+            tema_ids: input.temaIds ?? null,
+            n_preguntas: input.count,
+            dificultad: DIFF_TO_MOTOR[input.difficulty ?? 'medium'] ?? 'media',
+        };
+        const t0 = Date.now();
+        // Timeout interno 6 s (Cristian midió 3 s para 10 preguntas — 2× margen).
+        // Si el Motor tarda más, tratamos como miss para no bloquear al usuario.
+        const res = await this.http.post<Record<string, unknown>>(
+            '/v1/tests/from-cache',
+            body,
+            {
+                headers: { 'X-OpenAI-Key': this.config.openAiKey },
+                timeout: 6000,
+                // El Motor solo devuelve 200 (con deficit si aplica) o 422 de validación.
+                validateStatus: (s) => s === 200,
+            },
+        );
+
+        const data = res.data;
+        const preguntas = (data.preguntas as MotorPreguntaJob[] | undefined) ?? [];
+        const sessionId = (data.sesion_id as string | undefined) ?? null;
+        const deficitRaw = data.deficit as
+            | { pedidas?: number; publicadas?: number }
+            | null
+            | undefined;
+        const pedidas = deficitRaw?.pedidas ?? input.count;
+        const publicadas = deficitRaw?.publicadas ?? preguntas.length;
+
+        // Resolver correcta_idx desde el banco (workaround INC-04).
+        if (preguntas.length > 0) await this.ensureQuestionBank();
+
+        const mapped: GeneratedQuestion[] = [];
+        let dropped = 0;
+        let topicIdsPopulated = 0;
+        let topicIdsEmpty = 0;
+        for (const p of preguntas) {
+            const full = typeof p.correcta_idx === 'number'
+                ? (p as unknown as MotorPreguntaFull)
+                : this.questionBankCache.get(p.id);
+            if (full && typeof full.correcta_idx === 'number') {
+                mapped.push(this.mapPregunta(p, full));
+                // Diagnóstico: ¿el cache puebla tema_id? Si sí, la granularidad
+                // del Laboratorio (agrupación por topic_id) mejora vs el flujo
+                // streaming puro, donde el Motor deja tema_id: '' casi siempre.
+                if (typeof p.tema_id === 'string' && p.tema_id.length > 0) topicIdsPopulated++;
+                else topicIdsEmpty++;
+            } else {
+                // Pregunta cacheada NO resoluble (ni con correcta_idx inline ni
+                // presente en el banco). La DESCARTAMOS en vez de pushearla con
+                // correctIndex: -1 — el runner intentaría corregirla contra el
+                // sessionId del JOB (cuando el use case B arranca uno para el
+                // remaining) y el Motor devolvería 404 pregunta_no_encontrada
+                // porque esa pregunta pertenece a la sesión del cache, no del
+                // job. El use case GetCachedTestUseCase ve `publicadas` reducido
+                // y pide más preguntas al job para compensar.
+                dropped++;
+            }
+        }
+
+        // `publicadas` real: cuántas preguntas del cache llegan RESUELTAS al
+        // caller. Si el Motor devolvió 3 pero descartamos 1, publicadas=2 →
+        // el use case pedirá 8 al job en vez de 7. Sin este ajuste el runner
+        // vería menos preguntas de las anunciadas y arrancaría un test corto.
+        const publicadasReal = mapped.length;
+
+        logger.info('[motor-ai][cache] generateFromCache', {
+            cursoId: input.cursoId,
+            temas: input.temaIds?.length ?? 'null',
+            pedidas,
+            publicadasMotor: publicadas,
+            publicadasReal,
+            dropped,
+            topicIdsPopulated,
+            topicIdsEmpty,
+            sessionId,
+            ms: Date.now() - t0,
+        });
+
+        return { questions: mapped, sessionId, pedidas, publicadas: publicadasReal };
+    }
+
     /** Envía la respuesta del usuario a la sesión activa (background). */
     async postSessionAnswer(input: {
         sessionId: string;

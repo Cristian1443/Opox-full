@@ -67,6 +67,9 @@ export const API_ROUTES = {
         MOCK_DETAIL:        '/training/mocks/:id',
         MOCK_QUESTIONS:     '/training/mocks/:id/questions',
         GENERATE:           '/training/generate',
+        // Cache-first (estrategia B · gaps-22-09-26) — devuelve preguntas cacheadas
+        // al instante (~3 s) y opcionalmente un jobId para completar el resto en background.
+        FROM_CACHE:         '/training/from-cache',
         // Streaming (Fase 2 · gaps-15-09-26)
         GENERATE_STREAM:    '/training/generate-stream',
         JOB_STATUS:         '/training/job/:jobId',

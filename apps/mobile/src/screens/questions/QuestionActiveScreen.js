@@ -194,6 +194,11 @@ export default function QuestionActiveScreen({ navigation, route }) {
     // incrementalmente vía useTestSession. La primera se ve en ~5-8s.
     jobId = null,
     expectedTotal = null,
+    // Cache-first (estrategia B · gaps-22-09-26). Cuando el cache devuelve
+    // preguntas + jobId (hit parcial), estas se pasan como semilla al hook
+    // para pintarse al instante. Shape crudo del backend (NO adaptado) —
+    // el runner adapta al final igual que las que llegan del job.
+    initialQuestions = null,
     // Fallback de topicId cuando el Motor no puebla `tema_id` en las preguntas.
     // Sin esto la persistencia en training_attempt_responses fallaría por Zod
     // (topicId: min length 1) y el Laboratorio mostraría 0%.
@@ -212,7 +217,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
     status: streamStatus,
     sessionId: streamSessionId,
     deficit: streamDeficit,
-  } = useTestSession(jobId, { expectedTotal, requestedTopicId });
+  } = useTestSession(jobId, { expectedTotal, requestedTopicId, initialQuestions });
   // Cuando el Motor entrega menos preguntas de las pedidas (G08), mostramos
   // un modal antes de arrancar el test. Se rearma solo cuando llega un
   // deficit nuevo, no en cada re-render.

@@ -475,9 +475,73 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                     ? 'all'
                     : [...selectedTopicIds].join(',');
 
-            // Fase 2 · Streaming (gaps-15-09-26): intentamos primero el flujo
-            // asíncrono con jobId. Si el Motor no está configurado, el backend
-            // responde 503 MOTOR_UNAVAILABLE y caemos al síncrono legacy.
+            const commonParams = {
+                source: 'generator',
+                expectedTotal: count,
+                examTitle: isChallengeMode ? 'Reto de clan' : 'Generador infinito',
+                timedMode: fatigueMode,
+                oposicion,
+                // TopicId solicitado — fallback para el Laboratorio cuando
+                // Motor no puebla `tema_id` en las preguntas del SesionOut.
+                requestedTopicId: backendTopicId,
+                ...(challengeId && { challengeId }),
+                ...(challengeClanId && { clanId: challengeClanId }),
+                ...(taskId && { taskId }),
+            };
+
+            const finishAndNavigate = (routeParams) => {
+                clearTimeout(warnTimerRef.current);
+                clearTimeout(killTimerRef.current);
+                if (cancelledRef.current) return false;
+                setGenerating(false);
+                setSlowWarning(false);
+                allowExitRef.current = true;
+                navigation.replace('TrainingSession', routeParams);
+                return true;
+            };
+
+            // Fase 1 · Cache-first (estrategia B · gaps-22-09-26). El backend
+            // llama /v1/tests/from-cache (~3 s) y, si el cache no cubre todo,
+            // arranca un job para el remaining. Devuelve:
+            //   - pure hit  → questions.length === count && !jobId  → sync
+            //   - partial   → questions.length > 0 && jobId         → streaming con seed
+            //   - pure miss → questions.length === 0 && jobId       → streaming
+            //   - fallback  → questions.length === 0 && !jobId      → cae a fase 3
+            const cacheRes = await trainingApi.getFromCache({
+                oposicion,
+                topicId: backendTopicId,
+                difficulty,
+                count,
+            });
+            const cacheData = !cacheRes?.error ? cacheRes?.data : null;
+
+            if (cacheData && (cacheData.questions?.length > 0 || cacheData.jobId)) {
+                const rawQuestions = cacheData.questions ?? [];
+
+                if (cacheData.jobId) {
+                    // Partial hit o pure miss — streaming con o sin seed. Se pasa
+                    // el shape CRUDO del backend (adaptGeneratedQuestion no es
+                    // idempotente; el runner adapta al final). El hook dedupe por
+                    // id contra las que vayan llegando del job.
+                    if (finishAndNavigate({
+                        ...commonParams,
+                        jobId: cacheData.jobId,
+                        initialQuestions: rawQuestions,
+                    })) return;
+                } else {
+                    // Pure hit — flujo síncrono legacy, sin polling. El runner
+                    // sin jobId espera el shape YA adaptado.
+                    if (finishAndNavigate({
+                        ...commonParams,
+                        questions: adaptGeneratedQuestions(rawQuestions),
+                    })) return;
+                }
+                return;
+            }
+
+            // Fase 2 · Streaming clásico (gaps-15-09-26). Solo se ejecuta si
+            // el backend devolvió 503 en /from-cache (Motor no configurado)
+            // o si por lo que sea no vino ni cache ni jobId.
             const streamRes = await trainingApi.startTestJob({
                 oposicion,
                 topicId: backendTopicId,
@@ -486,30 +550,14 @@ export default function GeneratorConfigScreen({ navigation, route }) {
             });
 
             if (!streamRes?.error && streamRes?.data?.jobId) {
-                clearTimeout(warnTimerRef.current);
-                clearTimeout(killTimerRef.current);
-                if (cancelledRef.current) return;
-                setGenerating(false);
-                setSlowWarning(false);
-                allowExitRef.current = true;
-                navigation.replace('TrainingSession', {
-                    source: 'generator',
+                if (finishAndNavigate({
+                    ...commonParams,
                     jobId: streamRes.data.jobId,
-                    expectedTotal: count,
-                    examTitle: isChallengeMode ? 'Reto de clan' : 'Generador infinito',
-                    timedMode: fatigueMode,
-                    oposicion,
-                    // TopicId solicitado — fallback para el Laboratorio cuando
-                    // Motor no puebla `tema_id` en las preguntas del SesionOut.
-                    requestedTopicId: backendTopicId,
-                    ...(challengeId && { challengeId }),
-                    ...(challengeClanId && { clanId: challengeClanId }),
-                    ...(taskId && { taskId }),
-                });
+                })) return;
                 return;
             }
 
-            // Fallback síncrono cuando el Motor no está disponible (503).
+            // Fase 3 · Fallback síncrono cuando el Motor no está disponible (503).
             const { data, error } = await trainingApi.generateQuestions({
                 oposicion,
                 topicId: backendTopicId,
@@ -532,14 +580,8 @@ export default function GeneratorConfigScreen({ navigation, route }) {
 
             allowExitRef.current = true;
             navigation.replace('TrainingSession', {
-                source: 'generator',
+                ...commonParams,
                 questions: adaptGeneratedQuestions(data),
-                examTitle: isChallengeMode ? 'Reto de clan' : 'Generador infinito',
-                timedMode: fatigueMode,
-                oposicion,
-                ...(challengeId && { challengeId }),
-                ...(challengeClanId && { clanId: challengeClanId }),
-                ...(taskId && { taskId }),
             });
         } catch {
             clearTimeout(warnTimerRef.current);

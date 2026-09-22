@@ -55,6 +55,7 @@ declare const API_ROUTES: {
         readonly MOCK_DETAIL: string;
         readonly MOCK_QUESTIONS: string;
         readonly GENERATE: string;
+        readonly FROM_CACHE: string;
         readonly GENERATE_STREAM: string;
         readonly JOB_STATUS: string;
         readonly SESSION_QUESTIONS: string;

@@ -56,6 +56,7 @@ import type {
     GetSessionQuestionsUseCase,
     PostSessionAnswerUseCase,
     GetTopicsInventoryUseCase,
+    GetCachedTestUseCase,
     ListBankExamsUseCase,
     UploadBankExamUseCase,
     GetBankExamJobUseCase,
@@ -125,6 +126,7 @@ export class TrainingController {
             getSessionQuestions?: GetSessionQuestionsUseCase;
             postSessionAnswer?: PostSessionAnswerUseCase;
             getTopicsInventory?: GetTopicsInventoryUseCase;
+            getCachedTest?: GetCachedTestUseCase;
             // Bloque 6.6 · Banco de exámenes oficiales — opcional (requiere Motor)
             listBankExams?: ListBankExamsUseCase;
             uploadBankExam?: UploadBankExamUseCase;
@@ -301,6 +303,42 @@ export class TrainingController {
             error: { code: 'MOTOR_UNAVAILABLE', message: 'Streaming no disponible. Usa /training/generate.' },
         });
     }
+
+    /**
+     * Cache-first · estrategia B. Único endpoint que el mobile llama de primero
+     * cuando el usuario pulsa "Empezar" en el Generador Infinito. Devuelve:
+     *  - `questions`: 0..N preguntas del cache (con correcta_idx resuelto).
+     *  - `jobId`: null si pure hit; presente si hace falta generar más live.
+     *  - `sessionId`: del job cuando existe (útil para postSessionAnswer).
+     *  - `pedidas` / `publicadas`: contadores del deficit del Motor.
+     *
+     * Contrato para el mobile:
+     *  - questions.length === pedidas && !jobId → arranca test SÍNCRONO (~3 s).
+     *  - questions.length > 0 && jobId          → arranca STREAMING con seed.
+     *  - questions.length === 0 && jobId        → arranca STREAMING desde 0.
+     *  - questions.length === 0 && !jobId       → cae a /training/generate legacy.
+     */
+    getFromCache = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.getCachedTest) { this.motorUnavailable(res); return; }
+            const body = req.body as { oposicion: string; count?: number; difficulty?: 'easy' | 'medium' | 'hard'; topicId?: string };
+            const requestedCount = Math.max(1, Math.min(50, body.count ?? 10));
+            const result = await this.deps.getCachedTest.execute({
+                userId: req.authUser!.id,
+                oposicion: body.oposicion,
+                temaIds: parseTemaIds(body.topicId),
+                count: requestedCount,
+                difficulty: body.difficulty,
+            });
+            this.ok(res, 200, result);
+        } catch (err) {
+            if (err instanceof Error && err.message === 'MOTOR_UNAVAILABLE') {
+                this.motorUnavailable(res);
+                return;
+            }
+            next(err);
+        }
+    };
 
     generateStream = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
