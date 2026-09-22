@@ -72,6 +72,14 @@ export function createServer(): Express {
         syncService.refresh().catch(() => { /* logueado dentro del servicio */ });
     }
 
+    // Warm-up del Motor cada 10 min (2026-09-22 · diagnóstico "el motor no
+    // responde" en España/Argentina — ver GeneratorConfigScreen.js TTL_KILL_MS).
+    if (container.motorAiClient) {
+        const motor = container.motorAiClient;
+        scheduler.registerMotorWarmup(() => motor.warmUp());
+        motor.warmUp().catch(() => { /* silencioso, ver MotorAiClient.warmUp */ });
+    }
+
     scheduler.start();
 
     // 404 catch-all

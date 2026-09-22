@@ -42,6 +42,24 @@ export class NotificationScheduler {
         return this;
     }
 
+    /**
+     * Warm-up del Motor (2026-09-22 · diagnóstico "el motor no responde" desde
+     * España/Argentina). Evita que el contenedor del Motor se duerma por
+     * inactividad si su Render no está en plan always-on — un ping cada 10 min
+     * es mucho más barato que perder el primer request de cada sesión de
+     * usuario a un cold start de 30-60s+.
+     */
+    registerMotorWarmup(job: JobFn): this {
+        const task = cron.schedule('*/10 * * * *', async () => {
+            try { await job(); }
+            catch (err) { logger.error('[scheduler] motor-warmup error', { err }); }
+        }, { timezone: 'UTC' });
+
+        this.tasks.push(task);
+        logger.info('[scheduler] motor-warmup registrado — cron: */10 * * * * UTC');
+        return this;
+    }
+
     start(): void {
         this.tasks.forEach(t => t.start());
     }

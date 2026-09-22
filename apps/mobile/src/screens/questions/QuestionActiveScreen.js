@@ -659,16 +659,22 @@ export default function QuestionActiveScreen({ navigation, route }) {
             <>
               <ActivityIndicator size="large" color={colors.selectionBorder} />
               <Text style={{ fontSize: 14, color: colors.textDark, marginTop: 12 }}>
-                Preparando tu test…
+                Buscando tu primera pregunta…
               </Text>
               {/* Mientras esta pantalla está visible, `questions.length` es
                   siempre 0 — el test arranca en cuanto hay 1 pregunta real
                   (ver streamStillLoading), así que aquí nunca hay un número
                   útil que mostrar. Mensaje genérico en vez de un contador
-                  falso o un "0 de N" confuso. */}
+                  falso o un "0 de N" confuso.
+                  Copy suavizado (2026-09-22): "puede tardar hasta 2 minutos"
+                  se leía como el tiempo NORMAL de espera (medido en vivo: la
+                  primera pregunta suele llegar en 5-35 s), generando
+                  confusión sobre si el diseño "arranca con la primera
+                  pregunta" estaba realmente funcionando. Ahora comunica lo
+                  típico primero y el caso raro como excepción, no como regla. */}
               <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, textAlign: 'center', paddingHorizontal: 20 }}>
-                El Motor extrae cada pregunta del temario oficial.{'\n'}
-                Puede tardar hasta 2 minutos.
+                Normalmente listo en segundos.{'\n'}
+                Con temas muy específicos puede tardar un poco más.
               </Text>
             </>
           )}

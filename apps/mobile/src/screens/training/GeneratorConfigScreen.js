@@ -284,7 +284,14 @@ function FatigueToggle({ value, onValueChange }) {
 }
 
 const TTL_WARN_MS  = 15_000;
-const TTL_KILL_MS  = 90_000;
+// Subido de 90s a 180s (2026-09-22 · diagnóstico "el motor no responde" en
+// España/Argentina): este timer arma ANTES de llamar startTestJob, que
+// debería responder en <2s según el Motor. Si tarda más, probablemente es
+// el Motor "despertando" tras inactividad (cold start en su Render) +
+// latencia geográfica — no un fallo real. Con 90s se mataba el picker
+// aunque el job ya hubiera arrancado bien del otro lado. Pendiente:
+// confirmar con el equipo IA si el Motor está en plan always-on de Render.
+const TTL_KILL_MS  = 180_000;
 
 // ─── Pantalla 6.2 · Generador infinito ───────────────────────────────────────
 export default function GeneratorConfigScreen({ navigation, route }) {
@@ -796,7 +803,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                         <View style={styles.slowWarningRow}>
                             <Ionicons name="time-outline" size={14} color={COLORS.grayText} />
                             <Text style={styles.slowWarningText}>
-                                Generando con varios temas puede tardar hasta 90 s. Por favor espera…
+                                El Motor puede estar arrancando tras un rato sin uso. Puede tardar hasta 3 min — por favor espera…
                             </Text>
                         </View>
                     )}

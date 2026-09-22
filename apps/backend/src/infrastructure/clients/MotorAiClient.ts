@@ -158,6 +158,21 @@ export class MotorAiClient implements AiApiContract {
         return this.http;
     }
 
+    /**
+     * Ping liviano al Motor para evitar cold starts (2026-09-22 · diagnóstico
+     * "el motor no responde" reportado desde España/Argentina). `GET /v1/courses`
+     * no consume OpenAI ni genera contenido — solo mantiene el contenedor
+     * despierto si el Motor corre en un plan de Render que se duerme por
+     * inactividad. Nunca lanza; el caller (cron) solo necesita fire-and-forget.
+     */
+    async warmUp(): Promise<void> {
+        try {
+            await this.http.get('/v1/courses');
+        } catch {
+            // Silencioso — un warm-up fallido no debe alarmar ni cortar nada.
+        }
+    }
+
     constructor(config: MotorAiConfig) {
         this.config = config;
         this.http = axios.create({

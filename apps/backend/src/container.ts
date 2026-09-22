@@ -804,6 +804,7 @@ export function buildContainer() {
         pushRepo,
         pushService,
         courseSyncService,
+        motorAiClient,
         controllers: {
             health: healthController,
             auth: authController,

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
+import { API_ROUTES } from '@opox/constants';
 
 const TOKEN_KEY = 'opox.session';
 
@@ -8,6 +9,7 @@ const TOKEN_KEY = 'opox.session';
  * - Guarda el session (accessToken + refreshToken + user) en AsyncStorage.
  * - Adjunta Authorization: Bearer <accessToken> a cada request.
  * - Traduce respuestas ApiResponse<T> del backend al patrón { data, error }.
+ * - Refresca el accessToken automáticamente en el primer 401 (ver refreshAccessToken).
  */
 
 async function saveSession(session) {
@@ -23,11 +25,51 @@ async function loadSession() {
     return raw ? JSON.parse(raw) : null;
 }
 
-async function request(path, { method = 'GET', body, auth = false, timeoutMs } = {}) {
+// El accessToken de Supabase caduca (~1h) y antes nunca se refrescaba — el
+// cliente solo leía el token guardado y lo pegaba en cada request, sin
+// manejar 401 ni renovar. Un usuario con la app abierta >1h empezaba a ver
+// errores genéricos en cualquier acción (bug latente, 2026-09-22).
+// `refreshPromise` evita que varias requests que fallan con 401 al mismo
+// tiempo disparen N refresh en paralelo — todas esperan la misma promesa.
+let refreshPromise = null;
+
+async function refreshAccessToken(session) {
+    if (!session?.refreshToken) return null;
+    if (!refreshPromise) {
+        refreshPromise = (async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}${API_ROUTES.AUTH.REFRESH}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refreshToken: session.refreshToken }),
+                });
+                const payload = await res.json().catch(() => null);
+                if (payload?.ok && payload.data?.accessToken) {
+                    await saveSession(payload.data);
+                    return payload.data;
+                }
+                // Refresh token también inválido/caducado — no hay forma de
+                // recuperar la sesión sin re-login. Limpiamos para que el
+                // resto de la app detecte "sin sesión" en vez de seguir
+                // pegando el access token viejo en cada request.
+                await saveSession(null);
+                return null;
+            } catch {
+                return null;
+            } finally {
+                refreshPromise = null;
+            }
+        })();
+    }
+    return refreshPromise;
+}
+
+async function request(path, { method = 'GET', body, auth = false, timeoutMs, _retried = false } = {}) {
     const headers = { 'Content-Type': 'application/json' };
 
+    let session = null;
     if (auth) {
-        const session = await loadSession();
+        session = await loadSession();
         if (session?.accessToken) {
             headers.Authorization = `Bearer ${session.accessToken}`;
         }
@@ -59,6 +101,16 @@ async function request(path, { method = 'GET', body, auth = false, timeoutMs } =
         };
     } finally {
         if (timer) clearTimeout(timer);
+    }
+
+    // 401 en una request autenticada → probablemente el accessToken caducó.
+    // Refrescamos con el refreshToken guardado y reintentamos UNA sola vez
+    // (evita bucle infinito si el refresh también falla).
+    if (response.status === 401 && auth && !_retried && session?.refreshToken) {
+        const refreshed = await refreshAccessToken(session);
+        if (refreshed?.accessToken) {
+            return request(path, { method, body, auth, timeoutMs, _retried: true });
+        }
     }
 
     let payload = null;
