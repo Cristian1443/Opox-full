@@ -140,7 +140,7 @@ export class ProxyPodcastAudioUseCase {
         private readonly motorApiKey: string,
     ) {}
 
-    async execute(filename: string, rangeHeader?: string): Promise<{
+    async execute(filename: string, rangeHeader?: string, method: 'GET' | 'HEAD' = 'GET'): Promise<{
         status: number;
         contentType: string;
         contentLength: string | null;
@@ -151,7 +151,14 @@ export class ProxyPodcastAudioUseCase {
         const url = `${this.motorBaseUrl.replace(/\/$/, '')}/v1/classroom/podcast/${encodeURIComponent(filename)}`;
         const headers: Record<string, string> = { 'X-API-Key': this.motorApiKey };
         if (rangeHeader) headers['Range'] = rangeHeader;
-        const res = await fetch(url, { headers });
+        // Bug real (2026-09-22): antes SIEMPRE se hacía GET al Motor sin
+        // importar el método original — un HEAD del reproductor (probe previo
+        // al seek) terminaba descargando el mp3 completo para nada, y encima
+        // el streaming de esa respuesta vía res.write() le hacía perder el
+        // Content-Length/Accept-Ranges que el controller intentaba setear
+        // (Node cambia a Transfer-Encoding: chunked). Reenviar el método real
+        // deja que el controller responda un HEAD sin cuerpo, limpio.
+        const res = await fetch(url, { headers, method });
         return {
             status: res.status,
             contentType: res.headers.get('content-type') ?? 'audio/mpeg',

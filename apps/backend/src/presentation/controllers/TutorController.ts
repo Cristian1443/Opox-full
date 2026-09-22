@@ -234,10 +234,13 @@ export class TutorController {
                 res.status(400).json({ ok: false, error: { code: 'invalid-filename', message: 'Filename inválido' } });
                 return;
             }
-            // Reenvía Range al Motor (bug seek podcast — ver PodcastUseCases.ts).
+            // Reenvía Range Y el método real al Motor (bug seek podcast — ver
+            // PodcastUseCases.ts). Antes un HEAD del reproductor se convertía
+            // siempre en GET, descargando el mp3 completo para nada.
             const rangeHeader = req.headers.range;
-            const upstream = await this.deps.proxyPodcastAudio.execute(filename, rangeHeader);
-            if ((upstream.status !== 200 && upstream.status !== 206) || !upstream.body) {
+            const isHead = req.method === 'HEAD';
+            const upstream = await this.deps.proxyPodcastAudio.execute(filename, rangeHeader, isHead ? 'HEAD' : 'GET');
+            if (upstream.status !== 200 && upstream.status !== 206) {
                 res.status(upstream.status).end();
                 return;
             }
@@ -249,6 +252,15 @@ export class TutorController {
             if (upstream.acceptRanges) res.setHeader('Accept-Ranges', upstream.acceptRanges);
             if (upstream.contentLength) res.setHeader('Content-Length', upstream.contentLength);
             if (upstream.contentRange) res.setHeader('Content-Range', upstream.contentRange);
+
+            // Un HEAD nunca lleva cuerpo — responder de una vez sin tocar el
+            // stream evita que Node cambie a Transfer-Encoding: chunked y
+            // descarte el Content-Length/Accept-Ranges que acabamos de setear.
+            if (isHead || !upstream.body) {
+                res.end();
+                return;
+            }
+
             // Stream chunks del web-standard ReadableStream a Express (Node stream).
             const reader = upstream.body.getReader();
             const pump = async (): Promise<void> => {
