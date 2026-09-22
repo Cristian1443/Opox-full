@@ -348,7 +348,9 @@ function PodcastSeekBar({ elapsed, totalSecs, onSeek, onDragStart, onDragEnd }) 
 
     const normalPct = totalSecs > 0 ? Math.min(elapsed / totalSecs, 1) : 0;
     const pct = dragPct != null ? dragPct : normalPct;
-    const displaySecs = dragPct != null ? dragPct * totalSecs : elapsed;
+    // Defensa: nunca mostrar un tiempo mayor al total (podía pasar cuando el
+    // "total" era un estimado desactualizado — ver fix en MotorTutorClient).
+    const displaySecs = dragPct != null ? dragPct * totalSecs : Math.min(elapsed, totalSecs);
 
     return (
         <View style={styles.progressWrap}>

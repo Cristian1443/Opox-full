@@ -158,7 +158,7 @@ export class MotorTutorClient implements ITutorAiClient {
                 id?: string;
                 estado?: string;
                 mensaje?: string;
-                resultado?: { archivo?: string; url?: string };
+                resultado?: { archivo?: string; url?: string; duration_seconds?: number };
             }>(`/v1/jobs/${job.job_id}`);
 
             if (status.estado === 'done' && status.resultado?.url) {
@@ -167,7 +167,18 @@ export class MotorTutorClient implements ITutorAiClient {
                 const mp3Url = relative.startsWith('http')
                     ? relative
                     : `${this.baseUrl}${relative}`;
-                const estimatedSeconds = params.duracion === 'corta' ? 300 : 600;
+                // Fix 2026-09-22: antes se ignoraba `duration_seconds` (la duración
+                // REAL del audio, que el Motor sí devuelve) y siempre se mandaba
+                // un estimado fijo (300/600s según el tier pedido). Como el Motor
+                // a veces genera audios más largos/cortos que el target (bug
+                // reportado, ver INFORME_PODCAST_BUGS.md), el mobile mostraba un
+                // "total" falso — la barra llegaba al 100% mucho antes o después
+                // del final real, y el contador de tiempo podía superar el total
+                // mostrado. Usar la duración real cuando el Motor la manda.
+                const real = status.resultado.duration_seconds;
+                const estimatedSeconds = (typeof real === 'number' && Number.isFinite(real) && real > 0)
+                    ? Math.round(real)
+                    : (params.duracion === 'corta' ? 300 : 600);
                 return {
                     filename: status.resultado.archivo ?? '',
                     mp3Url,
