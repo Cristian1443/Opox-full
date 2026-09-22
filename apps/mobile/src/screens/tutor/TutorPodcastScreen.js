@@ -469,10 +469,24 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast, navigation }) {
         setElapsed(clamped);
     }, [player, totalSecs]);
 
-    const togglePlay = useCallback(() => {
-        if (isPlaying) player.pause();
-        else player.play();
-    }, [player, isPlaying]);
+    // Al terminar, el player queda parado exactamente en el final — no hay
+    // audio hacia adelante desde ahí, así que "play" no hacía nada (bug
+    // reportado 2026-09-22: "le doy reproducir y la barra no se regresa").
+    // Si detectamos que ya terminó, saltamos a 0 antes de reproducir.
+    const togglePlay = useCallback(async () => {
+        if (isPlaying) {
+            player.pause();
+            return;
+        }
+        const current = player.currentTime;
+        const atEnd = status?.didJustFinish
+            || (Number.isFinite(current) && totalSecs > 0 && current >= totalSecs - 0.25);
+        if (atEnd) {
+            await player.seekTo(0);
+            setElapsed(0);
+        }
+        player.play();
+    }, [player, isPlaying, status, totalSecs]);
 
     const skipBy = useCallback((delta) => {
         // Leer currentTime directamente para no depender del estado elapsed (puede ser stale)
