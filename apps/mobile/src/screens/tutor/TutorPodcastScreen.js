@@ -11,12 +11,13 @@ import {
     FlatList,
     ActivityIndicator,
     ScrollView,
+    PanResponder,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
 import { API_BASE_URL } from '../../api/config';
@@ -275,7 +276,7 @@ function PodcastConfig({ topic, oposicion, onGenerated, onBack }) {
                         <Text style={styles.loadingTitle}>Generando podcast…</Text>
                         <Text style={styles.loadingSub}>
                             La IA está redactando y sintetizando el audio.{'\n'}
-                            Puede tardar entre 30 s y 2 minutos.
+                            Puede tardar entre 30 s y 3 minutos.
                         </Text>
                     </View>
                 ) : (
@@ -293,8 +294,90 @@ function PodcastConfig({ topic, oposicion, onGenerated, onBack }) {
     );
 }
 
+// ─── Barra de progreso arrastrable (seek) ────────────────────────────────────
+// Antes era un View estático sin interacción — no seguía el dedo ni permitía
+// tocar para saltar. Mismo patrón de PanResponder que los sliders del
+// Generador Infinito (GeneratorConfigScreen.js): área de toque = todo el
+// ancho de la barra (no solo el thumb exacto), salto directo al punto
+// tocado, posición medida con `.measure()` (pageX absoluto, más confiable
+// que locationX). El seek real (`player.seekTo`) se dispara solo al soltar
+// — no en cada onPanResponderMove, para no saturar el audio con seeks.
+function PodcastSeekBar({ elapsed, totalSecs, onSeek, onDragStart, onDragEnd }) {
+    const [width, setWidth] = useState(0);
+    const widthRef = useRef(0);
+    const totalRef = useRef(totalSecs);
+    const [dragPct, setDragPct] = useState(null); // null = no se está arrastrando
+    const trackRef = useRef(null);
+    const trackPageX = useRef(0);
+
+    useEffect(() => { widthRef.current = width; }, [width]);
+    useEffect(() => { totalRef.current = totalSecs; }, [totalSecs]);
+
+    const pctFromPageX = (pageX) => {
+        const w = widthRef.current;
+        if (w <= 0) return 0;
+        const touchX = pageX - trackPageX.current;
+        return Math.max(0, Math.min(1, touchX / w));
+    };
+
+    const responder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponderCapture: () => true,
+            onMoveShouldSetPanResponderCapture: () => true,
+            onPanResponderGrant: (e) => {
+                onDragStart?.();
+                setDragPct(pctFromPageX(e.nativeEvent.pageX));
+            },
+            onPanResponderMove: (e) => {
+                setDragPct(pctFromPageX(e.nativeEvent.pageX));
+            },
+            onPanResponderRelease: (e) => {
+                const pct = pctFromPageX(e.nativeEvent.pageX);
+                setDragPct(null);
+                onDragEnd?.();
+                onSeek(pct * totalRef.current);
+            },
+            onPanResponderTerminate: () => {
+                setDragPct(null);
+                onDragEnd?.();
+            },
+        })
+    ).current;
+
+    const normalPct = totalSecs > 0 ? Math.min(elapsed / totalSecs, 1) : 0;
+    const pct = dragPct != null ? dragPct : normalPct;
+    const displaySecs = dragPct != null ? dragPct * totalSecs : elapsed;
+
+    return (
+        <View style={styles.progressWrap}>
+            <View
+                ref={trackRef}
+                style={styles.progressTouchArea}
+                onLayout={(e) => {
+                    setWidth(e.nativeEvent.layout.width);
+                    trackRef.current?.measure((x, y, w, h, pageX) => {
+                        trackPageX.current = pageX;
+                    });
+                }}
+                {...responder.panHandlers}
+            >
+                <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${pct * 100}%` }]} />
+                    <View style={[styles.progressThumb, { left: `${pct * 100}%` }]} />
+                </View>
+            </View>
+            <View style={styles.timesRow}>
+                <Text style={styles.timeText}>{formatTime(displaySecs)}</Text>
+                <Text style={styles.timeText}>{formatTime(totalSecs)}</Text>
+            </View>
+        </View>
+    );
+}
+
 // ─── 3) Player Figma con expo-audio ──────────────────────────────────────────
-function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
+function PodcastPlayer({ topic, podcast, onBack, onNewPodcast, navigation }) {
     const player = useAudioPlayer({ uri: podcast.mp3Url });
     const status = useAudioPlayerStatus(player);
 
@@ -308,12 +391,30 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
     const waveAnim            = useRef(new Animated.Value(0)).current;
     const waveLoop            = useRef(null);
 
+    // Activa reproducción en segundo plano + silencioso (2026-09-22 · bug
+    // "salgo de la app y no puedo seguir escuchando"). El plugin nativo
+    // (app.json → expo-audio, enableBackgroundPlayback:true por defecto) ya
+    // agrega UIBackgroundModes:audio en iOS y el foreground service en
+    // Android, pero sin este setAudioModeAsync() el módulo nunca activa esa
+    // sesión de audio — iOS suspende el player en cuanto la app pasa a
+    // segundo plano. Solo aplica en un build nativo real (EAS/APK); Expo Go
+    // no puede probarlo porque su binario no trae el plugin de este proyecto.
+    useEffect(() => {
+        setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: true,
+            interruptionMode: 'doNotMix',
+        }).catch(() => {});
+        return () => {
+            setAudioModeAsync({ shouldPlayInBackground: false }).catch(() => {});
+        };
+    }, []);
+
     const isPlaying = status?.playing ?? false;
     // duration puede llegar como NaN mientras el audio carga
     const totalSecs = (status?.duration && Number.isFinite(status.duration) && status.duration > 0)
         ? status.duration
         : (podcast.estimatedSeconds ?? podcast.totalSeconds ?? 600);
-    const progressPct = totalSecs > 0 ? Math.min((elapsed / totalSecs) * 100, 100) : 0;
 
     // Polling de posición real del player cada 500 ms mientras reproduce
     useEffect(() => {
@@ -351,6 +452,20 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
 
     // Cleanup del sleep timer al desmontar
     useEffect(() => () => clearTimeout(sleepTimerRef.current), []);
+
+    // El gesto nativo de swipe-back de iOS compite con el arrastre horizontal
+    // de la barra de progreso — mismo problema y misma solución que los
+    // sliders de GeneratorConfigScreen.js: desactivarlo de forma permanente
+    // en vez de intentar alternarlo a mitad de gesto (no llega a tiempo).
+    useEffect(() => {
+        navigation?.setOptions({ gestureEnabled: false });
+    }, [navigation]);
+
+    const handleSeek = useCallback((seconds) => {
+        const clamped = Math.max(0, Math.min(totalSecs, seconds));
+        player.seekTo(clamped);
+        setElapsed(clamped);
+    }, [player, totalSecs]);
 
     const togglePlay = useCallback(() => {
         if (isPlaying) player.pause();
@@ -435,16 +550,11 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast }) {
                 <Text style={styles.title} numberOfLines={3}>{topic.title}</Text>
                 <Text style={styles.subtitle}>{podcast.velocidad}x · narrado por la IA</Text>
 
-                <View style={styles.progressWrap}>
-                    <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
-                        <View style={[styles.progressThumb, { left: `${progressPct}%` }]} />
-                    </View>
-                    <View style={styles.timesRow}>
-                        <Text style={styles.timeText}>{formatTime(elapsed)}</Text>
-                        <Text style={styles.timeText}>{formatTime(totalSecs)}</Text>
-                    </View>
-                </View>
+                <PodcastSeekBar
+                    elapsed={elapsed}
+                    totalSecs={totalSecs}
+                    onSeek={handleSeek}
+                />
 
                 <View style={styles.controlsRow}>
                     <TouchableOpacity style={styles.controlButton} activeOpacity={0.7} onPress={() => skipBy(-15)} accessibilityLabel="Retroceder 15 segundos">
@@ -552,6 +662,7 @@ export default function TutorPodcastScreen({ navigation, route }) {
                 podcast={podcast}
                 onBack={() => navigation.goBack()}
                 onNewPodcast={() => { setPodcast(null); }}
+                navigation={navigation}
             />
         );
     }
@@ -768,6 +879,9 @@ const styles = StyleSheet.create({
         marginBottom: spacing.xl,
     },
     progressWrap: { alignSelf: 'stretch', marginBottom: spacing.xl },
+    // Área de toque real de la barra — más alta que el track visual (7.3px)
+    // para que sea fácil de agarrar con el dedo, centrada verticalmente.
+    progressTouchArea: { height: 30, justifyContent: 'center' },
     progressTrack: { height: 7.3, borderRadius: 1.78, backgroundColor: FIGMA.progressTrack },
     progressFill: {
         position: 'absolute',

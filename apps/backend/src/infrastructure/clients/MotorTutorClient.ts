@@ -141,9 +141,14 @@ export class MotorTutorClient implements ITutorAiClient {
         );
         if (!job.job_id) throw new Error('Motor no devolvió job_id');
 
-        // Polling hasta done (o error). Timeout total 2 min.
+        // Polling hasta done (o error). Timeout total 3 min (antes 2 min).
+        // Subido 2026-09-22: el Motor genera audios 1.6-1.7x más largos que el
+        // target pedido (bug reportado — ver INFORME_PODCAST_BUGS.md), y la
+        // síntesis TTS tarda proporcionalmente más. Con 2 min el job real a
+        // veces termina segundos después de que ya habíamos abortado el
+        // polling — el usuario veía "timeout" con el podcast casi listo.
         const start = Date.now();
-        const maxWaitMs = 120_000;
+        const maxWaitMs = 180_000;
         const intervalMs = 3_000;
 
         while (Date.now() - start < maxWaitMs) {
@@ -174,7 +179,7 @@ export class MotorTutorClient implements ITutorAiClient {
             }
         }
 
-        throw new Error('Motor podcast job timeout (2 min)');
+        throw new Error('Motor podcast job timeout (3 min)');
     }
 
     // GET auxiliar para polling de jobs — mismo timeout/auth que POST.

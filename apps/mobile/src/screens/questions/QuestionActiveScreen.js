@@ -947,8 +947,15 @@ export default function QuestionActiveScreen({ navigation, route }) {
               )}
             </TouchableOpacity>
             {!isLastQuestion && (
-              <TouchableOpacity onPress={handleNext} style={styles.skipLink} activeOpacity={0.7}>
-                <Text style={styles.skipLinkText}>Saltar por ahora →</Text>
+              <TouchableOpacity
+                onPress={handleNext}
+                style={styles.skipLink}
+                activeOpacity={0.7}
+                disabled={!canGoForward}
+              >
+                <Text style={[styles.skipLinkText, !canGoForward && { opacity: 0.4 }]}>
+                  {canGoForward ? 'Saltar por ahora →' : 'Esperando al Motor…'}
+                </Text>
               </TouchableOpacity>
             )}
           </>
@@ -961,12 +968,25 @@ export default function QuestionActiveScreen({ navigation, route }) {
             <Text style={styles.mainBtnText}>Terminar test</Text>
           </TouchableOpacity>
         ) : !isLastQuestion ? (
+          // Si el streaming aún no publicó la siguiente pregunta, handleNext
+          // no hace nada por dentro (guard `currentIndex+1 >= questions.length`).
+          // Sin este estado visual el botón parece colgado — el usuario lo
+          // reporta como "se está demorando mucho" cuando en realidad está
+          // esperando al Motor (bug detectado en pruebas en vivo, 2026-09-22).
           <TouchableOpacity
-            style={styles.mainBtn}
+            style={[styles.mainBtn, !canGoForward && styles.mainBtnDisabled]}
             onPress={handleNext}
+            disabled={!canGoForward}
             activeOpacity={0.85}
           >
-            <Text style={styles.mainBtnText}>Siguiente pregunta</Text>
+            {canGoForward ? (
+              <Text style={styles.mainBtnText}>Siguiente pregunta</Text>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ActivityIndicator color={colors.white} size="small" />
+                <Text style={styles.mainBtnText}>Esperando al Motor…</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ) : (
           // Última pregunta ya respondida pero quedan pendientes atrás
