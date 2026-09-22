@@ -326,10 +326,6 @@ export default function GeneratorConfigScreen({ navigation, route }) {
     );
     const [topics, setTopics] = useState([]);
     const [topicOpen, setTopicOpen] = useState(!isLockedMode); // cerrado en modo bloqueado
-    // Inventario del Motor (v1.6.0) por topicId — { questionsAvailable, healthyPool, ... }.
-    // Puramente informativo: avisa "pocas preguntas disponibles" junto al tema.
-    // No cambia COUNT_MAX ni el tope del slider (ver nota post-G10 más abajo).
-    const [topicsInventory, setTopicsInventory] = useState({});
 
     // Deshabilita el scroll del contenedor mientras se arrastra un slider —
     // en iOS el gesto nativo de UIScrollView compite con el PanResponder y le
@@ -402,15 +398,6 @@ export default function GeneratorConfigScreen({ navigation, route }) {
             }
             if (res?.data?.length) {
                 setTopics(res.data);
-            }
-
-            // Inventario informativo (Motor v1.6.0) — si falla o el Motor no
-            // está configurado (503), simplemente no se muestran los avisos.
-            const inv = await trainingApi.getTopicsInventory();
-            if (inv?.data?.length) {
-                const map = {};
-                for (const item of inv.data) map[item.topicId] = item;
-                setTopicsInventory(map);
             }
         })();
     }, []);
@@ -757,8 +744,6 @@ export default function GeneratorConfigScreen({ navigation, route }) {
 
                                         {topics.map((t) => {
                                             const active = selectedTopicIds.has(t.topicId);
-                                            const inv = topicsInventory[t.topicId];
-                                            const lowPool = inv && inv.healthyPool === false;
                                             return (
                                                 <TouchableOpacity
                                                     key={t.id}
@@ -766,16 +751,9 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                                                     style={[styles.topicItem, active && styles.topicItemActive]}
                                                 >
                                                     <View style={styles.topicRow}>
-                                                        <View style={{ flex: 1 }}>
-                                                            <Text style={[styles.topicText, active && styles.topicTextActive]}>
-                                                                {t.label}
-                                                            </Text>
-                                                            {lowPool && (
-                                                                <Text style={styles.topicLowPoolText}>
-                                                                    Pocas preguntas disponibles
-                                                                </Text>
-                                                            )}
-                                                        </View>
+                                                        <Text style={[styles.topicText, active && styles.topicTextActive, { flex: 1 }]}>
+                                                            {t.label}
+                                                        </Text>
                                                         {active && (
                                                             <Ionicons name="checkmark" size={16} color={COLORS.purple} />
                                                         )}
@@ -1079,12 +1057,6 @@ const styles = StyleSheet.create({
     topicTextActive: {
         fontFamily: FONTS.medium,
         color: COLORS.purple,
-    },
-    topicLowPoolText: {
-        fontFamily: FONTS.regular,
-        fontSize: 11,
-        color: COLORS.orange,
-        marginTop: 2,
     },
 
     /* Modo bloqueado (reto / tarea) */
