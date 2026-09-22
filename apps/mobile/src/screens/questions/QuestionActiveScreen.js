@@ -209,7 +209,6 @@ export default function QuestionActiveScreen({ navigation, route }) {
   // comporta como antes con las preguntas del route.params o los mocks.
   const {
     questions: streamedRaw,
-    progress: streamProgress,
     status: streamStatus,
     sessionId: streamSessionId,
     deficit: streamDeficit,
@@ -662,16 +661,15 @@ export default function QuestionActiveScreen({ navigation, route }) {
               <Text style={{ fontSize: 14, color: colors.textDark, marginTop: 12 }}>
                 Preparando tu test…
               </Text>
-              {streamProgress?.total > 0 ? (
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
-                  {streamProgress.done} de {streamProgress.total} preguntas listas
-                </Text>
-              ) : (
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, textAlign: 'center', paddingHorizontal: 20 }}>
-                  El Motor extrae cada pregunta del temario oficial.{'\n'}
-                  Puede tardar hasta 2 minutos.
-                </Text>
-              )}
+              {/* Mientras esta pantalla está visible, `questions.length` es
+                  siempre 0 — el test arranca en cuanto hay 1 pregunta real
+                  (ver streamStillLoading), así que aquí nunca hay un número
+                  útil que mostrar. Mensaje genérico en vez de un contador
+                  falso o un "0 de N" confuso. */}
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, textAlign: 'center', paddingHorizontal: 20 }}>
+                El Motor extrae cada pregunta del temario oficial.{'\n'}
+                Puede tardar hasta 2 minutos.
+              </Text>
             </>
           )}
         </View>

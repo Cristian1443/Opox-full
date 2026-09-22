@@ -69,6 +69,11 @@ export const trainingApi = {
 
     listTopics: () => api.get(API_ROUTES.TRAINING.TOPICS, { auth: true }),
 
+    // Motor v1.6.0 — informativo, avisa "pocas preguntas disponibles" por tema
+    // en el picker del Generador Infinito. Puede devolver 503 MOTOR_UNAVAILABLE
+    // si el Motor no está configurado — el caller lo ignora silenciosamente.
+    getTopicsInventory: () => api.get(API_ROUTES.TRAINING.TOPICS_INVENTORY, { auth: true }),
+
     // Ruta pública — no requiere sesión — para el test de nivel en onboarding
     getLevelTestQuestions: (oposicion = 'justicia-tramitacion') =>
         api.get(

@@ -191,6 +191,26 @@ export interface BankExamDTO {
     attemptCount: number;
 }
 
+// ─── Inventario de temas (Motor v1.6.0 · GET /v1/courses/{curso_id}/topics-inventory) ──
+// Informativo: cuántas preguntas puede entregar el Motor por tema. Usado en el
+// selector de temas del Generador Infinito para avisar "pocas preguntas
+// disponibles" — no cambia el tope del slider de cantidad (ver
+// GeneratorConfigScreen.js, nota post-G10: cambiar el tope según selección
+// se revirtió por ser molesto para el usuario).
+export interface TopicInventoryDTO {
+    topicId: string;
+    title: string;
+    blockId: string | null;
+    pages: number;
+    chunks: number;
+    /** Preguntas disponibles; descuenta las ya contestadas por el usuario si se pasó userId. */
+    questionsAvailable: number;
+    byDifficulty: Record<string, number>;
+    estimatedCapacity: number;
+    /** true si hay pool suficiente (Motor: questionsAvailable >= 10). */
+    healthyPool: boolean;
+}
+
 export interface UploadBankExamRequest {
     titulo: string;
     anio: number;

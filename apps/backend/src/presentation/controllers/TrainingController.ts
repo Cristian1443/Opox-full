@@ -29,6 +29,7 @@ import type {
     UploadBankExamRequest,
     UploadBankExamResponse,
     BankMockResultDTO,
+    TopicInventoryDTO,
 } from '@opox/types';
 import type {
     ListMockExamsUseCase,
@@ -54,6 +55,7 @@ import type {
     GetJobStatusUseCase,
     GetSessionQuestionsUseCase,
     PostSessionAnswerUseCase,
+    GetTopicsInventoryUseCase,
     ListBankExamsUseCase,
     UploadBankExamUseCase,
     GetBankExamJobUseCase,
@@ -122,6 +124,7 @@ export class TrainingController {
             getJobStatus?: GetJobStatusUseCase;
             getSessionQuestions?: GetSessionQuestionsUseCase;
             postSessionAnswer?: PostSessionAnswerUseCase;
+            getTopicsInventory?: GetTopicsInventoryUseCase;
             // Bloque 6.6 · Banco de exámenes oficiales — opcional (requiere Motor)
             listBankExams?: ListBankExamsUseCase;
             uploadBankExam?: UploadBankExamUseCase;
@@ -494,6 +497,27 @@ export class TrainingController {
             const topics = await this.deps.listTopics.execute(oposicion);
             this.ok(res, 200, topics);
         } catch (err) { next(err); }
+    };
+
+    // GET /training/topics-inventory — Motor v1.6.0. Informativo para el picker
+    // del Generador Infinito; si el Motor no está configurado responde 503 y
+    // el mobile lo ignora silenciosamente (no bloquea la generación de tests).
+    getTopicsInventory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!this.deps.getTopicsInventory) { this.motorUnavailable(res); return; }
+            const oposicion = req.authUser?.oposicion ?? null;
+            const data = await this.deps.getTopicsInventory.execute({
+                oposicion,
+                userId: req.authUser!.id,
+            });
+            this.ok<TopicInventoryDTO[]>(res, 200, data);
+        } catch (err) {
+            if (err instanceof Error && err.message === 'MOTOR_UNAVAILABLE') {
+                this.motorUnavailable(res);
+                return;
+            }
+            next(err);
+        }
     };
 
     // GET /training/level-test?oposicion= — PÚBLICO (sin auth, onboarding)

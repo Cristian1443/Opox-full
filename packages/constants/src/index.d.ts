@@ -71,6 +71,7 @@ declare const API_ROUTES: {
         readonly MOCK_PROGRESS: string;
         readonly LAW_VIEW: string;
         readonly TOPICS: string;
+        readonly TOPICS_INVENTORY: string;
         readonly LEVEL_TEST: string;
         readonly BANK_EXAMS: string;
         readonly BANK_EXAM_UPLOAD: string;

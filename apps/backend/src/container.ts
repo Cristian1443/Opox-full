@@ -64,6 +64,7 @@ import {
     GetJobStatusUseCase,
     GetSessionQuestionsUseCase,
     PostSessionAnswerUseCase,
+    GetTopicsInventoryUseCase,
     // Bloque 6.6 · Banco de exámenes oficiales
     ListBankExamsUseCase,
     UploadBankExamUseCase,
@@ -494,6 +495,7 @@ export function buildContainer() {
         getJobStatus: new GetJobStatusUseCase(motorAiClient),
         getSessionQuestions: new GetSessionQuestionsUseCase(motorAiClient),
         postSessionAnswer: new PostSessionAnswerUseCase(motorAiClient),
+        getTopicsInventory: new GetTopicsInventoryUseCase(motorAiClient, getCursoIdUseCase),
         // Bloque 6.6 · Banco de exámenes oficiales (Motor IA). Todos aceptan
         // motorAiClient=undefined y lanzan MOTOR_UNAVAILABLE si es null → 503.
         listBankExams: new ListBankExamsUseCase(motorAiClient, getCursoIdUseCase, trainingRepo),
@@ -663,6 +665,7 @@ export function buildContainer() {
         getJobStatus: useCases.getJobStatus,
         getSessionQuestions: useCases.getSessionQuestions,
         postSessionAnswer: useCases.postSessionAnswer,
+        getTopicsInventory: useCases.getTopicsInventory,
         // Bloque 6.6 · Banco de exámenes oficiales
         listBankExams: useCases.listBankExams,
         uploadBankExam: useCases.uploadBankExam,

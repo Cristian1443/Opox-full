@@ -70,3 +70,22 @@ export class PostSessionAnswerUseCase {
         return this.motor.postSessionAnswer(input);
     }
 }
+
+/**
+ * Inventario de temas (Motor v1.6.0). Informativo para el picker del Generador
+ * Infinito — avisa "pocas preguntas disponibles" por tema. No afecta la
+ * generación en sí; si el Motor no está configurado, el controller cae a
+ * "sin datos" en lugar de 503 (no es una feature crítica del flujo de test).
+ */
+export class GetTopicsInventoryUseCase {
+    constructor(
+        private readonly motor: MotorAiClient | undefined,
+        private readonly getCursoId: GetCursoIdUseCase,
+    ) {}
+
+    async execute(input: { oposicion: string | null; userId?: string }) {
+        if (!this.motor) throw new Error('MOTOR_UNAVAILABLE');
+        const cursoId = await this.getCursoId.execute(input.oposicion);
+        return this.motor.getTopicsInventory(cursoId, input.userId);
+    }
+}

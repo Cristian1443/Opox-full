@@ -8,16 +8,16 @@ import { trainingApi } from '../api';
 //
 // Ciclo de vida:
 //  1. GET /training/job/:jobId cada `intervalMs` (default 1500ms).
-//  2. Cuando `progress.done >= 1` y hay sessionId, dispara GET /training/session/:sessionId
-//     y agrega las nuevas preguntas al array (dedupe por id).
+//  2. En cada tick, si ya hay sessionId, dispara GET /training/session/:sessionId
+//     y agrega las nuevas preguntas al array (dedupe por id) — sin esperar
+//     ninguna señal de progreso del Motor, que no es confiable (ver abajo).
 //  3. Cuando `status === 'done'`, detiene el polling.
 //  4. Timeout total `timeoutMs` (default 360 s). Al agotarse marca `error='TIMEOUT'`.
 //
 // El hook expone `postAnswer(questionId, optionIndex)` para enviar respuestas
 // mientras el motor sigue generando (postSessionAnswer del backend).
 
-// Intervalo bajado a 1.5 s (antes 2.5 s) — el contador "N de M preguntas"
-// avanza ~40 % más rápido, reduce la sensación de "no pasa nada".
+// Intervalo bajado a 1.5 s (antes 2.5 s) — descubre preguntas nuevas más rápido.
 // Timeout subido a 360 s (antes 180 s) tras barrido de rendimiento:
 // n=30 media null tarda ~191 s en el Motor, n=50 supera los 300 s con
 // frecuencia. Con 180 s el usuario veía "El motor está tardando más
@@ -27,16 +27,6 @@ import { trainingApi } from '../api';
 const DEFAULT_INTERVAL_MS = 1500;
 const DEFAULT_TIMEOUT_MS = 360_000;
 
-// Ritmo de progreso simulado (G02(A) — INFORME_GENERADOR_INFINITO.md).
-// El Motor A VECES publica `progress.done` incremental (batches cada ~30-60s
-// según barrido de replay 2026-09-18: 3→7→11→15→21→27) pero otras se queda
-// en 0 hasta el final. Usamos progreso simulado como fallback: si el Motor
-// publica real más rápido, el `max(real, simulado)` prevalece. Si no, el
-// usuario ve algo moviéndose en vez de "0 de 30" durante 3 min.
-// Datos: n=10 → 73 s, n=20 → 135 s, n=30 → 191 s (~6.4 s/pregunta).
-// Usamos 7 s para quedarnos ligeramente por debajo de la realidad.
-const SIMULATED_STEP_MS = 7000;
-
 export function useTestSession(jobId, opts = {}) {
     const intervalMs = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -45,11 +35,10 @@ export function useTestSession(jobId, opts = {}) {
     const requestedTopicId = opts.requestedTopicId ?? null;
 
     const [questions, setQuestions] = useState([]);
-    // Progreso real del Motor (rara vez se actualiza incremental).
+    // Progreso real del Motor (rara vez se actualiza incremental — se guarda
+    // solo por si el caller lo necesita, pero el "done" que se EXPONE al
+    // usuario es `questions.length`, ver más abajo).
     const [realProgress, setRealProgress] = useState({ done: 0, total: expectedTotal });
-    // Progreso simulado — corre en paralelo mientras el Motor genera.
-    // Nunca supera `total - 1` para dejar la "última pregunta" a la señal real.
-    const [simulatedDone, setSimulatedDone] = useState(0);
     const [status, setStatus] = useState('idle'); // idle → running → done | error
     const [error, setError] = useState(null);
     const [sessionId, setSessionId] = useState(null);
@@ -90,12 +79,19 @@ export function useTestSession(jobId, opts = {}) {
             if (job?.sessionId && sessionIdRef.current !== job.sessionId) setSessionId(job.sessionId);
 
             // El Motor no siempre publica progreso incremental; `progress.done`
-            // puede quedarse en 0 hasta que el job termina. Refrescamos las
-            // preguntas cuando (a) hay progreso publicado ≥ 1, o (b) el job
-            // ya está en 'done' — en ambos casos el sessionId debe existir.
+            // puede quedarse en 0 hasta que el job termina, aunque ya haya
+            // preguntas reales disponibles en la sesión. Antes solo se
+            // consultaba `getSessionQuestions` cuando `progress.done >= 1`,
+            // así que en esos casos NUNCA se descubrían las preguntas ya
+            // generadas hasta el final del job — el cliente pedía
+            // explícitamente arrancar con 1-2 preguntas listas, no esperar.
+            // Fix: consultar en cada tick en cuanto exista sessionId, sin
+            // esperar la señal de progreso (que puede no llegar a tiempo o
+            // nunca). getSessionQuestions ya es barata y devuelve array
+            // vacío si la sesión aún no tiene nada.
             const sid = job?.sessionId ?? sessionIdRef.current;
             const jobDone = job?.status === 'done';
-            if (sid && (job?.progress?.done >= 1 || jobDone)) {
+            if (sid) {
                 const { data: sess } = await trainingApi.getSessionQuestions(sid, {
                     temaIds: requestedTopicId || undefined,
                     done: jobDone,
@@ -128,40 +124,21 @@ export function useTestSession(jobId, opts = {}) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [jobId]);
 
-    // Progreso SIMULADO — corre en paralelo mientras el status sea 'running'.
-    // Se detiene al llegar a `total - 1` (deja el último salto para la señal
-    // real cuando el job entra en 'done'). Solo se activa si conocemos el
-    // total (via `expectedTotal` del caller o `progress.total` del Motor).
-    useEffect(() => {
-        if (status !== 'running') return undefined;
-        const total = realProgress.total || expectedTotal;
-        if (total <= 1) return undefined;
-        const id = setInterval(() => {
-            setSimulatedDone((prev) => (prev < total - 1 ? prev + 1 : prev));
-        }, SIMULATED_STEP_MS);
-        return () => clearInterval(id);
-    }, [status, realProgress.total, expectedTotal]);
-
-    // Al terminar (status === 'done'), completar el progreso visual al 100%.
-    useEffect(() => {
-        if (status === 'done') {
-            const total = realProgress.total || expectedTotal;
-            if (total > 0) setSimulatedDone(total);
-        }
-    }, [status, realProgress.total, expectedTotal]);
-
     const postAnswer = async (questionId, optionIndex) => {
         if (!sessionId) return null;
         const { data } = await trainingApi.postSessionAnswer(sessionId, { questionId, optionIndex });
         return data ?? null;
     };
 
-    // El `progress.done` expuesto es el mayor entre el real y el simulado.
-    // Así, si el Motor SÍ publica progreso incremental (caso raro pero posible),
-    // se muestra el real; si no, se muestra el simulado.
-    const displayedDone = Math.max(realProgress.done || 0, simulatedDone);
-    const displayedTotal = realProgress.total || expectedTotal;
-    const progress = { done: displayedDone, total: displayedTotal };
+    // El "done" expuesto es SIEMPRE `questions.length` — el número real de
+    // preguntas ya cargadas y listas para mostrar, nunca una estimación.
+    // Antes se mostraba un progreso simulado que avanzaba solo con el reloj
+    // (independiente de si el Motor había generado algo de verdad), y podía
+    // decir "8 de 10 listas" cuando en realidad solo había 2 — confuso y
+    // contradecía al DeficitWarningModal cuando el Motor entregaba menos de
+    // lo pedido. `questions.length` nunca puede mentir: es exactamente lo
+    // que el usuario puede ver y responder ahora mismo.
+    const progress = { done: questions.length, total: realProgress.total || expectedTotal };
 
     return { questions, progress, status, error, sessionId, postAnswer, deficit };
 }

@@ -234,13 +234,21 @@ export class TutorController {
                 res.status(400).json({ ok: false, error: { code: 'invalid-filename', message: 'Filename inválido' } });
                 return;
             }
-            const upstream = await this.deps.proxyPodcastAudio.execute(filename);
-            if (upstream.status !== 200 || !upstream.body) {
+            // Reenvía Range al Motor (bug seek podcast — ver PodcastUseCases.ts).
+            const rangeHeader = req.headers.range;
+            const upstream = await this.deps.proxyPodcastAudio.execute(filename, rangeHeader);
+            if ((upstream.status !== 200 && upstream.status !== 206) || !upstream.body) {
                 res.status(upstream.status).end();
                 return;
             }
+            res.status(upstream.status);
             res.setHeader('Content-Type', upstream.contentType);
             res.setHeader('Cache-Control', 'public, max-age=3600');
+            // Pass-through honesto: solo se anuncian estas cabeceras si el Motor
+            // realmente las mandó — no se inventa soporte de Range que no existe.
+            if (upstream.acceptRanges) res.setHeader('Accept-Ranges', upstream.acceptRanges);
+            if (upstream.contentLength) res.setHeader('Content-Length', upstream.contentLength);
+            if (upstream.contentRange) res.setHeader('Content-Range', upstream.contentRange);
             // Stream chunks del web-standard ReadableStream a Express (Node stream).
             const reader = upstream.body.getReader();
             const pump = async (): Promise<void> => {

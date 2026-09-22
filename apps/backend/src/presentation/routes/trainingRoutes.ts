@@ -156,6 +156,12 @@ export function createTrainingRouter(
         controller.listTopics,
     );
 
+    r.get(
+        API_ROUTES.TRAINING.TOPICS_INVENTORY,
+        authMiddleware,
+        controller.getTopicsInventory,
+    );
+
     r.post(
         API_ROUTES.TRAINING.LAW_VIEW,
         authMiddleware,

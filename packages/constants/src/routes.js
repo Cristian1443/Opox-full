@@ -84,6 +84,7 @@ export const API_ROUTES = {
         MOCK_PROGRESS:      '/training/mocks/progress',
         LAW_VIEW:           '/training/law-view',
         TOPICS:             '/training/topics',
+        TOPICS_INVENTORY:   '/training/topics-inventory',
         LEVEL_TEST:         '/training/level-test',
         // Banco de exámenes oficiales (Bloque 6.6 · Motor IA)
         BANK_EXAMS:         '/training/bank/exams',

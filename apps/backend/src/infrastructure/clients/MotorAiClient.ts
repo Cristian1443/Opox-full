@@ -24,6 +24,7 @@ import type {
     StartBankMockRequest,
     StartBankMockResponse,
     BankMockResultDTO,
+    TopicInventoryDTO,
 } from '@opox/types';
 import { logger } from '@opox/utils';
 
@@ -704,6 +705,33 @@ export class MotorAiClient implements AiApiContract {
                 anio: Number(e.anio ?? 0),
                 fuente,
                 nPreguntas: Number(e.n_preguntas ?? 0),
+            };
+        });
+    }
+
+    /**
+     * Inventario de temas del Motor (v1.6.0 · GET /v1/courses/{curso_id}/topics-inventory).
+     * Con `userId` descuenta las preguntas que ese usuario ya contestó. Usado solo
+     * para informar al picker de temas — nunca bloquea ni cambia el flujo de generación.
+     */
+    async getTopicsInventory(cursoId: string, userId?: string): Promise<TopicInventoryDTO[]> {
+        const qs = userId ? `?user_id=${encodeURIComponent(userId)}` : '';
+        const res = await this.http.get<unknown[]>(
+            `/v1/courses/${encodeURIComponent(cursoId)}/topics-inventory${qs}`,
+        );
+        const list = Array.isArray(res.data) ? res.data : [];
+        return list.map((raw) => {
+            const e = raw as Record<string, unknown>;
+            return {
+                topicId: String(e.topic_id ?? ''),
+                title: String(e.title ?? ''),
+                blockId: e.block_id != null ? String(e.block_id) : null,
+                pages: Number(e.pages ?? 0),
+                chunks: Number(e.chunks ?? 0),
+                questionsAvailable: Number(e.questions_available ?? 0),
+                byDifficulty: (e.by_difficulty as Record<string, number> | undefined) ?? {},
+                estimatedCapacity: Number(e.estimated_capacity ?? 0),
+                healthyPool: Boolean(e.healthy_pool),
             };
         });
     }

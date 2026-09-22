@@ -127,20 +127,37 @@ export class GeneratePodcastUseCase {
 // El mp3 vive en el Motor tras auth con X-API-Key (+ X-OpenAI-Key en generación,
 // pero el GET del audio ya no la exige). Este use case devuelve {status, headers, body}
 // para que el controller haga stream al cliente.
+//
+// Reenvía el header `Range` del cliente al Motor (2026-09-21 · bug seek podcast):
+// expo-audio (AVPlayer/ExoPlayer) necesita 206 Partial Content + Content-Range
+// para poder saltar en el audio — sin esto el reproductor solo puede ir de
+// principio a fin. Este proxy queda listo en cuanto el Motor soporte Range;
+// mientras tanto, si el Motor ignora el header, simplemente sigue devolviendo
+// 200 completo como antes (pass-through honesto, no se inventan cabeceras).
 export class ProxyPodcastAudioUseCase {
     constructor(
         private readonly motorBaseUrl: string,
         private readonly motorApiKey: string,
     ) {}
 
-    async execute(filename: string): Promise<{ status: number; contentType: string; body: ReadableStream | null }> {
+    async execute(filename: string, rangeHeader?: string): Promise<{
+        status: number;
+        contentType: string;
+        contentLength: string | null;
+        contentRange: string | null;
+        acceptRanges: string | null;
+        body: ReadableStream | null;
+    }> {
         const url = `${this.motorBaseUrl.replace(/\/$/, '')}/v1/classroom/podcast/${encodeURIComponent(filename)}`;
-        const res = await fetch(url, {
-            headers: { 'X-API-Key': this.motorApiKey },
-        });
+        const headers: Record<string, string> = { 'X-API-Key': this.motorApiKey };
+        if (rangeHeader) headers['Range'] = rangeHeader;
+        const res = await fetch(url, { headers });
         return {
             status: res.status,
             contentType: res.headers.get('content-type') ?? 'audio/mpeg',
+            contentLength: res.headers.get('content-length'),
+            contentRange: res.headers.get('content-range'),
+            acceptRanges: res.headers.get('accept-ranges'),
             body: res.body,
         };
     }
