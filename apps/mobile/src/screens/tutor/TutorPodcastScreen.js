@@ -396,23 +396,28 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast, navigation }) {
     const waveAnim            = useRef(new Animated.Value(0)).current;
     const waveLoop            = useRef(null);
 
-    // Activa reproducción en segundo plano + silencioso (2026-09-22 · bug
-    // "salgo de la app y no puedo seguir escuchando"). El plugin nativo
-    // (app.json → expo-audio, enableBackgroundPlayback:true por defecto) ya
-    // agrega UIBackgroundModes:audio en iOS y el foreground service en
-    // Android, pero sin este setAudioModeAsync() el módulo nunca activa esa
-    // sesión de audio — iOS suspende el player en cuanto la app pasa a
-    // segundo plano. Solo aplica en un build nativo real (EAS/APK); Expo Go
-    // no puede probarlo porque su binario no trae el plugin de este proyecto.
+    // Reproducción en segundo plano DESACTIVADA (2026-09-24 · regresión
+    // confirmada en dispositivo). `shouldPlayInBackground: true` solo tiene
+    // efecto real en un build nativo (EAS/APK) — Expo Go no lo aplica. En
+    // Android, al activarse enruta la reproducción a través de un servicio
+    // con sesión de medios (para notificación / pantalla de bloqueo). Ese
+    // servicio evalúa `player.isLive` y, si lo detecta como "en vivo", retira
+    // el comando de seek del reproductor (expo-audio,
+    // AudioControlsService.kt:323-336, `COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM`).
+    // Los mp3 que genera el Motor son VBR sin cabecera Xing/VBRI (ver
+    // INFORME_PODCAST_BUGS.md) y ExoPlayer puede fallar al calcular su
+    // duración exacta con ese formato, lo que dispara ese detector de "en
+    // vivo" por error — bloqueando el seek SOLO en build nativo, nunca en
+    // Expo Go. Confirmado en dispositivo: con reproducción en segundo plano
+    // desactivada, el seek vuelve a funcionar. Se prioriza el seek (uso
+    // constante) sobre seguir escuchando con la app en background (uso
+    // ocasional) hasta que el Motor entregue el mp3 con cabecera de seek.
     useEffect(() => {
         setAudioModeAsync({
             playsInSilentMode: true,
-            shouldPlayInBackground: true,
+            shouldPlayInBackground: false,
             interruptionMode: 'doNotMix',
         }).catch(() => {});
-        return () => {
-            setAudioModeAsync({ shouldPlayInBackground: false }).catch(() => {});
-        };
     }, []);
 
     const isPlaying = status?.playing ?? false;
