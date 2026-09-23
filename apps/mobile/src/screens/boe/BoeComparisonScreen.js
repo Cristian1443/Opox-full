@@ -47,12 +47,12 @@ const MOCK_COMPARISON = {
         subtitle: 'Boletín Oficial del Estado',
         before: {
             segments: [
-                { type: 'normal', content: 'Texto de la redacción anterior disponible tras conectar el backend.' },
+                { type: 'normal', content: 'Texto de la redacción anterior no disponible por ahora.' },
             ],
         },
         after: {
             segments: [
-                { type: 'normal', content: 'Texto de la redacción vigente disponible tras conectar el backend.' },
+                { type: 'normal', content: 'Texto de la redacción vigente no disponible por ahora.' },
             ],
         },
     },

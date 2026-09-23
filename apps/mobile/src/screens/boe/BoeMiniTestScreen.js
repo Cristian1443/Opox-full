@@ -187,7 +187,7 @@ export default function BoeMiniTestScreen({ route, navigation }) {
                     <Ionicons name="time-outline" size={52} color={colors.purple} style={{ marginBottom: 20 }} />
                     <Text style={styles.stateTitle}>Preguntas en preparación</Text>
                     <Text style={styles.stateBody}>
-                        El Motor IA está regenerando las preguntas afectadas por este cambio. Vuelve en unos minutos.
+                        Estamos preparando las preguntas afectadas por este cambio. Vuelve en unos minutos.
                     </Text>
                     <TouchableOpacity style={styles.stateBtn} onPress={() => navigation.goBack()}>
                         <Text style={styles.stateBtnText}>Volver</Text>

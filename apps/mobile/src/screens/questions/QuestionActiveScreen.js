@@ -642,7 +642,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
           {streamHasError ? (
             <>
               <Text style={{ fontSize: 15, color: colors.textDark, textAlign: 'center', marginBottom: 16, paddingHorizontal: 20 }}>
-                El motor está tardando más de lo normal.{'\n'}
+                Esto está tardando más de lo normal.{'\n'}
                 Prueba con menos preguntas o vuelve a intentar.
               </Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -700,7 +700,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
             Cargando pregunta {currentIndex + 1}…
           </Text>
           <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 6, textAlign: 'center' }}>
-            El Motor sigue generando. Espera unos segundos.
+            Se sigue generando. Espera unos segundos.
           </Text>
           <TouchableOpacity
             style={{ marginTop: 20, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: colors.selectionBorder, borderRadius: 10 }}
@@ -781,7 +781,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
             <Text style={styles.progressSubLabel}>
               {answeredCount} de {total} respondidas
               {streamStoppedWithData && expectedTotal > questions.length
-                ? ` · Motor entregó ${questions.length} de ${expectedTotal}`
+                ? ` · Se generaron ${questions.length} de ${expectedTotal}`
                 : ''}
             </Text>
           </View>
@@ -965,7 +965,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
                 disabled={!canGoForward}
               >
                 <Text style={[styles.skipLinkText, !canGoForward && { opacity: 0.4 }]}>
-                  {canGoForward ? 'Saltar por ahora →' : 'Esperando al Motor…'}
+                  {canGoForward ? 'Saltar por ahora →' : 'Preparando siguiente…'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -983,7 +983,9 @@ export default function QuestionActiveScreen({ navigation, route }) {
           // no hace nada por dentro (guard `currentIndex+1 >= questions.length`).
           // Sin este estado visual el botón parece colgado — el usuario lo
           // reporta como "se está demorando mucho" cuando en realidad está
-          // esperando al Motor (bug detectado en pruebas en vivo, 2026-09-22).
+          // esperando la siguiente pregunta (bug detectado en pruebas en
+          // vivo, 2026-09-22). Copy sin jerga técnica (2026-09-24): el
+          // usuario final no sabe qué es "el Motor" ni le interesa.
           <TouchableOpacity
             style={[styles.mainBtn, !canGoForward && styles.mainBtnDisabled]}
             onPress={handleNext}
@@ -995,7 +997,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <ActivityIndicator color={colors.white} size="small" />
-                <Text style={styles.mainBtnText}>Esperando al Motor…</Text>
+                <Text style={styles.mainBtnText}>Preparando siguiente…</Text>
               </View>
             )}
           </TouchableOpacity>

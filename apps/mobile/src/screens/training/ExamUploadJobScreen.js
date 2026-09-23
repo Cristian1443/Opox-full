@@ -70,7 +70,7 @@ export default function ExamUploadJobScreen({ navigation, route }) {
             }
             if (data.status === 'error') {
                 setStatus('error');
-                setErrorMsg(data.error || 'El trabajo falló en el Motor.');
+                setErrorMsg(data.error || 'No se pudo procesar el examen.');
                 return;
             }
 
@@ -129,7 +129,7 @@ export default function ExamUploadJobScreen({ navigation, route }) {
                         <ActivityIndicator color={COLORS.orange} size="large" />
                         <Text style={styles.processingTitle}>Procesando examen…</Text>
                         <Text style={styles.processingDesc}>
-                            El Motor está leyendo el archivo, extrayendo las preguntas y clasificándolas
+                            Estamos leyendo el archivo, extrayendo las preguntas y clasificándolas
                             por tema. Suele tardar entre 30 y 90 segundos.
                         </Text>
                     </View>

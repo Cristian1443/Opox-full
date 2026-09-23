@@ -1,8 +1,10 @@
-// Modal que se muestra al usuario cuando el Motor entregó menos preguntas
-// de las pedidas (G08 · INFORME_GENERADOR_INFINITO.md). Motor pierde
-// silenciosamente 7 de 10 preguntas por descartes internos (hecho_ya_preguntado,
-// tope_minado, etc.) y sin este aviso el usuario empieza un test de 3
-// preguntas creyendo que pidió 10.
+// Modal que se muestra al usuario cuando se entregaron menos preguntas
+// de las pedidas (G08 · INFORME_GENERADOR_INFINITO.md). A veces se pierden
+// preguntas por descartes internos del generador y sin este aviso el
+// usuario empieza un test de 3 preguntas creyendo que pidió 10.
+// Copy sin jerga técnica (2026-09-24): nunca mostrar códigos internos
+// (hecho_ya_preguntado, tope_minado, etc.) ni mencionar "el Motor" — el
+// usuario final no sabe qué es eso ni le interesa.
 //
 // Diseño:
 //   - Backdrop no clickable (usuario debe reconocer y elegir)
@@ -26,10 +28,7 @@ function reasonLabel(reason) {
 
 export default function DeficitWarningModal({ visible, deficit, onProceed, onCancel }) {
     if (!deficit) return null;
-    const { requested, delivered, reason, motivos } = deficit;
-    const topMotivo = motivos
-        ? Object.entries(motivos).sort((a, b) => b[1] - a[1])[0]
-        : null;
+    const { requested, delivered, reason } = deficit;
 
     const reasonLine = reasonLabel(reason);
 
@@ -53,10 +52,7 @@ export default function DeficitWarningModal({ visible, deficit, onProceed, onCan
 
                     <Text style={styles.body}>
                         {reasonLine ??
-                            'El Motor no pudo generar todas las preguntas que pediste con la selección actual.'}
-                        {topMotivo && topMotivo[1] > 5
-                            ? `\n\nLa causa principal: ${topMotivo[1]} candidatas descartadas por "${topMotivo[0].replace(/_/g, ' ')}".`
-                            : ''}
+                            'No pudimos generar todas las preguntas que pediste con la selección actual.'}
                     </Text>
 
                     <TouchableOpacity

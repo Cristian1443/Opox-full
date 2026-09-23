@@ -823,7 +823,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                         <View style={styles.slowWarningRow}>
                             <Ionicons name="time-outline" size={14} color={COLORS.grayText} />
                             <Text style={styles.slowWarningText}>
-                                El Motor puede estar arrancando tras un rato sin uso. Puede tardar hasta 3 min — por favor espera…
+                                Puede tardar hasta 3 min si la app llevaba un rato sin usarse — por favor espera…
                             </Text>
                         </View>
                     )}
