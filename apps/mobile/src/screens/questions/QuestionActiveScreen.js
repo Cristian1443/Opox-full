@@ -265,6 +265,22 @@ export default function QuestionActiveScreen({ navigation, route }) {
   // (resumeAnswers), se normaliza para garantizar el length correcto.
   const [answers, setAnswers] = useState(() => resumeAnswers ?? []);
   const [showAbandonModal, setShowAbandonModal] = useState(false);
+  // Bug reportado por Javier (2026-09-23): el back del sistema Android
+  // (gesto o botón físico) no disparaba AbandonTestModal — solo el botón
+  // de header lo hacía manualmente, así que el usuario podía salir del
+  // test sin confirmar. `beforeRemove` intercepta CUALQUIER intento de
+  // salir (header, gesto, botón físico) por igual. `allowExitRef` deja
+  // pasar las salidas ya decididas (terminar test, confirmar abandono,
+  // etc.) para no mostrar el modal dos veces.
+  const allowExitRef = useRef(false);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (allowExitRef.current) return;
+      e.preventDefault();
+      setShowAbandonModal(true);
+    });
+    return unsubscribe;
+  }, [navigation]);
   const [showTimeUpModal, setShowTimeUpModal] = useState(false);
   const [showFinishConfirmModal, setShowFinishConfirmModal] = useState(false);
   const [toast, setToast] = useState(null);
@@ -610,6 +626,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
     if (source === 'official' && mockExamId) {
       trainingApi.clearMockProgress().catch(() => {});
     }
+    allowExitRef.current = true;
     navigation.replace('TrainingResult', {
       source, mockExamId, answers, questions, elapsedSeconds,
       challengeId, clanId, taskId, requestedTopicId,
@@ -648,13 +665,13 @@ export default function QuestionActiveScreen({ navigation, route }) {
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <TouchableOpacity
                   style={{ backgroundColor: colors.ctaGreen, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
-                  onPress={() => navigation.goBack()}
+                  onPress={() => { allowExitRef.current = true; navigation.goBack(); }}
                 >
                   <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Volver</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ backgroundColor: colors.selectionBorder, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
-                  onPress={() => navigation.replace('GeneratorConfig')}
+                  onPress={() => { allowExitRef.current = true; navigation.replace('GeneratorConfig'); }}
                 >
                   <Text style={{ color: colors.white, fontSize: 14, fontWeight: '600' }}>Reintentar</Text>
                 </TouchableOpacity>
@@ -1158,7 +1175,13 @@ export default function QuestionActiveScreen({ navigation, route }) {
         onStay={() => setShowAbandonModal(false)}
         onConfirmExit={() => {
           setShowAbandonModal(false);
-          navigation.navigate('TrainingHome');
+          allowExitRef.current = true;
+          // goBack() en vez de navigate('TrainingHome') — antes cada salida
+          // apilaba una TrainingHome nueva sobre la pila (el historial "iba
+          // hacia adelante" en vez de retroceder de verdad, bug reportado
+          // por Javier). goBack() vuelve a la pantalla real de origen,
+          // sea cual sea (TrainingHome, PlanningToday, Challenges, etc.).
+          navigation.goBack();
         }}
       />
 
@@ -1172,6 +1195,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
         onCancel={() => {
           setShowDeficitModal(false);
           setDeficitAcknowledged(true);
+          allowExitRef.current = true;
           navigation.goBack();
         }}
       />
@@ -1184,6 +1208,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
           if (source === 'official' && mockExamId) {
             trainingApi.clearMockProgress().catch(() => {});
           }
+          allowExitRef.current = true;
           navigation.replace('TrainingResult', { source, mockExamId, answers, questions, elapsedSeconds, challengeId, clanId, taskId, requestedTopicId });
         }}
       />
@@ -1231,6 +1256,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
                     if (source === 'official' && mockExamId) {
                       trainingApi.clearMockProgress().catch(() => {});
                     }
+                    allowExitRef.current = true;
                     navigation.replace('TrainingResult', {
                       source, mockExamId, answers: next, questions, elapsedSeconds,
                       challengeId, clanId, taskId, requestedTopicId,
@@ -1289,7 +1315,10 @@ export default function QuestionActiveScreen({ navigation, route }) {
         onExitAndSave={() => {
           setShowPauseModal(false);
           setIsPaused(false);
-          navigation.navigate('TrainingHome');
+          allowExitRef.current = true;
+          // Mismo fix que AbandonTestModal — goBack() en vez de navigate()
+          // para no apilar otra TrainingHome sobre la pila.
+          navigation.goBack();
         }}
       />
 
