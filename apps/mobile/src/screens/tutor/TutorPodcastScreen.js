@@ -183,7 +183,10 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
 
 // ─── 2) Configuración: duración + velocidad ─────────────────────────────────
 function PodcastConfig({ topic, oposicion, onGenerated, onBack }) {
-    const [duracion, setDuracion]     = useState('media');
+    // Default "corta" (2026-09-24): "media" tarda hasta 3 min en generarse
+    // (el guion es más largo, la síntesis de voz tarda proporcionalmente
+    // más) — el usuario percibía esa espera como "se demora demasiado".
+    const [duracion, setDuracion]     = useState('corta');
     const [velocidad, setVelocidad]   = useState(1.0);
     const [generating, setGenerating] = useState(false);
     const [error, setError]           = useState(null);
