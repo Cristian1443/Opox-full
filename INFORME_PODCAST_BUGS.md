@@ -43,6 +43,41 @@ Sin esa cabecera, ExoPlayer (Android) y probablemente AVPlayer (iOS) no pueden c
 
 **Cómo verificar**: los primeros ~1-2 KB del archivo deben contener la cadena ASCII `Xing`, `Info` o `VBRI` poco después del primer frame header MP3 (`0xFF 0xFx`).
 
+### Confirmación en dispositivo real (2026-09-23, panel de debug + `adb logcat`)
+
+Instrumentamos el reproductor (`expo-audio`/ExoPlayer en Android) con un panel de
+debug que expone el estado interno del player en vivo. Con un episodio ya
+reproduciéndose (mostrando "4:39" en la UI, calculado a partir del
+`duration_seconds` que manda el Motor — no del análisis real del archivo por
+parte del decoder), el estado interno del player mostró:
+
+```
+playbackState=ready · timeControlStatus=playing
+duration=0 · isLoaded=true
+
+17:51:29 skipBy(15) — currentTime=7.5 → pido 22.5
+17:51:29 skipBy OK — currentTime ahora=0.0
+17:51:33 skipBy(15) — currentTime=4.0 → pido 19.0
+17:51:33 skipBy OK — currentTime ahora=0.0
+17:51:36 skipBy(15) — currentTime=2.2 → pido 17.2
+17:51:36 skipBy OK — currentTime ahora=0.0
+17:51:38 skipBy(-15) — currentTime=1.6 → pido 0.0
+17:51:38 skipBy OK — currentTime ahora=0.0
+```
+
+**`duration=0` reportado por el propio ExoPlayer** — el decoder no logra calcular
+la duración real del archivo (confirma que le falta la cabecera Xing/VBRI, no es
+solo una sospecha por inspección de bytes). Cada llamada a `seekTo`/`skipBy`
+"funciona" (no lanza excepción, el SDK responde OK) pero el `currentTime`
+siempre queda en `0.0` sin importar la dirección o la posición pedida —
+comportamiento típico de un player que no puede posicionar un seek dentro de
+una duración desconocida y hace fallback a la posición inicial.
+
+Esto queda **confirmado en vivo en dispositivo real, no solo en teoría**: mientras
+el mp3 no traiga la cabecera de seek table (Xing/VBRI) o se codifique en CBR
+declarado, el seek seguirá roto sin importar qué tan bien soportemos HTTP Range
+de nuestro lado (que ya soportamos, verificado).
+
 ## Bug 2 — La duración real del audio no coincide con la pedida
 
 En la app el usuario elige entre "Corta (~5 min)" y "Media (~10 min)". Enviamos ese valor tal cual en el campo `duracion` del `PodcastIn` (`'corta'` o `'media'`).
