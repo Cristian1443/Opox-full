@@ -471,11 +471,29 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast, navigation }) {
         navigation?.setOptions({ gestureEnabled: false });
     }, [navigation]);
 
-    const handleSeek = useCallback((seconds) => {
+    // ── Panel de diagnóstico TEMPORAL (2026-09-23) ──────────────────────────
+    // Sin acceso a adb/logcat en ninguna de las dos máquinas, no hay forma de
+    // ver el error real de ExoPlayer. Este panel muestra en pantalla lo que
+    // pasa con cada intento de seek — quitar una vez encontrada la causa.
+    const [debugLog, setDebugLog] = useState([]);
+    const logDebug = useCallback((msg) => {
+        const line = `${new Date().toLocaleTimeString('es-ES', { hour12: false })} ${msg}`;
+        setDebugLog((prev) => [...prev.slice(-9), line]);
+    }, []);
+
+    const handleSeek = useCallback(async (seconds) => {
         const clamped = Math.max(0, Math.min(totalSecs, seconds));
-        player.seekTo(clamped);
+        const before = player.currentTime;
+        logDebug(`seekTo(${clamped.toFixed(1)}) — antes currentTime=${before?.toFixed?.(1)}`);
+        try {
+            await player.seekTo(clamped);
+            const after = player.currentTime;
+            logDebug(`seekTo OK — currentTime ahora=${after?.toFixed?.(1)}`);
+        } catch (e) {
+            logDebug(`seekTo ERROR: ${e?.message ?? String(e)}`);
+        }
         setElapsed(clamped);
-    }, [player, totalSecs]);
+    }, [player, totalSecs, logDebug]);
 
     // Al terminar, el player queda parado exactamente en el final — no hay
     // audio hacia adelante desde ahí, así que "play" no hacía nada (bug
@@ -496,14 +514,20 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast, navigation }) {
         player.play();
     }, [player, isPlaying, status, totalSecs]);
 
-    const skipBy = useCallback((delta) => {
+    const skipBy = useCallback(async (delta) => {
         // Leer currentTime directamente para no depender del estado elapsed (puede ser stale)
         const current = player.currentTime;
         const base = Number.isFinite(current) ? current : elapsed;
         const nextTime = Math.max(0, Math.min(totalSecs, base + delta));
-        player.seekTo(nextTime);
+        logDebug(`skipBy(${delta}) — currentTime=${current?.toFixed?.(1)} → pido ${nextTime.toFixed(1)}`);
+        try {
+            await player.seekTo(nextTime);
+            logDebug(`skipBy OK — currentTime ahora=${player.currentTime?.toFixed?.(1)}`);
+        } catch (e) {
+            logDebug(`skipBy ERROR: ${e?.message ?? String(e)}`);
+        }
         setElapsed(nextTime);
-    }, [player, elapsed, totalSecs]);
+    }, [player, elapsed, totalSecs, logDebug]);
 
     const scheduleSleep = useCallback((minutes) => {
         clearTimeout(sleepTimerRef.current);
@@ -624,6 +648,24 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast, navigation }) {
                         </Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Panel de diagnóstico TEMPORAL — quitar una vez resuelto el
+                    bug de seek en APK (ver handleSeek/skipBy). */}
+                <View style={styles.debugPanel}>
+                    <Text style={styles.debugTitle}>DEBUG (temporal)</Text>
+                    <Text style={styles.debugLine}>
+                        playbackState={String(status?.playbackState)} · timeControlStatus={String(status?.timeControlStatus)}
+                    </Text>
+                    <Text style={styles.debugLine}>
+                        reasonForWaitingToPlay={String(status?.reasonForWaitingToPlay)} · isBuffering={String(status?.isBuffering)}
+                    </Text>
+                    <Text style={styles.debugLine}>
+                        duration={String(status?.duration)} · isLoaded={String(status?.isLoaded)}
+                    </Text>
+                    {debugLog.map((line, i) => (
+                        <Text key={i} style={styles.debugLine}>{line}</Text>
+                    ))}
+                </View>
             </View>
 
             <Modal
@@ -715,6 +757,25 @@ const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
+    debugPanel: {
+        marginTop: spacing.md,
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#1A1A1A',
+        alignSelf: 'stretch',
+    },
+    debugTitle: {
+        color: '#FFB800',
+        fontSize: 10,
+        fontFamily: 'Poppins-SemiBold',
+        marginBottom: 4,
+    },
+    debugLine: {
+        color: '#6FE38C',
+        fontSize: 9,
+        fontFamily: 'Poppins-Regular',
+        lineHeight: 13,
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
