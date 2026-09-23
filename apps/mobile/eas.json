@@ -18,7 +18,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://opox-backend-x2mu.onrender.com",
+        "EXPO_PUBLIC_API_URL": "https://api.opox.ai",
         "EXPO_PUBLIC_SUPABASE_URL": "https://krqetttfdmnjjkxxdgij.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtycWV0dHRmZG1uampreHhkZ2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMzgxODUsImV4cCI6MjA5ODYxNDE4NX0.kl380eHJ9hl5YOeUkwSVYHJyH2E2VfBNVw_Z3WNVzZI"
       }
@@ -29,7 +29,7 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://opox-backend-x2mu.onrender.com",
+        "EXPO_PUBLIC_API_URL": "https://api.opox.ai",
         "EXPO_PUBLIC_SUPABASE_URL": "https://krqetttfdmnjjkxxdgij.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtycWV0dHRmZG1uampreHhkZ2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMzgxODUsImV4cCI6MjA5ODYxNDE4NX0.kl380eHJ9hl5YOeUkwSVYHJyH2E2VfBNVw_Z3WNVzZI"
       }
@@ -37,7 +37,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://opox-backend-x2mu.onrender.com",
+        "EXPO_PUBLIC_API_URL": "https://api.opox.ai",
         "EXPO_PUBLIC_SUPABASE_URL": "https://krqetttfdmnjjkxxdgij.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtycWV0dHRmZG1uampreHhkZ2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMzgxODUsImV4cCI6MjA5ODYxNDE4NX0.kl380eHJ9hl5YOeUkwSVYHJyH2E2VfBNVw_Z3WNVzZI"
       }
