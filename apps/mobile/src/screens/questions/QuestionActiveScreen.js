@@ -281,6 +281,16 @@ export default function QuestionActiveScreen({ navigation, route }) {
     });
     return unsubscribe;
   }, [navigation]);
+  // Fix iOS (2026-09-23): el gesto nativo de swipe-back de native-stack
+  // completa el pop A NIVEL NATIVO antes de que `beforeRemove` alcance a
+  // interceptarlo — React Navigation queda con la pantalla en su stack JS
+  // pero iOS ya la quitó, lo que produce el warning "removed natively but
+  // didn't get removed from JS state". Mismo patrón ya usado en
+  // GeneratorConfigScreen: se desactiva el gesto por completo para que la
+  // única salida posible sea el botón del header, que sí dispara el modal.
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: false });
+  }, [navigation]);
   const [showTimeUpModal, setShowTimeUpModal] = useState(false);
   const [showFinishConfirmModal, setShowFinishConfirmModal] = useState(false);
   const [toast, setToast] = useState(null);
