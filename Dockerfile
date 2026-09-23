@@ -24,7 +24,10 @@
 FROM node:22-alpine AS pruner
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
-RUN pnpm add -g turbo@2.3.3
+# npm en vez de `pnpm add -g` — pnpm exige configurar PNPM_HOME antes de
+# poder instalar paquetes globales (falla con ERR_PNPM_NO_GLOBAL_BIN_DIR en
+# un contenedor recién creado); npm no tiene ese requisito.
+RUN npm install -g turbo@2.3.3
 COPY . .
 RUN turbo prune @opox/backend --docker
 
