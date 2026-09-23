@@ -1,6 +1,6 @@
 # Reporte al equipo IA · Podcast del Aula Virtual (Bloque 8)
 
-**Fecha**: 2026-09-21 (actualizado 2026-09-23)
+**Fecha**: 2026-09-21 (actualizado 2026-09-23 — dos veces el mismo día, ver Bug 2)
 **Curso probado**: Policía Local de Galicia · temas 3 y 10
 **Endpoints afectados**: `POST https://ia.opox.ai/v1/classroom/podcast` (generación) y `GET https://ia.opox.ai/v1/classroom/podcast/{file}` (audio servido)
 **Origen del reporte**: pruebas en dispositivo del módulo Podcast, reproducible de forma consistente.
@@ -10,7 +10,7 @@
 Estado actualizado tras verificación en producción (2026-09-23):
 
 1. **Bug 1 — Seek roto: PARCIALMENTE resuelto.** El endpoint ya soporta HTTP Range (`206` correcto, confirmado con `curl`). Pero encontramos una **segunda causa, independiente**: el mp3 que genera el Motor no trae cabecera `Xing`/`VBRI`, así que los reproductores nativos (ExoPlayer en Android, y probablemente AVPlayer en iOS) no pueden calcular a qué byte saltar en un archivo de bitrate variable, aunque el servidor sí soporte Range. El seek sigue sin funcionar en el dispositivo por esta segunda causa. Ver detalle abajo.
-2. **Bug 2 — Duración real vs. pedida: prácticamente resuelto.** Verificamos una generación reciente con `duracion: 'corta'` → `duration_seconds: 303.84` contra un `target_seconds: 300` (0.9% de desvío, antes era 1.6-1.7× más largo). Gran mejora, dejamos la tabla original como referencia histórica.
+2. **Bug 2 — Duración real vs. pedida: NO resuelto, sigue habiendo desvío significativo (corregido el mismo día).** La medición de la mañana (`duration_seconds: 303.84` vs `target: 300`, 0.9%) resultó ser un caso puntual, no la norma. En pruebas posteriores del mismo día, con el mismo tema y `duracion: 'corta'`, obtuvimos **276.84 s** (objetivo 300 s, -7.7%), y en dispositivo el usuario midió **4:50** y **4:25** en dos generaciones consecutivas del mismo tema (-3.3% y -11.7% respectivamente). El desvío ya no es siempre "más largo" como documentamos originalmente — ahora varía en ambas direcciones y de forma inconsistente entre generaciones del mismo tema/tier. Dejamos la tabla original como referencia histórica.
 
 De nuestro lado ya desplegamos el proxy (`GET /tutor/podcast/audio/:filename`) reenviando `Range` y el método HTTP real (`HEAD` incluido — antes siempre hacíamos `GET`, lo que le hacía perder a Node las cabeceras `Content-Length`/`Accept-Ranges` en las respuestas a `HEAD`). Confirmado con `curl` en producción: `HEAD` y `GET` con `Range` responden correctamente. No requiere más cambios de nuestro lado para el soporte de Range — pero el seek sigue bloqueado por la falta de cabecera Xing/VBRI en el archivo.
 
@@ -58,9 +58,17 @@ El problema no es solo cosmético: para un usuario que elige "5 minutos" porque 
 
 **Sospecha (histórica)**: viene del guion generado por el LLM — más palabras de las que caben en el target según el WPM (palabras por minuto) de la voz de TTS usada.
 
-**Actualización 2026-09-23**: generamos un podcast nuevo (`duracion: 'corta'`, mismo curso) y medimos `duration_seconds: 303.84` contra `target_seconds: 300` — **0.9% de desvío**, dentro de lo razonable. Parece resuelto o muy mejorado. Dejamos la tabla y las sospechas originales como referencia por si el desvío grande reaparece en otras configuraciones (voz/velocidad distintas, temas más largos, etc.).
+**Actualización 2026-09-23 (mañana)**: generamos un podcast nuevo (`duracion: 'corta'`, mismo curso) y medimos `duration_seconds: 303.84` contra `target_seconds: 300` — **0.9% de desvío**. En ese momento pensamos que estaba resuelto.
 
-De nuestro lado ya usamos la duración real que ustedes devuelven (`duration_seconds`) en vez de un estimado fijo — antes lo ignorábamos y siempre mostrábamos 300s/600s según el tier pedido, lo cual generaba confusión adicional independiente de la precisión real del Motor.
+**Actualización 2026-09-23 (tarde) — el desvío reaparece, ahora hacia abajo**: un usuario probando en dispositivo (Tema 1, `duracion: 'corta'`, velocidad 1.0x) reportó dos generaciones consecutivas más cortas de lo esperado: **4:50** (290 s, -3.3%) y **4:25** (265 s, -11.7%). Reprodujimos el problema nosotros mismos llamando directamente a `POST /v1/classroom/podcast` con el mismo tema (`tema_id: 4f97d34a291646bf`, curso `ef7d941bea5f41d7`) y obtuvimos:
+
+```json
+{"resultado":{"duration_seconds":276.84,"target_seconds":300,"words":672}, "tokens_out":883}
+```
+
+**276.84 s contra 300 s objetivo (-7.7%)**. En menos de 12 horas vimos desvíos de +0.9%, -3.3%, -7.7% y -11.7% para el mismo tema y el mismo tier — el problema no está resuelto, es inestable. Sospechamos que sigue siendo el guion generado por el LLM (`words: 672` en esta corrida — si la meta son ~300s y el TTS ronda ~150 wpm, 672 palabras rinden ~4:29, coherente con los 276.84 s medidos: el guion mismo ya viene corto/largo de forma variable, no es un problema de la síntesis de voz). Sugerimos fijar un rango de palabras objetivo más estricto en el prompt del guion (o un paso de validación que regenere si el conteo de palabras se sale de ±5% del target) en vez de confiar en que el LLM lo calcule bien cada vez.
+
+De nuestro lado ya usamos la duración real que ustedes devuelven (`duration_seconds`) en vez de un estimado fijo — antes lo ignorábamos y siempre mostrábamos 300s/600s según el tier pedido, lo cual generaba confusión adicional independiente de la precisión real del Motor. Eso ya está bien de nuestro lado; lo que falta corregir es la precisión del guion/generación en el Motor.
 
 ## Cómo reproducir
 
