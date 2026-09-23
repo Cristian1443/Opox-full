@@ -1,0 +1,55 @@
+name: Build and push backend Docker image
+
+# Construye la imagen del backend (Dockerfile en la raíz, patrón turbo prune)
+# y la sube a GitHub Container Registry para que se pueda compartir con
+# `docker pull` sin depender de tener Docker instalado localmente.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'apps/backend/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/docker-backend.yml'
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: ghcr.io
+  # Nombre de imagen fijo en minúsculas — los tags de Docker no aceptan
+  # mayúsculas, y github.repository_owner puede venir con mayúsculas.
+  IMAGE_NAME: cristian1443/opox-backend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
