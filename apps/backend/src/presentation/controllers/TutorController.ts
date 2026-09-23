@@ -40,6 +40,7 @@ import type {
     TutorPodcastProgress,
     TutorSummary,
 } from '../../domain/entities';
+import type { PodcastAudioTranscoder } from '../../infrastructure/media/PodcastAudioTranscoder';
 
 function ok<T>(res: Response, status: number, data: T): void {
     res.status(status).json({ ok: true, data } satisfies ApiSuccessResponse<T>);
@@ -67,6 +68,7 @@ export class TutorController {
             getCursoId: GetCursoIdUseCase;
             generatePodcast: GeneratePodcastUseCase;
             proxyPodcastAudio?: ProxyPodcastAudioUseCase;
+            podcastAudioTranscoder: PodcastAudioTranscoder;
         },
     ) {}
 
@@ -219,10 +221,13 @@ export class TutorController {
         } catch (err) { next(err); }
     };
 
-    // Proxy stream del mp3 del Motor. Ruta pública — el filename es un hash aleatorio
-    // (podcast-[a-f0-9]{16,32}.mp3) que actúa como secreto compartido: solo lo conoce
-    // quien acaba de generar el podcast. Validamos el patrón para evitar path traversal
-    // y llamadas al Motor con paths arbitrarios.
+    // Sirve el mp3 del Motor, ya re-codificado a CBR con ffmpeg (ver
+    // PodcastAudioTranscoder — workaround del Bug 1b: el mp3 original del
+    // Motor no trae cabecera Xing/VBRI y ExoPlayer no puede hacer seek sobre
+    // él). Ruta pública — el filename es un hash aleatorio
+    // (podcast-[a-f0-9]{8,64}.mp3) que actúa como secreto compartido: solo lo
+    // conoce quien acaba de generar el podcast. Validamos el patrón para
+    // evitar path traversal y llamadas al Motor con paths arbitrarios.
     proxyPodcastAudio = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             if (!this.deps.proxyPodcastAudio) {
@@ -234,44 +239,24 @@ export class TutorController {
                 res.status(400).json({ ok: false, error: { code: 'invalid-filename', message: 'Filename inválido' } });
                 return;
             }
-            // Reenvía Range Y el método real al Motor (bug seek podcast — ver
-            // PodcastUseCases.ts). Antes un HEAD del reproductor se convertía
-            // siempre en GET, descargando el mp3 completo para nada.
-            const rangeHeader = req.headers.range;
-            const isHead = req.method === 'HEAD';
-            const upstream = await this.deps.proxyPodcastAudio.execute(filename, rangeHeader, isHead ? 'HEAD' : 'GET');
-            if (upstream.status !== 200 && upstream.status !== 206) {
-                res.status(upstream.status).end();
-                return;
+
+            const transcoder = this.deps.podcastAudioTranscoder;
+            if (!(await transcoder.isCached(filename))) {
+                // Primera petición para este archivo: hay que traerlo completo
+                // del Motor y re-codificarlo antes de poder responder nada
+                // (un HEAD/Range prematuro sobre el mp3 original solo
+                // reproduciría el bug que estamos arreglando).
+                const buffer = await this.deps.proxyPodcastAudio.fetchFullBuffer(filename);
+                await transcoder.ensureCached(filename, buffer);
             }
-            res.status(upstream.status);
-            res.setHeader('Content-Type', upstream.contentType);
+
             res.setHeader('Cache-Control', 'public, max-age=3600');
-            // Pass-through honesto: solo se anuncian estas cabeceras si el Motor
-            // realmente las mandó — no se inventa soporte de Range que no existe.
-            if (upstream.acceptRanges) res.setHeader('Accept-Ranges', upstream.acceptRanges);
-            if (upstream.contentLength) res.setHeader('Content-Length', upstream.contentLength);
-            if (upstream.contentRange) res.setHeader('Content-Range', upstream.contentRange);
-
-            // Un HEAD nunca lleva cuerpo — responder de una vez sin tocar el
-            // stream evita que Node cambie a Transfer-Encoding: chunked y
-            // descarte el Content-Length/Accept-Ranges que acabamos de setear.
-            if (isHead || !upstream.body) {
-                res.end();
-                return;
-            }
-
-            // Stream chunks del web-standard ReadableStream a Express (Node stream).
-            const reader = upstream.body.getReader();
-            const pump = async (): Promise<void> => {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    if (value) res.write(Buffer.from(value));
-                }
-                res.end();
-            };
-            await pump();
+            // `res.sendFile` (Express/`send`) maneja Range, HEAD, Accept-Ranges,
+            // Content-Length y 206 Partial Content nativamente sobre el archivo
+            // ya cacheado — no hace falta reenviar cabeceras a mano.
+            res.sendFile(transcoder.getCachePath(filename), (err) => {
+                if (err && !res.headersSent) next(err);
+            });
         } catch (err) { next(err); }
     };
 

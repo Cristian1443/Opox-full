@@ -191,6 +191,7 @@ import {
     HealthAiClient,
     WhatsAppNotificationClient,
     CourseSyncService,
+    PodcastAudioTranscoder,
 } from './infrastructure';
 import {
     HealthController,
@@ -393,6 +394,12 @@ export function buildContainer() {
     // veía el stub "Estoy consultando el temario…" en el APK.
     // Todos los endpoints del Motor exigen también X-OpenAI-Key (BYOK): reusamos
     // AI_API_KEY. Sin ella, cualquier llamada de generación falla con `falta_openai_key`.
+    // Workaround Bug 1b del podcast (ver INFORME_PODCAST_BUGS.md): el mp3 del
+    // Motor no trae cabecera Xing/VBRI y ExoPlayer no puede hacer seek sobre
+    // él. Re-codifica a CBR con ffmpeg y cachea en disco la primera vez que
+    // se pide cada archivo. Sin estado por request — un singleton alcanza.
+    const podcastAudioTranscoder = new PodcastAudioTranscoder();
+
     const motorTutor = isMotorConfigured
         ? new MotorTutorClient(
             env.MOTOR_API_BASE_URL!,
@@ -742,6 +749,7 @@ export function buildContainer() {
         getCursoId: useCases.getCursoId,
         generatePodcast: useCases.generatePodcast,
         proxyPodcastAudio: useCases.proxyPodcastAudio,
+        podcastAudioTranscoder,
     });
 
     const healthController = new HealthController({

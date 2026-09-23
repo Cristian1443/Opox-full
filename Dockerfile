@@ -51,6 +51,13 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 ENV NODE_ENV=production
 
+# ffmpeg: el mp3 que genera el Motor para el podcast del Aula Virtual no trae
+# cabecera Xing/VBRI, así que ExoPlayer no puede calcular su duración ni hacer
+# seek (confirmado en dispositivo real — ver INFORME_PODCAST_BUGS.md, Bug 1b).
+# PodcastAudioTranscoder re-codifica cada mp3 una vez a CBR (que sí trae esa
+# cabecera) invocando el binario `ffmpeg` vía child_process.
+RUN apk add --no-cache ffmpeg
+
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 opox
 

@@ -123,49 +123,38 @@ export class GeneratePodcastUseCase {
     }
 }
 
-// ─── Proxy audio del Motor (streaming) ────────────────────────────────────────
-// El mp3 vive en el Motor tras auth con X-API-Key (+ X-OpenAI-Key en generación,
-// pero el GET del audio ya no la exige). Este use case devuelve {status, headers, body}
-// para que el controller haga stream al cliente.
+// ─── Proxy audio del Motor ─────────────────────────────────────────────────
+// El mp3 vive en el Motor tras auth con X-API-Key. Antes este use case
+// reenviaba el header `Range` del cliente directo al Motor (streaming
+// pass-through) — necesario para que expo-audio pudiera pedir 206 Partial
+// Content. Pero el Motor genera el mp3 sin cabecera Xing/VBRI (Bug 1b,
+// INFORME_PODCAST_BUGS.md), así que aunque el Range funcionara, ExoPlayer no
+// podía calcular la duración real del archivo y el seek se reseteaba a 0.0
+// siempre — confirmado en dispositivo real con logs del propio reproductor.
 //
-// Reenvía el header `Range` del cliente al Motor (2026-09-21 · bug seek podcast):
-// expo-audio (AVPlayer/ExoPlayer) necesita 206 Partial Content + Content-Range
-// para poder saltar en el audio — sin esto el reproductor solo puede ir de
-// principio a fin. Este proxy queda listo en cuanto el Motor soporte Range;
-// mientras tanto, si el Motor ignora el header, simplemente sigue devolviendo
-// 200 completo como antes (pass-through honesto, no se inventan cabeceras).
+// Workaround (2026-09-23): en vez de hacer streaming pass-through, el
+// controller ahora usa `fetchFullBuffer` + `PodcastAudioTranscoder` para
+// descargar el mp3 completo una sola vez, re-codificarlo a CBR con ffmpeg
+// (que sí escribe la cabecera Xing) y cachearlo en disco. Las peticiones
+// (incluidas las de Range que dispara cada seek) se sirven desde ese archivo
+// ya arreglado vía `res.sendFile`, que maneja Range/HEAD nativamente.
 export class ProxyPodcastAudioUseCase {
     constructor(
         private readonly motorBaseUrl: string,
         private readonly motorApiKey: string,
     ) {}
 
-    async execute(filename: string, rangeHeader?: string, method: 'GET' | 'HEAD' = 'GET'): Promise<{
-        status: number;
-        contentType: string;
-        contentLength: string | null;
-        contentRange: string | null;
-        acceptRanges: string | null;
-        body: ReadableStream | null;
-    }> {
+    // Descarga el mp3 COMPLETO del Motor (sin Range) para poder re-codificarlo
+    // con ffmpeg antes de cachearlo — ver PodcastAudioTranscoder. Se usa solo
+    // la primera vez que se pide un filename; las siguientes peticiones se
+    // sirven desde el caché local.
+    async fetchFullBuffer(filename: string): Promise<Buffer> {
         const url = `${this.motorBaseUrl.replace(/\/$/, '')}/v1/classroom/podcast/${encodeURIComponent(filename)}`;
-        const headers: Record<string, string> = { 'X-API-Key': this.motorApiKey };
-        if (rangeHeader) headers['Range'] = rangeHeader;
-        // Bug real (2026-09-22): antes SIEMPRE se hacía GET al Motor sin
-        // importar el método original — un HEAD del reproductor (probe previo
-        // al seek) terminaba descargando el mp3 completo para nada, y encima
-        // el streaming de esa respuesta vía res.write() le hacía perder el
-        // Content-Length/Accept-Ranges que el controller intentaba setear
-        // (Node cambia a Transfer-Encoding: chunked). Reenviar el método real
-        // deja que el controller responda un HEAD sin cuerpo, limpio.
-        const res = await fetch(url, { headers, method });
-        return {
-            status: res.status,
-            contentType: res.headers.get('content-type') ?? 'audio/mpeg',
-            contentLength: res.headers.get('content-length'),
-            contentRange: res.headers.get('content-range'),
-            acceptRanges: res.headers.get('accept-ranges'),
-            body: res.body,
-        };
+        const res = await fetch(url, { headers: { 'X-API-Key': this.motorApiKey } });
+        if (!res.ok) {
+            throw new Error(`Motor devolvió ${res.status} al pedir el mp3 completo de ${filename}`);
+        }
+        const arrayBuffer = await res.arrayBuffer();
+        return Buffer.from(arrayBuffer);
     }
 }
