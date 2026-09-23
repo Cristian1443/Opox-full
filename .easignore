@@ -1,0 +1,78 @@
+# EAS Build usa este archivo EN VEZ de .gitignore para decidir qué subir al
+# builder. Es una copia deliberada de .gitignore, pero SIN excluir
+# google-services.json / GoogleService-Info.plist: esos archivos siguen sin
+# commitearse a git (evita exponer el API key de Firebase en el repo), pero
+# EAS Build sí los necesita localmente para compilar la app Android/iOS.
+# Ver apps/mobile/app.json → android.googleServicesFile.
+
+# dependencies
+node_modules/
+.pnpm-store/
+
+# Turborepo
+.turbo/
+
+# Build outputs
+dist/
+build/
+.expo/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.log*
+logs/
+*.log
+
+# macOS
+.DS_Store
+*.pem
+
+# env files (NUNCA commitear .env)
+.env
+.env.local
+.env.*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# tooling
+.mockups/
+
+# Materiales de trabajo (entregas del cliente + mockups extraídos)
+Lista de observaciones y mejoras*.docx
+mockups_bloque3/
+
+# Entornos de prueba locales (contienen credenciales, nunca subir)
+newman-env-*.json
+TESTING_*.md
+
+# Capturas de pantalla de sesiones de testing (referencia local, no commitear)
+screenshots/
+
+# Resultados JSON de los scripts de perf (se regeneran corriendo el script)
+apps/backend/scripts/perf_*.json
+apps/backend/scripts/perf_*.log
+# OpenAPI del Motor cacheado durante exploración (regenerable con curl)
+apps/mobile/motor_openapi.json
+# Materiales legales sueltos que caen a la raíz sin querer
+BOE-A-*.pdf
