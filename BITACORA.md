@@ -5,6 +5,35 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-24 — 3 gaps UX mobile · ranking hub, recta final y laboratorio
+
+Rama: `fix/podcast-seek-opo-toast`.
+
+**Gap 1 — Ranking en el hub de Motivación**: `DestacadoBanner` mostraba siempre
+`Ranking Global: -` y `Rank local: -` aunque el usuario sí apareciese en el ranking
+al entrar manualmente. Causa: `loadData` nunca llamaba a `motivationApi.getRanking`.
+Fix: `Promise.all` con 4 llamadas en paralelo (getSummary ×2 + getRanking('global') +
+getRanking('oposicion')); los resultados se muestran como `#N` o `'-'` si la llamada
+falla o el usuario aún no tiene posición.
+
+**Gap 2 — Tarea no aparecía tras activar recta final**: el botón "Activar recta final"
+en `PlanningHomeScreen` solo llamaba `updatePlan({ intensity: 'high' })` sin crear ninguna
+tarea. Fix: antes de navegar a `PlanningToday`, el handler carga la sesión del usuario,
+obtiene `oposicion`, consulta el primer tema disponible vía `boeApi.listTopics` y crea
+una tarea de test con `planningApi.createTask`. La tarea aparece inmediatamente en el hub
+de hoy gracias al `useFocusEffect` de `PlanningTodayScreen`.
+
+**Gap 3 — Botón sticky y dismiss en Laboratorio de errores**:
+- Botón "Iniciar test quirúrgico" movido fuera del `ScrollView` — queda fijo al fondo de la
+  pantalla con separador visual, igual que el patrón del Generador Infinito.
+- Nueva funcionalidad de ocultar tema: icono `×` en la cabecera de cada `WeaknessItem`.
+  Al pulsarlo aparece un `Alert.alert` de confirmación; si el usuario confirma, el tema
+  se persiste en `AsyncStorage('opox.lab.dismissed')` y desaparece del listado sin reload.
+  El dato persiste entre sesiones; se limpia automáticamente si el usuario vuelve a practicar
+  ese tema (la próxima vez que `listErrorPatterns` lo devuelva con datos nuevos).
+
+---
+
 ## 2026-09-24 — Alineación Motor IA · colección completa vs `MotorAiClient`
 
 Rama: `fix/podcast-seek-opo-toast`.
