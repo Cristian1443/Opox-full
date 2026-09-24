@@ -6,7 +6,6 @@ import {
     StatusBar,
     ScrollView,
     ActivityIndicator,
-    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TrainingHeader from '../../components/TrainingHeader';
+import AlertCardModal from '../../components/AlertCardModal';
 import { colors } from '../../theme';
 import { trainingApi } from '../../api/training';
 import { useFocusEffect } from '@react-navigation/native';
@@ -175,6 +175,7 @@ export default function ErrorLabScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('weak'); // 'weak' | 'mastered'
     const [dismissed, setDismissed] = useState(new Set());
+    const [dismissTarget, setDismissTarget] = useState(null); // topicId pendiente de confirmar
 
     useFocusEffect(useCallback(() => {
         let cancelled = false;
@@ -206,26 +207,20 @@ export default function ErrorLabScreen({ navigation }) {
     }, []));
 
     const handleDismiss = useCallback((topicId) => {
-        Alert.alert(
-            'Ocultar tema',
-            'Este tema dejará de aparecer en tu Laboratorio. Podrás recuperarlo si vuelves a practicarlo.',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Ocultar',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setDismissed((prev) => {
-                            const next = new Set(prev);
-                            next.add(topicId);
-                            AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])).catch(() => {});
-                            return next;
-                        });
-                    },
-                },
-            ],
-        );
+        setDismissTarget(topicId);
     }, []);
+
+    const performDismiss = useCallback(() => {
+        if (!dismissTarget) return;
+        const id = dismissTarget;
+        setDismissTarget(null);
+        setDismissed((prev) => {
+            const next = new Set(prev);
+            next.add(id);
+            AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])).catch(() => {});
+            return next;
+        });
+    }, [dismissTarget]);
 
     // Separación en dos grupos por umbral de dominio, excluyendo los ocultos.
     const visible_patterns = patterns.filter((p) => !dismissed.has(p.topicId));
@@ -332,6 +327,21 @@ export default function ErrorLabScreen({ navigation }) {
                     )}
                 </>
             )}
+
+            <AlertCardModal
+                visible={dismissTarget !== null}
+                icon={<Ionicons name="eye-off-outline" size={34} color={COLORS.purple} />}
+                iconBg="rgba(65,41,80,0.08)"
+                iconSize={72}
+                title="¿Ocultar este tema?"
+                description={'Dejará de aparecer en tu Laboratorio. Si vuelves a practicarlo, reaparecerá automáticamente.'}
+                primaryLabel="Ocultar"
+                primaryColor={COLORS.purple}
+                onPrimaryPress={performDismiss}
+                secondaryLabel="Cancelar"
+                secondaryVariant="link"
+                onSecondaryPress={() => setDismissTarget(null)}
+            />
         </SafeAreaView>
     );
 }
