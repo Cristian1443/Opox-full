@@ -139,10 +139,19 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     // ── Avanzar a la siguiente pregunta o finalizar ───────────────────────────
     function handleNext() {
         if (isLastQuestion) {
-            boeApi.completeMiniTest(itemId, scoreRef.current, total).catch(() => {});
-            navigation.navigate('BoeUpdateSuccess', {
-                articleRef: title ?? currentQ?.context ?? 'Actualización BOE',
-            });
+            boeApi.completeMiniTest(itemId, scoreRef.current, total)
+                .then(res => {
+                    navigation.navigate('BoeUpdateSuccess', {
+                        articleRef: title ?? currentQ?.context ?? 'Actualización BOE',
+                        pointsEarned: res?.data?.pointsEarned ?? 0,
+                    });
+                })
+                .catch(() => {
+                    navigation.navigate('BoeUpdateSuccess', {
+                        articleRef: title ?? currentQ?.context ?? 'Actualización BOE',
+                    });
+                });
+            return;
         } else {
             setCurrentIndex((i) => i + 1);
             setSelectedOptionIdx(null);

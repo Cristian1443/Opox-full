@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
     TouchableOpacity,
@@ -11,6 +11,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, spacing } from '../../theme';
 import { trainingApi, motivationApi, planningApi, boeApi } from '../../api';
+import OpoToast from '../../components/OpoToast';
 
 const OPTION_ID_TO_INDEX = { A: 0, B: 1, C: 2, D: 3 };
 
@@ -196,6 +197,7 @@ export default function TrainingResultScreen({ navigation, route }) {
   // Persiste el intento en el backend UNA SOLA VEZ al montar. Sin esto el
   // Laboratorio de Errores no tiene con qué calcular los patrones de fallo.
   const [boeUnread, setBoeUnread] = React.useState(0);
+  const [earnedPoints, setEarnedPoints] = useState(0);
 
   const savedRef = useRef(false);
   useEffect(() => {
@@ -223,11 +225,22 @@ export default function TrainingResultScreen({ navigation, route }) {
         durationSecs: elapsedSeconds,
         responses,
       })
+      .then(res => {
+        if (!res?.error && res?.data?.pointsEarned > 0) {
+          setEarnedPoints(res.data.pointsEarned);
+        }
+      })
       .catch(() => { /* no bloqueamos la UI si falla */ });
 
     // Si venimos de un reto de clan y superamos el umbral del 60%, completamos el reto.
     if (challengeId && clanId && percentage >= 60) {
-      motivationApi.completeChallenge(clanId, challengeId).catch(() => { });
+      motivationApi.completeChallenge(clanId, challengeId)
+        .then(res => {
+          if (!res?.error && (res?.data?.pointsEarned ?? 0) > 0 && !res?.data?.alreadyCompleted) {
+            setEarnedPoints(prev => prev + res.data.pointsEarned);
+          }
+        })
+        .catch(() => {});
     }
 
     // Si el test se lanzó desde una tarea de planificación, la marcamos como
@@ -277,6 +290,7 @@ export default function TrainingResultScreen({ navigation, route }) {
             <Text style={styles.ghostLinkText}>Por hoy es suficiente, gracias</Text>
           </TouchableOpacity>
         </ScrollView>
+        <OpoToast points={earnedPoints} subtitle="Por completar el test" />
       </SafeAreaView>
     );
   }
@@ -372,6 +386,7 @@ export default function TrainingResultScreen({ navigation, route }) {
           <Text style={styles.primaryBtnText}>Volver al inicio</Text>
         </TouchableOpacity>
       </ScrollView>
+      <OpoToast points={earnedPoints} subtitle="Por completar el test" />
     </SafeAreaView>
   );
 }

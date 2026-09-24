@@ -117,7 +117,7 @@ export class MotivationController {
         };
     }
 
-    private serializeCompleteResult(r: CompleteChallengeResult): CompleteChallengeResultDTO {
+    private serializeCompleteResult(r: CompleteChallengeResult): CompleteChallengeResultDTO & { pointsEarned: number } {
         return {
             gamification: {
                 currentStreak: r.gamification.currentStreak,
@@ -125,6 +125,7 @@ export class MotivationController {
                 opopointsBalance: r.gamification.opopointsBalance,
             },
             alreadyCompleted: r.alreadyCompleted,
+            pointsEarned: r.pointsEarned,
         };
     }
 

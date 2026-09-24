@@ -111,8 +111,8 @@ export class BoeController {
         try {
             const changeId = req.params['id'] as string;
             const { score, total } = req.body as { score: number; total: number };
-            await this.deps.completeMiniTest.execute(changeId, req.authUser!.id, score, total);
-            res.status(204).end();
+            const result = await this.deps.completeMiniTest.execute(changeId, req.authUser!.id, score, total);
+            ok(res, 200, result);
         } catch (e) { next(e); }
     };
 

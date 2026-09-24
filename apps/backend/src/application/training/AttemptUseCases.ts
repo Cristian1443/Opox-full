@@ -32,7 +32,7 @@ export class SaveAttemptUseCase {
         private readonly storeRepo: IStoreRepository,
     ) { }
 
-    async execute(input: SaveAttemptInput2): Promise<TrainingAttempt> {
+    async execute(input: SaveAttemptInput2): Promise<TrainingAttempt & { pointsEarned: number }> {
         const correctCount = input.responses.filter((r) => r.userAnswerIndex === r.correctIndex).length;
         const blankCount = input.responses.filter((r) => r.userAnswerIndex === null).length;
         const wrongCount = input.responses.length - correctCount - blankCount;
@@ -90,7 +90,7 @@ export class SaveAttemptUseCase {
             });
         }
 
-        return attempt;
+        return { ...attempt, pointsEarned: earnedPoints };
     }
 }
 

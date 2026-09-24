@@ -37,6 +37,7 @@ export interface ToggleTaskResult {
     task: StudyTask;
     goalCompleted: boolean;
     gamification?: UserGamification;
+    pointsEarned: number;
 }
 
 /**
@@ -54,7 +55,7 @@ export class ToggleTaskUseCase {
 
     async execute(input: { userId: string; taskId: string; done: boolean; localDate?: string }): Promise<ToggleTaskResult> {
         const task = await this.planningRepo.toggleTask(input);
-        if (!input.done) return { task, goalCompleted: false };
+        if (!input.done) return { task, goalCompleted: false, pointsEarned: 0 };
 
         const [plan, todayTasks] = await Promise.all([
             this.planningRepo.getPlan(input.userId),
@@ -78,9 +79,9 @@ export class ToggleTaskUseCase {
 
         if (crossedGoal) {
             await this.onGoalCompleted?.(input.userId).catch(() => {});
-            return { task, goalCompleted: true, gamification };
+            return { task, goalCompleted: true, gamification, pointsEarned: DAILY_GOAL_POINTS };
         }
 
-        return { task, goalCompleted: false, gamification };
+        return { task, goalCompleted: false, gamification, pointsEarned: 0 };
     }
 }

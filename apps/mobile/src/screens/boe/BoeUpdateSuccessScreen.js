@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
+import OpoToast from '../../components/OpoToast';
 
 // ─── 10.5 · Actualización al día · éxito tras mini-test ───────────────────────
 // Fiel al Figma (MonitorBoeModalesScreen.tsx → TemarioAlDiaModal, "ACTUALIZACION
@@ -35,7 +36,7 @@ function SuccessCheckIcon({ size = 64, color = colors.ctaGreen }) {
 
 export default function BoeUpdateSuccessScreen({ route, navigation }) {
     // articleRef: título corto del artículo (ej. "art. 14") pasado desde BoeMiniTestScreen
-    const { articleRef = 'el artículo' } = route.params ?? {};
+    const { articleRef = 'el artículo', pointsEarned = 0 } = route.params ?? {};
 
     return (
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -75,6 +76,7 @@ export default function BoeUpdateSuccessScreen({ route, navigation }) {
                     Puedes seguir estudiando o revisar otros cambios.
                 </Text>
             </View>
+            <OpoToast points={pointsEarned} subtitle="Por actualizar tu temario" />
         </SafeAreaView>
     );
 }

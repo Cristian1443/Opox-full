@@ -34,6 +34,7 @@ export class CreateClanChallengeUseCase {
 export interface CompleteChallengeResult {
     gamification: UserGamification;
     alreadyCompleted: boolean;
+    pointsEarned: number;
 }
 
 /**
@@ -57,7 +58,7 @@ export class CompleteChallengeUseCase {
 
         if (target.completedByMe) {
             const gamification = await this.dashboardRepo.getGamification(input.userId);
-            return { gamification, alreadyCompleted: true };
+            return { gamification, alreadyCompleted: true, pointsEarned: 0 };
         }
 
         await this.motivationRepo.completeChallenge({
@@ -72,6 +73,6 @@ export class CompleteChallengeUseCase {
             localDate: input.localDate,
         });
 
-        return { gamification, alreadyCompleted: false };
+        return { gamification, alreadyCompleted: false, pointsEarned: target.challenge.rewardPoints };
     }
 }

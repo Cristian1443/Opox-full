@@ -154,7 +154,7 @@ export class TrainingController {
         };
     }
 
-    private serializeAttempt(attempt: TrainingAttempt): TrainingAttemptDTO {
+    private serializeAttempt(attempt: TrainingAttempt & { pointsEarned?: number }): TrainingAttemptDTO & { pointsEarned: number } {
         return {
             id: attempt.id,
             source: attempt.source,
@@ -168,6 +168,7 @@ export class TrainingController {
             score: attempt.score,
             durationSecs: attempt.durationSecs,
             completedAt: attempt.completedAt.toISOString(),
+            pointsEarned: attempt.pointsEarned ?? 0,
         };
     }
 

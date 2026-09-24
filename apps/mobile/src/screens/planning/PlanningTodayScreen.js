@@ -15,6 +15,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import PlanningPopupModal, { CheckBadgeIcon } from '../../components/PlanningPopupModal';
 import { api, planningApi, boeApi } from '../../api';
 import { colors, spacing } from '../../theme';
+import OpoToast from '../../components/OpoToast';
 
 // Colores confirmados contra Figma (frame HOY, Bloque 4) sin equivalente
 // exacto en theme.js.
@@ -94,6 +95,7 @@ export default function PlanningTodayScreen({ navigation }) {
     const [tasks, setTasks] = useState([]);
     const [goalCount, setGoalCount] = useState(3);
     const [completedPopup, setCompletedPopup] = useState(null); // { streak, points } | null
+    const [toastPoints, setToastPoints] = useState(0);
 
     const [addVisible, setAddVisible] = useState(false);
     const [taskType, setTaskType] = useState('test');
@@ -150,7 +152,10 @@ export default function PlanningTodayScreen({ navigation }) {
         setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: nextDone } : t)));
         const { data } = await planningApi.toggleTask(task.id, nextDone);
         if (data?.goalCompleted && data.gamification) {
-            setCompletedPopup({ streak: data.gamification.currentStreak, points: 40 });
+            setCompletedPopup({ streak: data.gamification.currentStreak, points: data.pointsEarned ?? 40 });
+        }
+        if (nextDone && (data?.pointsEarned ?? 0) > 0) {
+            setToastPoints(data.pointsEarned);
         }
     };
 
@@ -388,6 +393,7 @@ export default function PlanningTodayScreen({ navigation }) {
                     </View>
                 </View>
             </Modal>
+            <OpoToast points={toastPoints} subtitle="Por completar la tarea" />
         </SafeAreaView>
     );
 }

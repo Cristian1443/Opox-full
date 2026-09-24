@@ -144,10 +144,11 @@ export class PlanningController {
         };
     }
 
-    private serializeToggleResult(result: ToggleTaskResult): ToggleTaskResultDTO {
+    private serializeToggleResult(result: ToggleTaskResult): ToggleTaskResultDTO & { pointsEarned: number } {
         return {
             task: this.serializeTask(result.task),
             goalCompleted: result.goalCompleted,
+            pointsEarned: result.pointsEarned,
             ...(result.gamification && {
                 gamification: {
                     currentStreak: result.gamification.currentStreak,

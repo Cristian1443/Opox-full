@@ -285,7 +285,7 @@ export class CompleteBoeMiniTestUseCase {
         private readonly dashboardRepo: IDashboardRepository,
     ) {}
 
-    async execute(changeId: string, userId: string, score: number, total: number): Promise<void> {
+    async execute(changeId: string, userId: string, score: number, total: number): Promise<{ pointsEarned: number }> {
         const change = await this.repo.getChange(changeId);
         if (!change) throw new BoeChangeNotFoundError();
         await this.repo.saveMiniTestResult({ userId, changeId, score, total });
@@ -299,6 +299,8 @@ export class CompleteBoeMiniTestUseCase {
                 points: miniTestPoints,
             });
         }
+
+        return { pointsEarned: miniTestPoints };
     }
 }
 
