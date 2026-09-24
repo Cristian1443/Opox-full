@@ -6,15 +6,19 @@ import {
     StatusBar,
     ScrollView,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import TrainingHeader from '../../components/TrainingHeader';
 import { colors } from '../../theme';
 import { trainingApi } from '../../api/training';
 import { useFocusEffect } from '@react-navigation/native';
+
+const DISMISSED_KEY = 'opox.lab.dismissed';
 
 const COLORS = {
     purple: colors.textDark,
@@ -85,7 +89,7 @@ function formatLastAttempt(iso) {
 // ─── Item de tema (débil o dominado) con expansión propia ────────────────────
 // La misma card sirve para ambos tabs — cambia el tono según `item.isMastered`:
 // débil = rojo/naranja (patrón de fallo), dominado = verde (tema controlado).
-function WeaknessItem({ item }) {
+function WeaknessItem({ item, onDismiss }) {
     const [open, setOpen] = useState(false);
     const isMastered = !!item.isMastered;
 
@@ -94,16 +98,25 @@ function WeaknessItem({ item }) {
 
     return (
         <View style={styles.itemWrapper}>
-            <TouchableOpacity style={styles.itemHeader} onPress={() => setOpen((v) => !v)} activeOpacity={0.7}>
-                <View style={{ marginRight: 10 }}>
-                    <IconTriangle size={16} direction={open ? 'down' : 'right'} color={triangleColor} />
-                </View>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.itemTitle} numberOfLines={1}>{item.topic}</Text>
-                    {dateLabel ? <Text style={styles.itemDate}>{dateLabel}</Text> : null}
-                </View>
-                <Text style={[styles.itemPct, isMastered && { color: COLORS.green }]}>{item.domain}%</Text>
-            </TouchableOpacity>
+            <View style={styles.itemHeaderRow}>
+                <TouchableOpacity style={[styles.itemHeader, { flex: 1 }]} onPress={() => setOpen((v) => !v)} activeOpacity={0.7}>
+                    <View style={{ marginRight: 10 }}>
+                        <IconTriangle size={16} direction={open ? 'down' : 'right'} color={triangleColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.itemTitle} numberOfLines={1}>{item.topic}</Text>
+                        {dateLabel ? <Text style={styles.itemDate}>{dateLabel}</Text> : null}
+                    </View>
+                    <Text style={[styles.itemPct, isMastered && { color: COLORS.green }]}>{item.domain}%</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.dismissBtn}
+                    onPress={() => onDismiss(item.topicId)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Ionicons name="close-circle-outline" size={20} color={COLORS.gray} style={{ opacity: 0.45 }} />
+                </TouchableOpacity>
+            </View>
 
             {open && (
                 <View style={styles.expandedCard}>
@@ -161,12 +174,18 @@ export default function ErrorLabScreen({ navigation }) {
     const [patterns, setPatterns] = useState([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('weak'); // 'weak' | 'mastered'
+    const [dismissed, setDismissed] = useState(new Set());
 
     useFocusEffect(useCallback(() => {
         let cancelled = false;
         setLoading(true);
-        trainingApi.listErrorPatterns().then(({ data }) => {
+        Promise.all([
+            trainingApi.listErrorPatterns(),
+            AsyncStorage.getItem(DISMISSED_KEY),
+        ]).then(([{ data }, storedDismissed]) => {
             if (cancelled) return;
+            const dismissedSet = new Set(storedDismissed ? JSON.parse(storedDismissed) : []);
+            setDismissed(dismissedSet);
             setPatterns((data ?? []).map((p, i) => ({
                 id: p.topicId,
                 topicId: p.topicId,
@@ -186,9 +205,32 @@ export default function ErrorLabScreen({ navigation }) {
         return () => { cancelled = true; };
     }, []));
 
-    // Separación en dos grupos por umbral de dominio.
-    const weak = patterns.filter((p) => p.domain < MASTERY_THRESHOLD);
-    const mastered = patterns.filter((p) => p.domain >= MASTERY_THRESHOLD)
+    const handleDismiss = useCallback((topicId) => {
+        Alert.alert(
+            'Ocultar tema',
+            'Este tema dejará de aparecer en tu Laboratorio. Podrás recuperarlo si vuelves a practicarlo.',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Ocultar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setDismissed((prev) => {
+                            const next = new Set(prev);
+                            next.add(topicId);
+                            AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])).catch(() => {});
+                            return next;
+                        });
+                    },
+                },
+            ],
+        );
+    }, []);
+
+    // Separación en dos grupos por umbral de dominio, excluyendo los ocultos.
+    const visible_patterns = patterns.filter((p) => !dismissed.has(p.topicId));
+    const weak = visible_patterns.filter((p) => p.domain < MASTERY_THRESHOLD);
+    const mastered = visible_patterns.filter((p) => p.domain >= MASTERY_THRESHOLD)
         .sort((a, b) => b.domain - a.domain); // más dominados primero
     const visible = tab === 'weak' ? weak : mastered;
     const primaryWeak = weak[0]; // el peor por fail_rate (backend ya ordena)
@@ -229,61 +271,66 @@ export default function ErrorLabScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
             ) : (
-                <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <View style={styles.cabecera}>
-                        <View style={styles.iconBox}>
-                            <IconMicroscope size={40} />
+                <>
+                    <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                        <View style={styles.cabecera}>
+                            <View style={styles.iconBox}>
+                                <IconMicroscope size={40} />
+                            </View>
+                            <View style={styles.cabeceraTextBox}>
+                                <Text style={styles.cabeceraTitle}>Laboratorio de errores</Text>
+                                <Text style={styles.cabeceraSubtitle}>
+                                    Repaso quirúrgico de fallos y puntos débiles
+                                </Text>
+                            </View>
                         </View>
-                        <View style={styles.cabeceraTextBox}>
-                            <Text style={styles.cabeceraTitle}>Laboratorio de errores</Text>
-                            <Text style={styles.cabeceraSubtitle}>
-                                Repaso quirúrgico de fallos y puntos débiles
-                            </Text>
+
+                        {/* Tabs: Débiles / Dominados con contador */}
+                        <View style={styles.tabsRow}>
+                            <TouchableOpacity
+                                onPress={() => setTab('weak')}
+                                style={[styles.tab, tab === 'weak' && styles.tabActive]}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={[styles.tabLabel, tab === 'weak' && styles.tabLabelActive]}>
+                                    Débiles · {weak.length}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setTab('mastered')}
+                                style={[styles.tab, tab === 'mastered' && styles.tabActiveGreen]}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={[styles.tabLabel, tab === 'mastered' && styles.tabLabelActiveGreen]}>
+                                    Dominados · {mastered.length}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
-                    </View>
 
-                    {/* Tabs: Débiles / Dominados con contador */}
-                    <View style={styles.tabsRow}>
-                        <TouchableOpacity
-                            onPress={() => setTab('weak')}
-                            style={[styles.tab, tab === 'weak' && styles.tabActive]}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={[styles.tabLabel, tab === 'weak' && styles.tabLabelActive]}>
-                                Débiles · {weak.length}
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setTab('mastered')}
-                            style={[styles.tab, tab === 'mastered' && styles.tabActiveGreen]}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={[styles.tabLabel, tab === 'mastered' && styles.tabLabelActiveGreen]}>
-                                Dominados · {mastered.length}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                        {visible.length === 0 ? (
+                            <View style={styles.tabEmptyWrap}>
+                                <Text style={styles.tabEmptyText}>
+                                    {tab === 'weak'
+                                        ? '¡Sin debilidades detectadas! Sigue practicando para mantener el nivel.'
+                                        : 'Aún no dominas ningún tema al 80%. Sigue con los tests quirúrgicos.'}
+                                </Text>
+                            </View>
+                        ) : (
+                            visible.map((item) => (
+                                <WeaknessItem key={item.id} item={item} onDismiss={handleDismiss} />
+                            ))
+                        )}
+                    </ScrollView>
 
-                    {visible.length === 0 ? (
-                        <View style={styles.tabEmptyWrap}>
-                            <Text style={styles.tabEmptyText}>
-                                {tab === 'weak'
-                                    ? '¡Sin debilidades detectadas! Sigue practicando para mantener el nivel.'
-                                    : 'Aún no dominas ningún tema al 80%. Sigue con los tests quirúrgicos.'}
-                            </Text>
-                        </View>
-                    ) : (
-                        visible.map((item) => (
-                            <WeaknessItem key={item.id} item={item} />
-                        ))
-                    )}
-
+                    {/* Botón sticky fuera del ScrollView para que siempre esté visible */}
                     {tab === 'weak' && weak.length > 0 && (
-                        <TouchableOpacity style={styles.boton} activeOpacity={0.85} onPress={startSurgical}>
-                            <Text style={styles.botonText}>Iniciar test quirúrgico</Text>
-                        </TouchableOpacity>
+                        <View style={styles.botonWrap}>
+                            <TouchableOpacity style={styles.boton} activeOpacity={0.85} onPress={startSurgical}>
+                                <Text style={styles.botonText}>Iniciar test quirúrgico</Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
-                </ScrollView>
+                </>
             )}
         </SafeAreaView>
     );
@@ -398,6 +445,10 @@ const styles = StyleSheet.create({
         marginHorizontal: 25,
         marginBottom: 10,
     },
+    itemHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     itemHeader: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -405,6 +456,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
+    },
+    dismissBtn: {
+        paddingLeft: 10,
+        paddingVertical: 16,
+        paddingRight: 0,
     },
     itemTitle: {
         fontFamily: 'Poppins-Medium',
@@ -485,9 +541,15 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.orange,
     },
 
+    botonWrap: {
+        paddingHorizontal: 37,
+        paddingTop: 12,
+        paddingBottom: 16,
+        backgroundColor: COLORS.white,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(65,41,80,0.08)',
+    },
     boton: {
-        marginHorizontal: 37,
-        marginTop: 24,
         height: 57,
         borderRadius: 14,
         backgroundColor: COLORS.green,

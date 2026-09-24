@@ -11,7 +11,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
 import PlanningPopupModal, { WarningIcon, CalendarCheckIcon } from '../../components/PlanningPopupModal';
-import { planningApi } from '../../api';
+import { api, boeApi, planningApi } from '../../api';
+
+const localDate = () => new Date().toLocaleDateString('sv');
 import { colors, spacing } from '../../theme';
 
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -262,6 +264,27 @@ export default function PlanningHomeScreen({ navigation }) {
                     secondaryLabel="Ahora no"
                     onPrimaryPress={async () => {
                         await planningApi.updatePlan({ intensity: 'high' });
+                        // Crear una tarea de test extra para cubrir el nuevo objetivo
+                        try {
+                            const session = await api.loadSession();
+                            const oposicion =
+                                session?.user?.oposicion ??
+                                session?.user?.user_metadata?.oposicion ??
+                                'policia-local-galicia';
+                            let topicsRes = await boeApi.listTopics(oposicion);
+                            if (!topicsRes?.data?.length && oposicion !== 'justicia-tramitacion') {
+                                topicsRes = await boeApi.listTopics('justicia-tramitacion');
+                            }
+                            const topic = topicsRes?.data?.[0];
+                            if (topic) {
+                                await planningApi.createTask({
+                                    taskDate: localDate(),
+                                    title: `Test · ${topic.label}`,
+                                    subtitle: JSON.stringify({ topicId: topic.topicId, count: 10 }),
+                                    kind: 'test',
+                                });
+                            }
+                        } catch (_) { /* silencioso: tarea extra no es crítica */ }
                         setAlert(null);
                         navigation.navigate('PlanningToday');
                     }}

@@ -142,6 +142,8 @@ export default function MotivationHomeScreen({ navigation }) {
     const [summary, setSummary] = useState(null);
     const [dangerVisible, setDangerVisible] = useState(false);
     const [dangerHours, setDangerHours] = useState(null);
+    const [globalRankPos, setGlobalRankPos] = useState(null);
+    const [localRankPos, setLocalRankPos] = useState(null);
     // Fase 3 · dark mode (gaps-15-09-26). Solo el fondo raíz y el StatusBar
     // cambian; los tokens dentro del StyleSheet siguen siendo estáticos.
     const themeColors = useThemeColors();
@@ -149,7 +151,12 @@ export default function MotivationHomeScreen({ navigation }) {
 
     const loadData = useCallback(() => {
         let cancelled = false;
-        Promise.all([motivationApi.getSummary(), planningApi.getSummary()]).then(([m, p]) => {
+        Promise.all([
+            motivationApi.getSummary(),
+            planningApi.getSummary(),
+            motivationApi.getRanking('global'),
+            motivationApi.getRanking('oposicion'),
+        ]).then(([m, p, globalR, localR]) => {
             if (cancelled) return;
             if (m.data) setSummary(m.data);
             const hour = new Date().getHours();
@@ -158,7 +165,9 @@ export default function MotivationHomeScreen({ navigation }) {
                 setDangerHours(Math.max(1, 24 - hour));
                 setDangerVisible(true);
             }
-        });
+            if (globalR.data?.me?.position != null) setGlobalRankPos(globalR.data.me.position);
+            if (localR.data?.me?.position != null) setLocalRankPos(localR.data.me.position);
+        }).catch(() => {});
         return () => { cancelled = true; };
     }, []);
 
@@ -189,8 +198,8 @@ export default function MotivationHomeScreen({ navigation }) {
                     justo después del header — no al final de la pantalla. */}
                 <DestacadoBanner
                     opopoints={gamification.opopointsBalance.toLocaleString('es-ES')}
-                    globalRank="-"
-                    localRank="-"
+                    globalRank={globalRankPos != null ? `#${globalRankPos}` : '-'}
+                    localRank={localRankPos != null ? `#${localRankPos}` : '-'}
                 />
 
                 {/* Figma: icono de llama a la izquierda + columna de texto a la derecha (no centrado/apilado) */}
