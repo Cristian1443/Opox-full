@@ -1,11 +1,11 @@
 services:
   - type: web
     name: opox-backend
-    runtime: node
+    runtime: docker
     plan: free
     region: oregon
-    buildCommand: npm install -g pnpm@9.15.0 && pnpm install --no-frozen-lockfile --prod=false
-    startCommand: pnpm --filter @opox/backend start
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     envVars:
       - key: NODE_VERSION
         value: 22.11.0
