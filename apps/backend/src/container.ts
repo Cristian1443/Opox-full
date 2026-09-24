@@ -441,7 +441,7 @@ export function buildContainer() {
         logout: new LogoutUseCase(authRepo),
         acceptTerms: new AcceptTermsUseCase(authRepo),
         updateProfile: new UpdateProfileUseCase(authRepo),
-        deleteAccount: new DeleteAccountUseCase(authRepo),
+        deleteAccount: new DeleteAccountUseCase(authRepo, motorAiClient),
 
         // Bloque 2 · Dashboard
         getDashboardSummary: new GetDashboardSummaryUseCase(authRepo, dashboardRepo, trainingRepo),

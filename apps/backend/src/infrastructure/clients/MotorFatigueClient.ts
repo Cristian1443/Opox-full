@@ -85,6 +85,19 @@ function computeSeverity(metricId: string, value: number, baseline?: number):
     return 'ok';
 }
 
+export interface MotorFatigueStatus {
+    nivel: 'bajo' | 'medio' | 'alto';
+    semaforo: 'verde' | 'amarillo' | 'rojo';
+    ts?: string;
+}
+
+export interface MotorFatigueAlert {
+    id: string;
+    tipo: string;
+    mensaje: string;
+    ts: string;
+}
+
 export class MotorFatigueClient {
     private readonly http: AxiosInstance;
 
@@ -161,5 +174,32 @@ export class MotorFatigueClient {
             recomendaciones: data.mensaje ? [data.mensaje] : [],
             historial_7_dias,
         };
+    }
+
+    /** GET /v1/fatigue/status?user_id= — estado de fatiga actual del usuario. */
+    async getStatus(userId: string): Promise<MotorFatigueStatus> {
+        const { data } = await this.http.get<Record<string, unknown>>(
+            `/v1/fatigue/status?user_id=${encodeURIComponent(userId)}`,
+        );
+        const nivel = COLOR_TO_NIVEL[String(data.nivel ?? 'verde')] ?? 'bajo';
+        const semaforo = COLOR_TO_SEMAFORO[String(data.nivel ?? 'verde')] ?? 'verde';
+        return { nivel, semaforo, ts: data.ts ? String(data.ts) : undefined };
+    }
+
+    /** GET /v1/fatigue/alerts?user_id= — alertas de fatiga activas del usuario. */
+    async getAlerts(userId: string): Promise<MotorFatigueAlert[]> {
+        const { data } = await this.http.get<unknown>(
+            `/v1/fatigue/alerts?user_id=${encodeURIComponent(userId)}`,
+        );
+        const list = Array.isArray(data) ? data : [];
+        return list.map((raw) => {
+            const a = raw as Record<string, unknown>;
+            return {
+                id: String(a.id ?? ''),
+                tipo: String(a.tipo ?? ''),
+                mensaje: String(a.mensaje ?? ''),
+                ts: String(a.ts ?? ''),
+            };
+        });
     }
 }

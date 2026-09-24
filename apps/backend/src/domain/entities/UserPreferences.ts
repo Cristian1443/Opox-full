@@ -31,10 +31,14 @@ export interface UpdatePreferencesInput {
     reduceMotion?: boolean;
 }
 
-/** Perfil de tono en el formato que espera el Motor IA en cada llamada. */
+/**
+ * Perfil de tono en el formato que espera el Motor IA (PerfilTonoIn).
+ * Verificado contra /openapi.json 2026-09-24.
+ */
 export interface ToneProfile {
     personalidad: 'Cercano' | 'Formal' | 'Directo' | 'Motivador';
     nivel_detalle: 'Breve' | 'Medio' | 'Profundo';
     estilo_pistas: 'Socraticas' | 'Directas';
-    refuerzo: 'Alto' | 'Normal' | 'Ninguno';
+    // 'ninguno' en OPOX no tiene equivalente directo; se mapea a 'baja'.
+    motivacion: 'alta' | 'media' | 'baja';
 }

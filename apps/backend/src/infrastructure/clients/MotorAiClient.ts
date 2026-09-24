@@ -81,7 +81,9 @@ interface MotorPreguntaFull extends MotorPreguntaJob {
 
 interface MotorJobResponse {
     job_id?: string;
-    estado: 'pending' | 'processing' | 'running' | 'done' | 'error';
+    // Enum verificado contra /openapi.json (JobOut.estado). Los valores
+    // 'pending'/'processing' que teníamos antes NUNCA los devuelve el Motor.
+    estado: 'reserved' | 'queued' | 'running' | 'done' | 'error';
     resultado?: { sesion_id: string; preguntas: MotorPreguntaJob[] };
     error?: string;
 }
@@ -422,36 +424,56 @@ export class MotorAiClient implements AiApiContract {
     // async del Motor (job_id + sesion_id + polling) para que el mobile pueda
     // mostrar la primera pregunta en cuanto está lista mientras el resto se genera.
 
-    /** Arranca un job en el Motor y devuelve solo el jobId. Sin polling. */
+    /**
+     * Arranca un job en el Motor y devuelve el jobId, sesionId e initialPreguntas.
+     * El Motor responde 202 con `GenerarTestRef: { job_id, sesion_id, preguntas[] }`
+     * (OpenAPI verificado 2026-09-24). `sesion_id` es requerido en el schema;
+     * `preguntas[]` son las initial_from_cache (default 3) para arranque instantáneo.
+     */
     async startTestJob(input: {
         userId: string;
         cursoId: string;
         temaIds?: string[] | null;
         count: number;
         difficulty?: 'easy' | 'medium' | 'hard';
-    }): Promise<{ jobId: string; sessionId: string | null }> {
-        const body = {
+        bloqueIds?: string[] | null;
+        contrarrelojSeg?: number;
+        query?: string | null;
+        fillFromCache?: boolean;
+        initialFromCache?: number;
+    }): Promise<{ jobId: string; sessionId: string | null; initialPreguntas: GeneratedQuestion[] }> {
+        const body: Record<string, unknown> = {
             curso_id: input.cursoId,
             user_id: input.userId,
             tema_ids: input.temaIds ?? null,
             n_preguntas: input.count,
             dificultad: DIFF_TO_MOTOR[input.difficulty ?? 'medium'] ?? 'media',
         };
+        if (input.bloqueIds?.length) body.bloque_ids = input.bloqueIds;
+        if (typeof input.contrarrelojSeg === 'number') body.contrarreloj_seg = input.contrarrelojSeg;
+        if (input.query) body.query = input.query;
+        if (typeof input.fillFromCache === 'boolean') body.fill_from_cache = input.fillFromCache;
+        if (typeof input.initialFromCache === 'number') body.initial_from_cache = input.initialFromCache;
+
         const t0 = Date.now();
         const res = await this.http.post<Record<string, unknown>>('/v1/tests/generate', body, {
             headers: { 'X-OpenAI-Key': this.config.openAiKey },
             validateStatus: (s) => s === 200 || s === 202,
         });
         const data = res.data;
+        const rawPreguntas202 = Array.isArray(data.preguntas) ? (data.preguntas as MotorPreguntaJob[]) : [];
         logger.info('[motor-ai][stream] startTestJob', {
             status: res.status,
             jobId: data.job_id,
+            sesionId: data.sesion_id,
+            initialCount: rawPreguntas202.length,
             hasResultado: !!data.resultado,
             ms: Date.now() - t0,
             cursoId: input.cursoId,
             temas: input.temaIds?.length ?? 'null',
             n: input.count,
         });
+
         // 200 = respuesta desde caché ya con sesion_id. 202 = job en curso.
         // `recurso_id` en JobOut = cursoId (NO sessionId). El sessionId real
         // vive en `resultado.sesion_id` cuando el job termina.
@@ -461,9 +483,39 @@ export class MotorAiClient implements AiApiContract {
             return {
                 jobId: (data.job_id as string) ?? '',
                 sessionId: progreso?.sesion_id ?? resultado?.sesion_id ?? null,
+                initialPreguntas: [],
             };
         }
-        return { jobId: data.job_id as string, sessionId: null };
+
+        // 202: GenerarTestRef = { job_id, sesion_id (required), preguntas[] }
+        const sesionId = (data.sesion_id as string | undefined) ?? null;
+        let initialPreguntas: GeneratedQuestion[] = [];
+        if (rawPreguntas202.length > 0) {
+            // Resolver correcta_idx desde banco (misma lógica que getSessionQuestions).
+            await this.ensureQuestionBank();
+            for (const p of rawPreguntas202) {
+                const full: MotorPreguntaFull | undefined = typeof p.correcta_idx === 'number'
+                    ? (p as unknown as MotorPreguntaFull)
+                    : this.questionBankCache.get(p.id);
+                if (full && typeof full.correcta_idx === 'number') {
+                    initialPreguntas.push(this.mapPregunta(p, full));
+                } else {
+                    // Sin correcta_idx — marker -1; el runner resuelve via /answer.
+                    initialPreguntas.push({
+                        id: p.id,
+                        text: p.enunciado,
+                        options: p.opciones as [string, string, string, string],
+                        correctIndex: -1 as unknown as 0 | 1 | 2 | 3,
+                        explanation: p.explicacion ?? '',
+                        topicId: p.tema_id,
+                        topic: p.tema_id,
+                        difficulty: (p.dificultad === 'facil' ? 'easy' : p.dificultad === 'dificil' ? 'hard' : 'medium'),
+                    });
+                }
+            }
+        }
+
+        return { jobId: data.job_id as string, sessionId: sesionId, initialPreguntas };
     }
 
     /** Consulta el estado del job. Formato tolerante al schema real del Motor. */
@@ -523,6 +575,8 @@ export class MotorAiClient implements AiApiContract {
             delivered: number;
             reason: string | null;
             motivos: Record<string, number>;
+            generated: number | null;
+            fromCache: number | null;
         } | null;
     }> {
         const res = await this.http.get<Record<string, unknown>>(`/v1/tests/${sessionId}`);
@@ -564,8 +618,10 @@ export class MotorAiClient implements AiApiContract {
             }
         }
         // El deficit real del Motor: qué preguntas se pidieron / publicaron / descarte.
+        // Schema `DeficitOut` verificado en /openapi.json (2026-09-24):
+        // { pedidas, publicadas, motivos_descarte, generated?, from_cache?, corte? }
         const deficitRaw = data.deficit as
-            | { pedidas?: number; publicadas?: number; motivos_descarte?: Record<string, number>; corte?: string }
+            | { pedidas?: number; publicadas?: number; motivos_descarte?: Record<string, number>; corte?: string; generated?: number; from_cache?: number }
             | number | null | undefined;
         const deficitCount = typeof deficitRaw === 'number'
             ? deficitRaw
@@ -616,6 +672,8 @@ export class MotorAiClient implements AiApiContract {
             delivered: number;
             reason: string | null;
             motivos: Record<string, number>;
+            generated: number | null;
+            fromCache: number | null;
         } | null = null;
         const finalDelivered = mapped.length;
         if (
@@ -627,9 +685,10 @@ export class MotorAiClient implements AiApiContract {
             deficitDetail = {
                 requested: deficitRaw.pedidas,
                 delivered: finalDelivered,
-                // DeficitOut no tiene campo "corte" en el schema del Motor.
-                reason: null,
+                reason: deficitRaw.corte ?? null,
                 motivos: deficitRaw.motivos_descarte ?? {},
+                generated: deficitRaw.generated ?? null,
+                fromCache: deficitRaw.from_cache ?? null,
             };
         }
 
@@ -675,19 +734,23 @@ export class MotorAiClient implements AiApiContract {
         temaIds?: string[] | null;
         count: number;
         difficulty?: 'easy' | 'medium' | 'hard';
+        bloqueIds?: string[] | null;
+        query?: string | null;
     }): Promise<{
         questions: GeneratedQuestion[];
         sessionId: string | null;
         pedidas: number;
         publicadas: number;
     }> {
-        const body = {
+        const body: Record<string, unknown> = {
             curso_id: input.cursoId,
             user_id: input.userId,
             tema_ids: input.temaIds ?? null,
             n_preguntas: input.count,
             dificultad: DIFF_TO_MOTOR[input.difficulty ?? 'medium'] ?? 'media',
         };
+        if (input.bloqueIds?.length) body.bloque_ids = input.bloqueIds;
+        if (input.query) body.query = input.query;
         const t0 = Date.now();
         // Timeout interno 6 s (Cristian midió 3 s para 10 preguntas — 2× margen).
         // Si el Motor tarda más, tratamos como miss para no bloquear al usuario.
@@ -1032,6 +1095,27 @@ export class MotorAiClient implements AiApiContract {
                 fallos: Number(t.fallos ?? 0),
             })),
         };
+    }
+
+    /**
+     * DELETE /v1/users/{user_id} — purga todos los datos del usuario del Motor
+     * (historial de sesiones, perfil de tono, preguntas respondidas).
+     * RGPD: fire-and-forget desde DeleteAccountUseCase. Silencia 404
+     * (usuario sin datos en el Motor — puede que nunca haya hecho un test).
+     */
+    async deleteUserData(userId: string): Promise<void> {
+        try {
+            await this.http.delete(`/v1/users/${encodeURIComponent(userId)}`);
+            logger.info('[motor-ai] deleteUserData ok', { userId });
+        } catch (err: unknown) {
+            const status = (err as { response?: { status?: number } }).response?.status;
+            if (status === 404) return;
+            logger.warn('[motor-ai] deleteUserData: error ignorado (RGPD no crítico)', {
+                userId,
+                status,
+                err: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     // ─── Helpers privados ─────────────────────────────────────────────────────

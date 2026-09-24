@@ -30,12 +30,12 @@ export interface UpdatePreferencesInput {
     reduceMotion?: boolean;
 }
 
-/** Perfil de tono en el formato que espera el Motor IA en cada llamada. */
+/** Perfil de tono en el formato que espera el Motor IA (PerfilTonoIn). */
 export interface ToneProfile {
     personalidad: 'Cercano' | 'Formal' | 'Directo' | 'Motivador';
     nivel_detalle: 'Breve' | 'Medio' | 'Profundo';
     estilo_pistas: 'Socraticas' | 'Directas';
-    refuerzo: 'Alto' | 'Normal' | 'Ninguno';
+    motivacion: 'alta' | 'media' | 'baja';
 }
 
 export type FeedbackType = 'suggestion' | 'bug' | 'other';

@@ -65,7 +65,8 @@ export class MotorTutorClient implements ITutorAiClient {
             curso_id: params.cursoId ?? this.cursoId,
             mensaje: params.message,
         };
-        if (params.toneProfile) body.tono = params.toneProfile;
+        // `TutorIn` del Motor solo acepta { user_id, curso_id, mensaje } —
+        // el campo `tono` es silenciosamente ignorado según /openapi.json (2026-09-24).
         if (params.history?.length) {
             body.historial = params.history.map((m) => ({
                 rol: m.role === 'user' ? 'usuario' : 'asistente',

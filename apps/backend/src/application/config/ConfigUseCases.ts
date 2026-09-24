@@ -43,16 +43,16 @@ export function buildToneProfile(prefs: UserPreferences): ToneProfile {
         motivador:   'Motivador',
     };
     const DETAIL_MAP: ToneProfile['nivel_detalle'][] = ['Breve', 'Medio', 'Profundo'];
-    const REFUERZO_MAP: Record<string, ToneProfile['refuerzo']> = {
-        alto:   'Alto',
-        normal: 'Normal',
-        ninguno: 'Ninguno',
+    const MOTIVACION_MAP: Record<string, ToneProfile['motivacion']> = {
+        alto:    'alta',
+        normal:  'media',
+        ninguno: 'baja', // sin equivalente directo en Motor; 'baja' es el más cercano
     };
     return {
-        personalidad:   PERSONALITY_MAP[prefs.personality] ?? 'Cercano',
-        nivel_detalle:  DETAIL_MAP[prefs.detailLevel] ?? 'Medio',
-        estilo_pistas:  prefs.hintStyle === 'socraticas' ? 'Socraticas' : 'Directas',
-        refuerzo:       REFUERZO_MAP[prefs.reinforcementLevel] ?? 'Normal',
+        personalidad:  PERSONALITY_MAP[prefs.personality] ?? 'Cercano',
+        nivel_detalle: DETAIL_MAP[prefs.detailLevel] ?? 'Medio',
+        estilo_pistas: prefs.hintStyle === 'socraticas' ? 'Socraticas' : 'Directas',
+        motivacion:    MOTIVACION_MAP[prefs.reinforcementLevel] ?? 'media',
     };
 }
 

@@ -118,7 +118,9 @@ export class CourseSyncService {
     private async fetchCatalog(): Promise<MotorCourseListItem[] | null> {
         try {
             const client = this.motor.rawHttp();
-            const res = await client.get<MotorCourseListItem[]>('/v1/courses');
+            // ?estado=listo filtra directamente en el Motor para excluir cursos
+            // en proceso de ingesta (evita match prematuro con un curso "running").
+            const res = await client.get<MotorCourseListItem[]>('/v1/courses?estado=listo');
             if (!Array.isArray(res.data)) {
                 logger.warn('[course-sync] catálogo inesperado', { type: typeof res.data });
                 return null;

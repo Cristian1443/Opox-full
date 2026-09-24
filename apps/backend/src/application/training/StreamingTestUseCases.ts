@@ -152,7 +152,12 @@ export class StartTestJobUseCase {
         temaIds?: string[] | null;
         count: number;
         difficulty?: 'easy' | 'medium' | 'hard';
-    }): Promise<{ jobId: string; sessionId: string | null }> {
+        bloqueIds?: string[] | null;
+        contrarrelojSeg?: number;
+        query?: string | null;
+        fillFromCache?: boolean;
+        initialFromCache?: number;
+    }): Promise<{ jobId: string; sessionId: string | null; initialPreguntas: GeneratedQuestion[] }> {
         if (!this.motor) throw new Error('MOTOR_UNAVAILABLE');
         const cursoId = await this.getCursoId.execute(input.oposicion);
         return this.motor.startTestJob({
@@ -161,6 +166,11 @@ export class StartTestJobUseCase {
             temaIds: input.temaIds,
             count: input.count,
             difficulty: input.difficulty,
+            bloqueIds: input.bloqueIds,
+            contrarrelojSeg: input.contrarrelojSeg,
+            query: input.query,
+            fillFromCache: input.fillFromCache,
+            initialFromCache: input.initialFromCache,
         });
     }
 }

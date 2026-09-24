@@ -20,7 +20,7 @@ interface MotorBankQuestion extends MotorJobQuestion {
 }
 
 interface MotorJobResponse {
-    estado: 'pending' | 'processing' | 'running' | 'done' | 'error';
+    estado: 'reserved' | 'queued' | 'running' | 'done' | 'error';
     resultado?: { sesion_id?: string; preguntas: MotorJobQuestion[] };
     error?: string;
 }
@@ -166,6 +166,19 @@ export class MotorOnboardingClient {
 
         logger.info('[motor-onboarding] placement-test ok', { count: result.length, cursoId: this.cursoId });
         return result;
+    }
+
+    /**
+     * POST /v1/onboarding/placement-test/{testId}/finish — notifica al Motor
+     * que el test de nivel ha terminado para que persista el resultado del usuario.
+     * No tiene callers todavía — preparado para cuando el flow de onboarding lo use.
+     */
+    async finishPlacementTest(testId: string, userId: string): Promise<void> {
+        await this.http.post(
+            `/v1/onboarding/placement-test/${encodeURIComponent(testId)}/finish`,
+            { user_id: userId },
+            { headers: { 'X-OpenAI-Key': this.openAiKey } },
+        );
     }
 
     // ─── Helpers privados ─────────────────────────────────────────────────────

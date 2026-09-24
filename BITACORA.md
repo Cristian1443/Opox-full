@@ -5,6 +5,35 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-24 — Alineación Motor IA · colección completa vs `MotorAiClient`
+
+Rama: `fix/podcast-seek-opo-toast`.
+
+Análisis de `MotorIA_Motor_completo.postman_collection4.json` verificado contra
+`https://ia.opox.ai/openapi.json`. 11 discrepancias corregidas en 9 archivos.
+Build TypeScript sin errores; test de 5 temas × 10 preguntas pasó en producción local.
+
+**Bugs críticos corregidos:**
+
+- `MotorJobResponse.estado`: `'pending'|'processing'` → `'reserved'|'queued'` (los valores reales del Motor). Afectaba también a `MotorOnboardingClient`.
+- `startTestJob`: el 202 de `GenerarTestRef` devuelve `{ job_id, sesion_id, preguntas[] }`. Antes solo se leía `job_id`; ahora se propaga `sesionId` e `initialPreguntas[]` al mobile para arranque instantáneo. Confirmado en logs: `initialCount: 3` en el 202.
+- `deficitDetail`: añadidos campos `generated` y `fromCache` (presentes en `DeficitOut` real del Motor). `reason` ahora usa `deficit.corte` en vez de `null` hardcoded.
+- RGPD — `DeleteAccountUseCase` ahora llama `DELETE /v1/users/{id}` al Motor fire-and-forget para purgar historial de sesiones y perfil de tono del usuario borrado.
+
+**Mejoras de alineación:**
+
+- `startTestJob` y `generateFromCache`: nuevos params opcionales `bloqueIds`, `contrarrelojSeg`, `query`, `fillFromCache`, `initialFromCache` — sin cambio de comportamiento actual; listos para cuando el mobile los envíe.
+- `MotorTutorClient.chat()`: eliminado `body.tono` — `TutorIn` del Motor solo acepta `{ user_id, curso_id, mensaje }` según OpenAPI; el campo era silenciosamente ignorado.
+- `ToneProfile`: renombrado `refuerzo: 'Alto'|'Normal'|'Ninguno'` → `motivacion: 'alta'|'media'|'baja'` (alineado con `PerfilTonoIn`); `'ninguno'` → `'baja'`. Actualizado en `domain/entities`, `packages/types` y `buildToneProfile`.
+- `CourseSyncService`: `GET /v1/courses?estado=listo` para excluir ingestas en progreso del match de curso activo.
+
+**Nuevos métodos (sin callers todavía):**
+
+- `MotorFatigueClient.getStatus()` / `getAlerts()` — `GET /v1/fatigue/status` y `GET /v1/fatigue/alerts`.
+- `MotorOnboardingClient.finishPlacementTest()` — `POST /v1/onboarding/placement-test/{id}/finish`.
+
+---
+
 ## 2026-09-20 — Generador Infinito · 3 bugs en fillFromBank (pool minado, temas estrechos, overflow)
 
 Rama: `fix/generador-infinito-2026-09-17`.
