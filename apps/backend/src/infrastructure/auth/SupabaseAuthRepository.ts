@@ -178,19 +178,20 @@ export class SupabaseAuthRepository implements IAuthRepository {
     // ─── OAuth ────────────────────────────────────
 
     async loginWithOAuth(input: {
-        provider: 'google' | 'apple' | 'meta';
-        idToken: string;
+        provider: 'google' | 'apple' | 'facebook';
+        idToken?: string;
+        accessToken?: string;
+        firstName?: string | null;
+        lastName?: string | null;
     }): Promise<Session> {
-        // Supabase acepta id_token de Google/Apple con signInWithIdToken.
-        // Meta/Facebook requiere flujo OAuth server-side; se deja como TODO.
-        if (input.provider === 'meta') {
-            // TODO: implementar flujo OAuth con Meta cuando el cliente lo priorice.
-            throw new Error('Meta login not implemented yet');
+        if (input.provider === 'facebook') {
+            return this.loginWithFacebook(input.accessToken!, input.firstName, input.lastName);
         }
 
+        // Google / Apple: signInWithIdToken es el flujo nativo de Supabase.
         const { data, error } = await this.supabaseAuth.auth.signInWithIdToken({
             provider: input.provider,
-            token: input.idToken,
+            token: input.idToken!,
         });
 
         if (error || !data.session || !data.user) {
@@ -208,6 +209,102 @@ export class SupabaseAuthRepository implements IAuthRepository {
                 email: data.user.email ?? null,
                 user_metadata: data.user.user_metadata ?? {},
                 created_at: data.user.created_at,
+            },
+        });
+    }
+
+    /**
+     * Facebook no tiene signInWithIdToken en Supabase.
+     * Flujo: verificar accessToken con Graph API → upsert user vía admin
+     * → generateLink(magiclink) → verifyOtp para emitir la sesión real.
+     * Mismo patrón que loginWithBiometric (que ya usa generateLink).
+     */
+    private async loginWithFacebook(
+        accessToken: string,
+        firstName?: string | null,
+        lastName?: string | null,
+    ): Promise<Session> {
+        // 1. Verificar el token con Facebook Graph API y obtener datos del usuario.
+        const graphUrl = `https://graph.facebook.com/me?fields=id,email,name,picture.type(large)&access_token=${encodeURIComponent(accessToken)}`;
+        const fbRes = await fetch(graphUrl);
+        if (!fbRes.ok) throw new InvalidCredentialsError();
+
+        const fbData = await fbRes.json() as {
+            id?: string;
+            email?: string;
+            name?: string;
+            picture?: { data?: { url?: string } };
+            error?: { message: string };
+        };
+
+        if (!fbData.id || fbData.error) {
+            logger.warn('[oauth/facebook] token inválido', { error: fbData.error?.message });
+            throw new InvalidCredentialsError();
+        }
+
+        // Si el usuario no concedió el permiso de email, usamos un email sintético
+        // para poder hacer upsert en Supabase. El usuario puede añadir su email
+        // real más adelante desde ajustes.
+        const email = fbData.email ?? `fb_${fbData.id}@opox-social.app`;
+        const displayName = fbData.name
+            ?? ([firstName, lastName].filter(Boolean).join(' ') || 'Usuario Facebook');
+        const avatarUrl = fbData.picture?.data?.url;
+
+        // 2. generateLink con magiclink: crea el usuario si no existe (email confirmado)
+        //    y devuelve el hashed_token para intercambiarlo por sesión real.
+        const { data: linkData, error: linkErr } = await this.supabaseAdmin.auth.admin.generateLink({
+            type: 'magiclink',
+            email,
+            options: {
+                data: {
+                    display_name: displayName,
+                    avatar_url: avatarUrl ?? null,
+                    auth_provider: 'facebook',
+                    facebook_id: fbData.id,
+                },
+            },
+        });
+
+        if (linkErr || !linkData.properties?.hashed_token) {
+            logger.warn('[oauth/facebook] generateLink falló', { message: linkErr?.message });
+            throw new InvalidCredentialsError();
+        }
+
+        // 3. Actualizar metadatos del usuario (display_name y avatar pueden
+        //    no haberse guardado si el usuario ya existía y generateLink no
+        //    mergeó los data de options).
+        await this.supabaseAdmin.auth.admin.updateUserById(linkData.user.id, {
+            user_metadata: {
+                display_name: displayName,
+                ...(avatarUrl && { avatar_url: avatarUrl }),
+                auth_provider: 'facebook',
+                facebook_id: fbData.id,
+            },
+        });
+
+        await this.syncProfileMirror(linkData.user.id, { displayName });
+
+        // 4. Intercambiar el hashed_token por una sesión con accessToken real.
+        const { data: sessionData, error: verifyErr } = await this.supabaseAuth.auth.verifyOtp({
+            type: 'magiclink',
+            token_hash: linkData.properties.hashed_token,
+        });
+
+        if (verifyErr || !sessionData.session || !sessionData.user) {
+            throw new InvalidCredentialsError();
+        }
+
+        return this.toDomainSession({
+            session: {
+                access_token: sessionData.session.access_token,
+                refresh_token: sessionData.session.refresh_token,
+                expires_in: sessionData.session.expires_in,
+            },
+            user: {
+                id: sessionData.user.id,
+                email: sessionData.user.email ?? null,
+                user_metadata: sessionData.user.user_metadata ?? {},
+                created_at: sessionData.user.created_at,
             },
         });
     }

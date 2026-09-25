@@ -387,7 +387,9 @@ export class MotorAiClient implements AiApiContract {
             return { questions, distribution };
         }
 
-        return { questions: allQuestions, distribution };
+        // Cap al total pedido: cada llamada individual puede devolver más que
+        // su cuota proporcional si el Motor ignora n_preguntas pequeños.
+        return { questions: allQuestions.slice(0, count), distribution };
     }
 
     // ─── Métodos que el Motor NO cubre ────────────────────────────────────────

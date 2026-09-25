@@ -81,10 +81,14 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
   const handleCloseRef = useRef(handleClose);
   handleCloseRef.current = handleClose;
 
+  const scrolledToTopRef = useRef(true);
+
   const panResponder = useRef(
     PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, { dy, dx }) =>
+        scrolledToTopRef.current && dy > 8 && Math.abs(dy) > Math.abs(dx),
       onMoveShouldSetPanResponder: (_, { dy, dx }) =>
-        dy > 8 && Math.abs(dy) > Math.abs(dx),
+        scrolledToTopRef.current && dy > 8 && Math.abs(dy) > Math.abs(dx),
       onPanResponderMove: (_, { dy }) => {
         if (dy > 0) translateY.setValue(dy);
       },
@@ -135,6 +139,7 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
         </Animated.View>
 
         <Animated.View
+          {...panResponder.panHandlers}
           style={[
             styles.sheet,
             {
@@ -144,7 +149,6 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
           ]}
         >
           <View
-            {...panResponder.panHandlers}
             style={styles.handleContainer}
             hitSlop={{ top: 16, bottom: 16, left: 40, right: 40 }}
           >
@@ -155,6 +159,8 @@ export default function ReportQuestionModal({ visible, questionId, onClose, onSe
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             bounces={false}
+            onScroll={(e) => { scrolledToTopRef.current = e.nativeEvent.contentOffset.y <= 0; }}
+            scrollEventThrottle={16}
           >
             <Text style={styles.title}>Reportar esta pregunta</Text>
             <Text style={styles.subtitle}>¿Qué le pasa?</Text>

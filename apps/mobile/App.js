@@ -23,7 +23,6 @@ import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 import { supabase } from './src/lib/supabase';
 import { AccessibilityProvider, AccessibilityContext } from './src/contexts/AccessibilityContext';
 import { ensureCheckinReminderScheduled } from './src/lib/checkinReminder';
-
 // Tipografía de marca OPOX
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -32,6 +31,14 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // interceptarlo. Por eso NO usamos import top-level — usamos require()
 // condicional para que Metro no lo evalúe al cargar el bundle.
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
+
+// Google Sign-In y Facebook SDK requieren native build — no disponibles en Expo Go.
+if (!IS_EXPO_GO) {
+  try {
+    const { configureGoogleSignIn } = require('./src/hooks/useSocialAuth');
+    configureGoogleSignIn();
+  } catch (_) { /* silencioso si el módulo nativo aún no está linkeado */ }
+}
 
 // Carga lazy: solo en development build / producción real
 let Notifications = null;

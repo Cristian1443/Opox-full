@@ -3,7 +3,7 @@
  * Consumidos tanto por el backend como por el mobile.
  */
 
-export type OAuthProvider = 'google' | 'apple' | 'meta';
+export type OAuthProvider = 'google' | 'apple' | 'facebook';
 
 export interface AuthUser {
     /** UUID del usuario (Supabase auth.users.id) */
@@ -49,8 +49,13 @@ export interface LoginRequest {
 
 export interface OAuthLoginRequest {
     provider: OAuthProvider;
-    /** ID token devuelto por el SDK del proveedor en el mobile */
-    idToken: string;
+    /** JWT firmado por Google o Apple */
+    idToken?: string;
+    /** Opaque token de Facebook SDK (solo cuando provider === 'facebook') */
+    accessToken?: string;
+    /** Nombre de pila; solo llega la primera vez en Apple Sign-In */
+    firstName?: string | null;
+    lastName?: string | null;
 }
 
 export interface OtpSendRequest {

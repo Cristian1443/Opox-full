@@ -42,7 +42,19 @@ export class ListSummariesUseCase {
     }
 }
 
-// ─── Obtener resumen de un tema (Supabase → Motor como fallback) ──────────────
+// ─── Caché en memoria para resúmenes generados por el Motor ───────────────────
+// Compartida entre instancias dentro del mismo proceso. Evita re-llamar al Motor
+// para el mismo (topicId, oposicion, detailLevel) — clave para la segunda consulta
+// cuando el usuario cambia de pill (Esquema ↔ Medio ↔ Profundo).
+// TTL 30 min: suficiente para cubrir una sesión de estudio sin servir contenido
+// obsoleto si el Motor re-indexa el curso.
+const _summaryMemCache = new Map<string, { data: TutorSummary; ts: number }>();
+const SUMMARY_MEM_TTL = 30 * 60 * 1_000;
+function _memKey(topicId: string, oposicion: string, level: number) {
+    return `${topicId}::${oposicion}::${level}`;
+}
+
+// ─── Obtener resumen de un tema (mem-cache → Supabase → Motor) ────────────────
 export class GetSummaryUseCase {
     constructor(
         private readonly tutorRepo: ITutorRepository,
@@ -50,20 +62,29 @@ export class GetSummaryUseCase {
     ) {}
 
     async execute(topicId: string, oposicion: string, cursoId?: string, detailLevel?: number): Promise<TutorSummary> {
-        // Solo usar caché cuando el nivel es el default (medio=1) — niveles distintos deben ir al Motor
-        const cached = detailLevel === undefined || detailLevel === 1
-            ? await this.tutorRepo.getSummary(topicId, oposicion)
-            : null;
-        if (cached) return cached;
+        const level = detailLevel ?? 1;
+        const memKey = _memKey(topicId, oposicion, level);
+
+        // 1. In-memory cache (todos los niveles).
+        const mem = _summaryMemCache.get(memKey);
+        if (mem && Date.now() - mem.ts < SUMMARY_MEM_TTL) return mem.data;
+
+        // 2. Supabase (solo nivel 1 — tabla siempre vacía en producción, pero por si acaso).
+        if (level === 1) {
+            const cached = await this.tutorRepo.getSummary(topicId, oposicion);
+            if (cached) {
+                _summaryMemCache.set(memKey, { data: cached, ts: Date.now() });
+                return cached;
+            }
+        }
 
         if (!this.tutorAi) throw new SummaryNotFoundError();
 
-        // Motor como fallback — construir TutorSummary temporal (no se persiste)
+        // 3. Motor — construir TutorSummary temporal (no se persiste en Supabase).
         try {
-            const sections = await this.tutorAi.getSummary({ topicId, oposicion, cursoId, detailLevel });
+            const sections = await this.tutorAi.getSummary({ topicId, oposicion, cursoId, detailLevel: level });
             if (!sections.length) throw new Error('Motor devolvió 0 secciones');
 
-            // Adaptar al formato de TutorSummary con secciones tipadas
             const now = new Date();
             const summary: TutorSummary = {
                 id: `motor-${topicId}-${Date.now()}`,
@@ -79,6 +100,8 @@ export class GetSummaryUseCase {
                 })),
                 updatedAt: now,
             };
+            // Guardar en mem-cache para que el siguiente cambio de pill sea instantáneo.
+            _summaryMemCache.set(memKey, { data: summary, ts: Date.now() });
             return summary;
         } catch (err) {
             logger.warn('[GetSummary] Motor falló', { err: String(err) });

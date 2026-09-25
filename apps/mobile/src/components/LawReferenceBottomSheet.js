@@ -64,6 +64,14 @@ function IconScalesBook({ size = 68 }) {
  * icono balanza+libro morado a la derecha, cuerpo con cita en cursiva
  * y CTA morado "Entendido, sigo".
  */
+// El Motor antepone el ID hexadecimal del documento a los textos de referencia
+// legislativa (ej: "06a8be28733e4e54 Artículo 21"). Limpiarlo antes de mostrar.
+const MOTOR_HEX_PREFIX_RE = /^[0-9a-f]{8,64}\s*/i;
+function stripMotorHex(text) {
+  if (!text) return text;
+  return String(text).replace(MOTOR_HEX_PREFIX_RE, '');
+}
+
 export default function LawReferenceBottomSheet({
   visible,
   law,
@@ -72,6 +80,10 @@ export default function LawReferenceBottomSheet({
   articleText,
   onClose,
 }) {
+  const cleanLaw = stripMotorHex(law);
+  const cleanArticle = stripMotorHex(article);
+  const cleanArticleTitle = stripMotorHex(articleTitle);
+  const cleanArticleText = stripMotorHex(articleText);
   const translateY = useRef(new Animated.Value(SHEET_OFFSET)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
@@ -117,10 +129,12 @@ export default function LawReferenceBottomSheet({
   const handleCloseRef = useRef(handleClose);
   handleCloseRef.current = handleClose;
 
+  const scrolledToTopRef = useRef(true);
+
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, { dy, dx }) =>
-        dy > 8 && Math.abs(dy) > Math.abs(dx),
+      onMoveShouldSetPanResponderCapture: (_, { dy, dx }) =>
+        scrolledToTopRef.current && dy > 8 && Math.abs(dy) > Math.abs(dx),
       onPanResponderMove: (_, { dy }) => {
         if (dy > 0) translateY.setValue(dy);
       },
@@ -157,6 +171,7 @@ export default function LawReferenceBottomSheet({
         </Animated.View>
 
         <Animated.View
+          {...panResponder.panHandlers}
           style={[
             styles.sheet,
             {
@@ -165,11 +180,7 @@ export default function LawReferenceBottomSheet({
             },
           ]}
         >
-          <View
-            {...panResponder.panHandlers}
-            style={styles.handleContainer}
-            hitSlop={{ top: 16, bottom: 16, left: 40, right: 40 }}
-          >
+          <View style={styles.handleContainer}>
             <View style={styles.handle} />
           </View>
 
@@ -177,17 +188,19 @@ export default function LawReferenceBottomSheet({
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             bounces={false}
+            onScroll={(e) => { scrolledToTopRef.current = e.nativeEvent.contentOffset.y <= 0; }}
+            scrollEventThrottle={16}
           >
             <View style={styles.headerRow}>
               <View style={{ flex: 1 }}>
-                {law && (
-                  <Text style={styles.law}>{law}</Text>
+                {cleanLaw && (
+                  <Text style={styles.law}>{cleanLaw}</Text>
                 )}
-                {article && (
-                  <Text style={styles.article}>{article}</Text>
+                {cleanArticle && (
+                  <Text style={styles.article}>{cleanArticle}</Text>
                 )}
-                {articleTitle && (
-                  <Text style={styles.articleTitle}>{articleTitle}</Text>
+                {cleanArticleTitle && (
+                  <Text style={styles.articleTitle}>{cleanArticleTitle}</Text>
                 )}
               </View>
               <View style={styles.headerIcon}>
@@ -197,8 +210,8 @@ export default function LawReferenceBottomSheet({
 
             <Text style={styles.sectionTitle}>Referencia legislativa</Text>
 
-            {articleText && (
-              <Text style={styles.quote}>{articleText}</Text>
+            {cleanArticleText && (
+              <Text style={styles.quote}>{cleanArticleText}</Text>
             )}
           </ScrollView>
 

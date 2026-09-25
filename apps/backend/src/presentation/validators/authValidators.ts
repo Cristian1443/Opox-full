@@ -15,9 +15,15 @@ export const loginSchema = z.object({
 });
 
 export const oauthLoginSchema = z.object({
-    provider: z.enum(['google', 'apple', 'meta']),
-    idToken: z.string().min(1),
-});
+    provider: z.enum(['google', 'apple', 'facebook']),
+    idToken: z.string().min(1).optional(),
+    accessToken: z.string().min(1).optional(),
+    firstName: z.string().max(80).nullable().optional(),
+    lastName: z.string().max(80).nullable().optional(),
+}).refine(
+    (d) => d.provider === 'facebook' ? !!d.accessToken : !!d.idToken,
+    { message: 'idToken requerido para Google/Apple; accessToken requerido para Facebook.' },
+);
 
 export const otpSendSchema = z.object({
     email: emailSchema,

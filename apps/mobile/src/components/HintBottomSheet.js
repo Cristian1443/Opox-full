@@ -5,7 +5,6 @@ import {
     StyleSheet,
     Modal,
     Animated,
-    ScrollView,
     PanResponder,
     ActivityIndicator,
 } from 'react-native';
@@ -82,6 +81,8 @@ export default function HintBottomSheet({ visible, hint, isLoading = false, onCl
 
   const panResponder = useRef(
     PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, { dy, dx }) =>
+        dy > 8 && Math.abs(dy) > Math.abs(dx),
       onMoveShouldSetPanResponder: (_, { dy, dx }) =>
         dy > 8 && Math.abs(dy) > Math.abs(dx),
       onPanResponderMove: (_, { dy }) => {
@@ -120,6 +121,7 @@ export default function HintBottomSheet({ visible, hint, isLoading = false, onCl
         </Animated.View>
 
         <Animated.View
+          {...panResponder.panHandlers}
           style={[
             styles.sheet,
             {
@@ -129,18 +131,13 @@ export default function HintBottomSheet({ visible, hint, isLoading = false, onCl
           ]}
         >
           <View
-            {...panResponder.panHandlers}
             style={styles.handleContainer}
             hitSlop={{ top: 16, bottom: 16, left: 40, right: 40 }}
           >
             <View style={styles.handle} />
           </View>
 
-          <ScrollView
-            style={styles.body}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-          >
+          <View style={styles.body}>
             <View style={styles.headerRow}>
               <Text style={styles.title}>Pista del tutor IA</Text>
               <View style={styles.headerIcon}>
@@ -159,7 +156,7 @@ export default function HintBottomSheet({ visible, hint, isLoading = false, onCl
             <Text style={styles.disclaimer}>
               La IA te guía sin revelar la respuesta correcta.
             </Text>
-          </ScrollView>
+          </View>
 
           <TouchableOpacity
             style={styles.btn}

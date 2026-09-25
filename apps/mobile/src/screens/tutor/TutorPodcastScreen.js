@@ -718,7 +718,14 @@ export default function TutorPodcastScreen({ navigation, route }) {
     // - selectedTopic === null            → picker
     // - selectedTopic && !podcast         → config
     // - podcast                           → player
-    const [selectedTopic, setSelectedTopic] = useState(null);
+    //
+    // Si llegamos desde TutorSummariesScreen con topicId en params, pre-seleccionar
+    // el tema y saltar el picker directamente a la pantalla de config.
+    const paramTopicId = route?.params?.topicId ?? null;
+    const paramTitle   = route?.params?.title   ?? null;
+    const [selectedTopic, setSelectedTopic] = useState(
+        paramTopicId ? { topicId: paramTopicId, title: paramTitle ?? paramTopicId } : null
+    );
     const [podcast, setPodcast]             = useState(null);
 
     if (podcast && selectedTopic) {

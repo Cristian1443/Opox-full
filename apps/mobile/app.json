@@ -69,6 +69,26 @@
       ],
       "./plugins/withHealthConnect.js",
       "./plugins/withHealthConnectPermissionDelegate.js",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.468573803070-3v6flatm7hagovj5rhl3ujg5c0h482j1"
+        }
+      ],
+      "expo-apple-authentication",
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "1078302401240466",
+          "clientToken": "108469a235f21e30bf303f473630ccc7",
+          "displayName": "OPOX",
+          "scheme": "fb1078302401240466",
+          "advertiserIDCollectionEnabled": false,
+          "autoLogAppEventsEnabled": false,
+          "isAutoInitEnabled": true,
+          "iosUserTrackingPermission": "Esta información no se usará para rastrearte con fines publicitarios."
+        }
+      ],
       "expo-secure-store",
       "expo-splash-screen",
       "expo-status-bar",

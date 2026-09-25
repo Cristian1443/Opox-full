@@ -20,8 +20,11 @@ export interface IAuthRepository {
 
     // ─── OAuth (Google / Apple / Meta) ────────────
     loginWithOAuth(input: {
-        provider: 'google' | 'apple' | 'meta';
-        idToken: string;
+        provider: 'google' | 'apple' | 'facebook';
+        idToken?: string;
+        accessToken?: string;
+        firstName?: string | null;
+        lastName?: string | null;
     }): Promise<Session>;
 
     // ─── OTP por email ────────────────────────────
