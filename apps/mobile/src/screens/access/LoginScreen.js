@@ -10,11 +10,13 @@ import {
     Modal,
     Image,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 import {
@@ -23,8 +25,10 @@ import {
     isBiometricLinked,
     loginWithBiometric,
 } from '../../lib/biometric';
+import { useSocialAuth } from '../../hooks/useSocialAuth';
 import OpoxLogo from '../../../assets/opoxLogo';
 import { UserIcon, LockIcon, EyeOffIcon, FaceIdIcon, RememberToggleIcon } from '../../components/icons/LoginIcons';
+import { GoogleLogo, AppleLogo } from '../../components/icons/SocialAuthIcons';
 
 const HERO_BG = require('../../../assets/login/hero_bg.jpg');
 
@@ -37,6 +41,8 @@ const ICON_GRAY = '#BDB6BF';
 
 const BLOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
+
+const META_LOGO = require('../../../assets/logo-meta.png');
 
 export default function LoginScreen({ navigation, route }) {
     const prefillEmail = route?.params?.prefillEmail || '';
@@ -177,6 +183,20 @@ export default function LoginScreen({ navigation, route }) {
         setError({ type: 'auth', message: bioError || 'No te hemos reconocido.' });
     };
 
+    const { loginWithGoogle, loginWithApple, loginWithFacebook, loading: socialLoading } = useSocialAuth();
+
+    const handleSocialLogin = async (loginFn) => {
+        const { data, error: socialError } = await loginFn();
+        if (!data && !socialError) return; // cancelación silenciosa
+        if (socialError) {
+            Alert.alert('Error', socialError.message);
+            return;
+        }
+        if (data?.accessToken) {
+            navigation.replace('SesionIniciada', { email: data.user?.email ?? '' });
+        }
+    };
+
     const isDisabled = !email || !password || isBlocked || isLoggingIn;
     // 1.3 · err: cuando hay error de login, el formulario colapsa a la variante
     // "ERROR CONTRASEÑA" (Figma node 2349:733) — desaparecen "recordar mis
@@ -303,6 +323,51 @@ export default function LoginScreen({ navigation, route }) {
                             </Text>
                         )}
                     </View>
+
+                    {/* Social login — divisor + 3 botones */}
+                    {!isBlocked && !showAuthError && (
+                        <View style={s.socialSection}>
+                            <View style={s.dividerRow}>
+                                <View style={s.dividerLine} />
+                                <Text style={s.dividerText}>o continúa con</Text>
+                                <View style={s.dividerLine} />
+                            </View>
+
+                            <TouchableOpacity
+                                style={[s.socialBtn, socialLoading === 'google' && s.socialBtnLoading]}
+                                onPress={() => handleSocialLogin(loginWithGoogle)}
+                                disabled={socialLoading !== null || isLoggingIn}
+                                activeOpacity={0.8}
+                            >
+                                {socialLoading === 'google'
+                                    ? <ActivityIndicator size="small" color={colors.textDark} />
+                                    : <><GoogleLogo size={20} /><Text style={s.socialBtnText}>Google</Text></>
+                                }
+                            </TouchableOpacity>
+
+                            {Platform.OS === 'ios' && (
+                                <AppleAuthentication.AppleAuthenticationButton
+                                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
+                                    cornerRadius={18}
+                                    style={s.appleBtn}
+                                    onPress={() => handleSocialLogin(loginWithApple)}
+                                />
+                            )}
+
+                            <TouchableOpacity
+                                style={[s.socialBtn, socialLoading === 'facebook' && s.socialBtnLoading]}
+                                onPress={() => handleSocialLogin(loginWithFacebook)}
+                                disabled={socialLoading !== null || isLoggingIn}
+                                activeOpacity={0.8}
+                            >
+                                {socialLoading === 'facebook'
+                                    ? <ActivityIndicator size="small" color={colors.textDark} />
+                                    : <><Image source={META_LOGO} style={s.metaLogo} /><Text style={s.socialBtnText}>Facebook</Text></>
+                                }
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
                     {!isBlocked && !showAuthError && biometricAvailable && (
                         <TouchableOpacity
@@ -611,6 +676,62 @@ const s = StyleSheet.create({
         fontFamily: 'Poppins-Medium',
         fontSize: 14,
         lineHeight: 20,
+    },
+    // Social login
+    socialSection: {
+        paddingHorizontal: 24,
+        gap: 12,
+        marginTop: 4,
+    },
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 4,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: colors.grayMid,
+    },
+    dividerText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: colors.grayText,
+    },
+    socialBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: colors.grayMid,
+        borderRadius: 18,
+        paddingVertical: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 1,
+        minHeight: 52,
+    },
+    socialBtnLoading: {
+        opacity: 0.6,
+    },
+    socialBtnText: {
+        fontFamily: 'Poppins-Medium',
+        fontSize: 15,
+        color: colors.textDark,
+    },
+    appleBtn: {
+        width: '100%',
+        height: 52,
+    },
+    metaLogo: {
+        width: 20,
+        height: 20,
+        resizeMode: 'contain',
     },
     // 1.3 · err — modal bloqueo
     modalOverlay: {

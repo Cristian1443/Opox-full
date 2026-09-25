@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     StyleSheet,
@@ -217,36 +217,62 @@ export default function TutorSummariesScreen({ navigation, route }) {
     );
     const topicId = selectedTopic?.topicId ?? null;
 
-    const [summary, setSummary]       = useState(null);
-    const [isLoading, setIsLoading]   = useState(!!topicId && !paramSections);
+    const [summary, setSummary]         = useState(null);
+    // `isFetching` = petición en vuelo. Distinto de `isLoading` (sin contenido):
+    // cuando ya hay un resumen visible, isFetching muestra solo una barra fina
+    // en lugar de reemplazar toda la pantalla con un spinner.
+    const [isFetching, setIsFetching]   = useState(!!topicId && !paramSections);
     const [detailLevel, setDetailLevel] = useState(1); // 0=Esquema, 1=Medio, 2=Profundo
+    const debounceRef  = useRef(null);   // timer para debounce de pills
+    const prefetchedRef = useRef(new Set()); // niveles ya precalentados en background
 
-    // Cache-first (Bloque 8): si tenemos un resumen previo en AsyncStorage lo
-    // pintamos al instante y disparamos el refresh en background. La latencia
-    // percibida cae de 15-60 s a 0 en la mayoría de reaperturas.
+    // GAP-RS-03: debounce — evita 3 llamadas concurrentes al tocar pills rápido.
+    const handleLevelChange = useCallback((newLevel) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => setDetailLevel(newLevel), 350);
+    }, []);
+
+    // GAP-RS-04: prefetch de los otros 2 niveles en background tras recibir el primero.
+    const prefetchSiblings = useCallback((tId, opos, currentLevel) => {
+        [0, 1, 2].forEach(async (lvl) => {
+            if (lvl === currentLevel) return;
+            const key = `${tId}-${lvl}`;
+            if (prefetchedRef.current.has(key)) return;
+            prefetchedRef.current.add(key);
+            const already = await getCachedSummary(tId, lvl).catch(() => null);
+            if (already) return;
+            tutorApi.getSummary(tId, opos, lvl)
+                .then((res) => { if (res && !res.error && res.data) setCachedSummary(tId, lvl, res.data); })
+                .catch(() => {});
+        });
+    }, []);
+
+    // Cache-first (Bloque 8): muestra el resumen en caché al instante y refresca
+    // en background. GAP-RS-02: el resumen anterior se mantiene visible mientras
+    // llega el nuevo nivel — no se borra con setSummary(null).
     useEffect(() => {
         if (!topicId) return;
         let cancelled = false;
         (async () => {
-            setSummary(null);
             const cached = await getCachedSummary(topicId, detailLevel);
             if (cancelled) return;
             if (cached) {
                 setSummary(cached);
-                setIsLoading(false); // fresco viene después sin bloquear la UI
+                setIsFetching(false);
             } else {
-                setIsLoading(true);
+                setIsFetching(true);
             }
             const res = await tutorApi.getSummary(topicId, oposicion, detailLevel).catch(() => null);
             if (cancelled) return;
             if (res && !res.error && res.data) {
                 setSummary(res.data);
                 setCachedSummary(topicId, detailLevel, res.data);
+                prefetchSiblings(topicId, oposicion, detailLevel);
             }
-            setIsLoading(false);
+            setIsFetching(false);
         })();
         return () => { cancelled = true; };
-    }, [topicId, oposicion, detailLevel]);
+    }, [topicId, oposicion, detailLevel, prefetchSiblings]);
 
     // Muestra el selector si aún no hay tema elegido
     if (!selectedTopic) {
@@ -259,7 +285,11 @@ export default function TutorSummariesScreen({ navigation, route }) {
         );
     }
 
-    const displayTitle    = summary?.topicTitle ?? selectedTopic?.topicTitle ?? paramTitle ?? MOCK_SUMMARY.title;
+    // El Motor devuelve hex IDs como topicTitle cuando el tema no tiene nombre
+    // resuelto en el banco (ej: "06a8be28733e4e54"). Filtrar antes de mostrar.
+    const HEX_ID_RE = /^#?[0-9a-f]{8,64}$/i;
+    const pickTitle = (...candidates) => candidates.find((t) => t && !HEX_ID_RE.test(t.trim()));
+    const displayTitle = pickTitle(summary?.topicTitle, selectedTopic?.topicTitle, paramTitle) ?? MOCK_SUMMARY.title;
     const displaySections = summary?.sections   ?? paramSections ?? MOCK_SUMMARY.sections;
 
     const Header = () => (
@@ -273,17 +303,18 @@ export default function TutorSummariesScreen({ navigation, route }) {
             </TouchableOpacity>
             <View style={styles.headerTextWrap}>
                 <Text style={styles.headerTitle}>Resumen</Text>
-                {!isLoading && <Text style={styles.headerSubtitle}>{displayTitle}</Text>}
+                {(!isFetching || summary) && <Text style={styles.headerSubtitle}>{displayTitle}</Text>}
             </View>
             <View style={styles.headerPlaceholder} />
         </View>
     );
 
-    if (isLoading) {
+    // Primera carga sin contenido previo → pantalla completa con spinner.
+    if (isFetching && !summary) {
         return (
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
                 <Header />
-                <DepthSelector value={detailLevel} onChange={setDetailLevel} />
+                <DepthSelector value={detailLevel} onChange={handleLevelChange} />
                 <View style={styles.loadingCenter}>
                     <ActivityIndicator color={colors.accentOrange} size="large" />
                 </View>
@@ -294,7 +325,9 @@ export default function TutorSummariesScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <Header />
-            <DepthSelector value={detailLevel} onChange={setDetailLevel} />
+            <DepthSelector value={detailLevel} onChange={handleLevelChange} />
+            {/* Barra fina de recarga cuando ya hay contenido visible (GAP-RS-02). */}
+            {isFetching && <View style={styles.fetchingBar} />}
 
             <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
                 {displaySections.map((section) => (
@@ -317,7 +350,7 @@ export default function TutorSummariesScreen({ navigation, route }) {
                 <TouchableOpacity
                     style={styles.secondaryButton}
                     activeOpacity={0.7}
-                    onPress={() => navigation.navigate('TutorPodcast', { title: displayTitle, oposicion })}
+                    onPress={() => navigation.navigate('TutorPodcast', { topicId, title: displayTitle, oposicion })}
                 >
                     <Text style={styles.secondaryButtonText}>Escuchar</Text>
                 </TouchableOpacity>
@@ -362,6 +395,12 @@ const styles = StyleSheet.create({
         fontSize: 10.7,
         color: FIGMA.subtitleMuted,
         textAlign: 'center',
+    },
+    fetchingBar: {
+        height: 2,
+        backgroundColor: colors.accentOrange,
+        opacity: 0.7,
+        marginHorizontal: 0,
     },
     loadingCenter: {
         flex: 1,

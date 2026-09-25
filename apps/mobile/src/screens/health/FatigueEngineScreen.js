@@ -36,7 +36,9 @@ function buildSignals(metrics, checkin) {
     const hrv = metrics?.hrv;
     const restHr = metrics?.restingHeartRate;
     const spo2 = metrics?.spo2;
-    const wearableSleep = metrics?.sleepHours;
+    // Forzar numérico: HealthKit/HC pueden devolver objetos en algunas versiones.
+    const rawSleep = metrics?.sleepHours;
+    const wearableSleep = rawSleep != null && !Number.isNaN(+rawSleep) ? +rawSleep : null;
     const checkinSleep = checkin?.sleepHours != null ? Number(checkin.sleepHours) : null;
     const sleep = wearableSleep ?? checkinSleep;
     const mood = checkin?.moodScore != null ? Number(checkin.moodScore) : null;
@@ -215,6 +217,9 @@ function stringifySignalValue(v) {
         if (typeof v.valor === 'string' || typeof v.valor === 'number') return String(v.valor);
         if (typeof v.value === 'string' || typeof v.value === 'number') return String(v.value);
         if (typeof v.label === 'string') return v.label;
+        // Fallback: primer valor string/número del objeto (evita "[object Object]").
+        const first = Object.values(v).find((x) => typeof x === 'string' || typeof x === 'number');
+        if (first != null) return String(first);
     }
     return '—';
 }
