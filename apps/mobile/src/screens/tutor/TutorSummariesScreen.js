@@ -62,7 +62,10 @@ const DEPTH_OPTIONS = [
     { level: 2, label: 'Profundo', sub: 'Para estudiar' },
 ];
 
-function DepthSelector({ value, onChange }) {
+// loading=true mientras hay una petición en vuelo: deshabilita las tres pills
+// para evitar que el usuario dispare peticiones concurrentes al Motor, y muestra
+// un spinner dentro de la pill activa para confirmar que el tap fue registrado.
+function DepthSelector({ value, onChange, loading = false }) {
     return (
         <View style={styles.depthRow}>
             {DEPTH_OPTIONS.map((opt) => {
@@ -70,16 +73,31 @@ function DepthSelector({ value, onChange }) {
                 return (
                     <TouchableOpacity
                         key={opt.level}
-                        style={[styles.depthPill, active && styles.depthPillActive]}
+                        style={[
+                            styles.depthPill,
+                            active && styles.depthPillActive,
+                            loading && !active && styles.depthPillDisabled,
+                        ]}
                         onPress={() => onChange(opt.level)}
-                        activeOpacity={0.75}
+                        activeOpacity={loading ? 1 : 0.75}
+                        disabled={loading}
                     >
-                        <Text style={[styles.depthLabel, active && styles.depthLabelActive]}>
-                            {opt.label}
-                        </Text>
-                        <Text style={[styles.depthSub, active && styles.depthSubActive]}>
-                            {opt.sub}
-                        </Text>
+                        {active && loading ? (
+                            // Pill activa mientras carga: spinner + texto "generando"
+                            <>
+                                <ActivityIndicator size="small" color={colors.white} />
+                                <Text style={[styles.depthSub, styles.depthSubActive]}>generando…</Text>
+                            </>
+                        ) : (
+                            <>
+                                <Text style={[styles.depthLabel, active && styles.depthLabelActive]}>
+                                    {opt.label}
+                                </Text>
+                                <Text style={[styles.depthSub, active && styles.depthSubActive]}>
+                                    {opt.sub}
+                                </Text>
+                            </>
+                        )}
                     </TouchableOpacity>
                 );
             })}
@@ -314,9 +332,14 @@ export default function TutorSummariesScreen({ navigation, route }) {
         return (
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
                 <Header />
-                <DepthSelector value={detailLevel} onChange={handleLevelChange} />
+                <DepthSelector value={detailLevel} onChange={handleLevelChange} loading={isFetching} />
                 <View style={styles.loadingCenter}>
                     <ActivityIndicator color={colors.accentOrange} size="large" />
+                    {detailLevel === 2 && (
+                        <Text style={styles.loadingHint}>
+                            El resumen profundo se genera con IA{'\n'}y puede tardar hasta 2 minutos
+                        </Text>
+                    )}
                 </View>
             </SafeAreaView>
         );
@@ -325,7 +348,7 @@ export default function TutorSummariesScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <Header />
-            <DepthSelector value={detailLevel} onChange={handleLevelChange} />
+            <DepthSelector value={detailLevel} onChange={handleLevelChange} loading={isFetching} />
             {/* Barra fina de recarga cuando ya hay contenido visible (GAP-RS-02). */}
             {isFetching && <View style={styles.fetchingBar} />}
 
@@ -407,6 +430,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: spacing.md,
+    },
+    loadingHint: {
+        fontSize: 13,
+        fontFamily: 'Poppins-Regular',
+        color: FIGMA.subtitleMuted,
+        textAlign: 'center',
+        marginTop: 8,
+        lineHeight: 20,
     },
     emptyText: {
         fontSize: 15,
@@ -538,6 +569,9 @@ const styles = StyleSheet.create({
     depthPillActive: {
         backgroundColor: `${colors.purple}18`,
         borderColor: colors.purple,
+    },
+    depthPillDisabled: {
+        opacity: 0.4,
     },
     depthLabel: {
         fontFamily: 'Poppins-SemiBold',

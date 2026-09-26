@@ -68,6 +68,32 @@ const METRIC_LABELS: Record<string, string> = {
     spo2: 'Saturación de oxígeno',
 };
 
+// Unidades para mostrar junto al valor numérico en la UI.
+const METRIC_UNITS: Record<string, string> = {
+    horas_sueno: 'h',
+    spo2: '%',
+};
+
+// El Motor puede devolver metricas[key] como número (caso normal) o como objeto
+// anidado {valor: N, ...} (caso visto en producción con horas_sueno). String(objeto)
+// produce "[object Object]". Este helper extrae siempre un string legible.
+function safeMetricValue(key: string, raw: unknown): string {
+    if (raw == null) return 'Sin datos';
+    if (typeof raw === 'string') return raw; // ya tiene formato
+    let num: number | null = null;
+    if (typeof raw === 'number') {
+        num = raw;
+    } else if (typeof raw === 'object') {
+        const o = raw as Record<string, unknown>;
+        const inner = o.valor ?? o.value ?? o.horas ?? o.ms;
+        if (typeof inner === 'number') num = inner;
+        else if (typeof inner === 'string') return inner;
+    }
+    if (num == null) return 'Sin datos';
+    const unit = METRIC_UNITS[key] ?? '';
+    return `${num}${unit}`;
+}
+
 // Umbrales de desviación vs baseline para asignar severidad por señal.
 // Métricas donde subir el valor es MEJOR (HRV, sueño, SpO2): rojo cuando ≤ 70 %
 // del baseline; amarillo cuando ≤ 85 %. FC reposo es al revés (más alto = peor).
@@ -156,7 +182,7 @@ export class MotorFatigueClient {
             return {
                 id: key,
                 label: METRIC_LABELS[key] ?? key.replace(/_/g, ' '),
-                valor: value != null ? String(value) : 'Sin datos',
+                valor: safeMetricValue(key, value),
                 estado: severidad === 'critical' ? 'alerta' : 'ok',
                 severidad,
             };
