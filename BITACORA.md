@@ -5,6 +5,112 @@ técnica queda en el código y en el historial de git.
 
 ---
 
+## 2026-09-26 — Social login nativo, resúmenes asíncronos Motor 1.9.0, UX pills, podcast ffmpeg
+
+Rama: `fix/podcast-seek-opo-toast`.
+
+### Gap A — Login social: Google DEVELOPER_ERROR + Facebook crash + botones Registro sin función
+
+Los tres botones sociales en `RegistroScreen` no hacían nada (no tenían `onPress`). En
+`LoginScreen`, Google fallaba con `DEVELOPER_ERROR` y Facebook crasheaba la app al intentar
+abrir el módulo nativo.
+
+**Causa raíz Google**: el `google-services.json` de `apps/mobile/` tenía `"oauth_client": []`
+vacío — era un archivo de otro proyecto. Además, las credenciales en `useSocialAuth.js`
+pertenecían al proyecto antiguo `468573803070` en lugar del activo `76808135597`.
+
+**Causa raíz Facebook**: `require('react-native-fbsdk-next')` estaba fuera del bloque
+`try/catch`, por lo que cualquier error de carga del módulo nativo propagaba sin capturar
+y crasheaba la app.
+
+**Fixes aplicados**:
+- `apps/mobile/google-services.json` reemplazado con el del proyecto `76808135597` (con
+  `oauth_client` poblado: Android type 1 con SHA-1 + Web type 3).
+- `apps/mobile/GoogleService-Info.plist` creado (no existía en esa ruta).
+- `apps/mobile/app.json` — `iosUrlScheme` corregido al proyecto `76808135597`.
+- `useSocialAuth.js` reescrito completamente: flujo nativo token → `supabase.auth.signInWithIdToken()`
+  directo (antes pasaba por endpoint propio `/auth/oauth`). `mapSupabaseSession()` convierte
+  el formato snake_case de Supabase al camelCase interno de la app y guarda vía `api.saveSession()`.
+  Lazy `require` de Google y Facebook dentro de cada función → Expo Go no evalúa los módulos
+  nativos al arrancar. Error `DEVELOPER_ERROR` / código `'10'` devuelve mensaje amigable.
+- `RegistroScreen.js` — conectado `useSocialAuth`, `handleSocialLogin`, spinner por botón activo,
+  Apple condicional solo en iOS.
+
+**Facebook Key Hash** para registrar en Meta for Developers: `JLbEWbCtvYMeOX9ZR8fyCiqD1HI=`
+(SHA-1 `24b6c459b0adbd831e397f5947c7f20a2a83d472` → Base64).
+
+**Pendiente** (requiere acción manual): EAS build para compilar los nuevos archivos de
+credenciales; registrar Key Hash en Meta; habilitar proveedores en Supabase Dashboard.
+
+---
+
+### Gap B — `[object Object]` en Motor de Fatiga para "Horas de sueño"
+
+El Motor devolvía `metricas.horas_sueno` como objeto `{valor: 8}` en lugar de número.
+`String({valor:8})` producía `"[object Object]"` que pasaba la guarda `typeof === 'string'`
+y se renderizaba tal cual en `FatigueEngineScreen`.
+
+Fix en `MotorFatigueClient.ts`: función `safeMetricValue(key, raw)` que desenvuelve
+objetos anidados (`raw.valor ?? raw.value ?? raw.horas ?? raw.ms`) y añade unidades por
+clave (`horas_sueno → h`, `spo2 → %`).
+
+---
+
+### Motor 1.9.0 — Resúmenes asíncronos en Aula Virtual
+
+El equipo IA publicó la versión 1.9.0 del Motor con soporte asíncrono para
+`POST /v1/classroom/summary`. Para temas largos en nivel Profundo el Motor tardaba
+99-136 s, superando el timeout de 60 s del cliente → el usuario veía error aunque
+el resumen se generase correctamente.
+
+**Protocolo nuevo**: `Prefer: respond-async` en el POST.
+- `200` → caché hit, respuesta inmediata (10 ms).
+- `202` → devuelve `{ job_id }`, hay que sondear `GET /v1/jobs/{job_id}` cada 2 s.
+- Job `estado: done` → `resultado` con el mismo esquema que el `200`.
+- Job `estado: error` → `mensaje` con código; no reintentar `salida_truncada` ni errores de clave.
+- `progreso.etapa`: `en_cola | redactando | listo`. `progreso.estimado_s` orientativo.
+- La caché no tiene TTL; se invalida si el Monitor BOE modifica el tema.
+- Backward-compatible: Motor <1.9.0 ignora el header y responde 200 síncrono.
+
+**Cambios**:
+- `MotorTutorClient.ts` — nuevo método `postWithStatus()` (expone HTTP status junto al
+  body). `getSummary()` usa `Prefer: respond-async`; si 200 parsea directo; si 202 hace
+  polling con `GET /v1/jobs/{job_id}` cada 2 s, máximo 3 min.
+- `tutor.js` mobile — `getSummary` timeout: 60 s → 210 s (margen sobre los 180 s del
+  polling del backend).
+
+---
+
+### UX pills de profundidad — bloqueo durante carga
+
+Con el resumen asíncrono (hasta 2 min para Profundo), el usuario podía tocar las tres
+pills rápido al no ver cambio visual → múltiples peticiones concurrentes al Motor.
+
+Fix en `TutorSummariesScreen.js`:
+- `DepthSelector` recibe prop `loading` (= `isFetching`).
+- Cuando `loading`:
+  - La pill activa muestra `ActivityIndicator` pequeño + texto "generando…" en lugar del label.
+  - Las otras dos pills pasan a 40% de opacidad y `disabled={true}`.
+- En la primera carga sin contenido, nivel Profundo muestra además el texto:
+  "El resumen profundo se genera con IA y puede tardar hasta 2 minutos".
+- Cuando hay caché el Motor responde en ~10 ms → las pills vuelven a la normalidad antes
+  de que el usuario perciba el bloqueo.
+
+---
+
+### ffmpeg ENOENT — fallback en dev Windows para proxy de podcast
+
+`PodcastAudioTranscoder` ejecuta `ffmpeg` para añadir cabecera Xing/VBRI al MP3 del Motor
+(necesaria para seek en Android ExoPlayer). En dev Windows sin ffmpeg instalado el servidor
+crasheaba con `spawn ffmpeg ENOENT` al intentar reproducir un podcast generado.
+
+Fix en `PodcastAudioTranscoder.ts`: en el `catch` de `transcode()`, si el código de error
+es `ENOENT`, el archivo fuente se renombra directamente al path de caché (sin re-codificar)
+y se loguea un `warn`. El audio se reproduce sin seek funcional en Android, pero sin crash.
+En producción (Render tiene ffmpeg) el comportamiento es idéntico al anterior.
+
+---
+
 ## 2026-09-24 — 3 gaps UX mobile · ranking hub, recta final y laboratorio
 
 Rama: `fix/podcast-seek-opo-toast`.

@@ -9,6 +9,7 @@ import {
     ScrollView,
     ActivityIndicator,
     Image,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../components/AppText';
@@ -16,7 +17,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 import OpoxWordmark from '../../../assets/opoxLogo';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { GoogleLogo, AppleLogo } from '../../components/icons/SocialAuthIcons';
+import { useSocialAuth } from '../../hooks/useSocialAuth';
 import EmailAlreadyRegisteredModal from '../../components/EmailAlreadyRegisteredModal';
 import AlertCardModal from '../../components/AlertCardModal';
 
@@ -118,26 +121,38 @@ export default function RegistroScreen({ navigation }) {
         setTimeout(() => emailInputRef.current?.focus(), 50);
     };
 
-    // TODO(bloque1): cablear authApi.oauthLogin(provider) cuando el SDK nativo
-    // de Google/Meta/Apple esté integrado — de momento los botones sociales
-    // son solo visuales (igual que antes de este cambio, no había onPress).
+    const metaIcon = (
+        <View style={s.metaLogoClip}>
+            <Image
+                source={require('../../../assets/logo-meta.png')}
+                style={s.metaLogoImage}
+                resizeMode="cover"
+            />
+        </View>
+    );
+
     const socialButtons = [
-        { key: 'google', label: 'Continuar con Google', icon: <GoogleLogo size={20} /> },
-        {
-            key: 'meta',
-            label: 'Continuar con Meta',
-            icon: (
-                <View style={s.metaLogoClip}>
-                    <Image
-                        source={require('../../../assets/logo-meta.png')}
-                        style={s.metaLogoImage}
-                        resizeMode="cover"
-                    />
-                </View>
-            ),
-        },
-        { key: 'apple', label: 'Continuar con Apple', icon: <AppleLogo size={19} /> },
+        { key: 'google', label: 'Continuar con Google', icon: <GoogleLogo size={20} />, fn: loginWithGoogle },
+        { key: 'meta', label: 'Continuar con Meta', icon: metaIcon, fn: loginWithFacebook },
+        // Apple Sign-In solo en iOS (el SDK nativo no existe en Android)
+        ...(Platform.OS === 'ios'
+            ? [{ key: 'apple', label: 'Continuar con Apple', icon: <AppleLogo size={19} />, fn: loginWithApple }]
+            : []),
     ];
+
+    const { loginWithGoogle, loginWithApple, loginWithFacebook, loading: socialLoading } = useSocialAuth();
+
+    const handleSocialLogin = async (loginFn) => {
+        const { data, error: socialError } = await loginFn();
+        if (!data && !socialError) return; // cancelación silenciosa
+        if (socialError) {
+            Alert.alert('Error', socialError.message);
+            return;
+        }
+        if (data?.accessToken) {
+            navigation.replace('SesionIniciada', { email: data.user?.email ?? '' });
+        }
+    };
 
     const isDisabled = !nombre || !email || password.length < MIN_PASSWORD_LENGTH || isLoading;
 
@@ -161,9 +176,17 @@ export default function RegistroScreen({ navigation }) {
                     {/* Botones sociales */}
                     <View style={s.socialContainer}>
                         {socialButtons.map((btn) => (
-                            <TouchableOpacity key={btn.key} style={s.socialButton} activeOpacity={0.8}>
-                                {btn.icon}
-                                <Text style={s.socialText}>{btn.label}</Text>
+                            <TouchableOpacity
+                                key={btn.key}
+                                style={[s.socialButton, (socialLoading !== null || isLoading) && { opacity: 0.6 }]}
+                                activeOpacity={0.8}
+                                disabled={socialLoading !== null || isLoading}
+                                onPress={() => handleSocialLogin(btn.fn)}
+                            >
+                                {socialLoading === btn.key
+                                    ? <ActivityIndicator size="small" color={colors.textDark} />
+                                    : <>{btn.icon}<Text style={s.socialText}>{btn.label}</Text></>
+                                }
                             </TouchableOpacity>
                         ))}
                     </View>

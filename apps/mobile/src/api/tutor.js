@@ -73,9 +73,12 @@ export const tutorApi = {
     listSummaries: (oposicion) =>
         api.get(`${T.SUMMARIES}?oposicion=${encodeURIComponent(oposicion)}`, { auth: true }),
 
+    // Timeout 210 s: el backend hace polling al Motor async (motor 1.9.0) y
+    // el nivel "profundo" puede tardar ~100 s en generarse. 210 s da margen
+    // sobre los 180 s máximos del polling del backend.
     getSummary: (topicId, oposicion, detailLevel = null) =>
         api.get(
             `${T.SUMMARY.replace(':topicId', topicId)}?oposicion=${encodeURIComponent(oposicion)}${detailLevel != null ? `&detailLevel=${detailLevel}` : ''}`,
-            { auth: true, timeoutMs: 60_000 },
+            { auth: true, timeoutMs: 210_000 },
         ),
 };

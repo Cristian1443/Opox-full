@@ -66,9 +66,23 @@ export class PodcastAudioTranscoder {
             await rename(tmpOutput, cachedPath);
             logger.info('[podcast-transcoder] mp3 re-codificado a CBR con Xing header', { filename });
             return cachedPath;
+        } catch (err) {
+            const isEnoent = (err as NodeJS.ErrnoException).code === 'ENOENT';
+            if (isEnoent) {
+                // ffmpeg no está instalado en este entorno (habitual en dev Windows).
+                // Servimos el MP3 original sin re-codificar: el seek en Android
+                // ExoPlayer no funcionará (sin cabecera Xing), pero el audio se
+                // reproduce correctamente. En producción (Render) ffmpeg sí existe.
+                logger.warn('[podcast-transcoder] ffmpeg no encontrado — sirviendo MP3 sin transcodificar (seek deshabilitado en Android)', { filename });
+                await rm(cachedPath, { force: true });
+                await rename(tmpInput, cachedPath);
+                return cachedPath;
+            }
+            throw err;
         } finally {
-            await rm(tmpInput, { force: true });
-            await rm(tmpOutput, { force: true });
+            // tmpInput puede ya no existir si lo renombramos en el fallback.
+            await rm(tmpInput, { force: true }).catch(() => undefined);
+            await rm(tmpOutput, { force: true }).catch(() => undefined);
         }
     }
 

@@ -33,7 +33,7 @@ export class MotorTutorClient implements ITutorAiClient {
         };
     }
 
-    private async post<T>(path: string, body: unknown): Promise<T> {
+    private async post<T>(path: string, body: unknown, extraHeaders?: Record<string, string>): Promise<T> {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
         try {
@@ -42,6 +42,7 @@ export class MotorTutorClient implements ITutorAiClient {
                 headers: {
                     'Content-Type': 'application/json',
                     ...this.authHeaders(),
+                    ...(extraHeaders ?? {}),
                 },
                 body: JSON.stringify(body),
                 signal: ctrl.signal,
@@ -54,6 +55,35 @@ export class MotorTutorClient implements ITutorAiClient {
                 throw err;
             }
             return res.json() as Promise<T>;
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    // Variante de post() que devuelve status HTTP junto al body — necesaria para
+    // distinguir 200 (caché) de 202 (job encolado) en el modo asíncrono.
+    private async postWithStatus<T>(path: string, body: unknown, extraHeaders?: Record<string, string>): Promise<{ status: number; data: T }> {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+        try {
+            const res = await fetch(`${this.baseUrl}${path}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...this.authHeaders(),
+                    ...(extraHeaders ?? {}),
+                },
+                body: JSON.stringify(body),
+                signal: ctrl.signal,
+            });
+            if (!res.ok && res.status !== 202) {
+                const text = await res.text().catch(() => '');
+                const err = new Error(`Motor tutor ${path} → ${res.status}: ${text.slice(0, 200)}`);
+                (err as NodeJS.ErrnoException).code = res.status >= 500 ? 'MOTOR_SERVER_ERROR' : 'MOTOR_CLIENT_ERROR';
+                throw err;
+            }
+            const data = await res.json() as T;
+            return { status: res.status, data };
         } finally {
             clearTimeout(timer);
         }
@@ -223,7 +253,17 @@ export class MotorTutorClient implements ITutorAiClient {
         const nivelMap: Record<number, string> = { 0: 'esquema', 1: 'medio', 2: 'profundo' };
         const nivel = nivelMap[params.detailLevel ?? 1] ?? 'medio';
 
-        const data = await this.post<{
+        const body = {
+            curso_id: params.cursoId ?? this.cursoId,
+            tema_id: params.topicId,
+            nivel,
+        };
+
+        // Motor 1.9.0: modo asíncrono con Prefer: respond-async.
+        // - 200 → caché hit, misma estructura que la respuesta síncrona anterior.
+        // - 202 → job encolado, sondear GET /v1/jobs/{job_id} cada 2 s (hasta 3 min).
+        // Motor <1.9.0 ignora el header y responde 200 síncrono (backward-compat).
+        type SummaryBody = {
             tema_id?: string;
             nivel?: string;
             resumen?: {
@@ -232,13 +272,59 @@ export class MotorTutorClient implements ITutorAiClient {
                 desarrollo?: string | string[];
                 puntos_examen?: string[];
             };
-        }>('/v1/classroom/summary', {
-            curso_id: params.cursoId ?? this.cursoId,
-            tema_id: params.topicId,
-            nivel,
-        });
+        };
 
-        const r = data.resumen;
+        const { status, data: initial } = await this.postWithStatus<SummaryBody | { job_id?: string }>(
+            '/v1/classroom/summary',
+            body,
+            { 'Prefer': 'respond-async' },
+        );
+
+        let summaryBody: SummaryBody;
+
+        if (status === 202) {
+            // El Motor necesita generarlo — polling hasta done.
+            const jobInfo = initial as { job_id?: string };
+            if (!jobInfo.job_id) throw new Error('Motor summary: 202 sin job_id');
+
+            // Profundo puede tardar ~99-136 s; polling hasta 3 min con pausa de 2 s.
+            const maxWaitMs = 180_000;
+            const intervalMs = 2_000;
+            const start = Date.now();
+            let resolved: SummaryBody | null = null;
+
+            while (Date.now() - start < maxWaitMs) {
+                await new Promise((r) => setTimeout(r, intervalMs));
+
+                const jobStatus = await this.get<{
+                    estado?: string;
+                    mensaje?: string;
+                    progreso?: { etapa?: string; estimado_s?: number };
+                    resultado?: SummaryBody;
+                }>(`/v1/jobs/${jobInfo.job_id}`);
+
+                if (jobStatus.estado === 'done') {
+                    resolved = jobStatus.resultado ?? {};
+                    break;
+                }
+                if (jobStatus.estado === 'error') {
+                    const msg = jobStatus.mensaje ?? 'error desconocido';
+                    const err = new Error(`Motor summary job error: ${msg}`);
+                    // salida_truncada y errores de clave no tienen solución reintentando.
+                    (err as NodeJS.ErrnoException).code = 'MOTOR_SERVER_ERROR';
+                    throw err;
+                }
+                // en_cola / redactando → continuar sondeo
+            }
+
+            if (!resolved) throw new Error('Motor summary job timeout (3 min)');
+            summaryBody = resolved;
+        } else {
+            // 200: caché hit (o Motor anterior a 1.9.0 respondiendo síncronamente)
+            summaryBody = initial as SummaryBody;
+        }
+
+        const r = summaryBody.resumen;
         if (!r) return [];
         const sections: Array<{ title: string; content: string }> = [];
         if (r.titulo) {
