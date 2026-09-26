@@ -1828,3 +1828,81 @@ solo corre cuando `opts.jobDone === true`.
 
 **Campo `corte` eliminado del código**: `deficitRaw.corte` siempre devolvía `undefined`
 porque `DeficitOut` no lo define en el schema. Hardcoded `reason: null` en `deficitDetail`.
+
+---
+
+## Gaps-26-09-26 · notas clave
+
+### Login social nativo — Google / Apple / Facebook (2026-09-26)
+
+**Causa raíz de `DEVELOPER_ERROR` en Google**: `apps/mobile/google-services.json` tenía
+`"oauth_client": []` vacío (era de un proyecto diferente). Las credenciales en
+`useSocialAuth.js` también eran del proyecto antiguo `468573803070`; el activo es `76808135597`.
+
+**Nuevo flujo** en `apps/mobile/src/hooks/useSocialAuth.js`:
+- `configureGoogleSignIn()` — llamar desde `App.js` solo si `!IS_EXPO_GO`.
+  `webClientId`: `76808135597-moaetvsrr1sph9hfe3kebd33vtrt9d57.apps.googleusercontent.com`.
+  `iosClientId`: `76808135597-s7ofnpev65fg3lg26cnp6o4biip1oi4g.apps.googleusercontent.com`.
+- Cada provider: token nativo → `supabase.auth.signInWithIdToken({ provider, token })`
+  directo (sin pasar por endpoint propio). `mapSupabaseSession(session, user)` convierte
+  `access_token/refresh_token` de Supabase a `accessToken/refreshToken` del formato interno,
+  extrae `oposicion` de `user_metadata` y guarda con `api.saveSession(mapped)`.
+- `require()` lazy dentro de cada función para que Metro no evalúe módulos nativos en Expo Go.
+- Error `DEVELOPER_ERROR` / código `'10'` → mensaje amigable (no crash).
+
+**`RegistroScreen.js`**: `socialButtons` array con `fn` property; Apple condicional con
+`Platform.OS === 'ios'`; `handleSocialLogin` con `Alert.alert` en error, `navigation.replace`
+en éxito.
+
+**Archivos de credenciales** (en `.gitignore`, nunca se suben):
+- `apps/mobile/google-services.json` — proyecto `76808135597`, `oauth_client` poblado:
+  Android client type 1 con SHA-1 `24b6c459b0adbd831e397f5947c7f20a2a83d472`, Web type 3.
+- `apps/mobile/GoogleService-Info.plist` — iOS, `CLIENT_ID`:
+  `76808135597-s7ofnpev65fg3lg26cnp6o4biip1oi4g`.
+- `apps/mobile/app.json` → `iosUrlScheme`:
+  `com.googleusercontent.apps.76808135597-s7ofnpev65fg3lg26cnp6o4biip1oi4g`.
+- Facebook `appID: "1078302401240466"`, `scheme: "fb1078302401240466"` ya correctos.
+- **Key Hash Facebook** (registrar en Meta for Developers → App → Android → Key Hashes):
+  `JLbEWbCtvYMeOX9ZR8fyCiqD1HI=` (SHA-1 `24b6c4...` en Base64).
+
+**Pendientes** (acción manual antes de APK):
+1. EAS build para compilar nuevas credenciales nativas.
+2. Registrar Key Hash en Meta for Developers.
+3. Supabase Dashboard → Authentication → Providers: habilitar Google, Apple, Facebook con secretos.
+
+### `[object Object]` en Motor de Fatiga — fix `safeMetricValue` (2026-09-26)
+
+`MotorFatigueClient.ts`: el Motor devuelve `metricas.horas_sueno` como `{valor: N}` en lugar
+de número. Función `safeMetricValue(key, raw)` desenvuelve el objeto y añade unidades por clave
+(`horas_sueno → h`, `spo2 → %`). Tabla `METRIC_UNITS` extensible para nuevas métricas.
+
+### Resúmenes asíncronos Motor 1.9.0 — `MotorTutorClient.getSummary` (2026-09-26)
+
+Motor 1.9.0 soporta `Prefer: respond-async` en `POST /v1/classroom/summary`:
+- `200`: caché hit, inmediato.
+- `202`: `{ job_id }`, sondear `GET /v1/jobs/{job_id}` cada 2 s.
+- Job `estado: done` → `resultado` con el mismo esquema que el `200` síncrono.
+- `progreso.etapa`: `en_cola | redactando | listo`. `progreso.estimado_s` orientativo.
+- No reintentar `salida_truncada` ni errores de clave. Reintentar `error_interno`.
+- Sin la cabecera: Motor <1.9.0 responde 200 síncrono (backward-compatible).
+
+Implementación: `postWithStatus()` (variante de `post()` que expone HTTP status); `getSummary()`
+hace polling con máximo 3 min (profundo tarda ~99-136 s). Timeout mobile `getSummary`: 60 s → 210 s.
+
+### UX pills de profundidad — bloqueo durante carga (2026-09-26)
+
+`TutorSummariesScreen.js` — `DepthSelector` recibe `loading={isFetching}`:
+- `loading && active` → `ActivityIndicator` pequeño + texto "generando…" en la pill.
+- `loading && !active` → `opacity: 0.4`, `disabled={true}` — impide peticiones concurrentes al Motor.
+- Primera carga + nivel Profundo → hint "El resumen profundo se genera con IA y puede tardar
+  hasta 2 minutos" bajo el spinner central.
+
+### ffmpeg ENOENT — fallback en `PodcastAudioTranscoder` (2026-09-26)
+
+En dev Windows sin `ffmpeg` instalado, `spawn ffmpeg ENOENT` crasheaba el servidor al servir
+el proxy de audio del podcast. Fix en `PodcastAudioTranscoder.ts`: en el `catch` de `transcode()`,
+si `err.code === 'ENOENT'`, el buffer fuente se escribe directamente al path de caché sin
+re-codificar y se emite `logger.warn`. El audio se reproduce (sin seek funcional en Android
+ExoPlayer), sin crash. En producción (Render tiene ffmpeg) el comportamiento es idéntico al anterior.
+
+Instalar ffmpeg en dev Windows si se necesita seek: `winget install Gyan.FFmpeg`.
