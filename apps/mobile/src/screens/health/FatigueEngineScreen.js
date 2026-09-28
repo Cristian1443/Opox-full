@@ -291,9 +291,11 @@ export default function FatigueEngineScreen({ navigation, route }) {
         }
     }, [motorResult, metrics, checkin]);
 
-    // Motor disponible → usa sus datos; sin Motor → cálculo local con check-in.
-    const SIGNALS = motorResult
-        ? mapMotorSignals(motorResult.senales ?? [])
+    // Motor disponible con señales → usa sus datos.
+    // Sin Motor o sin señales (sin_datos) → cálculo local, que muestra señales
+    // con "Sin datos" para métricas ausentes en lugar de una lista vacía.
+    const SIGNALS = (motorResult && (motorResult.senales?.length ?? 0) > 0)
+        ? mapMotorSignals(motorResult.senales)
         : buildSignals(metrics, checkin);
 
     const motorFatigueLevel = motorResult
