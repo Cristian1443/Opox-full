@@ -58,7 +58,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         const user = User.create({
             id: payload.user.id,
             email: payload.user.email || '',
-            displayName: (metadata['display_name'] as string) || null,
+            displayName: (metadata['display_name'] as string) || (metadata['full_name'] as string) || (metadata['name'] as string) || null,
             avatarUrl: (metadata['avatar_url'] as string) || null,
             hasBiometric: Boolean(metadata['has_biometric']),
             termsAcceptedAt: metadata['terms_accepted_at']
@@ -601,7 +601,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         const user = User.create({
             id: data.user.id,
             email: data.user.email || '',
-            displayName: (data.user.user_metadata?.['display_name'] as string) || null,
+            displayName: (data.user.user_metadata?.['display_name'] as string) || (data.user.user_metadata?.['full_name'] as string) || (data.user.user_metadata?.['name'] as string) || null,
             avatarUrl: (data.user.user_metadata?.['avatar_url'] as string) || null,
             hasBiometric: Boolean(data.user.user_metadata?.['has_biometric']),
             termsAcceptedAt: data.user.user_metadata?.['terms_accepted_at']
@@ -666,7 +666,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         return User.create({
             id: data.user.id,
             email: data.user.email || '',
-            displayName: (data.user.user_metadata?.['display_name'] as string) || null,
+            displayName: (data.user.user_metadata?.['display_name'] as string) || (data.user.user_metadata?.['full_name'] as string) || (data.user.user_metadata?.['name'] as string) || null,
             avatarUrl: (data.user.user_metadata?.['avatar_url'] as string) || null,
             hasBiometric: Boolean(data.user.user_metadata?.['has_biometric']),
             termsAcceptedAt: new Date(now),
@@ -701,7 +701,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         return User.create({
             id: data.user.id,
             email: data.user.email || '',
-            displayName: (data.user.user_metadata?.['display_name'] as string) || null,
+            displayName: (data.user.user_metadata?.['display_name'] as string) || (data.user.user_metadata?.['full_name'] as string) || (data.user.user_metadata?.['name'] as string) || null,
             avatarUrl: (data.user.user_metadata?.['avatar_url'] as string) || null,
             hasBiometric: Boolean(data.user.user_metadata?.['has_biometric']),
             termsAcceptedAt: data.user.user_metadata?.['terms_accepted_at']
