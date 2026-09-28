@@ -38,6 +38,14 @@ if (!IS_EXPO_GO) {
     const { configureGoogleSignIn } = require('./src/hooks/useSocialAuth');
     configureGoogleSignIn();
   } catch (_) { /* silencioso si el módulo nativo aún no está linkeado */ }
+
+  // Meta Android SDK v16+ (react-native-fbsdk-next v13+) ya no se auto-inicializa
+  // solo con isAutoInitEnabled en el manifest — requiere llamada explícita en JS.
+  // Sin esto, LoginManager lanza una excepción nativa fatal al primer uso.
+  try {
+    const { Settings } = require('react-native-fbsdk-next');
+    Settings.initializeSDK();
+  } catch (_) { /* silencioso si el módulo nativo aún no está linkeado */ }
 }
 
 // Carga lazy: solo en development build / producción real
