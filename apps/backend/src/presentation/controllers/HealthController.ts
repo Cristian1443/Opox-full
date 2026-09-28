@@ -157,7 +157,9 @@ export class HealthController {
         // métrica, y el Motor devolvería "Fatiga baja" con una sola señal.
         // Cuando solo hay check-in (con o sin sueño) el fallback local es la
         // ruta correcta porque sabe interpretar mood/energía/factores.
-        const hasWearableBiometric = hrv != null || fc_reposo != null || spo2 != null;
+        // spo2 excluido: el Motor solo acepta hrv_ms y fc_reposo — si solo hay SpO2
+        // el fallback local (buildFatigueLocally) la muestra correctamente como señal.
+        const hasWearableBiometric = hrv != null || fc_reposo != null;
         const hasCheckin = moodScore != null || perceivedEnergy != null || (Array.isArray(factors) && factors.length > 0);
         const hasAnyInput = hasWearableBiometric || hasCheckin || sueno_horas != null;
 

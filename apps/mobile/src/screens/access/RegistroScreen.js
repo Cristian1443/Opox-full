@@ -121,6 +121,8 @@ export default function RegistroScreen({ navigation }) {
         setTimeout(() => emailInputRef.current?.focus(), 50);
     };
 
+    const { loginWithGoogle, loginWithApple, loginWithFacebook, loading: socialLoading } = useSocialAuth();
+
     const metaIcon = (
         <View style={s.metaLogoClip}>
             <Image
@@ -139,8 +141,6 @@ export default function RegistroScreen({ navigation }) {
             ? [{ key: 'apple', label: 'Continuar con Apple', icon: <AppleLogo size={19} />, fn: loginWithApple }]
             : []),
     ];
-
-    const { loginWithGoogle, loginWithApple, loginWithFacebook, loading: socialLoading } = useSocialAuth();
 
     const handleSocialLogin = async (loginFn) => {
         const { data, error: socialError } = await loginFn();
