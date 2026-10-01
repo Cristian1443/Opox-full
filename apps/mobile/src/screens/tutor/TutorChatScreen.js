@@ -168,9 +168,152 @@ const markdownStyles = {
 // un "Ver más" — evita el "muro de scroll" reportado en el gap.
 const COLLAPSE_THRESHOLD = 500;
 
+// ─── Tarjeta de configuración de test ────────────────────────────────────────
+function TestConfigCard({ msg, onNavigate }) {
+    const { suggestedTopics = [] } = msg;
+    const [selectedIds, setSelectedIds] = useState(new Set(suggestedTopics.map((t) => t.topicId)));
+    const [useAll, setUseAll] = useState(suggestedTopics.length === 0);
+    const [count, setCount] = useState(10);
+    const [started, setStarted] = useState(false);
+
+    const toggleTopic = (tid) => {
+        const next = new Set(selectedIds);
+        if (next.has(tid)) next.delete(tid); else next.add(tid);
+        setSelectedIds(next);
+        setUseAll(false);
+    };
+
+    return (
+        <View style={[styles.messageRow, styles.rowLeft]}>
+            <Avatar size={26} />
+            <View style={[styles.configCard]}>
+                <Text style={styles.configCardTitle}>¿Sobre qué temas quieres el test?</Text>
+                <View style={styles.configChipsRow}>
+                    {suggestedTopics.map((t) => {
+                        const active = !useAll && selectedIds.has(t.topicId);
+                        return (
+                            <TouchableOpacity
+                                key={t.topicId}
+                                style={[styles.configChip, active && styles.configChipActive]}
+                                onPress={() => toggleTopic(t.topicId)}
+                                disabled={started}
+                            >
+                                <Text style={[styles.configChipText, active && styles.configChipTextActive]}>
+                                    {t.topicTitle}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                    <TouchableOpacity
+                        style={[styles.configChip, useAll && styles.configChipActive]}
+                        onPress={() => { setUseAll(true); setSelectedIds(new Set()); }}
+                        disabled={started}
+                    >
+                        <Text style={[styles.configChipText, useAll && styles.configChipTextActive]}>
+                            Todos los temas
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <Text style={styles.configCardLabel}>Número de preguntas:</Text>
+                <View style={styles.configChipsRow}>
+                    {[10, 20, 30].map((n) => (
+                        <TouchableOpacity
+                            key={n}
+                            style={[styles.configChip, count === n && styles.configChipActive]}
+                            onPress={() => setCount(n)}
+                            disabled={started}
+                        >
+                            <Text style={[styles.configChipText, count === n && styles.configChipTextActive]}>{n}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.configStartBtn, started && styles.configStartBtnDone]}
+                    onPress={() => {
+                        if (started) return;
+                        setStarted(true);
+                        const topicId = useAll ? null : [...selectedIds].join(',') || null;
+                        onNavigate('GeneratorConfig', topicId ? { topicId, questionCount: count } : { questionCount: count });
+                    }}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.configStartBtnText}>{started ? '✓ Test iniciado' : 'Empezar test →'}</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+}
+
+// ─── Tarjeta de configuración de flashcards ───────────────────────────────────
+function FlashcardsConfigCard({ msg, onNavigate }) {
+    const { suggestedTopics = [] } = msg;
+    const firstId = suggestedTopics[0]?.topicId ?? null;
+    const [selectedId, setSelectedId] = useState(suggestedTopics.length === 1 ? firstId : null);
+    const [started, setStarted] = useState(false);
+    const canStart = started || selectedId != null || suggestedTopics.length === 0;
+
+    return (
+        <View style={[styles.messageRow, styles.rowLeft]}>
+            <Avatar size={26} />
+            <View style={styles.configCard}>
+                <Text style={styles.configCardTitle}>¿Para qué tema quieres las flashcards?</Text>
+                <View style={styles.configChipsRow}>
+                    {suggestedTopics.map((t) => (
+                        <TouchableOpacity
+                            key={t.topicId}
+                            style={[styles.configChip, selectedId === t.topicId && styles.configChipActive]}
+                            onPress={() => setSelectedId(t.topicId)}
+                            disabled={started}
+                        >
+                            <Text style={[styles.configChipText, selectedId === t.topicId && styles.configChipTextActive]}>
+                                {t.topicTitle}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                    {suggestedTopics.length === 0 && (
+                        <TouchableOpacity
+                            style={[styles.configChip, styles.configChipActive]}
+                            disabled
+                        >
+                            <Text style={[styles.configChipText, styles.configChipTextActive]}>Elegir tema</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.configStartBtn, (!canStart || started) && styles.configStartBtnDone]}
+                    onPress={() => {
+                        if (started) return;
+                        setStarted(true);
+                        const topic = suggestedTopics.find((t) => t.topicId === selectedId);
+                        if (topic) {
+                            onNavigate('TutorFlashcardsLoading', { topicId: topic.topicId, topicTitle: topic.topicTitle });
+                        } else {
+                            onNavigate('TutorFlashcards', {});
+                        }
+                    }}
+                    disabled={!canStart}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.configStartBtnText}>
+                        {started ? '✓ Generando flashcards' : 'Generar flashcards →'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+}
+
 // ─── Burbuja de mensaje ───────────────────────────────────────────────────────
-function MessageBubble({ msg, onAction }) {
+function MessageBubble({ msg, onAction, onNavigate }) {
     const [expanded, setExpanded] = useState(false);
+
+    // Config cards se renderizan como componentes propios dentro del row
+    if (msg.isConfigCard === 'test') return <TestConfigCard msg={msg} onNavigate={onNavigate} />;
+    if (msg.isConfigCard === 'flashcards') return <FlashcardsConfigCard msg={msg} onNavigate={onNavigate} />;
+
     const isLong = msg.isAI && typeof msg.text === 'string' && msg.text.length > COLLAPSE_THRESHOLD;
     const displayText = isLong && !expanded ? `${msg.text.slice(0, COLLAPSE_THRESHOLD)}…` : msg.text;
 
@@ -240,15 +383,19 @@ export default function TutorChatScreen({ navigation, route }) {
     const scrollRef = useRef(null);
     const conversationIdRef = useRef(resumeConversationId);
     const tonePrefsRef = useRef(DEFAULT_TONE);
+    // Acumula los temas mencionados en esta sesión para la config de test/flashcards
+    const conversationTopicsRef = useRef([]);
 
-    // Crea (o reanuda) la conversación y carga el tono de IA al montar
+    // Carga tono y (si hay conversationId) el historial de mensajes al montar.
+    // La creación de conversación es LAZY: ocurre en el primer mensaje enviado
+    // usando los primeros 60 chars como título — así el historial de TutorHome
+    // muestra títulos significativos en vez de "Nueva conversación".
     useEffect(() => {
         AsyncStorage.getItem(TONE_KEY)
             .then((raw) => { if (raw) tonePrefsRef.current = { ...DEFAULT_TONE, ...JSON.parse(raw) }; })
             .catch(() => {});
 
         if (resumeConversationId) {
-            // E1: cargar historial de la conversación existente
             tutorApi.getConversation(resumeConversationId)
                 .then((res) => {
                     if (!res?.error && res?.data?.messages?.length) {
@@ -257,17 +404,14 @@ export default function TutorChatScreen({ navigation, route }) {
                             isAI: m.isAI,
                             text: m.content,
                             actions: Array.isArray(m.suggestedActions)
-                                ? m.suggestedActions.map((a, i) => ({ id: `sa${i}`, label: a.label, icon: a.icon }))
+                                ? m.suggestedActions.map((a, i) => ({
+                                    id: `sa${i}`, label: a.label, icon: a.icon,
+                                    topicId: a.topicId, topicTitle: a.topicTitle,
+                                }))
                                 : null,
                         }));
                         setMessages(loaded);
                     }
-                })
-                .catch(() => {});
-        } else {
-            tutorApi.createConversation('Nueva conversación', technique)
-                .then((res) => {
-                    if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
                 })
                 .catch(() => {});
         }
@@ -295,17 +439,35 @@ export default function TutorChatScreen({ navigation, route }) {
             const res = await tutorApi.sendMessage(cid, userText, tonePrefsRef.current);
             if (res?.error || !res?.data) throw new Error('api-err');
             const ai = res.data.aiMessage;
+            const rawActions = Array.isArray(ai.suggestedActions) ? ai.suggestedActions : [];
+
+            // Actualizar topicId activo y acumular temas de la conversación
+            const topicAction = rawActions.find((a) => a.topicId);
+            if (topicAction?.topicId) {
+                topicIdRef.current = topicAction.topicId;
+                topicTitleRef.current = topicAction.topicTitle ?? null;
+                const existing = conversationTopicsRef.current;
+                if (!existing.find((t) => t.topicId === topicAction.topicId)) {
+                    conversationTopicsRef.current = [
+                        ...existing,
+                        { topicId: topicAction.topicId, topicTitle: topicAction.topicTitle ?? 'Tema' },
+                    ];
+                }
+            }
+
             addMessage({
                 id: ai.id,
                 isAI: true,
                 text: ai.content,
                 timestamp: nowTime(),
-                actions: Array.isArray(ai.suggestedActions)
-                    ? ai.suggestedActions.map((a, i) => ({ id: `sa${i}`, label: a.label, icon: a.icon }))
+                actions: rawActions.length
+                    ? rawActions.map((a, i) => ({
+                        id: `sa${i}`, label: a.label, icon: a.icon,
+                        topicId: a.topicId, topicTitle: a.topicTitle,
+                    }))
                     : null,
             });
         } catch {
-            // fallback stub cuando el backend no está disponible
             addMessage({
                 id: Date.now().toString(),
                 isAI: true,
@@ -321,33 +483,38 @@ export default function TutorChatScreen({ navigation, route }) {
         }
     }, [addMessage]);
 
-    const handleSend = useCallback(() => {
+    const handleSend = useCallback(async () => {
         const text = inputText.trim();
         if (!text) return;
 
-        addMessage({
-            id: Date.now().toString(),
-            isAI: false,
-            text,
-            timestamp: nowTime(),
-            actions: null,
-        });
+        addMessage({ id: Date.now().toString(), isAI: false, text, timestamp: nowTime(), actions: null });
         setInputText('');
+
+        // Lazy creation: crear conversación con el primer mensaje como título
+        if (!conversationIdRef.current) {
+            try {
+                const title = text.slice(0, 60).trim();
+                const res = await tutorApi.createConversation(title, technique ?? null);
+                if (res?.data?.id) conversationIdRef.current = res.data.id;
+            } catch { /* sendToApi lanzará 'no-conv' pero el msg ya se añadió */ }
+        }
+
         sendToApi(text);
-    }, [inputText, addMessage, sendToApi]);
+    }, [inputText, addMessage, sendToApi, technique]);
 
     // ─── Handlers del menú "tres puntos" ─────────────────────────────────────
     // Antes se usaba Alert.alert con estilo nativo (pantalla oscura, texto en
     // mayúsculas verde) — poco alineado con Figma y "Compartir chat" no hacía
     // nada. Ahora es un Modal Figma y Share.share exporta la conversación real.
-    const handleNewConversation = useCallback(async () => {
+    const handleNewConversation = useCallback(() => {
         setOptionsVisible(false);
         setMessages(buildInitialMessages(technique, tonePrefsRef.current.personality));
         setInputText('');
-        try {
-            const res = await tutorApi.createConversation('Nueva conversación', technique);
-            if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
-        } catch { /* fallback: la conversación anterior se descarta igualmente */ }
+        // Reset de refs — la nueva conversación se crea de forma lazy al primer mensaje
+        conversationIdRef.current = null;
+        conversationTopicsRef.current = [];
+        topicIdRef.current = null;
+        topicTitleRef.current = null;
     }, [technique]);
 
     const handleShareChat = useCallback(async () => {
@@ -370,32 +537,51 @@ export default function TutorChatScreen({ navigation, route }) {
         } catch { /* usuario canceló el sheet o falló el share — ignorar */ }
     }, [messages]);
 
-    // action puede ser un objeto { label, icon, topicId?, topicTitle? } o
-    // un string legacy (acciones enviadas como label directo desde el stub).
+    // action puede ser un objeto { label, icon, topicId?, topicTitle? } o string legacy.
     const handleAction = useCallback((action) => {
         const label = typeof action === 'string' ? action : action.label;
-        // El topicId viene del action (backend lo incluye cuando detecta "Tema N")
-        // con fallback al ref (topic pasado por route.params al abrir el chat).
-        const tid = (typeof action === 'object' && action.topicId) ? action.topicId : topicIdRef.current;
-        const ttitle = (typeof action === 'object' && action.topicTitle) ? action.topicTitle : topicTitleRef.current;
-        // Actualizar refs para que acciones posteriores en la misma sesión también
-        // tengan el topic correcto aunque el usuario envíe mensajes adicionales.
-        if (tid) { topicIdRef.current = tid; topicTitleRef.current = ttitle; }
-
-        if (label === 'Crear flashcards') {
-            if (tid) {
-                navigation.navigate('TutorFlashcardsLoading', { topicId: tid, topicTitle: ttitle ?? tid });
-            } else {
-                navigation.navigate('TutorFlashcards');
+        // Actualizar refs con el topic del action si viene
+        if (typeof action === 'object' && action.topicId) {
+            topicIdRef.current = action.topicId;
+            topicTitleRef.current = action.topicTitle ?? null;
+            const existing = conversationTopicsRef.current;
+            if (!existing.find((t) => t.topicId === action.topicId)) {
+                conversationTopicsRef.current = [
+                    ...existing,
+                    { topicId: action.topicId, topicTitle: action.topicTitle ?? 'Tema' },
+                ];
             }
+        }
+
+        if (label === 'Lanzar test') {
+            // Inyectar tarjeta de configuración en el chat para que el usuario
+            // elija temas y número de preguntas de forma conversacional
+            addMessage({
+                id: Date.now().toString(),
+                isAI: true,
+                isConfigCard: 'test',
+                suggestedTopics: conversationTopicsRef.current.length > 0
+                    ? conversationTopicsRef.current
+                    : topicIdRef.current
+                        ? [{ topicId: topicIdRef.current, topicTitle: topicTitleRef.current ?? 'Tema' }]
+                        : [],
+                actions: null,
+            });
             return;
         }
-        if (label === 'Lanzar test') {
-            if (tid) {
-                navigation.navigate('GeneratorConfig', { topicId: tid, questionCount: 10 });
-            } else {
-                navigation.navigate('GeneratorConfig');
-            }
+
+        if (label === 'Crear flashcards') {
+            addMessage({
+                id: Date.now().toString(),
+                isAI: true,
+                isConfigCard: 'flashcards',
+                suggestedTopics: conversationTopicsRef.current.length > 0
+                    ? conversationTopicsRef.current
+                    : topicIdRef.current
+                        ? [{ topicId: topicIdRef.current, topicTitle: topicTitleRef.current ?? 'Tema' }]
+                        : [],
+                actions: null,
+            });
             return;
         }
 
@@ -497,7 +683,12 @@ export default function TutorChatScreen({ navigation, route }) {
                         scrollEventThrottle={100}
                     >
                         {messages.map((msg) => (
-                            <MessageBubble key={msg.id} msg={msg} onAction={handleAction} />
+                            <MessageBubble
+                                key={msg.id}
+                                msg={msg}
+                                onAction={handleAction}
+                                onNavigate={(screen, params) => navigation.navigate(screen, params)}
+                            />
                         ))}
                         {isTyping && <TypingIndicator />}
                     </ScrollView>
@@ -770,5 +961,67 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 14,
         color: colors.accentOrange,
+    },
+
+    // ── Tarjetas de configuración conversacional (test / flashcards) ──────────
+    configCard: {
+        maxWidth: '88%',
+        backgroundColor: FIGMA.aiBubbleBg,
+        borderRadius: 13.3,
+        padding: 14,
+        gap: 10,
+    },
+    configCardTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: 2,
+    },
+    configCardLabel: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: 'rgba(52,58,61,0.6)',
+        marginTop: 4,
+    },
+    configChipsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    configChip: {
+        borderWidth: 1,
+        borderColor: 'rgba(65,41,80,0.25)',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: colors.white,
+    },
+    configChipActive: {
+        backgroundColor: colors.selectionBorder,
+        borderColor: colors.selectionBorder,
+    },
+    configChipText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.5,
+        color: colors.textDark,
+    },
+    configChipTextActive: {
+        color: colors.white,
+        fontFamily: 'Poppins-SemiBold',
+    },
+    configStartBtn: {
+        marginTop: 6,
+        backgroundColor: colors.ctaGreen,
+        borderRadius: 10,
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    configStartBtnDone: {
+        backgroundColor: 'rgba(65,41,80,0.2)',
+    },
+    configStartBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.white,
     },
 });

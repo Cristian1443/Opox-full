@@ -4,6 +4,7 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
+    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -158,6 +159,28 @@ export default function TutorHomeScreen({ navigation, route }) {
         navigation.navigate('TutorChat', { conversationId: conv.id, topic: conv.topic });
     };
 
+    const handleDeleteConversation = (conv) => {
+        Alert.alert(
+            'Eliminar conversación',
+            '¿Seguro? No se puede deshacer.',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await tutorApi.deleteConversation(conv.id);
+                            setRecentConversations((prev) => prev.filter((c) => c.id !== conv.id));
+                        } catch {
+                            Alert.alert('Error', 'No se pudo eliminar la conversación.');
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <View style={styles.header}>
@@ -190,18 +213,26 @@ export default function TutorHomeScreen({ navigation, route }) {
                     <View style={styles.recentSection}>
                         <Text style={styles.recentTitle}>CONVERSACIONES RECIENTES</Text>
                         {recentConversations.map((conv) => (
-                            <TouchableOpacity
-                                key={conv.id}
-                                style={styles.recentItem}
-                                onPress={() => handleResumeConversation(conv)}
-                                activeOpacity={0.75}
-                            >
-                                <Ionicons name="chatbubble-outline" size={18} color={colors.purple} style={styles.recentIcon} />
-                                <Text style={styles.recentItemText} numberOfLines={1}>
-                                    {conv.topic || 'Conversación sin título'}
-                                </Text>
-                                <Ionicons name="chevron-forward" size={16} color={colors.textDark} style={{ opacity: 0.4 }} />
-                            </TouchableOpacity>
+                            <View key={conv.id} style={styles.recentItem}>
+                                <TouchableOpacity
+                                    style={styles.recentItemMain}
+                                    onPress={() => handleResumeConversation(conv)}
+                                    activeOpacity={0.75}
+                                >
+                                    <Ionicons name="chatbubble-outline" size={18} color={colors.purple} style={styles.recentIcon} />
+                                    <Text style={styles.recentItemText} numberOfLines={1}>
+                                        {conv.title || conv.topic || 'Conversación sin título'}
+                                    </Text>
+                                    <Ionicons name="chevron-forward" size={16} color={colors.textDark} style={{ opacity: 0.4 }} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => handleDeleteConversation(conv)}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    style={styles.recentDeleteBtn}
+                                >
+                                    <Ionicons name="trash-outline" size={16} color="rgba(200,50,50,0.6)" />
+                                </TouchableOpacity>
+                            </View>
                         ))}
                     </View>
                 )}
@@ -300,13 +331,19 @@ const styles = StyleSheet.create({
     recentItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 14,
         backgroundColor: colors.white,
         borderWidth: 1,
         borderColor: FIGMA.cardBorder,
         borderRadius: 12,
         marginBottom: 8,
+        overflow: 'hidden',
+    },
+    recentItemMain: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
     },
     recentIcon: {
         marginRight: 10,
@@ -316,5 +353,9 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-Regular',
         fontSize: 13,
         color: colors.textDark,
+    },
+    recentDeleteBtn: {
+        paddingHorizontal: 14,
+        paddingVertical: 14,
     },
 });

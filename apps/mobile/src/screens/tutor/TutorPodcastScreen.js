@@ -44,6 +44,16 @@ async function loadPodcastHistory() {
         return raw ? JSON.parse(raw) : [];
     } catch { return []; }
 }
+
+async function deletePodcastFromHistory(topicId, generatedAt) {
+    try {
+        const raw = await AsyncStorage.getItem(PODCAST_HISTORY_KEY);
+        const history = raw ? JSON.parse(raw) : [];
+        const updated = history.filter((h) => !(h.topicId === topicId && h.generatedAt === generatedAt));
+        await AsyncStorage.setItem(PODCAST_HISTORY_KEY, JSON.stringify(updated));
+        return updated;
+    } catch { return []; }
+}
 import { useFocusEffect } from '@react-navigation/native';
 
 // Colores confirmados contra Figma (frame PODCAST, Bloque 8).
@@ -177,21 +187,45 @@ function EpisodePicker({ oposicion, onSelect, onSelectHistory, onBack }) {
                         <View style={styles.historySection}>
                             <Text style={styles.historySectionTitle}>MIS PODCASTS</Text>
                             {history.map((h) => (
-                                <TouchableOpacity
-                                    key={h.topicId + h.generatedAt}
-                                    style={styles.historyRow}
-                                    onPress={() => onSelectHistory(h)}
-                                    activeOpacity={0.75}
-                                >
-                                    <Ionicons name="play-circle" size={22} color={colors.accentOrange} style={{ marginRight: 10 }} />
-                                    <View style={styles.episodeInfo}>
-                                        <Text style={styles.episodeName} numberOfLines={2}>{h.topicTitle}</Text>
-                                        <Text style={styles.episodeDuration}>
-                                            {new Date(h.generatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                                        </Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
-                                </TouchableOpacity>
+                                <View key={h.topicId + h.generatedAt} style={styles.historyRow}>
+                                    <TouchableOpacity
+                                        style={styles.historyRowMain}
+                                        onPress={() => onSelectHistory(h)}
+                                        activeOpacity={0.75}
+                                    >
+                                        <Ionicons name="play-circle" size={22} color={colors.accentOrange} style={{ marginRight: 10 }} />
+                                        <View style={styles.episodeInfo}>
+                                            <Text style={styles.episodeName} numberOfLines={2}>{h.topicTitle}</Text>
+                                            <Text style={styles.episodeDuration}>
+                                                {new Date(h.generatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.historyDeleteBtn}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                        onPress={() => {
+                                            Alert.alert(
+                                                'Eliminar podcast',
+                                                '¿Eliminar este podcast del historial?',
+                                                [
+                                                    { text: 'Cancelar', style: 'cancel' },
+                                                    {
+                                                        text: 'Eliminar',
+                                                        style: 'destructive',
+                                                        onPress: async () => {
+                                                            const updated = await deletePodcastFromHistory(h.topicId, h.generatedAt);
+                                                            setHistory(updated);
+                                                        },
+                                                    },
+                                                ],
+                                            );
+                                        }}
+                                    >
+                                        <Ionicons name="trash-outline" size={18} color="#C0392B" />
+                                    </TouchableOpacity>
+                                </View>
                             ))}
                         </View>
                     )}
@@ -859,11 +893,24 @@ const styles = StyleSheet.create({
     historyRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 12,
         backgroundColor: `${colors.accentOrange}11`,
         borderRadius: 12,
         marginBottom: 8,
+        overflow: 'hidden',
+    },
+    historyRowMain: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingLeft: 12,
+        paddingRight: 8,
+    },
+    historyDeleteBtn: {
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        alignSelf: 'stretch',
+        justifyContent: 'center',
     },
 
     // ── Config ──────────────────────────────────────────────────────────────
