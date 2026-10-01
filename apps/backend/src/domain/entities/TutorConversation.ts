@@ -13,6 +13,6 @@ export interface TutorMessage {
     conversationId: string;
     isAI: boolean;
     content: string;
-    suggestedActions: Array<{ label: string; icon: string }> | null;
+    suggestedActions: Array<{ label: string; icon: string; topicId?: string; topicTitle?: string }> | null;
     createdAt: Date;
 }

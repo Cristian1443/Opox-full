@@ -143,8 +143,8 @@ export default function TutorHomeScreen({ navigation, route }) {
     // E1: cargar conversaciones recientes cada vez que la pantalla recibe foco
     useFocusEffect(useCallback(() => {
         tutorApi.listConversations().then(({ data }) => {
-            if (data?.conversations) {
-                setRecentConversations(data.conversations.slice(0, 3));
+            if (Array.isArray(data) && data.length > 0) {
+                setRecentConversations(data.slice(0, 3));
             }
         }).catch(() => {});
     }, []));

@@ -13,9 +13,12 @@ import type { ToneProfile } from '../../domain/entities';
 function buildContextualActions(
     aiText: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
-): Array<{ label: string; icon: string }> {
-    const actions: Array<{ label: string; icon: string }> = [
-        { label: 'Lanzar test', icon: 'flash-outline' },
+    topicId?: string | null,
+    topicTitle?: string | null,
+): Array<{ label: string; icon: string; topicId?: string; topicTitle?: string }> {
+    const topicMeta = topicId ? { topicId, topicTitle: topicTitle ?? undefined } : {};
+    const actions: Array<{ label: string; icon: string; topicId?: string; topicTitle?: string }> = [
+        { label: 'Lanzar test', icon: 'flash-outline', ...topicMeta },
     ];
 
     const isExplaining =
@@ -26,9 +29,9 @@ function buildContextualActions(
         actions.push({ label: 'Ponme un ejemplo', icon: 'bulb-outline' });
     }
 
-    // ≥ 4 mensajes en historial = al menos 2 intercambios previos → suficiente contexto
-    if (history.length >= 4) {
-        actions.push({ label: 'Crear flashcards', icon: 'layers-outline' });
+    // ≥ 2 mensajes en historial = al menos 1 intercambio previo → suficiente contexto
+    if (history.length >= 2) {
+        actions.push({ label: 'Crear flashcards', icon: 'layers-outline', ...topicMeta });
     }
 
     return actions;
@@ -116,10 +119,10 @@ export class SendMessageUseCase {
                 // Traduce "Tema 5" → "Tema 5 («título real del temario»)" antes de
                 // mandar al Motor. Sin esto, el RAG busca literal "Tema 5" en el
                 // corpus del curso y devuelve "no puedo asegurar cuál es".
-                const enrichedForAi = await this.tutorRepo.resolveTopicReferences(
-                    params.oposicion,
-                    params.content,
-                );
+                // También devuelve el topicId del primer tema mencionado para
+                // incluirlo en las acciones sugeridas (pre-rellena GeneratorConfig).
+                const { enriched: enrichedForAi, topicId: resolvedTopicId, topicTitle: resolvedTopicTitle } =
+                    await this.tutorRepo.resolveTopicReferences(params.oposicion, params.content);
 
                 // Obtener historial reciente para dar contexto al Motor
                 const allMessages = await this.tutorRepo.listMessages(params.conversationId, params.userId);
@@ -136,7 +139,7 @@ export class SendMessageUseCase {
                     topic: conversation.topic,
                 });
                 aiContent = result.content;
-                suggestedActions = buildContextualActions(aiContent, history);
+                suggestedActions = buildContextualActions(aiContent, history, resolvedTopicId, resolvedTopicTitle);
             } catch (err) {
                 const code = (err as NodeJS.ErrnoException).code;
                 const isServerError = code === 'MOTOR_SERVER_ERROR';

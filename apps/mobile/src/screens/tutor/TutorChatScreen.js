@@ -200,7 +200,7 @@ function MessageBubble({ msg, onAction }) {
                                 key={a.id}
                                 icon={a.icon}
                                 label={a.label}
-                                onPress={() => onAction(a.label)}
+                                onPress={() => onAction(a)}
                             />
                         ))}
                     </View>
@@ -228,6 +228,9 @@ export default function TutorChatScreen({ navigation, route }) {
     // E1: si viene conversationId desde TutorHome, reanudar esa conversación
     // en vez de crear una nueva.
     const resumeConversationId = route?.params?.conversationId ?? null;
+    // topicId/topicTitle: usados para pre-rellenar "Lanzar test" y "Crear flashcards"
+    const topicIdRef = useRef(route?.params?.topicId ?? null);
+    const topicTitleRef = useRef(route?.params?.topicTitle ?? null);
 
     const [messages, setMessages] = useState(() => buildInitialMessages(technique, DEFAULT_TONE.personality));
     const [inputText, setInputText] = useState('');
@@ -253,7 +256,9 @@ export default function TutorChatScreen({ navigation, route }) {
                             id: m.id,
                             isAI: m.isAI,
                             text: m.content,
-                            suggestedActions: m.suggestedActions ?? [],
+                            actions: Array.isArray(m.suggestedActions)
+                                ? m.suggestedActions.map((a, i) => ({ id: `sa${i}`, label: a.label, icon: a.icon }))
+                                : null,
                         }));
                         setMessages(loaded);
                     }
@@ -365,16 +370,32 @@ export default function TutorChatScreen({ navigation, route }) {
         } catch { /* usuario canceló el sheet o falló el share — ignorar */ }
     }, [messages]);
 
-    const handleAction = useCallback((label) => {
+    // action puede ser un objeto { label, icon, topicId?, topicTitle? } o
+    // un string legacy (acciones enviadas como label directo desde el stub).
+    const handleAction = useCallback((action) => {
+        const label = typeof action === 'string' ? action : action.label;
+        // El topicId viene del action (backend lo incluye cuando detecta "Tema N")
+        // con fallback al ref (topic pasado por route.params al abrir el chat).
+        const tid = (typeof action === 'object' && action.topicId) ? action.topicId : topicIdRef.current;
+        const ttitle = (typeof action === 'object' && action.topicTitle) ? action.topicTitle : topicTitleRef.current;
+        // Actualizar refs para que acciones posteriores en la misma sesión también
+        // tengan el topic correcto aunque el usuario envíe mensajes adicionales.
+        if (tid) { topicIdRef.current = tid; topicTitleRef.current = ttitle; }
+
         if (label === 'Crear flashcards') {
-            // Ir al picker de temas — antes iba directo a Loading con topicId por
-            // defecto ('constitucion'), que en el curso nuevo no existe y el Motor
-            // devolvía tema_no_encontrado. Ahora el usuario elige el tema.
-            navigation.navigate('TutorFlashcards');
+            if (tid) {
+                navigation.navigate('TutorFlashcardsLoading', { topicId: tid, topicTitle: ttitle ?? tid });
+            } else {
+                navigation.navigate('TutorFlashcards');
+            }
             return;
         }
         if (label === 'Lanzar test') {
-            navigation.navigate('GeneratorConfig');
+            if (tid) {
+                navigation.navigate('GeneratorConfig', { topicId: tid, questionCount: 10 });
+            } else {
+                navigation.navigate('GeneratorConfig');
+            }
             return;
         }
 
