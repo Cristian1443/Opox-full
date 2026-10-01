@@ -15,8 +15,7 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import * as AppleAuthentication from 'expo-apple-authentication';
+import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 import {
@@ -42,7 +41,6 @@ const ICON_GRAY = '#BDB6BF';
 const BLOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 
-const META_LOGO = require('../../../assets/logo-meta.png');
 
 export default function LoginScreen({ navigation, route }) {
     const prefillEmail = route?.params?.prefillEmail || '';
@@ -333,39 +331,30 @@ export default function LoginScreen({ navigation, route }) {
                                 <View style={s.dividerLine} />
                             </View>
 
-                            <TouchableOpacity
-                                style={[s.socialBtn, socialLoading === 'google' && s.socialBtnLoading]}
-                                onPress={() => handleSocialLogin(loginWithGoogle)}
-                                disabled={socialLoading !== null || isLoggingIn}
-                                activeOpacity={0.8}
-                            >
-                                {socialLoading === 'google'
-                                    ? <ActivityIndicator size="small" color={colors.textDark} />
-                                    : <><GoogleLogo size={20} /><Text style={s.socialBtnText}>Google</Text></>
-                                }
-                            </TouchableOpacity>
-
-                            {Platform.OS === 'ios' && (
-                                <AppleAuthentication.AppleAuthenticationButton
-                                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
-                                    cornerRadius={18}
-                                    style={s.appleBtn}
-                                    onPress={() => handleSocialLogin(loginWithApple)}
-                                />
-                            )}
-
-                            <TouchableOpacity
-                                style={[s.socialBtn, socialLoading === 'facebook' && s.socialBtnLoading]}
-                                onPress={() => handleSocialLogin(loginWithFacebook)}
-                                disabled={socialLoading !== null || isLoggingIn}
-                                activeOpacity={0.8}
-                            >
-                                {socialLoading === 'facebook'
-                                    ? <ActivityIndicator size="small" color={colors.textDark} />
-                                    : <><Image source={META_LOGO} style={s.metaLogo} /><Text style={s.socialBtnText}>Facebook</Text></>
-                                }
-                            </TouchableOpacity>
+                            {/* Figma no incluye OAuth: para no romper el layout se
+                                muestran como botones de solo logo en una fila. */}
+                            <View style={s.socialIconRow}>
+                                {[
+                                    { key: 'google', fn: loginWithGoogle, icon: <GoogleLogo size={24} />, label: 'Continuar con Google' },
+                                    { key: 'facebook', fn: loginWithFacebook, icon: <FontAwesome6 name="meta" brand size={24} color="#0081FB" />, label: 'Continuar con Meta' },
+                                    ...(Platform.OS === 'ios'
+                                        ? [{ key: 'apple', fn: loginWithApple, icon: <AppleLogo size={22} />, label: 'Continuar con Apple' }]
+                                        : []),
+                                ].map((btn) => (
+                                    <TouchableOpacity
+                                        key={btn.key}
+                                        style={[s.socialIconBtn, socialLoading === btn.key && s.socialBtnLoading]}
+                                        onPress={() => handleSocialLogin(btn.fn)}
+                                        disabled={socialLoading !== null || isLoggingIn}
+                                        activeOpacity={0.8}
+                                        accessibilityLabel={btn.label}
+                                    >
+                                        {socialLoading === btn.key
+                                            ? <ActivityIndicator size="small" color={colors.textDark} />
+                                            : btn.icon}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
                         </View>
                     )}
 
@@ -377,9 +366,9 @@ export default function LoginScreen({ navigation, route }) {
                         >
                             <Text style={s.biometricLabel}>Accede con {biometricLabelText}</Text>
                             {biometricType === 'finger' ? (
-                                <Ionicons name="finger-print" size={96} color={colors.textDark} />
+                                <Ionicons name="finger-print" size={64} color={colors.textDark} />
                             ) : (
-                                <FaceIdIcon size={96} />
+                                <FaceIdIcon size={64} />
                             )}
                         </TouchableOpacity>
                     )}
@@ -467,7 +456,7 @@ const s = StyleSheet.create({
     },
     flex: { flex: 1 },
     scroll: {
-        paddingBottom: 40,
+        paddingBottom: 20,
     },
     hero: {
         height: 210,
@@ -497,8 +486,8 @@ const s = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 24,
-        marginTop: 20,
-        marginBottom: 24,
+        marginTop: 36,
+        marginBottom: 20,
     },
     title: {
         fontFamily: 'Poppins-SemiBold',
@@ -599,8 +588,8 @@ const s = StyleSheet.create({
     },
     biometricBlock: {
         alignItems: 'center',
-        marginTop: 28,
-        gap: 14,
+        marginTop: 16,
+        gap: 8,
     },
     biometricLabel: {
         fontFamily: 'Poppins-Regular',
@@ -610,7 +599,7 @@ const s = StyleSheet.create({
     bottomTextContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: 30,
+        marginTop: 18,
     },
     bottomText: {
         fontFamily: 'Poppins-Regular',
@@ -627,7 +616,7 @@ const s = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         gap: 8,
-        marginTop: 24,
+        marginTop: 14,
     },
     footerDot: {
         width: 16,
@@ -699,39 +688,23 @@ const s = StyleSheet.create({
         fontSize: 12,
         color: colors.grayText,
     },
-    socialBtn: {
+    socialIconRow: {
         flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 16,
+    },
+    socialIconBtn: {
+        width: 56,
+        height: 56,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 10,
         backgroundColor: colors.white,
         borderWidth: 1,
         borderColor: colors.grayMid,
-        borderRadius: 18,
-        paddingVertical: 14,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
-        minHeight: 52,
+        borderRadius: 16,
     },
     socialBtnLoading: {
         opacity: 0.6,
-    },
-    socialBtnText: {
-        fontFamily: 'Poppins-Medium',
-        fontSize: 15,
-        color: colors.textDark,
-    },
-    appleBtn: {
-        width: '100%',
-        height: 52,
-    },
-    metaLogo: {
-        width: 20,
-        height: 20,
-        resizeMode: 'contain',
     },
     // 1.3 · err — modal bloqueo
     modalOverlay: {

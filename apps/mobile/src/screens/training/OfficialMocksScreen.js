@@ -8,7 +8,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -28,7 +28,13 @@ const COLORS = {
     subtitleGray: '#C4C4C4',
 };
 
-const EMPTY_COPY = 'Este curso aún no tiene exámenes en el banco.\nSé el primero: sube uno con el botón "＋ Subir examen".';
+// Subida de exámenes por alumnos oculta temporalmente hasta que se decida si
+// deben poder hacerlo (feedback QA 2026-10). La pantalla ExamUpload sigue intacta.
+const UPLOAD_ENABLED = false;
+
+const EMPTY_COPY = UPLOAD_ENABLED
+    ? 'Este curso aún no tiene exámenes en el banco.\nSé el primero: sube uno con el botón "＋ Subir examen".'
+    : 'Este curso aún no tiene exámenes en el banco.';
 const MOTOR_UNAVAILABLE_COPY = 'El banco de exámenes no está disponible ahora mismo. Inténtalo más tarde.';
 
 // Filtros del listado — chips en cabecera. 'all' = sin filtro.
@@ -80,24 +86,24 @@ function ExamCard({ exam, onPress }) {
     const cardBg = isDone ? COLORS.cardBgCompleted : 'transparent';
 
     return (
+        // Figma: icono a la izquierda y TODO el contenido (título, subtítulo,
+        // barra, estado/acción) en una columna a su derecha.
         <TouchableOpacity style={[styles.card, { backgroundColor: cardBg }]} onPress={onPress} activeOpacity={0.85}>
-            <View style={styles.cardTopRow}>
-                <View style={styles.cardIcon}>
-                    {isDone || isOngoing ? <IconRibbonCheck size={58} /> : <IconDiploma size={58} />}
-                </View>
-                <View style={styles.cardTitleWrap}>
-                    <Text style={styles.cardTitle}>Examen {exam.year}</Text>
-                    <Text style={styles.cardSubtitle}>{exam.questions} preguntas · {exam.minutes} min</Text>
-                </View>
+            <View style={styles.cardIcon}>
+                {isDone || isOngoing ? <IconRibbonCheck size={44} /> : <IconDiploma size={44} />}
             </View>
+            <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Examen {exam.year}</Text>
+                <Text style={styles.cardSubtitle}>{exam.questions} preguntas · {exam.minutes} min</Text>
 
-            <View style={[styles.track, { backgroundColor: trackColor }]}>
-                <View style={[styles.trackFill, { width: `${exam.progress}%`, backgroundColor: fillColor }]} />
-            </View>
+                <View style={[styles.track, { backgroundColor: trackColor }]}>
+                    <View style={[styles.trackFill, { width: `${exam.progress}%`, backgroundColor: fillColor }]} />
+                </View>
 
-            <View style={styles.cardBottomRow}>
-                <Text style={styles.cardStatus}>{exam.progress}% completado</Text>
-                <Text style={styles.cardAction}>{action}</Text>
+                <View style={styles.cardBottomRow}>
+                    <Text style={styles.cardStatus}>{exam.progress}% completado</Text>
+                    <Text style={styles.cardAction}>{action}</Text>
+                </View>
             </View>
         </TouchableOpacity>
     );
@@ -113,6 +119,7 @@ export default function OfficialMocksScreen({ navigation }) {
     const [loadError, setLoadError] = useState(null);
     const [motorDown, setMotorDown] = useState(false);
     const [filter, setFilter] = useState('all');
+    const insets = useSafeAreaInsets();
 
     const loadMocks = useCallback(async () => {
         setLoading(true);
@@ -253,9 +260,11 @@ export default function OfficialMocksScreen({ navigation }) {
             </ScrollView>
 
             {/* FAB "Subir examen" — oculto si el Motor no está disponible */}
-            {!motorDown && (
+            {/* Un View absoluto no hereda el padding del SafeAreaView: sin sumar
+                insets.bottom el FAB quedaba encima de los botones del sistema. */}
+            {UPLOAD_ENABLED && !motorDown && (
                 <TouchableOpacity
-                    style={styles.fab}
+                    style={[styles.fab, { bottom: 24 + insets.bottom }]}
                     onPress={() => navigation.navigate('ExamUpload')}
                     activeOpacity={0.85}
                 >
@@ -275,7 +284,8 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 25,
         paddingTop: 20,
-        paddingBottom: 40,
+        // Hueco para que la última tarjeta no quede tapada por el FAB.
+        paddingBottom: UPLOAD_ENABLED ? 110 : 40,
     },
 
     // Header / NAV
@@ -312,45 +322,46 @@ const styles = StyleSheet.create({
 
     // Card
     card: {
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: COLORS.cardBorder,
-        paddingHorizontal: 16,
-        paddingVertical: 20,
-        marginBottom: 18,
-    },
-    cardTopRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLORS.cardBorder,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
         marginBottom: 14,
     },
     cardIcon: {
-        marginRight: 16,
-    },
-    cardTitleWrap: {
+        width: 52,
         alignItems: 'center',
+        marginRight: 12,
+    },
+    cardContent: {
+        flex: 1,
     },
     cardTitle: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 19,
+        fontSize: 17,
         color: COLORS.purple,
+        textAlign: 'center',
     },
     cardSubtitle: {
         fontFamily: 'Poppins-Light',
-        fontSize: 13,
+        fontSize: 11,
         color: COLORS.purple,
-        marginTop: 2,
+        opacity: 0.6,
+        textAlign: 'center',
+        marginBottom: 8,
     },
     track: {
-        height: 10,
-        borderRadius: 5,
+        height: 6,
+        borderRadius: 3,
         overflow: 'hidden',
-        marginBottom: 10,
+        marginBottom: 6,
     },
     trackFill: {
         height: '100%',
-        borderRadius: 5,
+        borderRadius: 3,
     },
     cardBottomRow: {
         flexDirection: 'row',
@@ -359,12 +370,12 @@ const styles = StyleSheet.create({
     },
     cardStatus: {
         fontFamily: 'Poppins-Regular',
-        fontSize: 14,
+        fontSize: 11,
         color: COLORS.purple,
     },
     cardAction: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 15,
+        fontSize: 12,
         color: COLORS.purple,
     },
 
@@ -445,7 +456,6 @@ const styles = StyleSheet.create({
     fab: {
         position: 'absolute',
         right: 20,
-        bottom: 24,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,

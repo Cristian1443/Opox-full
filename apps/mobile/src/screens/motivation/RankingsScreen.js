@@ -94,7 +94,7 @@ function IconMedal({ position }) {
     const Medal = MEDAL_ICONS[position] || IconMedal1;
     return (
         <View style={styles.medalWrap}>
-            <Medal size={26} />
+            <Medal size={30} />
         </View>
     );
 }
@@ -150,18 +150,30 @@ export default function RankingsScreen({ navigation }) {
         return () => { cancelled = true; };
     }, [tab, selectedTopicId]);
 
+    // Figma muestra siempre ambas posiciones en la tarjeta, no solo cuando su
+    // pestaña está activa — se cargan una vez al montar.
+    const [myRanks, setMyRanks] = useState({ global: null, local: null });
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all([motivationApi.getRanking('global'), motivationApi.getRanking('oposicion')])
+            .then(([g, l]) => {
+                if (cancelled) return;
+                setMyRanks({ global: g?.data?.me?.position ?? null, local: l?.data?.me?.position ?? null });
+            })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, []);
+
     const entries = ranking?.entries ?? [];
     const meInTop = entries.some((e) => ranking?.me && e.userId === ranking.me.userId);
 
-    // Usamos los puntos del scope activo como proxy de opopoints (solo se muestra
-    // el rango global/local cuando ese scope está efectivamente cargado).
     const opopoints = ranking?.me?.points ?? 0;
-    const globalRank = tab === 'global' ? (ranking?.me?.position ?? '—') : '—';
-    const localRank = tab === 'oposicion' ? (ranking?.me?.position ?? '—') : '—';
+    const globalRank = myRanks.global != null ? `#${myRanks.global.toLocaleString('es-ES')}` : '—';
+    const localRank = myRanks.local != null ? `#${myRanks.local.toLocaleString('es-ES')}` : '—';
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -170,6 +182,10 @@ export default function RankingsScreen({ navigation }) {
                 <Text style={styles.headerTitle}>Rankings</Text>
             </View>
 
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+                <DestacadoBanner opopoints={opopoints} globalRank={globalRank} localRank={localRank} />
+
+            {/* Figma: los filtros van pegados a la lista, debajo de la tarjeta. */}
             <View style={styles.tabs}>
                 <View style={styles.filterIcon}><IconFilter /></View>
                 {/* Fila de tabs con scroll horizontal: a fontSize 16dp (medida exacta de Figma),
@@ -212,9 +228,6 @@ export default function RankingsScreen({ navigation }) {
                 </ScrollView>
             )}
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                <DestacadoBanner opopoints={opopoints} globalRank={globalRank} localRank={localRank} />
-
                 {tab === 'topic' && topics.length === 0 ? (
                     <Text style={styles.empty}>Completa al menos un test para ver el ranking por tema.</Text>
                 ) : entries.length === 0 ? (
@@ -240,7 +253,7 @@ export default function RankingsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.grayLight },
+    container: { flex: 1, backgroundColor: colors.white },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -259,8 +272,13 @@ const styles = StyleSheet.create({
     },
     // Figma (2334:262 "Rankings"): fontSize 21dp exacto.
     headerTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3, textAlign: 'center' },
-    tabs: { flexDirection: 'row', alignItems: 'center', paddingLeft: 27, paddingBottom: 12 },
-    tabsScroll: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 7, paddingRight: 27 },
+    // Dentro del body (ya trae los 27dp laterales): línea inferior como en Figma.
+    tabs: {
+        flexDirection: 'row', alignItems: 'center',
+        marginTop: 20, paddingBottom: 10,
+        borderBottomWidth: 1, borderBottomColor: 'rgba(65, 41, 80, 0.12)',
+    },
+    tabsScroll: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 7 },
     tab: { paddingVertical: 6, paddingHorizontal: 11, borderRadius: 15, borderWidth: 1.5, borderColor: 'transparent' },
     // Figma: el tab activo es un pill de BORDE (no relleno)
     tabActive: { borderColor: colors.textDark, backgroundColor: colors.white },
@@ -273,7 +291,7 @@ const styles = StyleSheet.create({
     body: { paddingHorizontal: 27, paddingBottom: 24 },
     empty: { textAlign: 'center', color: colors.textMuted, fontSize: 12.5, marginTop: 30 },
     // Figma (2337:1245 "1" — grupo de fila): 348dp de ancho x 44.5dp de alto.
-    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 3, paddingVertical: spacing.sm },
+    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 3, paddingVertical: 16 },
     rowSeparator: { borderBottomWidth: 1, borderBottomColor: 'rgba(65, 41, 80, 0.12)' },
     // Figma (2334:367 "TÚ", 2334:436 "BG ACTIVO"): la fila resaltada se extiende de
     // borde a borde de la pantalla (402dp), sin el padding lateral de las demás filas.
@@ -291,7 +309,7 @@ const styles = StyleSheet.create({
     name: { fontSize: 16, fontWeight: '700', color: colors.textDark, flex: 1 },
     score: { fontSize: 16, fontWeight: '400', color: colors.textMuted, textAlign: 'right' },
     ellipsis: { textAlign: 'center', color: colors.textMuted, opacity: 0.5, fontSize: 14, marginVertical: 4 },
-    topicScroll: { flexDirection: 'row', gap: 7, paddingHorizontal: 27, paddingBottom: 10 },
+    topicScroll: { flexDirection: 'row', gap: 7, paddingTop: 10, paddingBottom: 4 },
     topicPill: { paddingVertical: 5, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1.5, borderColor: 'transparent', backgroundColor: colors.grayLight },
     topicPillActive: { borderColor: colors.textDark, backgroundColor: colors.white },
     topicPillText: { fontSize: 13, fontWeight: '500', color: colors.textMuted },

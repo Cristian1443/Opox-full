@@ -8,10 +8,9 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
-    Image,
     Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
@@ -123,15 +122,9 @@ export default function RegistroScreen({ navigation }) {
 
     const { loginWithGoogle, loginWithApple, loginWithFacebook, loading: socialLoading } = useSocialAuth();
 
-    const metaIcon = (
-        <View style={s.metaLogoClip}>
-            <Image
-                source={require('../../../assets/logo-meta.png')}
-                style={s.metaLogoImage}
-                resizeMode="cover"
-            />
-        </View>
-    );
+    // Glifo oficial de Meta (∞). Antes se recortaba logo-meta.png (wordmark
+    // completo) a 22×15 y solo se veía media figura.
+    const metaIcon = <FontAwesome6 name="meta" brand size={20} color="#0081FB" />;
 
     const socialButtons = [
         { key: 'google', label: 'Continuar con Google', icon: <GoogleLogo size={20} />, fn: loginWithGoogle },
@@ -250,20 +243,30 @@ export default function RegistroScreen({ navigation }) {
                                 <Text style={s.primaryButtonText}>Crear cuenta</Text>
                             )}
                         </TouchableOpacity>
+
+                        {/* Enlace a login — mismo patrón que la pantalla de login
+                            (que ya enlaza a registro). */}
+                        <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
+                            <Text style={s.loginLinkText}>
+                                ¿Ya tienes una cuenta creada? <Text style={s.loginLinkStrong}>Iniciar sesión</Text>
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
-                    {/* Footer: wordmark + Ayuda / Aviso legal */}
-                    <View style={s.footerLogoWrap}>
-                        <OpoxWordmark width={96} />
-                    </View>
-                    <View style={s.footerRow}>
-                        <View style={s.footerLink}>
-                            <View style={s.helpBadge}>
-                                <Text style={s.helpBadgeText}>?</Text>
-                            </View>
-                            <Text style={s.footerLinkText}>Ayuda</Text>
+                    {/* Footer anclado al fondo de la pantalla (marginTop: 'auto'). */}
+                    <View style={s.footer}>
+                        <View style={s.footerLogoWrap}>
+                            <OpoxWordmark width={96} />
                         </View>
-                        <Text style={s.footerLinkText}>Aviso legal</Text>
+                        <View style={s.footerRow}>
+                            <View style={s.footerLink}>
+                                <View style={s.helpBadge}>
+                                    <Text style={s.helpBadgeText}>?</Text>
+                                </View>
+                                <Text style={s.footerLinkText}>Ayuda</Text>
+                            </View>
+                            <Text style={s.footerLinkText}>Aviso legal</Text>
+                        </View>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -301,6 +304,7 @@ const s = StyleSheet.create({
     },
     flex: { flex: 1 },
     scroll: {
+        flexGrow: 1,
         padding: 24,
         paddingBottom: 32,
     },
@@ -309,18 +313,22 @@ const s = StyleSheet.create({
         marginBottom: 26,
         alignItems: 'center',
     },
+    // Poppins trae mucho interlineado por defecto: se acota lineHeight para que
+    // el subtítulo quede pegado al título como en Figma.
     title: {
         fontSize: 26,
+        lineHeight: 32,
         fontFamily: 'Poppins-SemiBold',
         color: colors.textDark,
         textAlign: 'center',
     },
     subtitle: {
         fontSize: 14,
+        lineHeight: 18,
         fontFamily: 'Poppins-Regular',
         color: colors.textDark,
         opacity: 0.5,
-        marginTop: 6,
+        marginTop: 0,
         textAlign: 'center',
     },
     socialContainer: {
@@ -335,15 +343,6 @@ const s = StyleSheet.create({
         backgroundColor: colors.white,
         height: 58,
         borderRadius: 18,
-    },
-    metaLogoClip: {
-        width: 22,
-        height: 15,
-        overflow: 'hidden',
-    },
-    metaLogoImage: {
-        width: 96,
-        height: 19,
     },
     socialText: {
         fontSize: 15,
@@ -368,6 +367,10 @@ const s = StyleSheet.create({
         fontSize: 15,
         fontFamily: 'Poppins-Regular',
         color: colors.textDark,
+        // Android añade padding de fuente extra a Poppins y descentra el texto.
+        paddingVertical: 0,
+        textAlignVertical: 'center',
+        includeFontPadding: false,
     },
     passwordFeedback: {
         fontSize: 12,
@@ -385,7 +388,7 @@ const s = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 8,
+        marginTop: 26,
     },
     primaryButtonDisabled: {
         opacity: 0.5,
@@ -400,9 +403,22 @@ const s = StyleSheet.create({
         fontSize: 17,
         fontFamily: 'Poppins-SemiBold',
     },
+    loginLinkText: {
+        textAlign: 'center',
+        fontSize: 13,
+        fontFamily: 'Poppins-Regular',
+        color: colors.textDark,
+    },
+    loginLinkStrong: {
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.purple,
+    },
+    footer: {
+        marginTop: 'auto',
+        paddingTop: 40,
+    },
     footerLogoWrap: {
         alignItems: 'center',
-        marginTop: 40,
         marginBottom: 14,
     },
     footerRow: {

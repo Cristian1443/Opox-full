@@ -12,8 +12,8 @@ import Svg, { Circle } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 
 // ─── Rosco circular (full ring) de progreso ─────────────────────────────────
-const RING_SIZE = 150;
-const RING_STROKE = 14;
+const RING_SIZE = 190;
+const RING_STROKE = 18;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const BACK_BTN_SIZE = 32;
@@ -137,11 +137,11 @@ export default function LevelTestResultScreen({ navigation, route }) {
                 <View style={styles.statsRow}>
                     <View style={styles.statTile}>
                         <Text style={[styles.statValue, styles.statValueGreen]}>{aciertos}</Text>
-                        <Text style={styles.statLabel}>Aciertos</Text>
+                        <Text style={[styles.statLabel, styles.statValueGreen]}>Aciertos</Text>
                     </View>
                     <View style={styles.statTile}>
                         <Text style={[styles.statValue, styles.statValueRed]}>{fallos}</Text>
-                        <Text style={styles.statLabel}>Fallos</Text>
+                        <Text style={[styles.statLabel, styles.statValueRed]}>Fallos</Text>
                     </View>
                     <View style={styles.statTile}>
                         <Text style={[styles.statValue, styles.statValueDark]}>{tiempo}</Text>
@@ -154,16 +154,16 @@ export default function LevelTestResultScreen({ navigation, route }) {
                 {/* ── Puntos fuertes ── */}
                 <Text style={styles.sectionLabel}>PUNTOS FUERTES:</Text>
                 <View style={styles.chipsRow}>
-                    {strengths.map((label) => (
-                        <ChipStrength key={label} label={label} />
+                    {strengths.map((label, i) => (
+                        <ChipStrength key={`${label}-${i}`} label={label} />
                     ))}
                 </View>
 
                 {/* ── A reforzar ── */}
                 <Text style={[styles.sectionLabel, styles.sectionLabelWeak]}>A REFORZAR:</Text>
                 <View style={styles.chipsRow}>
-                    {weaknesses.map((label) => (
-                        <ChipWeakness key={label} label={label} />
+                    {weaknesses.map((label, i) => (
+                        <ChipWeakness key={`${label}-${i}`} label={label} />
                     ))}
                 </View>
 
@@ -212,8 +212,8 @@ const styles = StyleSheet.create({
         flex: 1,
         textAlign: 'center',
         marginRight: BACK_BTN_SIZE, // compensa el ancho del botón de back para centrar el título
-        fontSize: 17,
-        fontWeight: '700',
+        fontSize: 20,
+        fontWeight: '600',
         color: colors.textDark,
     },
 
@@ -245,19 +245,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     ringPercent: {
-        fontSize: 32,
-        fontWeight: '800',
+        fontSize: 46,
+        fontWeight: '600',
         color: colors.textDark,
     },
     ringPercentSign: {
-        fontSize: 22,
+        fontSize: 28,
         fontWeight: '400',
         color: colors.textDark,
     },
 
     // ── "X de Y correctas" ───────────────────────
     correctLine: {
-        fontSize: 15,
+        fontSize: 20,
         fontWeight: '700',
         color: colors.textDark,
         textAlign: 'center',
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     // ── Separador ────────────────────────────────
     separator: {
         height: 1,
-        backgroundColor: colors.textDark,
+        backgroundColor: 'rgba(65, 41, 80, 0.15)',
         marginVertical: spacing.md,
     },
 
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statValue: {
-        fontSize: 20,
+        fontSize: 28,
         fontWeight: '700',
     },
     statValueGreen: {
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
         color: colors.textDark,
     },
     statLabel: {
-        fontSize: 11,
+        fontSize: 15,
         color: colors.textDark,
         marginTop: 2,
     },
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     // ── Section labels ───────────────────────────
     sectionLabel: {
         marginTop: spacing.md,
-        fontSize: 11,
+        fontSize: 15,
         fontWeight: '700',
         color: colors.textDark,
     },
@@ -326,8 +326,9 @@ const styles = StyleSheet.create({
     chipsRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 6,
-        marginTop: 6,
+        gap: 10,
+        marginTop: 10,
+        paddingLeft: spacing.sm,
     },
 
     // Chip verde (puntos fuertes) — fill/stroke/texto #24bd90 (ctaGreen), fondo al 15% de opacidad
@@ -335,13 +336,13 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(36, 189, 144, 0.15)',
         borderWidth: 1,
         borderColor: colors.ctaGreen,
-        borderRadius: 10,
-        paddingVertical: 4,
-        paddingHorizontal: 9,
+        borderRadius: 6,
+        paddingVertical: 5,
+        paddingHorizontal: 14,
     },
     chipStrengthText: {
-        fontSize: 10,
-        fontWeight: '700',
+        fontSize: 12,
+        fontWeight: '600',
         color: colors.ctaGreen,
     },
 
@@ -350,27 +351,29 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 38, 56, 0.15)',
         borderWidth: 1,
         borderColor: colors.statRed,
-        borderRadius: 10,
-        paddingVertical: 4,
-        paddingHorizontal: 9,
+        borderRadius: 6,
+        paddingVertical: 5,
+        paddingHorizontal: 14,
     },
     chipWeaknessText: {
-        fontSize: 10,
-        fontWeight: '700',
+        fontSize: 12,
+        fontWeight: '600',
         color: colors.statRed,
     },
 
-    // ── Botón CTA ────────────────────────────────
+    // ── Botón CTA — mismo formato Figma que el del test (centrado, alto) ──
     btnPrimary: {
+        alignSelf: 'center',
+        width: '78%',
         backgroundColor: colors.ctaGreen,
-        borderRadius: 12,
-        paddingVertical: 13,
+        borderRadius: 14,
+        paddingVertical: 16,
         alignItems: 'center',
-        marginTop: spacing.lg - 6,
+        marginTop: spacing.lg + 4,
     },
     btnPrimaryText: {
         color: colors.white,
-        fontSize: 13.5,
-        fontWeight: '700',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

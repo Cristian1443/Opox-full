@@ -382,11 +382,6 @@ export default function LevelTestInProgressScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
 
-                {/* Chip de tema */}
-                <View style={styles.topicChip}>
-                    <Text style={styles.topicChipText}>{question.topicLabel}</Text>
-                </View>
-
                 {/* Enunciado */}
                 <Text style={styles.questionText}>{question.question}</Text>
 
@@ -495,14 +490,6 @@ const styles = StyleSheet.create({
     },
     progressLabel: { fontSize: 13, fontWeight: '700', color: colors.textDark },
 
-    topicChip: {
-        alignSelf: 'flex-start',
-        backgroundColor: 'rgba(36, 189, 144, 0.12)',
-        borderRadius: 8,
-        paddingVertical: 3, paddingHorizontal: 10,
-        marginBottom: spacing.sm,
-    },
-    topicChipText: { fontSize: 10, fontWeight: '700', color: colors.ctaGreen },
 
     questionText: {
         fontSize: 15, fontWeight: '700', color: colors.textDark,
@@ -516,23 +503,26 @@ const styles = StyleSheet.create({
         borderRadius: 14, backgroundColor: colors.white,
         paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.md,
     },
+    // Figma: seleccionada = borde lila 2px sobre fondo blanco (no verde).
     optionSelected: {
-        borderColor: colors.ctaGreen, borderWidth: 2,
-        backgroundColor: 'rgba(36, 189, 144, 0.06)',
+        borderColor: colors.selectionBorder, borderWidth: 2,
+        backgroundColor: colors.white,
     },
     optionLetter: { width: 26, fontSize: 15, fontWeight: '700', color: colors.textDark },
-    optionLetterSelected: { color: colors.ctaGreen },
+    optionLetterSelected: { color: colors.textDark },
     optionText: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.textDark },
-    optionTextSelected: { color: colors.textDark, fontWeight: '600' },
+    optionTextSelected: { color: colors.textDark },
 
+    // Figma: botón centrado (~78% del ancho), más alto y con esquinas amplias.
     bottomRow: {
         position: 'absolute', bottom: spacing.md,
-        left: spacing.md + 2, right: spacing.md + 2,
+        left: 0, right: 0, alignItems: 'center',
     },
     btnPrimary: {
-        backgroundColor: colors.ctaGreen, borderRadius: 20,
-        paddingVertical: spacing.md - 3, alignItems: 'center',
+        width: '78%',
+        backgroundColor: colors.ctaGreen, borderRadius: 14,
+        paddingVertical: 16, alignItems: 'center',
     },
     btnPrimaryOff: { opacity: 0.4 },
-    btnPrimaryText: { color: colors.white, fontSize: 15, fontWeight: '700' },
+    btnPrimaryText: { color: colors.white, fontSize: 16, fontWeight: '600' },
 });

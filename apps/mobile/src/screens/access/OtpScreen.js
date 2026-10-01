@@ -7,6 +7,8 @@ import {
     Pressable,
     Keyboard,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -117,19 +119,28 @@ export default function OtpScreen({ route, navigation }) {
 
     return (
         <SafeAreaView style={s.container}>
-            <View style={s.content}>
-                <View style={s.topBlock}>
-                    {/* Volver */}
-                    <TouchableOpacity
-                        style={s.backRow}
-                        onPress={handleGoBack}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
+            <KeyboardAvoidingView
+                style={s.content}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                {/* Volver — icono y texto con el mismo tono (antes el icono iba
+                    a opacidad completa y el texto al 50%). */}
+                <TouchableOpacity
+                    style={s.backRow}
+                    onPress={handleGoBack}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <View style={s.backInner}>
                         <Ionicons name="chevron-back" size={18} color={colors.textDark} />
                         <Text style={s.backText}>Volver</Text>
-                    </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
 
+                {/* Figma: título + casillas + reenviar + botón forman un bloque
+                    centrado verticalmente. El KeyboardAvoidingView lo sube al
+                    abrir el teclado para que "Verificar" no quede oculto. */}
+                <View style={s.centerBlock}>
                     {/* Header */}
                     <View style={s.header}>
                         <Text style={s.title}>Verifica tu email</Text>
@@ -156,7 +167,8 @@ export default function OtpScreen({ route, navigation }) {
                                             !!error && s.otpBoxError,
                                         ]}
                                     >
-                                        <Text style={s.otpDigit}>{digit}</Text>
+                                        {/* Figma: el código se enmascara con un punto. */}
+                                        {digit ? <View style={s.otpDot} /> : null}
                                     </View>
                                 );
                             })}
@@ -208,25 +220,24 @@ export default function OtpScreen({ route, navigation }) {
                             </Text>
                         )}
                     </TouchableOpacity>
-                </View>
 
-                {/* CTA anclada al bottom */}
-                <TouchableOpacity
-                    style={[s.verifyButton, (!isComplete || isVerifying) && s.buttonDisabled]}
-                    onPress={handleVerify}
-                    disabled={!isComplete || isVerifying}
-                    activeOpacity={0.85}
-                >
-                    {isVerifying ? (
-                        <View style={s.processingRow}>
-                            <ActivityIndicator size="small" color={colors.white} />
-                            <Text style={s.verifyButtonText}>Verificando...</Text>
-                        </View>
-                    ) : (
-                        <Text style={s.verifyButtonText}>Verificar</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
+                    <TouchableOpacity
+                        style={[s.verifyButton, (!isComplete || isVerifying) && s.buttonDisabled]}
+                        onPress={handleVerify}
+                        disabled={!isComplete || isVerifying}
+                        activeOpacity={0.85}
+                    >
+                        {isVerifying ? (
+                            <View style={s.processingRow}>
+                                <ActivityIndicator size="small" color={colors.white} />
+                                <Text style={s.verifyButtonText}>Verificando...</Text>
+                            </View>
+                        ) : (
+                            <Text style={s.verifyButtonText}>Verificar</Text>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
@@ -248,25 +259,28 @@ const s = StyleSheet.create({
     content: {
         flex: 1,
         padding: 28,
-        paddingBottom: 32,
-        justifyContent: 'space-between',
-    },
-    topBlock: {
-        paddingTop: 8,
+        paddingBottom: 24,
     },
     backRow: {
+        alignSelf: 'flex-start',
+        paddingVertical: 4,
+        marginTop: 8,
+    },
+    // La opacidad va en el contenedor para que icono y texto compartan tono.
+    backInner: {
         flexDirection: 'row',
         alignItems: 'center',
-        alignSelf: 'flex-start',
         gap: 4,
-        marginBottom: 28,
-        paddingVertical: 4,
+        opacity: 0.5,
     },
     backText: {
         fontFamily: 'Poppins-Medium',
         fontSize: 14,
         color: colors.textDark,
-        opacity: 0.5,
+    },
+    centerBlock: {
+        flex: 1,
+        justifyContent: 'center',
     },
     header: {
         marginBottom: 28,
@@ -328,10 +342,11 @@ const s = StyleSheet.create({
         borderColor: colors.statRed,
         backgroundColor: colors.errorBg,
     },
-    otpDigit: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 20,
-        color: FIGMA.inputText,
+    otpDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: FIGMA.inputText,
     },
     // Input real, invisible pero foco-able
     hiddenInput: {
@@ -368,6 +383,7 @@ const s = StyleSheet.create({
         paddingVertical: 18,
         borderRadius: 24,
         alignItems: 'center',
+        marginTop: 28,
     },
     buttonDisabled: {
         opacity: 0.5,

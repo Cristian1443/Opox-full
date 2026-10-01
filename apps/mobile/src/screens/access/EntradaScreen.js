@@ -43,24 +43,26 @@ export default function EntradaScreen({ navigation }) {
                 <Text style={s.tagline}>
                     La mejor app para{'\n'}preparar tus oposiciones
                 </Text>
-            </View>
 
-            <View style={s.footer}>
-                <TouchableOpacity
-                    style={s.primaryButton}
-                    onPress={handleCrearCuenta}
-                    activeOpacity={0.85}
-                >
-                    <Text style={s.primaryButtonText}>Crear cuenta</Text>
-                </TouchableOpacity>
+                {/* Figma: logo + texto + botones forman un único bloque centrado
+                    verticalmente (antes los botones iban anclados al fondo). */}
+                <View style={s.buttons}>
+                    <TouchableOpacity
+                        style={s.primaryButton}
+                        onPress={handleCrearCuenta}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={s.primaryButtonText}>Crear cuenta</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                    style={s.secondaryButton}
-                    onPress={handleLogin}
-                    activeOpacity={0.85}
-                >
-                    <Text style={s.secondaryButtonText}>Ya tengo cuenta</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                        style={s.secondaryButton}
+                        onPress={handleLogin}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={s.secondaryButtonText}>Ya tengo cuenta</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </SafeAreaView>
     );
@@ -85,7 +87,7 @@ const s = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 24,
+        paddingHorizontal: scale(90),
         zIndex: 1,
     },
     tagline: {
@@ -96,11 +98,9 @@ const s = StyleSheet.create({
         textAlign: 'center',
         marginTop: scale(21),
     },
-    footer: {
+    buttons: {
         width: '100%',
-        paddingHorizontal: scale(90),
-        paddingBottom: scale(68),
-        zIndex: 1,
+        marginTop: scale(60),
     },
     primaryButton: {
         backgroundColor: colors.purple,

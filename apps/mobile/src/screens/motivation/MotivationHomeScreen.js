@@ -10,6 +10,7 @@ import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { RachaPeligroModal } from '../../components/MotivationModals';
 import DestacadoBanner from '../../components/DestacadoBanner';
 import { motivationApi, planningApi } from '../../api';
@@ -293,6 +294,15 @@ export default function MotivationHomeScreen({ navigation }) {
                     {myClan && (
                         <ExploreItem icon={<IconChallenge />} label="Retos" onPress={() => navigation.navigate('Challenges', { clanId: myClan.id })} />
                     )}
+                    {/* Antes estaba como botón dentro del detalle del clan; se movió
+                        aquí (zona social) para quien ya pertenece a un clan. */}
+                    {myClan && (
+                        <ExploreItem
+                            icon={<Ionicons name="compass-outline" size={26} color={colors.accentOrange} />}
+                            label="Descubrir"
+                            onPress={() => navigation.navigate('ClansList')}
+                        />
+                    )}
                 </View>
             </ScrollView>
 
@@ -413,7 +423,9 @@ const styles = StyleSheet.create({
     shopLinkText: { fontSize: 16, fontWeight: '700', color: colors.textDark },
     shopArrow: { fontSize: 16, color: colors.textDark },
     // Figma ("EXPLORAR", 2337:1207): fila de 339dp de ancho, sin chevrons
-    exploreRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    exploreItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-    exploreLabel: { fontSize: 16, fontWeight: '500', color: colors.textDark },
+    // Icono arriba + etiqueta abajo en columnas iguales: con 4 accesos (Rankings,
+    // Mis clanes, Retos, Descubrir) la fila en línea no cabía y se cortaba.
+    exploreRow: { flexDirection: 'row' },
+    exploreItem: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: spacing.xs },
+    exploreLabel: { fontSize: 13, fontWeight: '500', color: colors.textDark, textAlign: 'center' },
 });
