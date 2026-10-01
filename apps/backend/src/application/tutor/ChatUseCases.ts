@@ -5,12 +5,34 @@ import type { ITutorAiClient } from '../../domain/repositories/ITutorAiClient';
 import type { TutorConversation, TutorMessage } from '../../domain/entities';
 import type { ToneProfile } from '../../domain/entities';
 
-// ─── Stub de respuesta IA (fallback sin Motor) ────────────────────────────────
-const DEFAULT_SUGGESTED_ACTIONS: Array<{ label: string; icon: string }> = [
-    { label: 'Crear flashcards', icon: 'layers-outline' },
-    { label: 'Ponme un ejemplo', icon: 'bulb-outline' },
-    { label: 'Lanzar test', icon: 'flash-outline' },
-];
+// ─── Acciones contextuales ────────────────────────────────────────────────────
+// Decide qué sugerencias mostrar según el contenido de la última respuesta IA
+// y el historial de la conversación. Siempre incluye "Lanzar test". Las otras
+// dos solo aparecen cuando tienen sentido para evitar recursión de explicaciones
+// y sugerir flashcards solo cuando hay suficiente contenido que resumir.
+function buildContextualActions(
+    aiText: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Array<{ label: string; icon: string }> {
+    const actions: Array<{ label: string; icon: string }> = [
+        { label: 'Lanzar test', icon: 'flash-outline' },
+    ];
+
+    const isExplaining =
+        aiText.length > 150 &&
+        /consiste|define|significa|es decir|por tanto/i.test(aiText);
+    const noExampleInResponse = !/por ejemplo/i.test(aiText);
+    if (isExplaining && noExampleInResponse) {
+        actions.push({ label: 'Ponme un ejemplo', icon: 'bulb-outline' });
+    }
+
+    // ≥ 4 mensajes en historial = al menos 2 intercambios previos → suficiente contexto
+    if (history.length >= 4) {
+        actions.push({ label: 'Crear flashcards', icon: 'layers-outline' });
+    }
+
+    return actions;
+}
 
 function buildStubAiResponse(personality: string = 'equilibrado', isServerError = false): { content: string; suggestedActions: Array<{ label: string; icon: string }> } {
     let content: string;
@@ -24,7 +46,7 @@ function buildStubAiResponse(personality: string = 'equilibrado', isServerError 
     } else {
         content = 'Estoy consultando el temario para responderte. Si la respuesta tarda más de lo esperado, prueba a enviar de nuevo tu pregunta.';
     }
-    return { content, suggestedActions: DEFAULT_SUGGESTED_ACTIONS };
+    return { content, suggestedActions: [{ label: 'Lanzar test', icon: 'flash-outline' }] };
 }
 
 // ─── Listar conversaciones ────────────────────────────────────────────────────
@@ -114,7 +136,7 @@ export class SendMessageUseCase {
                     topic: conversation.topic,
                 });
                 aiContent = result.content;
-                suggestedActions = result.suggestedActions ?? DEFAULT_SUGGESTED_ACTIONS;
+                suggestedActions = buildContextualActions(aiContent, history);
             } catch (err) {
                 const code = (err as NodeJS.ErrnoException).code;
                 const isServerError = code === 'MOTOR_SERVER_ERROR';
@@ -124,9 +146,13 @@ export class SendMessageUseCase {
                 suggestedActions = stub.suggestedActions;
             }
         } else {
+            const allMessages = await this.tutorRepo.listMessages(params.conversationId, params.userId);
+            const history = allMessages
+                .slice(-11, -1)
+                .map((m) => ({ role: m.isAI ? 'assistant' as const : 'user' as const, content: m.content }));
             const stub = buildStubAiResponse(params.personality);
             aiContent = stub.content;
-            suggestedActions = stub.suggestedActions;
+            suggestedActions = buildContextualActions(aiContent, history);
         }
 
         const aiMessage = await this.tutorRepo.addMessage({

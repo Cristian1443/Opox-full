@@ -10,7 +10,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { RetoRecibidoModal } from '../../components/MotivationModals';
@@ -106,6 +106,7 @@ function Stepper({ value, min, max, step, onChange, label }) {
 
 export default function ChallengesScreen({ navigation, route }) {
     const { clanId } = route.params;
+    const insets = useSafeAreaInsets();
     const [challenges, setChallenges] = useState([]);
 
     // ─── Wizard de creación ────────────────────────────────────────────────────
@@ -199,12 +200,16 @@ export default function ChallengesScreen({ navigation, route }) {
                 ) : (
                     challenges.map((c) => <ChallengeCard key={c.id} item={c} onStart={handleStart} />)
                 )}
+            </ScrollView>
 
+            {/* B3: botón fijo al fondo — siempre visible aunque haya muchos retos.
+                paddingBottom respeta la barra de navegación de Android. */}
+            <View style={[styles.createFooter, { paddingBottom: Math.max(20, insets.bottom) }]}>
                 <TouchableOpacity style={styles.createCard} onPress={openWizard} activeOpacity={0.85}>
                     <Text style={styles.createTitle}>+ Crear reto</Text>
                     <Text style={styles.createCaption}>Elige tema, preguntas y puntos</Text>
                 </TouchableOpacity>
-            </ScrollView>
+            </View>
 
             {/* ─── Wizard modal ──────────────────────────────────────────────── */}
             <Modal transparent visible={wizardVisible} animationType="fade" onRequestClose={() => setWizardVisible(false)}>
@@ -330,7 +335,12 @@ const styles = StyleSheet.create({
     headerTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3, textAlign: 'center' },
     headerSpacer: { width: 44 },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 27, paddingBottom: 24 },
+    body: { paddingHorizontal: 27, paddingBottom: 110 },
+    createFooter: {
+        paddingHorizontal: 27,
+        paddingTop: 12,
+        backgroundColor: colors.grayLight,
+    },
     groupTitle: { fontSize: 18, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, marginBottom: 12, marginTop: 8, textTransform: 'uppercase' },
     empty: { textAlign: 'center', color: colors.textMuted, fontSize: 12.5, marginBottom: 10 },
     card: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 14, padding: spacing.lg, marginBottom: 16 },

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
     StyleSheet,
@@ -9,7 +9,9 @@ import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing } from '../../theme';
+import { tutorApi } from '../../api';
 
 // Colores confirmados contra Figma (frame HUB AULA VIRTUAL, Bloque 8) sin
 // equivalente exacto en theme.js.
@@ -130,6 +132,7 @@ function ModeRow({ mode, onPress }) {
 
 export default function TutorHomeScreen({ navigation, route }) {
     const technique = route?.params?.technique ?? null;
+    const [recentConversations, setRecentConversations] = useState([]);
 
     useEffect(() => {
         if (technique) {
@@ -137,9 +140,22 @@ export default function TutorHomeScreen({ navigation, route }) {
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // E1: cargar conversaciones recientes cada vez que la pantalla recibe foco
+    useFocusEffect(useCallback(() => {
+        tutorApi.listConversations().then(({ data }) => {
+            if (data?.conversations) {
+                setRecentConversations(data.conversations.slice(0, 3));
+            }
+        }).catch(() => {});
+    }, []));
+
     const handleMode = (mode) => {
         const params = mode.id === 'chat' && technique ? { technique } : undefined;
         navigation.navigate(mode.route, params);
+    };
+
+    const handleResumeConversation = (conv) => {
+        navigation.navigate('TutorChat', { conversationId: conv.id, topic: conv.topic });
     };
 
     return (
@@ -168,6 +184,27 @@ export default function TutorHomeScreen({ navigation, route }) {
                         <ModeRow key={mode.id} mode={mode} onPress={() => handleMode(mode)} />
                     ))}
                 </View>
+
+                {/* E1: conversaciones recientes — máx. 3, solo cuando existen */}
+                {recentConversations.length > 0 && (
+                    <View style={styles.recentSection}>
+                        <Text style={styles.recentTitle}>CONVERSACIONES RECIENTES</Text>
+                        {recentConversations.map((conv) => (
+                            <TouchableOpacity
+                                key={conv.id}
+                                style={styles.recentItem}
+                                onPress={() => handleResumeConversation(conv)}
+                                activeOpacity={0.75}
+                            >
+                                <Ionicons name="chatbubble-outline" size={18} color={colors.purple} style={styles.recentIcon} />
+                                <Text style={styles.recentItemText} numberOfLines={1}>
+                                    {conv.topic || 'Conversación sin título'}
+                                </Text>
+                                <Ionicons name="chevron-forward" size={16} color={colors.textDark} style={{ opacity: 0.4 }} />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -249,5 +286,35 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-Regular',
         fontSize: 11.6,
         color: FIGMA.textNoteMuted,
+    },
+    recentSection: {
+        marginTop: spacing.lg,
+    },
+    recentTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 10,
+        color: FIGMA.subtitleMuted,
+        letterSpacing: 0.8,
+        marginBottom: 8,
+    },
+    recentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: FIGMA.cardBorder,
+        borderRadius: 12,
+        marginBottom: 8,
+    },
+    recentIcon: {
+        marginRight: 10,
+    },
+    recentItemText: {
+        flex: 1,
+        fontFamily: 'Poppins-Regular',
+        fontSize: 13,
+        color: colors.textDark,
     },
 });

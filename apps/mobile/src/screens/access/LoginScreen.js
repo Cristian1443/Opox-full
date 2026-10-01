@@ -322,8 +322,10 @@ export default function LoginScreen({ navigation, route }) {
                         )}
                     </View>
 
-                    {/* Social login — divisor + 3 botones */}
-                    {!isBlocked && !showAuthError && (
+                    {/* Social login — divisor + 3 botones. Siempre visible salvo bloqueo
+                        temporal (3 intentos fallidos). El error de contraseña no lo oculta:
+                        el usuario debe poder usar Google/Meta incluso tras un fallo. */}
+                    {!isBlocked && (
                         <View style={s.socialSection}>
                             <View style={s.dividerRow}>
                                 <View style={s.dividerLine} />
@@ -358,7 +360,7 @@ export default function LoginScreen({ navigation, route }) {
                         </View>
                     )}
 
-                    {!isBlocked && !showAuthError && biometricAvailable && (
+                    {!isBlocked && biometricAvailable && (
                         <TouchableOpacity
                             style={s.biometricBlock}
                             onPress={handleBiometricLogin}

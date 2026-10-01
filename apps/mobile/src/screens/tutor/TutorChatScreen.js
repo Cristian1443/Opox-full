@@ -225,6 +225,9 @@ function TypingIndicator() {
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 export default function TutorChatScreen({ navigation, route }) {
     const technique = route?.params?.technique ?? null;
+    // E1: si viene conversationId desde TutorHome, reanudar esa conversación
+    // en vez de crear una nueva.
+    const resumeConversationId = route?.params?.conversationId ?? null;
 
     const [messages, setMessages] = useState(() => buildInitialMessages(technique, DEFAULT_TONE.personality));
     const [inputText, setInputText] = useState('');
@@ -232,20 +235,37 @@ export default function TutorChatScreen({ navigation, route }) {
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const [optionsVisible, setOptionsVisible] = useState(false);
     const scrollRef = useRef(null);
-    const conversationIdRef = useRef(null);
+    const conversationIdRef = useRef(resumeConversationId);
     const tonePrefsRef = useRef(DEFAULT_TONE);
 
-    // Crea la conversación y carga el tono de IA al montar la pantalla
+    // Crea (o reanuda) la conversación y carga el tono de IA al montar
     useEffect(() => {
         AsyncStorage.getItem(TONE_KEY)
             .then((raw) => { if (raw) tonePrefsRef.current = { ...DEFAULT_TONE, ...JSON.parse(raw) }; })
             .catch(() => {});
 
-        tutorApi.createConversation('Nueva conversación', technique)
-            .then((res) => {
-                if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
-            })
-            .catch(() => {});
+        if (resumeConversationId) {
+            // E1: cargar historial de la conversación existente
+            tutorApi.getConversation(resumeConversationId)
+                .then((res) => {
+                    if (!res?.error && res?.data?.messages?.length) {
+                        const loaded = res.data.messages.map((m) => ({
+                            id: m.id,
+                            isAI: m.isAI,
+                            text: m.content,
+                            suggestedActions: m.suggestedActions ?? [],
+                        }));
+                        setMessages(loaded);
+                    }
+                })
+                .catch(() => {});
+        } else {
+            tutorApi.createConversation('Nueva conversación', technique)
+                .then((res) => {
+                    if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
+                })
+                .catch(() => {});
+        }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const scrollToBottom = useCallback(() => {
