@@ -620,6 +620,9 @@ export default function DashboardScreen({ navigation }) {
     const healthHr = healthMetrics?.heartRate ?? healthMetrics?.restingHeartRate ?? null;
     const healthEnergy = combineDashEnergy(healthMetrics, healthCheckin);
     const healthCheckinPending = !healthCheckin;
+    // Sin wearable ni Estado del día no hay nada que mostrar: en vez de rayitas
+    // ("— ppm" / anillo vacío) el widget invita a conectar el reloj.
+    const hasHealthData = healthHr != null || !!healthCheckin;
     // Subtítulo del widget: prioriza wearable > check-in > pendiente.
     let healthStatus;
     if (healthCheckinPending) {
@@ -692,7 +695,7 @@ export default function DashboardScreen({ navigation }) {
                 <TouchableOpacity
                     style={styles.widget}
                     onPress={() => navigation.navigate(
-                        healthCheckinPending ? 'DailyCheckIn' : 'HomeHealth'
+                        !hasHealthData ? 'WearableOnboarding' : healthCheckinPending ? 'DailyCheckIn' : 'HomeHealth'
                     )}
                     activeOpacity={0.85}
                 >
@@ -700,6 +703,21 @@ export default function DashboardScreen({ navigation }) {
                         <IconHealth size={24} />
                         <Text style={styles.widgetHeadText}>Salud</Text>
                     </View>
+                    {!hasHealthData ? (
+                        <View style={styles.healthRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.healthEmptyTitle}>Conecta tu smartwatch</Text>
+                                <TouchableOpacity
+                                    onPress={() => navigation.navigate('DailyCheckIn')}
+                                    activeOpacity={0.7}
+                                    hitSlop={{ top: 6, bottom: 6 }}
+                                >
+                                    <Text style={styles.healthEmptyLink}>O registra tu Estado del día · 20 s</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <IconChevronRight size={13} />
+                        </View>
+                    ) : (
                     <View style={styles.healthRow}>
                         <View style={{ flex: 1 }}>
                             {/* Opción A · tipografía consistente con `72 ppm`:
@@ -726,6 +744,7 @@ export default function DashboardScreen({ navigation }) {
                         </View>
                         <IconChevronRight size={13} />
                     </View>
+                    )}
                 </TouchableOpacity>
 
                 <View style={styles.grid2}>
@@ -1133,6 +1152,17 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontFamily: 'Poppins-Light',
         color: colors.textDark,
+        marginTop: 4,
+    },
+    healthEmptyTitle: {
+        fontSize: 18,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.textDark,
+    },
+    healthEmptyLink: {
+        fontSize: 12,
+        fontFamily: 'Poppins-Medium',
+        color: colors.purple,
         marginTop: 4,
     },
     ringWrap: {

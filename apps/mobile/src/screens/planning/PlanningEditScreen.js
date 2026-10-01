@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
         marginTop: 40,
         width: 322,
         height: 61,
-        borderRadius: 30,
+        borderRadius: 12,
         backgroundColor: colors.ctaGreen,
         alignItems: 'center',
         justifyContent: 'center',

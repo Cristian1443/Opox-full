@@ -560,6 +560,25 @@ export class TrainingController {
     };
 
     // GET /training/level-test?oposicion= — PÚBLICO (sin auth, onboarding)
+    // El Motor devuelve `tema_id` hex; el resultado del test lo mostraba crudo en
+    // los chips de fortalezas/debilidades. Se resuelve a "Tema N" (misma convención
+    // que ListTopicsUseCase). La ruta es pública y `oposicion` puede venir vacía o
+    // con un slug retirado, pero las preguntas siempre son del curso activo: si no
+    // resuelve con la recibida, se reintenta con la oposición operativa.
+    private async labelLevelTestTopics(questions: LevelTestQuestion[], oposicion: string): Promise<LevelTestQuestion[]> {
+        const ids = new Set(questions.map((q) => q.topic));
+        const labels = new Map<string, string>();
+        for (const op of [oposicion, 'policia-local-galicia']) {
+            const topics = await this.deps.listTopics.execute(op).catch(() => []);
+            for (const t of topics) if (ids.has(t.topicId)) labels.set(t.topicId, t.label);
+            if (labels.size > 0) break;
+        }
+        return questions.map((q) => ({
+            ...q,
+            topicLabel: labels.get(q.topic) ?? (/^[0-9a-f]{12,}$/i.test(q.topicLabel) ? 'Temario general' : q.topicLabel),
+        }));
+    }
+
     getLevelTest = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const oposicion = (req.query['oposicion'] as string) ?? 'justicia-tramitacion';
@@ -567,7 +586,7 @@ export class TrainingController {
             if (this.deps.motorOnboarding) {
                 try {
                     const questions = await this.deps.motorOnboarding.getLevelTestQuestions(oposicion, 10);
-                    this.ok<LevelTestQuestion[]>(res, 200, questions);
+                    this.ok<LevelTestQuestion[]>(res, 200, await this.labelLevelTestTopics(questions, oposicion));
                     return;
                 } catch {
                     // Motor falló — usar estático sin propagar el error al cliente

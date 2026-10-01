@@ -66,6 +66,18 @@ export default function ClanDetailScreen({ navigation, route }) {
         );
     };
 
+    // "Salir del clan" vive en el menú ⋯ del header (no como botón en el cuerpo).
+    const openOptions = () => {
+        Alert.alert(
+            detail?.name ?? 'Clan',
+            undefined,
+            [
+                { text: 'Salir del clan', style: 'destructive', onPress: handleLeave },
+                { text: 'Cancelar', style: 'cancel' },
+            ],
+        );
+    };
+
     const load = useCallback(() => {
         setLoading(true);
         setLoadError(false);
@@ -83,12 +95,14 @@ export default function ClanDetailScreen({ navigation, route }) {
     if (!detail) {
         return (
             <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+                <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
                 <View style={styles.header}>
                     <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+                    {/* Espaciador del mismo ancho que el back para centrar el título en pantalla */}
+                    <View style={styles.headerSide} />
                 </View>
                 <View style={styles.centeredState}>
                     {loading ? (
@@ -108,13 +122,24 @@ export default function ClanDetailScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="chevron-back" size={24} color={colors.textDark} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+                <TouchableOpacity
+                    style={styles.headerSide}
+                    onPress={openOptions}
+                    disabled={leaving}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Opciones del clan"
+                >
+                    {leaving
+                        ? <ActivityIndicator size="small" color={colors.statRed} />
+                        : <Ionicons name="ellipsis-horizontal" size={22} color={colors.textDark} />}
+                </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -162,35 +187,13 @@ export default function ClanDetailScreen({ navigation, route }) {
                         {i < detail.members.length - 1 && <View style={styles.separator} />}
                     </React.Fragment>
                 ))}
-
-                <TouchableOpacity
-                    style={styles.discoverBtn}
-                    onPress={() => navigation.navigate('ClansList')}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="compass-outline" size={16} color={colors.accentOrange} />
-                    <Text style={styles.discoverBtnText}>Descubrir otros clanes</Text>
-                    <Ionicons name="chevron-forward" size={14} color={colors.accentOrange} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.leaveBtn}
-                    onPress={handleLeave}
-                    disabled={leaving}
-                    activeOpacity={0.7}
-                >
-                    {leaving
-                        ? <ActivityIndicator size="small" color={colors.statRed} />
-                        : <Text style={styles.leaveBtnText}>Salir del clan</Text>
-                    }
-                </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.grayLight },
+    container: { flex: 1, backgroundColor: colors.white },
     centeredState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
     errorText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.md },
     retryBtn: { backgroundColor: colors.ctaGreen, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
@@ -212,6 +215,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     headerTitle: { flex: 1, fontSize: 21, fontWeight: '800', color: colors.textDark, letterSpacing: -0.2, textAlign: 'center' },
+    // Mismo ancho que backBtn: equilibra el header para que el título quede
+    // centrado respecto a la pantalla, no al espacio sobrante.
+    headerSide: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: spacing.lg },
     summaryBox: { backgroundColor: colors.ctaGreen, borderRadius: 14, alignItems: 'center', padding: spacing.lg, marginBottom: 11 },
@@ -232,7 +238,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
         borderWidth: 1.5,
         borderColor: colors.textDark,
-        borderRadius: 24,
+        borderRadius: 12,
         paddingVertical: 21,
     },
     // Figma (2335:842 "Chat", 2336:847 "Retos (3)"): fontSize 16dp exacto.
@@ -242,26 +248,4 @@ const styles = StyleSheet.create({
     memberRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: spacing.sm + 4 },
     memberName: { fontSize: 18, fontWeight: '700', color: colors.textDark },
     memberCaption: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-    leaveBtn: {
-        marginTop: spacing.xl,
-        paddingVertical: 14,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.statRed,
-        borderRadius: 12,
-    },
-    leaveBtnText: { fontSize: 14, fontWeight: '600', color: colors.statRed },
-    discoverBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: spacing.lg,
-        paddingVertical: 14,
-        paddingHorizontal: spacing.md,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: `${colors.accentOrange}40`,
-        justifyContent: 'center',
-    },
-    discoverBtnText: { fontSize: 14, fontWeight: '600', color: colors.accentOrange, flex: 1, textAlign: 'center' },
 });

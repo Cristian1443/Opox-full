@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import {
     View,
     Image,
+    Text,
     StyleSheet,
     StatusBar,
 } from 'react-native';
@@ -90,6 +91,7 @@ export default function IconoScreen({ navigation }) {
             {/* Tarjeta redondeada con el isotipo X */}
             <View style={s.card}>
                 <XIcon size={140} />
+                <Text style={s.registered}>®</Text>
             </View>
         </View>
     );
@@ -112,20 +114,24 @@ const s = StyleSheet.create({
         height: '100%',
         opacity: 0.8,
     },
+    // Figma: tarjeta transparente (deja ver el camuflaje) con borde fino, sin
+    // sombra. La `elevation` de Android era la que pintaba el recuadro blanco.
     card: {
         zIndex: 1,
         width: 200,
         height: 200,
         borderRadius: 30,
-        backgroundColor: 'rgba(255,255,255,0.92)',
-        borderWidth: 1.5,
+        backgroundColor: 'transparent',
+        borderWidth: 1,
         borderColor: 'rgba(65,41,80,0.35)',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#412950',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.12,
-        shadowRadius: 32,
-        elevation: 8,
+    },
+    registered: {
+        position: 'absolute',
+        right: 34,
+        bottom: 22,
+        fontSize: 17,
+        color: '#412950',
     },
 });
