@@ -411,12 +411,15 @@ export function buildContainer() {
         : undefined;
 
     // Placement-test job: hasta 60 s de polling. Si supera el límite, cae a estáticas.
+    // supabaseAdmin se usa para resolver `tema_id` hex → "Tema N" en los chips
+    // de puntos fuertes / a reforzar de la pantalla de resultado.
     const motorOnboarding = isMotorConfigured
         ? new MotorOnboardingClient(
             env.MOTOR_API_BASE_URL!,
             env.MOTOR_API_KEY!,
             env.AI_API_KEY ?? '',
             env.MOTOR_DEFAULT_CURSO_ID ?? '',
+            isSupabaseConfigured ? getSupabaseAdmin() : undefined,
         )
         : undefined;
 
