@@ -217,8 +217,9 @@ export default function ConfigToneScreen({ navigation }) {
           />
         </View>
 
-        {/* ── Refuerzo ─────────────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, styles.sectionSpacing]}>REFUERZO</Text>
+        {/* ── Refuerzo (reinforcementLevel del Motor) — título de Figma, pero
+            con los 3 niveles del Motor en vez de un switch sí/no. ─────── */}
+        <Text style={[styles.sectionLabel, styles.sectionSpacing]}>MOTIVACIÓN EN LOS AVISOS</Text>
         <SegmentControl
           options={REINFORCE_OPTIONS}
           value={tone.reinforcementLevel}
