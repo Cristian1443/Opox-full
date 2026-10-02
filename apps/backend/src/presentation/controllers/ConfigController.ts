@@ -45,6 +45,8 @@ function serializeProStats(s: ProStats): ProStatsDTO {
         topicsWeak:           s.topicsWeak,
         topicBreakdown:       s.topicBreakdown,
         avgSecsPerQuestion:   s.avgSecsPerQuestion,
+        weeklyAccuracy:       s.weeklyAccuracy,
+        accuracyDeltaMonth:   s.accuracyDeltaMonth,
         computedAt:           s.computedAt.toISOString(),
     };
 }

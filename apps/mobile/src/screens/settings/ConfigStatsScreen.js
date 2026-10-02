@@ -16,15 +16,12 @@ import { colors, spacing } from '../../theme';
 import { settingsApi } from '../../api';
 
 // ─── 12.6 · Estadísticas Pro ────────────────────────────────────────────────
-// Fiel al Figma (EstadisticasProScreen.tsx) para el anillo de probabilidad y
-// el radar de soft-skills — ambos son mejoras reales de precisión: el radar
-// de Figma dibuja el polígono real por eje. "DOMINIO POR TEMA" NO se reproduce
-// como gráfico de líneas: el propio TSX de referencia documenta que 2 líneas
-// no pueden representar sin ambigüedad 3 temas, así que se conserva la barra
-// de progreso exacta por tema, solo reestilizada. Datos reales desde
-// GET /config/pro-stats (training_attempt_responses + streak). El backend
-// resuelve `topic_id → "Tema N"` con enrichTopicsWithLabels — antes se
-// pintaban UUIDs hex crudos porque getProStats no aplicaba el mapeo.
+// Anillo de probabilidad + radar de soft-skills como en Figma. El gráfico de
+// líneas de Figma ("Dominio por ley") venía incompleto; se implementa como
+// EVOLUCIÓN del acierto semanal (línea verde) frente a la referencia de
+// aprobado al 50% (línea roja), con datos reales de GET /config/pro-stats
+// (`weeklyAccuracy`). Sustituye a la lista de barras por tema, que QA veía
+// repetitiva — el detalle por tema ya vive en el Laboratorio de errores.
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   ringTrack: '#E7E7EA',
@@ -162,27 +159,94 @@ function SoftSkillsRadar({ skills, size = 220 }) {
   );
 }
 
-// Color por umbral de dominio — real, sin equivalente en Figma (no hay forma
-// resoluble de derivarlo del gráfico de líneas ambiguo que reemplaza esto).
-function lawColor(percent) {
-  if (percent >= 85) return colors.ctaGreen;
-  if (percent >= 65) return colors.accentOrange;
-  return colors.statRed;
+const PASS_THRESHOLD = 50;
+const CHART_HEIGHT = 170;
+const CHART_PAD = { left: 30, right: 10, top: 10, bottom: 22 };
+
+function formatWeekLabel(isoDate) {
+  const [, m, d] = isoDate.split('-');
+  return `${Number(d)}/${Number(m)}`;
 }
 
-function LawBar({ name, percent, isLast }) {
-  const barColor = lawColor(percent);
+/** Evolución semanal del acierto vs. referencia de aprobado (50%). */
+function EvolutionChart({ points }) {
+  const [width, setWidth] = useState(0);
+  const plotW = Math.max(0, width - CHART_PAD.left - CHART_PAD.right);
+  const plotH = CHART_HEIGHT - CHART_PAD.top - CHART_PAD.bottom;
+  const xAt = (i) => CHART_PAD.left + (points.length > 1 ? (i / (points.length - 1)) * plotW : plotW / 2);
+  const yAt = (pct) => CHART_PAD.top + (1 - pct / 100) * plotH;
+
+  const withData = points
+    .map((p, i) => ({ ...p, i }))
+    .filter((p) => p.accuracyPct != null);
+  const linePath = withData
+    .map((p, k) => `${k === 0 ? 'M' : 'L'}${xAt(p.i)},${yAt(p.accuracyPct)}`)
+    .join(' ');
+
   return (
-    <View style={[styles.lawItem, isLast && styles.lawItemLast]}>
-      <View style={styles.lawHeader}>
-        <Text style={styles.lawName}>{name}</Text>
-        <Text style={[styles.lawPercent, { color: barColor }]}>{percent}%</Text>
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      {width > 0 && (
+        <Svg width={width} height={CHART_HEIGHT}>
+          {[0, 50, 100].map((v) => (
+            <Line
+              key={v}
+              x1={CHART_PAD.left}
+              x2={width - CHART_PAD.right}
+              y1={yAt(v)}
+              y2={yAt(v)}
+              stroke={FIGMA.radarSpoke}
+              strokeWidth={1}
+            />
+          ))}
+          {/* Referencia de aprobado */}
+          <Line
+            x1={CHART_PAD.left}
+            x2={width - CHART_PAD.right}
+            y1={yAt(PASS_THRESHOLD)}
+            y2={yAt(PASS_THRESHOLD)}
+            stroke={colors.statRed}
+            strokeWidth={2}
+            strokeDasharray="6 4"
+          />
+          {/* Acierto semanal */}
+          {withData.length > 1 && (
+            <Path d={linePath} stroke={colors.ctaGreen} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          )}
+          {withData.map((p) => (
+            <Circle key={p.weekStart} cx={xAt(p.i)} cy={yAt(p.accuracyPct)} r={4} fill={colors.ctaGreen} />
+          ))}
+        </Svg>
+      )}
+      {/* Etiquetas del eje Y */}
+      {[100, 50, 0].map((v) => (
+        <Text key={v} style={[styles.axisYLabel, { top: yAt(v) - 7 }]}>{v}%</Text>
+      ))}
+      {/* Etiquetas del eje X — una de cada dos semanas para no amontonar */}
+      <View style={[styles.axisXRow, { paddingLeft: CHART_PAD.left, paddingRight: CHART_PAD.right }]}>
+        {points.map((p, i) => (
+          <Text key={p.weekStart} style={styles.axisXLabel}>
+            {(points.length - 1 - i) % 2 === 0 ? formatWeekLabel(p.weekStart) : ''}
+          </Text>
+        ))}
       </View>
-      <View style={styles.progressBg}>
-        <View style={[styles.progressFill, { width: `${percent}%`, backgroundColor: barColor }]} />
+      <View style={styles.legendRow}>
+        <View style={[styles.legendSwatch, { backgroundColor: colors.ctaGreen }]} />
+        <Text style={styles.legendText}>Tu acierto semanal</Text>
+        <View style={[styles.legendSwatch, { backgroundColor: colors.statRed, marginLeft: 16 }]} />
+        <Text style={styles.legendText}>Aprobado ({PASS_THRESHOLD}%)</Text>
       </View>
     </View>
   );
+}
+
+// Frase bajo el anillo: tendencia real del mes (como en Figma) o, si aún no
+// hay datos para comparar, el acierto global.
+function trendLine(stats) {
+  const d = stats.accuracyDeltaMonth;
+  if (d == null) return { text: `${stats.accuracyPct}% de acierto global`, color: FIGMA.textMuted };
+  if (d > 0) return { text: `+${d}% este mes · vas por buen camino`, color: colors.ctaGreen };
+  if (d < 0) return { text: `${d}% este mes · toca reforzar`, color: colors.statRed };
+  return { text: 'Igual que el mes pasado · mantén el ritmo', color: FIGMA.textMuted };
 }
 
 export default function ConfigStatsScreen({ navigation }) {
@@ -263,8 +327,8 @@ export default function ConfigStatsScreen({ navigation }) {
               <Text style={styles.ringPercentage}>{stats.passedProbabilityPct}%</Text>
             </View>
           </View>
-          <Text style={styles.monthDelta}>
-            {stats.accuracyPct}% de acierto · racha de {stats.studyStreakDays} días
+          <Text style={[styles.monthDelta, { color: trendLine(stats).color }]}>
+            {trendLine(stats).text}
           </Text>
 
           {/* ── Soft skills ───────────────────────────────────────────────── */}
@@ -276,21 +340,14 @@ export default function ConfigStatsScreen({ navigation }) {
             </Text>
           )}
 
-          {/* ── Dominio por ley (datos reales del backend) ─────────────────── */}
-          {stats.topicBreakdown.length > 0 && (
-            <>
-              <Text style={[styles.sectionLabel, styles.sectionSpacing]}>DOMINIO POR TEMA</Text>
-              <View style={styles.lawList}>
-                {stats.topicBreakdown.map((t, idx) => (
-                  <LawBar
-                    key={t.topicId}
-                    name={t.topic || t.topicId}
-                    percent={t.accuracyPct}
-                    isLast={idx === stats.topicBreakdown.length - 1}
-                  />
-                ))}
-              </View>
-            </>
+          {/* ── Evolución (gráfico de líneas de Figma, hecho con datos reales) ── */}
+          <Text style={[styles.sectionLabel, styles.sectionSpacing]}>EVOLUCIÓN</Text>
+          {(stats.weeklyAccuracy ?? []).some((w) => w.accuracyPct != null) ? (
+            <EvolutionChart points={stats.weeklyAccuracy} />
+          ) : (
+            <Text style={styles.radarNote}>
+              Completa tests durante varias semanas para ver tu evolución.
+            </Text>
           )}
 
           {/* ── Resumen — temas fuertes / débiles ───────────────────────────── */}
@@ -420,43 +477,44 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
 
-  // ── Dominio por ley ───────────────────────────────────────────
-  lawList: {
-    gap: spacing.md,
+  // ── Evolución ─────────────────────────────────────────────────
+  axisYLabel: {
+    position: 'absolute',
+    left: 0,
+    width: 26,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 9,
+    color: FIGMA.textMuted,
+    textAlign: 'right',
   },
-  lawItem: {
-    paddingBottom: spacing.sm + 4,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(65, 41, 80, 0.12)',
-  },
-  lawItemLast: {
-    borderBottomWidth: 0,
-    paddingBottom: 0,
-  },
-  lawHeader: {
+  axisXRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginTop: -CHART_PAD.bottom + 4,
   },
-  lawName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
-    color: colors.textDark,
+  axisXLabel: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 9,
+    color: FIGMA.textMuted,
+    minWidth: 24,
+    textAlign: 'center',
   },
-  lawPercent: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
-    color: colors.ctaGreen,
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm + 4,
   },
-  progressBg: {
-    height: 8,
-    backgroundColor: 'rgba(65, 41, 80, 0.08)',
-    borderRadius: 4,
-    overflow: 'hidden',
+  legendSwatch: {
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    marginRight: 6,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
+  legendText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
   },
 
   // ── Resumen ───────────────────────────────────────────────────
