@@ -90,11 +90,21 @@ export default function RegistroScreen({ navigation }) {
                 setEmailExistsError(true);
                 return;
             }
+            // Contraseña demasiado común (Supabase: weak_password) → mensaje amigable.
+            const isWeakPassword =
+                error.code === 'weak_password' ||
+                error.code === 'auth/weak-password' ||
+                error.message?.toLowerCase().includes('weak') ||
+                error.message?.toLowerCase().includes('contraseña demasiado');
+            if (isWeakPassword) {
+                setErrorModal({ message: 'Esa contraseña es demasiado común. Prueba con algo más personal y difícil de adivinar.' });
+                return;
+            }
             // Si el backend devuelve errores de validación por campo (Zod),
             // ese detalle es más útil que el mensaje genérico "Datos inválidos.".
             const specificMessage = error.fields
                 ? Object.values(error.fields).join(' ')
-                : error.message;
+                : (error.message ?? 'No se pudo crear la cuenta. Inténtalo de nuevo.');
             setErrorModal({ message: specificMessage });
             return;
         }

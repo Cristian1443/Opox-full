@@ -10,7 +10,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { RetoRecibidoModal } from '../../components/MotivationModals';
@@ -106,6 +106,7 @@ function Stepper({ value, min, max, step, onChange, label }) {
 
 export default function ChallengesScreen({ navigation, route }) {
     const { clanId } = route.params;
+    const insets = useSafeAreaInsets();
     const [challenges, setChallenges] = useState([]);
 
     // ─── Wizard de creación ────────────────────────────────────────────────────
@@ -192,7 +193,11 @@ export default function ChallengesScreen({ navigation, route }) {
                 <View style={styles.headerSpacer} />
             </View>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={[styles.body, { paddingBottom: Math.max(20, insets.bottom) }]}
+                showsVerticalScrollIndicator={false}
+            >
                 <Text style={styles.groupTitle}>RETOS ACTIVOS</Text>
                 {challenges.length === 0 ? (
                     <Text style={styles.empty}>Todavía no hay retos en tu clan.</Text>
@@ -330,7 +335,7 @@ const styles = StyleSheet.create({
     headerTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3, textAlign: 'center' },
     headerSpacer: { width: 44 },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 27, paddingBottom: 24 },
+    body: { paddingHorizontal: 27 },
     groupTitle: { fontSize: 18, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, marginBottom: 12, marginTop: 8, textTransform: 'uppercase' },
     empty: { textAlign: 'center', color: colors.textMuted, fontSize: 12.5, marginBottom: 10 },
     card: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: '#EEF1F7', borderRadius: 14, padding: spacing.lg, marginBottom: 16 },
@@ -343,7 +348,7 @@ const styles = StyleSheet.create({
     timeBadge: { fontSize: 13, fontWeight: '700', color: colors.accentOrange },
     startLink: { fontSize: 13, fontWeight: '700', color: colors.ctaGreen },
     startLinkDone: { color: colors.textMuted },
-    createCard: { backgroundColor: colors.ctaGreen, borderRadius: 30, paddingVertical: 20, paddingHorizontal: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+    createCard: { backgroundColor: colors.ctaGreen, borderRadius: 30, paddingVertical: 14, paddingHorizontal: spacing.md, alignItems: 'center', marginTop: spacing.lg },
     createTitle: { fontSize: 19, fontWeight: '700', color: colors.white },
     createCaption: { fontSize: 13, fontWeight: '500', color: colors.white, marginTop: 3 },
     overlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },

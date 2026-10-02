@@ -128,13 +128,14 @@ function IconChallenge({ size = 28, color = colors.accentOrange }) {
     );
 }
 
-// Figma ("EXPLORAR", node 2337:1207): fila horizontal de pares icono+etiqueta,
-// NO una lista vertical de filas con chevron.
+// Figma ("EXPLORAR", node 2337:1207): fila horizontal de pares icono+etiqueta.
+// Añadido fondo + borde + chevron para que sea más obvio que son botones clicables.
 function ExploreItem({ icon, label, onPress }) {
     return (
-        <TouchableOpacity style={styles.exploreItem} onPress={onPress} activeOpacity={0.6}>
+        <TouchableOpacity style={styles.exploreItem} onPress={onPress} activeOpacity={0.7}>
             {icon}
             <Text style={styles.exploreLabel}>{label}</Text>
+            <Text style={styles.exploreChevron}>›</Text>
         </TouchableOpacity>
     );
 }
@@ -192,6 +193,8 @@ export default function MotivationHomeScreen({ navigation }) {
                     <IconChevronLeft size={22} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Motivación</Text>
+                {/* Spacer igual al botón atrás para que el título quede centrado en pantalla */}
+                <View style={{ width: 44 }} />
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -425,7 +428,18 @@ const styles = StyleSheet.create({
     // Figma ("EXPLORAR", 2337:1207): fila de 339dp de ancho, sin chevrons
     // Icono arriba + etiqueta abajo en columnas iguales: con 4 accesos (Rankings,
     // Mis clanes, Retos, Descubrir) la fila en línea no cabía y se cortaba.
-    exploreRow: { flexDirection: 'row' },
-    exploreItem: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: spacing.xs },
-    exploreLabel: { fontSize: 13, fontWeight: '500', color: colors.textDark, textAlign: 'center' },
+    exploreRow: { flexDirection: 'row', gap: 8 },
+    exploreItem: {
+        flex: 1,
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 12,
+        paddingHorizontal: 4,
+        backgroundColor: '#F7F7FA',
+        borderWidth: 1,
+        borderColor: 'rgba(65,41,80,0.12)',
+        borderRadius: 14,
+    },
+    exploreLabel: { fontSize: 12, fontWeight: '500', color: colors.textDark, textAlign: 'center' },
+    exploreChevron: { fontSize: 16, color: colors.accentOrange, lineHeight: 18 },
 });

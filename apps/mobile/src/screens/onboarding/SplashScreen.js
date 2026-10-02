@@ -8,6 +8,7 @@ import {
 import Text from '../../components/AppText';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 import OpoxWordmark from '../../../assets/opoxLogo';
 import camoImg from '../../imports/CargaInicial/3e43d7dd7590060c7fd1b2f8e506e66fc41fe1d7.jpg';
 import { api, authApi } from '../../api';
@@ -113,7 +114,9 @@ export default function SplashScreen({ navigation }) {
             if (cancelled) return;
 
             if (result === 'offline') return navigation.replace('SplashNoConnection');
-            if (result === 'valid') return navigation.replace('Dashboard');
+            if (result === 'valid') return navigation.dispatch(
+                CommonActions.reset({ index: 0, routes: [{ name: 'Dashboard' }] })
+            );
 
             const entryRoute = await resolveOnboardingEntryRoute();
             if (cancelled) return;

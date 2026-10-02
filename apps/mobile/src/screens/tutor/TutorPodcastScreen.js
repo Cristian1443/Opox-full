@@ -14,13 +14,47 @@ import {
     PanResponder,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AlertCardModal from '../../components/AlertCardModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
 import { API_BASE_URL } from '../../api/config';
+
+const PODCAST_HISTORY_KEY = 'opox.tutor.podcast.history';
+const MAX_HISTORY = 10;
+
+async function savePodcastToHistory({ topicId, topicTitle, mp3Url }) {
+    try {
+        const raw = await AsyncStorage.getItem(PODCAST_HISTORY_KEY);
+        const history = raw ? JSON.parse(raw) : [];
+        const entry = { topicId, topicTitle, mp3Url, generatedAt: new Date().toISOString() };
+        // Deduplicar por topicId — el nuevo reemplaza al anterior para ese tema
+        const filtered = history.filter((h) => h.topicId !== topicId);
+        const updated = [entry, ...filtered].slice(0, MAX_HISTORY);
+        await AsyncStorage.setItem(PODCAST_HISTORY_KEY, JSON.stringify(updated));
+    } catch { /* no bloquear el flujo principal */ }
+}
+
+async function loadPodcastHistory() {
+    try {
+        const raw = await AsyncStorage.getItem(PODCAST_HISTORY_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+}
+
+async function deletePodcastFromHistory(topicId, generatedAt) {
+    try {
+        const raw = await AsyncStorage.getItem(PODCAST_HISTORY_KEY);
+        const history = raw ? JSON.parse(raw) : [];
+        const updated = history.filter((h) => !(h.topicId === topicId && h.generatedAt === generatedAt));
+        await AsyncStorage.setItem(PODCAST_HISTORY_KEY, JSON.stringify(updated));
+        return updated;
+    } catch { return []; }
+}
 import { useFocusEffect } from '@react-navigation/native';
 
 // Colores confirmados contra Figma (frame PODCAST, Bloque 8).
@@ -108,13 +142,17 @@ function Waveform({ waveAnim, isPlaying }) {
 }
 
 // ─── 1) Selector de temas ─────────────────────────────────────────────────────
-function EpisodePicker({ oposicion, onSelect, onBack }) {
+function EpisodePicker({ oposicion, onSelect, onSelectHistory, onBack }) {
     const [episodes, setEpisodes] = useState([]);
     const [loading, setLoading]   = useState(true);
+    const [history, setHistory]   = useState([]);
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState(null); // entry | null
 
     useFocusEffect(useCallback(() => {
         let cancelled = false;
         setLoading(true);
+        // Cargar historial local y temas en paralelo
+        loadPodcastHistory().then((h) => { if (!cancelled) setHistory(h); });
         tutorApi.listEpisodes(oposicion)
             .then((res) => {
                 if (cancelled) return;
@@ -144,39 +182,87 @@ function EpisodePicker({ oposicion, onSelect, onBack }) {
 
             {loading ? (
                 <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} />
-            ) : episodes.length === 0 ? (
-                <View style={styles.pickerEmpty}>
-                    <Ionicons name="headset-outline" size={44} color={colors.textDark} />
-                    <Text style={styles.pickerEmptyText}>Aún no hay temas para tu oposición.</Text>
-                </View>
             ) : (
-                <FlatList
-                    data={episodes}
-                    keyExtractor={(ep) => ep.id}
-                    ListHeaderComponent={
-                        <Text style={styles.pickerHint}>
-                            Elige un tema y genera un podcast con la IA.
-                        </Text>
-                    }
-                    contentContainerStyle={styles.pickerList}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={styles.episodeRow}
-                            onPress={() => onSelect(item)}
-                            activeOpacity={0.75}
-                        >
-                            <View style={styles.episodeIcon}>
-                                <Ionicons name="headset-outline" size={22} color={colors.accentOrange} />
-                            </View>
-                            <View style={styles.episodeInfo}>
-                                <Text style={styles.episodeName} numberOfLines={3}>{item.title}</Text>
-                                <Text style={styles.episodeDuration}>Generar podcast con IA</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
-                        </TouchableOpacity>
+                <ScrollView contentContainerStyle={styles.pickerList} showsVerticalScrollIndicator={false}>
+                    {/* E3: historial local de podcasts generados */}
+                    {history.length > 0 && (
+                        <View style={styles.historySection}>
+                            <Text style={styles.historySectionTitle}>MIS PODCASTS</Text>
+                            {history.map((h) => (
+                                <View key={h.topicId + h.generatedAt} style={styles.historyRow}>
+                                    <TouchableOpacity
+                                        style={styles.historyRowMain}
+                                        onPress={() => onSelectHistory(h)}
+                                        activeOpacity={0.75}
+                                    >
+                                        <Ionicons name="play-circle" size={22} color={colors.accentOrange} style={{ marginRight: 10 }} />
+                                        <View style={styles.episodeInfo}>
+                                            <Text style={styles.episodeName} numberOfLines={2}>{h.topicTitle}</Text>
+                                            <Text style={styles.episodeDuration}>
+                                                {new Date(h.generatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.historyDeleteBtn}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                        onPress={() => setDeleteConfirmModal(h)}
+                                    >
+                                        <Ionicons name="trash-outline" size={18} color="#C0392B" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </View>
                     )}
-                />
+
+                    <Text style={styles.pickerHint}>
+                        Elige un tema y genera un podcast con la IA.
+                    </Text>
+
+                    {episodes.length === 0 ? (
+                        <View style={styles.pickerEmpty}>
+                            <Ionicons name="headset-outline" size={44} color={colors.textDark} />
+                            <Text style={styles.pickerEmptyText}>Aún no hay temas para tu oposición.</Text>
+                        </View>
+                    ) : (
+                        episodes.map((item) => (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={styles.episodeRow}
+                                onPress={() => onSelect(item)}
+                                activeOpacity={0.75}
+                            >
+                                <View style={styles.episodeIcon}>
+                                    <Ionicons name="headset-outline" size={22} color={colors.accentOrange} />
+                                </View>
+                                <View style={styles.episodeInfo}>
+                                    <Text style={styles.episodeName} numberOfLines={3}>{item.title}</Text>
+                                    <Text style={styles.episodeDuration}>Generar podcast con IA</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
+                            </TouchableOpacity>
+                        ))
+                    )}
+                </ScrollView>
             )}
+            <AlertCardModal
+                visible={!!deleteConfirmModal}
+                icon={<Ionicons name="trash-outline" size={32} color="#C0392B" />}
+                iconBg="#FDECEA"
+                title="Eliminar podcast"
+                description="¿Eliminar este podcast del historial?"
+                primaryLabel="Eliminar"
+                primaryColor="#C0392B"
+                onPrimaryPress={async () => {
+                    const updated = await deletePodcastFromHistory(deleteConfirmModal.topicId, deleteConfirmModal.generatedAt);
+                    setHistory(updated);
+                    setDeleteConfirmModal(null);
+                }}
+                secondaryLabel="Cancelar"
+                secondaryVariant="button"
+                onSecondaryPress={() => setDeleteConfirmModal(null)}
+            />
         </SafeAreaView>
     );
 }
@@ -703,7 +789,15 @@ export default function TutorPodcastScreen({ navigation, route }) {
             <PodcastConfig
                 topic={selectedTopic}
                 oposicion={oposicion}
-                onGenerated={(p) => setPodcast(p)}
+                onGenerated={(p) => {
+                    // E3: guardar en historial local antes de mostrar el player
+                    savePodcastToHistory({
+                        topicId: selectedTopic.topicId,
+                        topicTitle: selectedTopic.title,
+                        mp3Url: p.mp3Url,
+                    });
+                    setPodcast(p);
+                }}
                 onBack={() => setSelectedTopic(null)}
             />
         );
@@ -713,6 +807,11 @@ export default function TutorPodcastScreen({ navigation, route }) {
         <EpisodePicker
             oposicion={oposicion}
             onSelect={(ep) => setSelectedTopic({ topicId: ep.topicId, title: ep.title })}
+            onSelectHistory={(h) => {
+                // E3: reproducir podcast del historial directamente, sin re-generar
+                setSelectedTopic({ topicId: h.topicId, title: h.topicTitle });
+                setPodcast({ mp3Url: h.mp3Url });
+            }}
             onBack={() => navigation.goBack()}
         />
     );
@@ -786,6 +885,36 @@ const styles = StyleSheet.create({
     episodeInfo: { flex: 1 },
     episodeName: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: colors.textDark, marginBottom: 3 },
     episodeDuration: { fontFamily: 'Poppins-Regular', fontSize: 12, color: FIGMA.subtitleMuted },
+    historySection: { marginBottom: spacing.md },
+    historySectionTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 10,
+        color: FIGMA.subtitleMuted,
+        letterSpacing: 0.8,
+        marginBottom: 8,
+    },
+    historyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: `${colors.accentOrange}11`,
+        borderRadius: 12,
+        marginBottom: 8,
+        overflow: 'hidden',
+    },
+    historyRowMain: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingLeft: 12,
+        paddingRight: 8,
+    },
+    historyDeleteBtn: {
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        alignSelf: 'stretch',
+        justifyContent: 'center',
+    },
 
     // ── Config ──────────────────────────────────────────────────────────────
     genBody: { padding: spacing.md, paddingBottom: spacing.xl },

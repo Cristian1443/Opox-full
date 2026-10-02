@@ -28,10 +28,21 @@ const evaluarFuerza = (pass) => {
     const count = segments.filter(Boolean).length;
 
     if (count <= 1) {
-        return { fuerza: 'débil', mensaje: 'Fuerza débil: usa al menos 8 caracteres.', segments };
+        // Construir mensaje exacto según qué falta para evitar "usa 8 chars" cuando ya los tienes
+        const missing = [];
+        if (!segments[1]) missing.push('10+ caracteres');
+        if (!segments[2]) missing.push('un número');
+        if (!segments[3]) missing.push('un símbolo');
+        const detail = missing.length ? `Añade ${missing.join(', ')}.` : '';
+        return { fuerza: 'débil', mensaje: `Fuerza débil. ${detail}`.trim(), segments };
     }
     if (count <= 3) {
-        return { fuerza: 'media', mensaje: 'Fuerza media: añade un número o símbolo.', segments };
+        const missing = [];
+        if (!segments[1]) missing.push('10+ caracteres');
+        if (!segments[2]) missing.push('un número');
+        if (!segments[3]) missing.push('un símbolo');
+        const detail = missing.length ? `Añade ${missing.join(', ')}.` : '';
+        return { fuerza: 'media', mensaje: `Fuerza media. ${detail}`.trim(), segments };
     }
     return { fuerza: 'fuerte', mensaje: 'Fuerza fuerte: ¡buena elección!', segments };
 };

@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    ScrollView,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -63,6 +64,16 @@ export default function OtpScreen({ route, navigation }) {
     };
 
     const focusInput = () => inputRef.current?.focus();
+
+    // C2: Al tocar una celda ya ocupada, truncar el código hasta ese índice para
+    // que el cursor quede efectivamente en esa posición y el siguiente dígito
+    // reemplace desde ahí en lugar de appendear al final.
+    const handleCellPress = (i) => {
+        if (i < code.length) {
+            setCode(code.slice(0, i));
+        }
+        inputRef.current?.focus();
+    };
 
     const handleVerify = async () => {
         if (code.length < OTP_LENGTH || isVerifying) return;
@@ -119,108 +130,125 @@ export default function OtpScreen({ route, navigation }) {
 
     return (
         <SafeAreaView style={s.container}>
+            {/* B1: el botón "Verificar" está fuera de centerBlock, como hermano al
+                nivel del KeyboardAvoidingView. En Android (behavior='height') el KAV
+                reduce su altura al abrirse el teclado → el botón sube con el fondo
+                y no queda tapado. */}
             <KeyboardAvoidingView
-                style={s.content}
+                style={s.kav}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
-                {/* Volver — icono y texto con el mismo tono (antes el icono iba
-                    a opacidad completa y el texto al 50%). */}
-                <TouchableOpacity
-                    style={s.backRow}
-                    onPress={handleGoBack}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                <ScrollView
+                    style={s.content}
+                    contentContainerStyle={s.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
                 >
-                    <View style={s.backInner}>
-                        <Ionicons name="chevron-back" size={18} color={colors.textDark} />
-                        <Text style={s.backText}>Volver</Text>
-                    </View>
-                </TouchableOpacity>
-
-                {/* Figma: título + casillas + reenviar + botón forman un bloque
-                    centrado verticalmente. El KeyboardAvoidingView lo sube al
-                    abrir el teclado para que "Verificar" no quede oculto. */}
-                <View style={s.centerBlock}>
-                    {/* Header */}
-                    <View style={s.header}>
-                        <Text style={s.title}>Verifica tu email</Text>
-                        <Text style={s.subtitle}>
-                            Escribe el código de {OTP_LENGTH} dígitos que enviamos a{'\n'}
-                            <Text style={s.emailHighlight}>{email}</Text>
-                        </Text>
-                    </View>
-
-                    {/* Casillas OTP — solo VISUAL. El input real está oculto detrás. */}
-                    <Pressable onPress={focusInput} style={s.otpWrapper}>
-                        <View style={s.otpContainer}>
-                            {Array.from({ length: OTP_LENGTH }).map((_, i) => {
-                                const digit = code[i] || '';
-                                const isCurrent = code.length === i;
-                                return (
-                                    <View
-                                        key={i}
-                                        style={[
-                                            s.otpBox,
-                                            digit && s.otpBoxFilled,
-                                            isCurrent && s.otpBoxCurrent,
-                                            isComplete && !error && s.otpBoxComplete,
-                                            !!error && s.otpBoxError,
-                                        ]}
-                                    >
-                                        {/* Figma: el código se enmascara con un punto. */}
-                                        {digit ? <View style={s.otpDot} /> : null}
-                                    </View>
-                                );
-                            })}
-                        </View>
-
-                        {/* Input oculto que captura toda la escritura */}
-                        <TextInput
-                            ref={inputRef}
-                            style={s.hiddenInput}
-                            value={code}
-                            onChangeText={handleChange}
-                            keyboardType="number-pad"
-                            inputMode="numeric"
-                            maxLength={OTP_LENGTH}
-                            textContentType="oneTimeCode"
-                            autoComplete="one-time-code"
-                            autoFocus
-                            caretHidden
-                            editable={!isVerifying}
-                        />
-                    </Pressable>
-
-                    {/* Error inline */}
-                    {!!error && (
-                        <View style={s.errorRow}>
-                            <Ionicons name="alert-circle" size={16} color={colors.statRed} />
-                            <Text style={s.errorText}>{error}</Text>
-                        </View>
-                    )}
-
-                    {/* Reenviar */}
+                    {/* Volver — icono y texto con el mismo tono (antes el icono iba
+                        a opacidad completa y el texto al 50%). */}
                     <TouchableOpacity
-                        style={s.resendButton}
-                        onPress={handleResend}
-                        disabled={timer > 0}
+                        style={s.backRow}
+                        onPress={handleGoBack}
                         activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                        {timer > 0 ? (
-                            <Text style={s.resendLine}>
-                                <Text style={s.resendLabel}>¿No te ha llegado? </Text>
-                                <Text style={s.resendTextDisabled}>
-                                    Reenviar en {formatTime(timer)}
-                                </Text>
-                            </Text>
-                        ) : (
-                            <Text style={s.resendLine}>
-                                <Text style={s.resendLabel}>¿No te ha llegado? </Text>
-                                <Text style={s.resendText}>Reenviar código</Text>
-                            </Text>
-                        )}
+                        <View style={s.backInner}>
+                            <Ionicons name="chevron-back" size={18} color={colors.textDark} />
+                            <Text style={s.backText}>Volver</Text>
+                        </View>
                     </TouchableOpacity>
 
+                    {/* Figma: título + casillas + reenviar centrados verticalmente */}
+                    <View style={s.centerBlock}>
+                        {/* Header */}
+                        <View style={s.header}>
+                            <Text style={s.title}>Verifica tu email</Text>
+                            <Text style={s.subtitle}>
+                                Escribe el código de {OTP_LENGTH} dígitos que enviamos a{'\n'}
+                                <Text style={s.emailHighlight}>{email}</Text>
+                            </Text>
+                        </View>
+
+                        {/* Casillas OTP — solo VISUAL. El input real está oculto detrás.
+                            C2: cada celda es TouchableOpacity individual para mover el
+                            punto de entrada al índice pulsado. */}
+                        <Pressable onPress={focusInput} style={s.otpWrapper}>
+                            <View style={s.otpContainer}>
+                                {Array.from({ length: OTP_LENGTH }).map((_, i) => {
+                                    const digit = code[i] || '';
+                                    const isCurrent = code.length === i;
+                                    return (
+                                        <TouchableOpacity
+                                            key={i}
+                                            style={[
+                                                s.otpBox,
+                                                digit && s.otpBoxFilled,
+                                                isCurrent && s.otpBoxCurrent,
+                                                isComplete && !error && s.otpBoxComplete,
+                                                !!error && s.otpBoxError,
+                                            ]}
+                                            onPress={() => handleCellPress(i)}
+                                            activeOpacity={0.8}
+                                        >
+                                            {/* Figma: el código se enmascara con un punto. */}
+                                            {digit ? <View style={s.otpDot} /> : null}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            {/* Input oculto que captura toda la escritura */}
+                            <TextInput
+                                ref={inputRef}
+                                style={s.hiddenInput}
+                                value={code}
+                                onChangeText={handleChange}
+                                keyboardType="number-pad"
+                                inputMode="numeric"
+                                maxLength={OTP_LENGTH}
+                                textContentType="oneTimeCode"
+                                autoComplete="one-time-code"
+                                autoFocus
+                                caretHidden
+                                editable={!isVerifying}
+                            />
+                        </Pressable>
+
+                        {/* Error inline */}
+                        {!!error && (
+                            <View style={s.errorRow}>
+                                <Ionicons name="alert-circle" size={16} color={colors.statRed} />
+                                <Text style={s.errorText}>{error}</Text>
+                            </View>
+                        )}
+
+                        {/* Reenviar */}
+                        <TouchableOpacity
+                            style={s.resendButton}
+                            onPress={handleResend}
+                            disabled={timer > 0}
+                            activeOpacity={0.7}
+                        >
+                            {timer > 0 ? (
+                                <Text style={s.resendLine}>
+                                    <Text style={s.resendLabel}>¿No te ha llegado? </Text>
+                                    <Text style={s.resendTextDisabled}>
+                                        Reenviar en {formatTime(timer)}
+                                    </Text>
+                                </Text>
+                            ) : (
+                                <Text style={s.resendLine}>
+                                    <Text style={s.resendLabel}>¿No te ha llegado? </Text>
+                                    <Text style={s.resendText}>Reenviar código</Text>
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+
+                {/* Botón anclado al fondo del KAV — sube con el layout cuando el
+                    teclado aparece, nunca queda tapado. */}
+                <View style={s.buttonContainer}>
                     <TouchableOpacity
                         style={[s.verifyButton, (!isComplete || isVerifying) && s.buttonDisabled]}
                         onPress={handleVerify}
@@ -256,10 +284,22 @@ const s = StyleSheet.create({
         flex: 1,
         backgroundColor: FIGMA.background,
     },
+    kav: {
+        flex: 1,
+    },
     content: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
         padding: 28,
+        paddingBottom: 8,
+    },
+    buttonContainer: {
+        paddingHorizontal: 28,
         paddingBottom: 24,
+        paddingTop: 12,
+        backgroundColor: FIGMA.background,
     },
     backRow: {
         alignSelf: 'flex-start',
@@ -383,7 +423,6 @@ const s = StyleSheet.create({
         paddingVertical: 18,
         borderRadius: 24,
         alignItems: 'center',
-        marginTop: 28,
     },
     buttonDisabled: {
         opacity: 0.5,

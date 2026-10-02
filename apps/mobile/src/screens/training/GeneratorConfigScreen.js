@@ -11,7 +11,7 @@ import {
     Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import ConfirmExitModal from '../../components/ConfirmExitModal';
@@ -358,6 +358,8 @@ export default function GeneratorConfigScreen({ navigation, route }) {
     const [generating, setGenerating] = useState(false);
     const [slowWarning, setSlowWarning] = useState(false);
     const [generateError, setGenerateError] = useState(false);
+
+    const insets = useSafeAreaInsets();
 
     const cancelledRef = useRef(false);
     const allowExitRef = useRef(false);
@@ -791,7 +793,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                 a scrollear hasta abajo tras seleccionar temas. Se oculta cuando
                 hay error de generación (la tarjeta de error ya expone el retry). */}
             {!generateError && (
-                <View style={styles.footer}>
+                <View style={[styles.footer, { paddingBottom: Math.max(20, insets.bottom) }]}>
                     <TouchableOpacity
                         style={[styles.button, generating && { opacity: 0.7 }]}
                         onPress={generate}

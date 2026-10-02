@@ -54,7 +54,7 @@ const CARD_HEIGHT = 493.8;
 
 function CheckBadgeIcon({ width = 107, height = 70, color = colors.ctaGreen }) {
     return (
-        <Svg width={width} height={height} viewBox="0 0 107 70">
+        <Svg width={width} height={height} viewBox="0 0 107 70" overflow="visible">
             <Path d="M4 36L38 66L103 4" stroke={color} strokeWidth={16} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
@@ -323,11 +323,10 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
                 <DeckCompleted
                     knownCount={knownCount}
                     failedCount={failedCards.length}
-                    onEmpezarTest={() => (
-                        topicId
-                            ? navigation.navigate('GeneratorConfig', { topicId, questionCount: 20 })
-                            : navigation.popTo('AITutor')
-                    )}
+                    onEmpezarTest={() => navigation.replace('GeneratorConfig', {
+                        ...(topicId ? { topicId } : {}),
+                        questionCount: 20,
+                    })}
                     onVolverAlAula={() => navigation.popTo('AITutor')}
                 />
             </SafeAreaView>
@@ -625,6 +624,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 28,
     },
     doneIconWrap: {
+        marginTop: 8,
         marginBottom: spacing.md,
         alignItems: 'center',
         justifyContent: 'center',

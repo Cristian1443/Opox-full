@@ -3,6 +3,7 @@ import { StyleSheet, View, StatusBar } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 import { colors } from '../../theme';
 import { api, authApi, planningApi } from '../../api';
 import { PENDING_OPOSICION_KEY } from '../onboarding/OppositionSelectorScreen';
@@ -71,7 +72,11 @@ export default function SesionIniciadaScreen({ navigation, route }) {
             // Fire-and-forget: el registro push no debe bloquear la entrada al Dashboard.
             // El token se registra en background; si falla, el usuario ya está dentro.
             registerForPushNotifications().catch(() => {});
-            navigation.replace('Dashboard', { email });
+            // Resetear el stack completo para que el botón "atrás" en Dashboard
+            // salga de la app en vez de regresar a las pantallas de auth.
+            navigation.dispatch(
+                CommonActions.reset({ index: 0, routes: [{ name: 'Dashboard' }] })
+            );
         }, 2000);
 
         return () => clearTimeout(timer);

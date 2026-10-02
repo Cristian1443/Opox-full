@@ -69,37 +69,48 @@ export async function resolveTopicReferencesInMessage(
     supabaseAdmin: SupabaseClient,
     oposicion: string | null | undefined,
     message: string,
-): Promise<string> {
-    if (!oposicion || !message) return message;
+): Promise<{ enriched: string; topicId: string | null; topicTitle: string | null; topicLabel: string | null }> {
+    if (!oposicion || !message) return { enriched: message, topicId: null, topicTitle: null, topicLabel: null };
 
     // Regex tolerante: "Tema 5", "tema 5", "Tema  5", "Tema 05".
     // Máximo 2 dígitos → evita capturar años ("Ley 39/2015") o números largos
     // que casi nunca son referencias a un tema del temario.
     const re = /\btema\s+(\d{1,2})\b/gi;
     const matches = Array.from(message.matchAll(re));
-    if (matches.length === 0) return message;
+    if (matches.length === 0) return { enriched: message, topicId: null, topicTitle: null, topicLabel: null };
 
     const { data } = await supabaseAdmin
         .from('training_topics')
-        .select('label, sort_order')
+        .select('topic_id, label, sort_order')
         .eq('oposicion', oposicion)
         .order('sort_order', { ascending: true });
 
-    const topics = (data ?? []) as Array<{ label: string; sort_order: number }>;
-    if (topics.length === 0) return message;
+    const topics = (data ?? []) as Array<{ topic_id: string; label: string; sort_order: number }>;
+    if (topics.length === 0) return { enriched: message, topicId: null, topicTitle: null, topicLabel: null };
 
     let enriched = message;
+    let firstTopicId: string | null = null;
+    let firstTopicTitle: string | null = null;
+    let firstTopicLabel: string | null = null;
     const seen = new Set<number>();
     for (const m of matches) {
         const n = parseInt(m[1] ?? '0', 10);
         if (n < 1 || n > topics.length || seen.has(n)) continue;
         seen.add(n);
-        const label = topics[n - 1]?.label;
-        if (!label) continue;
+        const topic = topics[n - 1];
+        if (!topic?.label) continue;
+        // Guardar el primer tema mencionado para sugerencias contextuales
+        if (firstTopicId === null) {
+            firstTopicId = topic.topic_id;
+            // Truncar títulos muy largos para que no superen los límites del validador
+            const raw = topic.label;
+            firstTopicTitle = raw.length > 120 ? raw.slice(0, 117) + '…' : raw;
+            firstTopicLabel = `Tema ${n}`;
+        }
         // Reemplazo global de esa variante numérica exacta — no toca los demás
         // Tema K que existan en el mismo mensaje, cada uno se procesa aparte.
         const replaceRe = new RegExp(`\\btema\\s+${n}\\b`, 'gi');
-        enriched = enriched.replace(replaceRe, `Tema ${n} («${label}»)`);
+        enriched = enriched.replace(replaceRe, `Tema ${n} («${topic.label}»)`);
     }
-    return enriched;
+    return { enriched, topicId: firstTopicId, topicTitle: firstTopicTitle, topicLabel: firstTopicLabel };
 }

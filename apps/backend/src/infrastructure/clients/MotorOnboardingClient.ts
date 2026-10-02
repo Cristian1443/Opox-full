@@ -1,5 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@opox/utils';
+import { enrichTopicsWithLabels } from '../shared/topicLabels';
 
 // ─── Tipos internos del Motor ─────────────────────────────────────────────────
 
@@ -53,6 +55,7 @@ export class MotorOnboardingClient {
     private readonly http: AxiosInstance;
     private readonly openAiKey: string;
     private readonly cursoId: string;
+    private readonly supabaseAdmin: SupabaseClient | undefined;
 
     /** Tiempo máximo (ms) para el bucle de polling del job. */
     private readonly pollTimeoutMs: number;
@@ -67,11 +70,13 @@ export class MotorOnboardingClient {
         apiKey: string,
         openAiKey: string,
         cursoId = '',
+        supabaseAdmin?: SupabaseClient,
         pollTimeoutMs = 60_000,
         pollIntervalMs = 3_000,
     ) {
         this.openAiKey = openAiKey;
         this.cursoId = cursoId;
+        this.supabaseAdmin = supabaseAdmin;
         this.pollTimeoutMs = pollTimeoutMs;
         this.pollIntervalMs = pollIntervalMs;
 
@@ -162,6 +167,27 @@ export class MotorOnboardingClient {
                 'Motor placement-test: 0 preguntas con correcta_idx resuelto (INC-04). ' +
                 'Usa el banco para resolverlo o espera fix del equipo IA.',
             );
+        }
+
+        // 5. Resolver hex `tema_id` → "Tema N" para que la UI (chips de puntos
+        //    fuertes / a reforzar) no muestre identificadores crudos al usuario.
+        //    Si no hay supabaseAdmin o la oposición no tiene temas en
+        //    `training_topics`, dejamos el hex como fallback silencioso.
+        if (this.supabaseAdmin) {
+            try {
+                const uniqueTemaIds = Array.from(new Set(result.map((q) => q.topic)));
+                const labelMap = await enrichTopicsWithLabels(this.supabaseAdmin, uniqueTemaIds);
+                if (labelMap.size > 0) {
+                    for (const q of result) {
+                        const resolved = labelMap.get(q.topic);
+                        if (resolved) q.topicLabel = resolved;
+                    }
+                }
+            } catch (err) {
+                logger.warn('[motor-onboarding] enrichTopicsWithLabels falló', {
+                    err: err instanceof Error ? err.message : String(err),
+                });
+            }
         }
 
         logger.info('[motor-onboarding] placement-test ok', { count: result.length, cursoId: this.cursoId });

@@ -10,6 +10,8 @@ import {
     Alert,
     Modal,
     Share,
+    ActivityIndicator,
+    Dimensions,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -168,9 +170,152 @@ const markdownStyles = {
 // un "Ver más" — evita el "muro de scroll" reportado en el gap.
 const COLLAPSE_THRESHOLD = 500;
 
+// ─── Tarjeta de configuración de test ────────────────────────────────────────
+function TestConfigCard({ msg, onNavigate }) {
+    const { suggestedTopics = [] } = msg;
+    const [selectedIds, setSelectedIds] = useState(new Set(suggestedTopics.map((t) => t.topicId)));
+    const [useAll, setUseAll] = useState(suggestedTopics.length === 0);
+    const [count, setCount] = useState(10);
+    const [started, setStarted] = useState(false);
+
+    const toggleTopic = (tid) => {
+        const next = new Set(selectedIds);
+        if (next.has(tid)) next.delete(tid); else next.add(tid);
+        setSelectedIds(next);
+        setUseAll(false);
+    };
+
+    return (
+        <View style={[styles.messageRow, styles.rowLeft]}>
+            <Avatar size={26} />
+            <View style={[styles.configCard]}>
+                <Text style={styles.configCardTitle}>¿Sobre qué temas quieres el test?</Text>
+                <View style={styles.configChipsRow}>
+                    {suggestedTopics.map((t) => {
+                        const active = !useAll && selectedIds.has(t.topicId);
+                        return (
+                            <TouchableOpacity
+                                key={t.topicId}
+                                style={[styles.configChip, active && styles.configChipActive]}
+                                onPress={() => toggleTopic(t.topicId)}
+                                disabled={started}
+                            >
+                                <Text style={[styles.configChipText, active && styles.configChipTextActive]}>
+                                    {t.topicLabel || t.topicTitle || 'Tema'}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                    <TouchableOpacity
+                        style={[styles.configChip, useAll && styles.configChipActive]}
+                        onPress={() => { setUseAll(true); setSelectedIds(new Set()); }}
+                        disabled={started}
+                    >
+                        <Text style={[styles.configChipText, useAll && styles.configChipTextActive]}>
+                            Todos los temas
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <Text style={styles.configCardLabel}>Número de preguntas:</Text>
+                <View style={styles.configChipsRow}>
+                    {[10, 20, 30].map((n) => (
+                        <TouchableOpacity
+                            key={n}
+                            style={[styles.configChip, count === n && styles.configChipActive]}
+                            onPress={() => setCount(n)}
+                            disabled={started}
+                        >
+                            <Text style={[styles.configChipText, count === n && styles.configChipTextActive]}>{n}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.configStartBtn, started && styles.configStartBtnDone]}
+                    onPress={() => {
+                        if (started) return;
+                        setStarted(true);
+                        const topicId = useAll ? null : [...selectedIds].join(',') || null;
+                        onNavigate('GeneratorConfig', topicId ? { topicId, questionCount: count } : { questionCount: count });
+                    }}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.configStartBtnText}>{started ? '✓ Test iniciado' : 'Empezar test →'}</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+}
+
+// ─── Tarjeta de configuración de flashcards ───────────────────────────────────
+function FlashcardsConfigCard({ msg, onNavigate }) {
+    const { suggestedTopics = [] } = msg;
+    const firstId = suggestedTopics[0]?.topicId ?? null;
+    const [selectedId, setSelectedId] = useState(suggestedTopics.length === 1 ? firstId : null);
+    const [started, setStarted] = useState(false);
+    const canStart = started || selectedId != null || suggestedTopics.length === 0;
+
+    return (
+        <View style={[styles.messageRow, styles.rowLeft]}>
+            <Avatar size={26} />
+            <View style={styles.configCard}>
+                <Text style={styles.configCardTitle}>¿Para qué tema quieres las flashcards?</Text>
+                <View style={styles.configChipsRow}>
+                    {suggestedTopics.map((t) => (
+                        <TouchableOpacity
+                            key={t.topicId}
+                            style={[styles.configChip, selectedId === t.topicId && styles.configChipActive]}
+                            onPress={() => setSelectedId(t.topicId)}
+                            disabled={started}
+                        >
+                            <Text style={[styles.configChipText, selectedId === t.topicId && styles.configChipTextActive]}>
+                                {t.topicLabel || t.topicTitle || 'Tema'}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                    {suggestedTopics.length === 0 && (
+                        <TouchableOpacity
+                            style={[styles.configChip, styles.configChipActive]}
+                            disabled
+                        >
+                            <Text style={[styles.configChipText, styles.configChipTextActive]}>Elegir tema</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.configStartBtn, (!canStart || started) && styles.configStartBtnDone]}
+                    onPress={() => {
+                        if (started) return;
+                        setStarted(true);
+                        const topic = suggestedTopics.find((t) => t.topicId === selectedId);
+                        if (topic) {
+                            onNavigate('TutorFlashcardsLoading', { topicId: topic.topicId, topicTitle: topic.topicTitle });
+                        } else {
+                            onNavigate('TutorFlashcards', {});
+                        }
+                    }}
+                    disabled={!canStart}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.configStartBtnText}>
+                        {started ? '✓ Generando flashcards' : 'Generar flashcards →'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+}
+
 // ─── Burbuja de mensaje ───────────────────────────────────────────────────────
-function MessageBubble({ msg, onAction }) {
+function MessageBubble({ msg, onAction, onNavigate }) {
     const [expanded, setExpanded] = useState(false);
+
+    // Config cards se renderizan como componentes propios dentro del row
+    if (msg.isConfigCard === 'test') return <TestConfigCard msg={msg} onNavigate={onNavigate} />;
+    if (msg.isConfigCard === 'flashcards') return <FlashcardsConfigCard msg={msg} onNavigate={onNavigate} />;
+
     const isLong = msg.isAI && typeof msg.text === 'string' && msg.text.length > COLLAPSE_THRESHOLD;
     const displayText = isLong && !expanded ? `${msg.text.slice(0, COLLAPSE_THRESHOLD)}…` : msg.text;
 
@@ -200,7 +345,7 @@ function MessageBubble({ msg, onAction }) {
                                 key={a.id}
                                 icon={a.icon}
                                 label={a.label}
-                                onPress={() => onAction(a.label)}
+                                onPress={() => onAction(a)}
                             />
                         ))}
                     </View>
@@ -225,27 +370,70 @@ function TypingIndicator() {
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 export default function TutorChatScreen({ navigation, route }) {
     const technique = route?.params?.technique ?? null;
+    // E1: si viene conversationId desde TutorHome, reanudar esa conversación
+    // en vez de crear una nueva.
+    const resumeConversationId = route?.params?.conversationId ?? null;
+    // topicId/topicTitle: usados para pre-rellenar "Lanzar test" y "Crear flashcards"
+    const topicIdRef = useRef(route?.params?.topicId ?? null);
+    const topicTitleRef = useRef(route?.params?.topicTitle ?? null);
 
     const [messages, setMessages] = useState(() => buildInitialMessages(technique, DEFAULT_TONE.personality));
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const [optionsVisible, setOptionsVisible] = useState(false);
+    const [historyVisible, setHistoryVisible] = useState(false);
+    const [historyConversations, setHistoryConversations] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const scrollRef = useRef(null);
-    const conversationIdRef = useRef(null);
+    const conversationIdRef = useRef(resumeConversationId);
     const tonePrefsRef = useRef(DEFAULT_TONE);
+    // Acumula los temas mencionados en esta sesión para la config de test/flashcards
+    const conversationTopicsRef = useRef([]);
 
-    // Crea la conversación y carga el tono de IA al montar la pantalla
+    // Carga tono y (si hay conversationId) el historial de mensajes al montar.
+    // La creación de conversación es LAZY: ocurre en el primer mensaje enviado
+    // usando los primeros 60 chars como título — así el historial de TutorHome
+    // muestra títulos significativos en vez de "Nueva conversación".
     useEffect(() => {
         AsyncStorage.getItem(TONE_KEY)
             .then((raw) => { if (raw) tonePrefsRef.current = { ...DEFAULT_TONE, ...JSON.parse(raw) }; })
             .catch(() => {});
 
-        tutorApi.createConversation('Nueva conversación', technique)
-            .then((res) => {
-                if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
-            })
-            .catch(() => {});
+        if (resumeConversationId) {
+            tutorApi.getConversation(resumeConversationId)
+                .then((res) => {
+                    if (!res?.error && res?.data?.messages?.length) {
+                        const loaded = res.data.messages.map((m) => ({
+                            id: m.id,
+                            isAI: m.isAI,
+                            text: m.content,
+                            actions: Array.isArray(m.suggestedActions)
+                                ? m.suggestedActions.map((a, i) => ({
+                                    id: `sa${i}`, label: a.label, icon: a.icon,
+                                    topicId: a.topicId, topicTitle: a.topicTitle,
+                                    topicLabel: a.topicLabel,
+                                }))
+                                : null,
+                        }));
+                        setMessages(loaded);
+                        // Poblar conversationTopicsRef con los temas de la historia cargada
+                        const topicsSeen = new Set();
+                        const accumulated = [];
+                        for (const m of loaded) {
+                            if (!Array.isArray(m.actions)) continue;
+                            for (const a of m.actions) {
+                                if (a.topicId && !topicsSeen.has(a.topicId)) {
+                                    topicsSeen.add(a.topicId);
+                                    accumulated.push({ topicId: a.topicId, topicTitle: a.topicTitle, topicLabel: a.topicLabel });
+                                }
+                            }
+                        }
+                        if (accumulated.length > 0) conversationTopicsRef.current = accumulated;
+                    }
+                })
+                .catch(() => {});
+        }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const scrollToBottom = useCallback(() => {
@@ -270,17 +458,39 @@ export default function TutorChatScreen({ navigation, route }) {
             const res = await tutorApi.sendMessage(cid, userText, tonePrefsRef.current);
             if (res?.error || !res?.data) throw new Error('api-err');
             const ai = res.data.aiMessage;
+            const rawActions = Array.isArray(ai.suggestedActions) ? ai.suggestedActions : [];
+
+            // Actualizar topicId activo y acumular temas de la conversación
+            const topicAction = rawActions.find((a) => a.topicId);
+            if (topicAction?.topicId) {
+                topicIdRef.current = topicAction.topicId;
+                topicTitleRef.current = topicAction.topicTitle ?? null;
+                const existing = conversationTopicsRef.current;
+                if (!existing.find((t) => t.topicId === topicAction.topicId)) {
+                    conversationTopicsRef.current = [
+                        ...existing,
+                        {
+                            topicId: topicAction.topicId,
+                            topicTitle: topicAction.topicTitle ?? 'Tema',
+                            topicLabel: topicAction.topicLabel ?? null,
+                        },
+                    ];
+                }
+            }
+
             addMessage({
                 id: ai.id,
                 isAI: true,
                 text: ai.content,
                 timestamp: nowTime(),
-                actions: Array.isArray(ai.suggestedActions)
-                    ? ai.suggestedActions.map((a, i) => ({ id: `sa${i}`, label: a.label, icon: a.icon }))
+                actions: rawActions.length
+                    ? rawActions.map((a, i) => ({
+                        id: `sa${i}`, label: a.label, icon: a.icon,
+                        topicId: a.topicId, topicTitle: a.topicTitle,
+                    }))
                     : null,
             });
         } catch {
-            // fallback stub cuando el backend no está disponible
             addMessage({
                 id: Date.now().toString(),
                 isAI: true,
@@ -296,33 +506,38 @@ export default function TutorChatScreen({ navigation, route }) {
         }
     }, [addMessage]);
 
-    const handleSend = useCallback(() => {
+    const handleSend = useCallback(async () => {
         const text = inputText.trim();
         if (!text) return;
 
-        addMessage({
-            id: Date.now().toString(),
-            isAI: false,
-            text,
-            timestamp: nowTime(),
-            actions: null,
-        });
+        addMessage({ id: Date.now().toString(), isAI: false, text, timestamp: nowTime(), actions: null });
         setInputText('');
+
+        // Lazy creation: crear conversación con el primer mensaje como título
+        if (!conversationIdRef.current) {
+            try {
+                const title = text.slice(0, 60).trim();
+                const res = await tutorApi.createConversation(title, technique ?? null);
+                if (res?.data?.id) conversationIdRef.current = res.data.id;
+            } catch { /* sendToApi lanzará 'no-conv' pero el msg ya se añadió */ }
+        }
+
         sendToApi(text);
-    }, [inputText, addMessage, sendToApi]);
+    }, [inputText, addMessage, sendToApi, technique]);
 
     // ─── Handlers del menú "tres puntos" ─────────────────────────────────────
     // Antes se usaba Alert.alert con estilo nativo (pantalla oscura, texto en
     // mayúsculas verde) — poco alineado con Figma y "Compartir chat" no hacía
     // nada. Ahora es un Modal Figma y Share.share exporta la conversación real.
-    const handleNewConversation = useCallback(async () => {
+    const handleNewConversation = useCallback(() => {
         setOptionsVisible(false);
         setMessages(buildInitialMessages(technique, tonePrefsRef.current.personality));
         setInputText('');
-        try {
-            const res = await tutorApi.createConversation('Nueva conversación', technique);
-            if (!res?.error && res?.data?.id) conversationIdRef.current = res.data.id;
-        } catch { /* fallback: la conversación anterior se descarta igualmente */ }
+        // Reset de refs — la nueva conversación se crea de forma lazy al primer mensaje
+        conversationIdRef.current = null;
+        conversationTopicsRef.current = [];
+        topicIdRef.current = null;
+        topicTitleRef.current = null;
     }, [technique]);
 
     const handleShareChat = useCallback(async () => {
@@ -345,16 +560,103 @@ export default function TutorChatScreen({ navigation, route }) {
         } catch { /* usuario canceló el sheet o falló el share — ignorar */ }
     }, [messages]);
 
-    const handleAction = useCallback((label) => {
-        if (label === 'Crear flashcards') {
-            // Ir al picker de temas — antes iba directo a Loading con topicId por
-            // defecto ('constitucion'), que en el curso nuevo no existe y el Motor
-            // devolvía tema_no_encontrado. Ahora el usuario elige el tema.
-            navigation.navigate('TutorFlashcards');
+    const handleOpenHistory = useCallback(() => {
+        setOptionsVisible(false);
+        setHistoryVisible(true);
+        setHistoryLoading(true);
+        tutorApi.listConversations()
+            .then((res) => {
+                const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+                setHistoryConversations(list);
+            })
+            .catch(() => {})
+            .finally(() => setHistoryLoading(false));
+    }, []);
+
+    const handleLoadConversation = useCallback(async (conv) => {
+        setHistoryVisible(false);
+        // Resetear estado del chat y cargar la conversación seleccionada
+        conversationIdRef.current = conv.id;
+        conversationTopicsRef.current = [];
+        topicIdRef.current = null;
+        topicTitleRef.current = null;
+        setInputText('');
+        const res = await tutorApi.getConversation(conv.id).catch(() => null);
+        if (res?.data?.messages?.length) {
+            const loaded = res.data.messages.map((m) => ({
+                id: m.id,
+                isAI: m.isAI,
+                text: m.content,
+                actions: Array.isArray(m.suggestedActions)
+                    ? m.suggestedActions.map((a, i) => ({
+                        id: `sa${i}`, label: a.label, icon: a.icon,
+                        topicId: a.topicId, topicTitle: a.topicTitle, topicLabel: a.topicLabel,
+                    }))
+                    : null,
+            }));
+            setMessages(loaded);
+            // Poblar temas acumulados desde el historial cargado
+            const topicsSeen = new Set();
+            const accumulated = [];
+            for (const m of loaded) {
+                for (const a of (m.actions ?? [])) {
+                    if (a.topicId && !topicsSeen.has(a.topicId)) {
+                        topicsSeen.add(a.topicId);
+                        accumulated.push({ topicId: a.topicId, topicTitle: a.topicTitle, topicLabel: a.topicLabel });
+                    }
+                }
+            }
+            if (accumulated.length > 0) conversationTopicsRef.current = accumulated;
+        } else {
+            setMessages(buildInitialMessages(technique, tonePrefsRef.current.personality));
+        }
+    }, [technique]);
+
+    // action puede ser un objeto { label, icon, topicId?, topicTitle? } o string legacy.
+    const handleAction = useCallback((action) => {
+        const label = typeof action === 'string' ? action : action.label;
+        // Actualizar refs con el topic del action si viene
+        if (typeof action === 'object' && action.topicId) {
+            topicIdRef.current = action.topicId;
+            topicTitleRef.current = action.topicTitle ?? null;
+            const existing = conversationTopicsRef.current;
+            if (!existing.find((t) => t.topicId === action.topicId)) {
+                conversationTopicsRef.current = [
+                    ...existing,
+                    { topicId: action.topicId, topicTitle: action.topicTitle ?? 'Tema', topicLabel: action.topicLabel ?? null },
+                ];
+            }
+        }
+
+        if (label === 'Lanzar test') {
+            // Inyectar tarjeta de configuración en el chat para que el usuario
+            // elija temas y número de preguntas de forma conversacional
+            addMessage({
+                id: Date.now().toString(),
+                isAI: true,
+                isConfigCard: 'test',
+                suggestedTopics: conversationTopicsRef.current.length > 0
+                    ? conversationTopicsRef.current
+                    : topicIdRef.current
+                        ? [{ topicId: topicIdRef.current, topicTitle: topicTitleRef.current ?? 'Tema' }]
+                        : [],
+                actions: null,
+            });
             return;
         }
-        if (label === 'Lanzar test') {
-            navigation.navigate('GeneratorConfig');
+
+        if (label === 'Crear flashcards') {
+            addMessage({
+                id: Date.now().toString(),
+                isAI: true,
+                isConfigCard: 'flashcards',
+                suggestedTopics: conversationTopicsRef.current.length > 0
+                    ? conversationTopicsRef.current
+                    : topicIdRef.current
+                        ? [{ topicId: topicIdRef.current, topicTitle: topicTitleRef.current ?? 'Tema' }]
+                        : [],
+                actions: null,
+            });
             return;
         }
 
@@ -424,6 +726,15 @@ export default function TutorChatScreen({ navigation, route }) {
                         <View style={styles.optionsSeparator} />
                         <TouchableOpacity
                             style={styles.optionsRow}
+                            onPress={handleOpenHistory}
+                            activeOpacity={0.75}
+                        >
+                            <Ionicons name="time-outline" size={20} color={colors.textDark} />
+                            <Text style={styles.optionsRowText}>Historial de chats</Text>
+                        </TouchableOpacity>
+                        <View style={styles.optionsSeparator} />
+                        <TouchableOpacity
+                            style={styles.optionsRow}
                             onPress={handleShareChat}
                             activeOpacity={0.75}
                         >
@@ -441,6 +752,55 @@ export default function TutorChatScreen({ navigation, route }) {
                 </TouchableOpacity>
             </Modal>
 
+            {/* Panel de historial de conversaciones — slide-in desde abajo */}
+            <Modal
+                transparent
+                visible={historyVisible}
+                animationType="slide"
+                onRequestClose={() => setHistoryVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.historyOverlay}
+                    activeOpacity={1}
+                    onPress={() => setHistoryVisible(false)}
+                />
+                <View style={styles.historyPanel}>
+                    <View style={styles.historyPanelHeader}>
+                        <Text style={styles.historyPanelTitle}>Conversaciones</Text>
+                        <TouchableOpacity onPress={() => setHistoryVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name="close" size={22} color={colors.textDark} />
+                        </TouchableOpacity>
+                    </View>
+                    {historyLoading ? (
+                        <ActivityIndicator style={{ marginTop: 32 }} color={colors.accentOrange} />
+                    ) : historyConversations.length === 0 ? (
+                        <Text style={styles.historyEmpty}>Aún no tienes conversaciones guardadas.</Text>
+                    ) : (
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {historyConversations.map((conv) => (
+                                <TouchableOpacity
+                                    key={conv.id}
+                                    style={styles.historyItem}
+                                    onPress={() => handleLoadConversation(conv)}
+                                    activeOpacity={0.75}
+                                >
+                                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.accentOrange} style={{ marginRight: 12 }} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.historyItemTitle} numberOfLines={1}>
+                                            {conv.title || conv.topic || 'Conversación'}
+                                        </Text>
+                                        <Text style={styles.historyItemDate}>
+                                            {new Date(conv.updatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={16} color="rgba(65,41,80,0.4)" />
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    )}
+                </View>
+            </Modal>
+
             <KeyboardAvoidingView
                 style={styles.flex}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -456,7 +816,12 @@ export default function TutorChatScreen({ navigation, route }) {
                         scrollEventThrottle={100}
                     >
                         {messages.map((msg) => (
-                            <MessageBubble key={msg.id} msg={msg} onAction={handleAction} />
+                            <MessageBubble
+                                key={msg.id}
+                                msg={msg}
+                                onAction={handleAction}
+                                onNavigate={(screen, params) => navigation.navigate(screen, params)}
+                            />
                         ))}
                         {isTyping && <TypingIndicator />}
                     </ScrollView>
@@ -729,5 +1094,117 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 14,
         color: colors.accentOrange,
+    },
+
+    // ── Tarjetas de configuración conversacional (test / flashcards) ──────────
+    configCard: {
+        maxWidth: '88%',
+        backgroundColor: FIGMA.aiBubbleBg,
+        borderRadius: 13.3,
+        padding: 14,
+        gap: 10,
+    },
+    configCardTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: 2,
+    },
+    configCardLabel: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12,
+        color: 'rgba(52,58,61,0.6)',
+        marginTop: 4,
+    },
+    configChipsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    configChip: {
+        borderWidth: 1,
+        borderColor: 'rgba(65,41,80,0.25)',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: colors.white,
+    },
+    configChipActive: {
+        backgroundColor: colors.selectionBorder,
+        borderColor: colors.selectionBorder,
+    },
+    configChipText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 12.5,
+        color: colors.textDark,
+    },
+    configChipTextActive: {
+        color: colors.white,
+        fontFamily: 'Poppins-SemiBold',
+    },
+    configStartBtn: {
+        marginTop: 6,
+        backgroundColor: colors.ctaGreen,
+        borderRadius: 10,
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    configStartBtnDone: {
+        backgroundColor: 'rgba(65,41,80,0.2)',
+    },
+    configStartBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 13,
+        color: colors.white,
+    },
+    // ── Panel de historial ──────────────────────────────────────────────────────
+    historyOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+    },
+    historyPanel: {
+        backgroundColor: colors.white,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 36,
+        maxHeight: Dimensions.get('window').height * 0.75,
+    },
+    historyPanelHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    historyPanelTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 18,
+        color: colors.textDark,
+    },
+    historyEmpty: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 14,
+        color: 'rgba(65,41,80,0.5)',
+        textAlign: 'center',
+        marginTop: 24,
+    },
+    historyItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(65,41,80,0.08)',
+    },
+    historyItemTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: 2,
+    },
+    historyItemDate: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 12,
+        color: 'rgba(65,41,80,0.5)',
     },
 });
