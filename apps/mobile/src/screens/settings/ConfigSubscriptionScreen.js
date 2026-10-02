@@ -211,8 +211,10 @@ const styles = StyleSheet.create({
   },
 
   // ── Contenido ─────────────────────────────────────────────────
+  // Misma separación título → contenido que Ajustes y Perfil (spacing.lg).
   scroll: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
 
