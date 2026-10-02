@@ -5,6 +5,7 @@ import {
     TouchableOpacity,
     ScrollView,
     StatusBar,
+    Switch,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +18,6 @@ import { settingsApi } from '../../api';
 // ─── 12.4 · Tono de la IA — alineado con Motor /tone ───────────────────────
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
-  segmentBorder: 'rgba(65, 41, 80, 0.2)',
   sliderTrack: '#F3E1CC',
 };
 
@@ -39,12 +39,6 @@ const PERSONALITY_OPTIONS = [
 ];
 
 const DETAIL_LABELS = ['Breve', 'Medio', 'Profundo'];
-
-// Estilo de pistas: 2 opciones del Motor
-const HINT_OPTIONS = [
-  { key: 'socraticas', label: 'Socráticas' },
-  { key: 'directas',   label: 'Directas' },
-];
 
 // Refuerzo: 3 opciones del Motor
 const REINFORCE_OPTIONS = [
@@ -207,13 +201,21 @@ export default function ConfigToneScreen({ navigation }) {
           ))}
         </View>
 
-        {/* ── Estilo de pistas ─────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, styles.sectionSpacing]}>ESTILO DE PISTAS</Text>
-        <SegmentControl
-          options={HINT_OPTIONS}
-          value={tone.hintStyle}
-          onChange={(key) => update({ hintStyle: key })}
-        />
+        {/* ── Estilo de pistas — switch como en Figma. Mapeo 1:1 con el Motor:
+            encendido = 'directas', apagado = 'socraticas'. ─────────────── */}
+        <View style={styles.switchRow}>
+          <View style={styles.switchTextWrap}>
+            <Text style={styles.switchTitle}>Pistas más directas</Text>
+            <Text style={styles.switchSubtitle}>Acércate más a la respuesta</Text>
+          </View>
+          <Switch
+            value={tone.hintStyle === 'directas'}
+            onValueChange={(on) => update({ hintStyle: on ? 'directas' : 'socraticas' })}
+            trackColor={{ false: '#E2E2E6', true: 'rgba(65, 41, 80, 0.35)' }}
+            thumbColor={tone.hintStyle === 'directas' ? colors.textDark : colors.white}
+            accessibilityLabel="Pistas más directas"
+          />
+        </View>
 
         {/* ── Refuerzo ─────────────────────────────────────────────── */}
         <Text style={[styles.sectionLabel, styles.sectionSpacing]}>REFUERZO</Text>
@@ -284,21 +286,24 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 
+  // Figma: las opciones se reparten todo el ancho; la activa lleva borde y
+  // texto en morado oscuro (textDark), no el morado vivo.
   segmentedRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
     marginBottom: spacing.lg,
   },
   segmentButton: {
-    borderWidth: 1,
-    borderColor: FIGMA.segmentBorder,
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     borderRadius: 10,
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 4,
   },
   segmentButtonActive: {
-    borderColor: colors.purple,
+    borderColor: colors.textDark,
   },
   segmentText: {
     fontFamily: 'Poppins-SemiBold',
@@ -306,7 +311,28 @@ const styles = StyleSheet.create({
     color: FIGMA.textMuted,
   },
   segmentTextActive: {
-    color: colors.purple,
+    color: colors.textDark,
+  },
+
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: spacing.sm,
+  },
+  switchTextWrap: {
+    flex: 1,
+  },
+  switchTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 15,
+    color: colors.textDark,
+  },
+  switchSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 10.5,
+    color: FIGMA.textMuted,
+    marginTop: 2,
   },
 
   sliderLabelsRow: {
@@ -321,8 +347,9 @@ const styles = StyleSheet.create({
     color: FIGMA.textMuted,
   },
 
+  // Figma: burbuja de ejemplo en lila claro, no morado sólido.
   previewBubble: {
-    backgroundColor: colors.purple,
+    backgroundColor: 'rgba(159, 110, 228, 0.75)',
     borderRadius: 14,
     padding: spacing.md,
     marginTop: spacing.md,
