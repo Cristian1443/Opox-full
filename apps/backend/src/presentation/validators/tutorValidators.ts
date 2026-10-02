@@ -18,7 +18,7 @@ export const sendMessageBody = z.object({
 
 export const generateDeckBody = z.object({
     topicId: z.string().min(1).max(80),
-    topicTitle: z.string().min(1).max(120),
+    topicTitle: z.string().min(1).max(500),
     oposicion: z.string().min(1).max(80),
 });
 

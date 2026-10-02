@@ -102,7 +102,9 @@ export async function resolveTopicReferencesInMessage(
         // Guardar el primer tema mencionado para sugerencias contextuales
         if (firstTopicId === null) {
             firstTopicId = topic.topic_id;
-            firstTopicTitle = topic.label;
+            // Truncar títulos muy largos para que no superen los límites del validador
+            const raw = topic.label;
+            firstTopicTitle = raw.length > 120 ? raw.slice(0, 117) + '…' : raw;
             firstTopicLabel = `Tema ${n}`;
         }
         // Reemplazo global de esa variante numérica exacta — no toca los demás
