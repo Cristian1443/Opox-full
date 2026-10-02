@@ -3,11 +3,11 @@ import {
     View,
     StyleSheet,
     TouchableOpacity,
-    Pressable,
     ScrollView,
     StatusBar,
 } from 'react-native';
 import Text from '../components/AppText';
+import SettingsRow from '../components/SettingsRow';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,7 +32,6 @@ const PERSONALITY_LABELS = { cercano: 'Cercano', equilibrado: 'Equilibrado', exi
 const FIGMA = {
   textMuted: 'rgba(65, 41, 80, 0.5)',
   separator: 'rgba(65, 41, 80, 0.12)',
-  highlightBg: '#F5F5F7',
 };
 
 function resetToSplash(navigation) {
@@ -47,13 +46,6 @@ function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
   );
 }
 
-function ChevronRightIcon({ size = 18, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M9 5L16 12L9 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 // Ruta exacta exportada de Figma (avatar circular, 355×355).
 function AvatarIcon({ size = 96 }) {
@@ -315,24 +307,14 @@ export default function SettingsScreen({ navigation }) {
       >
         {MENU_ROWS.map((row) => {
           const Icon = row.icon;
-          // Figma: al tocar se ensombrece la fila completa (borde a borde), no
-          // un recuadro redondeado; ninguna fila va resaltada en reposo.
           return (
-            <Pressable
+            <SettingsRow
               key={row.id}
-              style={({ pressed }) => [styles.row, pressed && { backgroundColor: FIGMA.highlightBg }]}
+              icon={<Icon />}
+              label={row.label}
+              subtitle={row.subtitle}
               onPress={row.onPress}
-              accessibilityLabel={row.label}
-            >
-              <Icon />
-              <View style={styles.rowTextWrap}>
-                <Text style={styles.rowLabel}>{row.label}</Text>
-                {row.subtitle ? (
-                  <Text style={styles.rowSubtitle} numberOfLines={1}>{row.subtitle}</Text>
-                ) : null}
-              </View>
-              <ChevronRightIcon />
-            </Pressable>
+            />
           );
         })}
 
@@ -410,30 +392,9 @@ const styles = StyleSheet.create({
   },
 
   // ── Lista ─────────────────────────────────────────────────────
-  // Sin padding lateral aquí: lo lleva cada fila para que el sombreado al
-  // presionar ocupe todo el ancho.
+  // Sin padding lateral aquí: lo lleva cada SettingsRow para que el sombreado
+  // al presionar ocupe todo el ancho.
   scroll: {},
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 16,
-    paddingHorizontal: spacing.lg + 8,
-  },
-  rowTextWrap: {
-    flex: 1,
-  },
-  rowLabel: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: colors.textDark,
-  },
-  rowSubtitle: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 10.5,
-    color: FIGMA.textMuted,
-    marginTop: 2,
-  },
 
   // ── Acciones de sesión ────────────────────────────────────────
   footer: {

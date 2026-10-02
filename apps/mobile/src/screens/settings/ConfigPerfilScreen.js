@@ -12,6 +12,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
+import SettingsRow from '../../components/SettingsRow';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { api, authApi } from '../../api';
@@ -39,14 +40,6 @@ function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
-function ChevronRightIcon({ size = 18, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M9 5L16 12L9 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -265,68 +258,43 @@ export default function ConfigPerfilScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ── Avatar ──────────────────────────────────────────────────── */}
         <View style={styles.avatarBlock}>
+          {/* El nombre ya aparece en "Nombre y apellidos": no se repite aquí. */}
           <AvatarIcon />
-          {!loading && (
-            <Text style={styles.avatarName} numberOfLines={1}>{user?.displayName || 'Opositor'}</Text>
-          )}
           <TouchableOpacity activeOpacity={0.7} onPress={handleEditPhoto}>
             <Text style={styles.cambiarFoto}>Cambiar foto</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── Datos personales ───────────────────────────────────────── */}
+        {/* Mismo componente de fila que Ajustes: sin tarjetas ni separadores. */}
         <Text style={styles.sectionLabel}>DATOS PERSONALES</Text>
-        <View style={styles.card}>
-          <TouchableOpacity
-            style={styles.row}
-            onPress={handleOpenNameModal}
-            activeOpacity={0.7}
-            accessibilityLabel="Editar nombre"
-          >
-            <View style={styles.rowTextWrap}>
-              <Text style={styles.rowSmallLabel}>Nombre y apellidos</Text>
-              <Text style={styles.rowValue}>{user?.displayName || '—'}</Text>
-            </View>
-            <ChevronRightIcon />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.row, styles.rowBorder]}
-            onPress={() => setEmailModalVisible(true)}
-            activeOpacity={0.7}
-            accessibilityLabel="Ver email"
-          >
-            <View style={styles.rowTextWrap}>
-              <Text style={styles.rowSmallLabel}>Email</Text>
-              <Text style={styles.rowValue}>{user?.email || '—'}</Text>
-            </View>
-            <ChevronRightIcon />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.row, styles.rowBorder]}
-            onPress={() => setOposicionModalVisible(true)}
-            activeOpacity={0.7}
-            accessibilityLabel="Cambiar oposición"
-          >
-            <View style={styles.rowTextWrap}>
-              <Text style={styles.rowSmallLabel}>Oposición</Text>
-              <Text style={styles.rowValue}>{oposicionLine}</Text>
-            </View>
-            <ChevronRightIcon />
-          </TouchableOpacity>
-        </View>
+        <SettingsRow
+          caption="Nombre y apellidos"
+          label={user?.displayName || '—'}
+          onPress={handleOpenNameModal}
+          accessibilityLabel="Editar nombre"
+        />
+        <SettingsRow
+          caption="Email"
+          label={user?.email || '—'}
+          onPress={() => setEmailModalVisible(true)}
+          accessibilityLabel="Ver email"
+        />
+        <SettingsRow
+          caption="Oposición"
+          label={oposicionLine}
+          onPress={() => setOposicionModalVisible(true)}
+          accessibilityLabel="Cambiar oposición"
+        />
 
         {/* ── Seguridad ───────────────────────────────────────────────── */}
         <Text style={[styles.sectionLabel, styles.securityLabel]}>SEGURIDAD</Text>
-        <View style={styles.card}>
-          {showFaceRow && (
-            <View style={styles.row}>
-              <FaceIdIcon />
-              <View style={styles.rowTextWrap}>
-                <Text style={styles.rowTitle}>Face ID</Text>
-                <Text style={styles.rowSubtitle}>Acceso con reconocimiento facial</Text>
-              </View>
+        {showFaceRow && (
+          <SettingsRow
+            icon={<FaceIdIcon />}
+            label="Face ID"
+            subtitle="Acceso con reconocimiento facial"
+            right={(
               <Switch
                 value={bioEnabled}
                 onValueChange={handleBioToggle}
@@ -335,15 +303,15 @@ export default function ConfigPerfilScreen({ navigation }) {
                 thumbColor={colors.white}
                 accessibilityLabel={`Face ID ${bioEnabled ? 'activado' : 'desactivado'}`}
               />
-            </View>
-          )}
-          {showFingerRow && (
-            <View style={[styles.row, showFaceRow && styles.rowBorder]}>
-              <FingerprintIcon />
-              <View style={styles.rowTextWrap}>
-                <Text style={styles.rowTitle}>{fingerLabel}</Text>
-                <Text style={styles.rowSubtitle}>Acceso con huella dactilar</Text>
-              </View>
+            )}
+          />
+        )}
+        {showFingerRow && (
+          <SettingsRow
+            icon={<FingerprintIcon />}
+            label={fingerLabel}
+            subtitle="Acceso con huella dactilar"
+            right={(
               <Switch
                 value={bioEnabled}
                 onValueChange={handleBioToggle}
@@ -352,19 +320,14 @@ export default function ConfigPerfilScreen({ navigation }) {
                 thumbColor={colors.white}
                 accessibilityLabel={`${fingerLabel} ${bioEnabled ? 'activada' : 'desactivada'}`}
               />
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.row, bioType !== 'none' && styles.rowBorder]}
-            onPress={handleChangePassword}
-            activeOpacity={0.7}
-            accessibilityLabel="Cambiar contraseña"
-          >
-            <LockIcon />
-            <Text style={[styles.rowTitle, { flex: 1 }]}>Cambiar contraseña</Text>
-            <ChevronRightIcon />
-          </TouchableOpacity>
-        </View>
+            )}
+          />
+        )}
+        <SettingsRow
+          icon={<LockIcon />}
+          label="Cambiar contraseña"
+          onPress={handleChangePassword}
+        />
       </ScrollView>
 
       {/* ── Modal: editar nombre ─────────────────────────────────────── */}
@@ -529,19 +492,15 @@ const styles = StyleSheet.create({
   },
 
   // ── Contenido ─────────────────────────────────────────────────
+  // Sin padding lateral: lo aporta cada SettingsRow (sombreado borde a borde).
   scroll: {
-    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
+  // Misma separación título → contenido que en Ajustes.
   avatarBlock: {
     alignItems: 'center',
+    marginTop: spacing.lg,
     marginBottom: spacing.lg,
-  },
-  avatarName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: colors.textDark,
-    marginTop: 10,
   },
   cambiarFoto: {
     fontFamily: 'Poppins-Regular',
@@ -549,55 +508,16 @@ const styles = StyleSheet.create({
     color: FIGMA.textMuted,
     marginTop: 6,
   },
+  // Alineado con el texto de las filas (mismo padding lateral que SettingsRow).
   sectionLabel: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 12,
     color: colors.textDark,
-    marginBottom: 8,
+    paddingHorizontal: spacing.lg + 8,
+    marginBottom: 4,
   },
   securityLabel: {
     marginTop: spacing.lg,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: FIGMA.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-  },
-  rowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: FIGMA.separator,
-  },
-  rowTextWrap: {
-    flex: 1,
-  },
-  rowSmallLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 10,
-    color: FIGMA.textMuted,
-    marginBottom: 2,
-  },
-  rowValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: colors.textDark,
-  },
-  rowTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: colors.textDark,
-  },
-  rowSubtitle: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 10.5,
-    color: FIGMA.textMuted,
-    marginTop: 2,
   },
 
   // ── Modal compartido ──────────────────────────────────────────
