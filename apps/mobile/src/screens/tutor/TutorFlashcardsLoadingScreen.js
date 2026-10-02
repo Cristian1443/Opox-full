@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import FlashcardsSuccessModal from '../../components/FlashcardsSuccessModal';
@@ -69,6 +70,7 @@ export default function TutorFlashcardsLoadingScreen({ navigation, route }) {
     const [stepIndex, setStepIndex] = useState(0);
     const [showSuccess, setShowSuccess] = useState(false);
     const [deckResult, setDeckResult] = useState(null);
+    const [genError, setGenError] = useState(false);
 
     useEffect(() => {
         isMounted.current = true;
@@ -107,11 +109,15 @@ export default function TutorFlashcardsLoadingScreen({ navigation, route }) {
             })
             .catch(() => null);
 
-        // Espera a que AMBAS terminen para mostrar el modal de éxito
+        // Espera a que AMBAS terminen para mostrar el modal de éxito o error
         Promise.all([animPromise, apiPromise]).then(([, data]) => {
             if (!isMounted.current) return;
-            setDeckResult(data);
-            setShowSuccess(true);
+            if (data && Array.isArray(data.cards) && data.cards.length > 0) {
+                setDeckResult(data);
+                setShowSuccess(true);
+            } else {
+                setGenError(true);
+            }
         });
 
         const stepInterval = setInterval(() => {
@@ -146,27 +152,38 @@ export default function TutorFlashcardsLoadingScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.overlay} edges={['top', 'left', 'right']}>
             <View style={styles.card}>
-                <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
-                    <View style={styles.iconWrap}>
-                        <Animated.View style={[styles.pulseRing, { opacity: pulseAnim }]} />
-                        <SparklesIcon />
+                {genError ? (
+                    // Estado de error: el Motor falló y el backend no devolvió tarjetas
+                    <View style={styles.errorWrap}>
+                        <Ionicons name="warning-outline" size={48} color="#E67E22" style={{ marginBottom: 16 }} />
+                        <Text style={styles.errorTitle}>No se pudieron generar las flashcards</Text>
+                        <Text style={styles.subtitle}>El servicio de IA no está disponible en este momento. Inténtalo de nuevo más tarde.</Text>
+                        <TouchableOpacity onPress={handleCancel} style={styles.cancelBtn}>
+                            <Text style={styles.cancelText}>Volver</Text>
+                        </TouchableOpacity>
                     </View>
-                </Animated.View>
+                ) : (
+                    <>
+                        <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
+                            <View style={styles.iconWrap}>
+                                <Animated.View style={[styles.pulseRing, { opacity: pulseAnim }]} />
+                                <SparklesIcon />
+                            </View>
+                        </Animated.View>
 
-                <Text style={styles.title}>Creando tus flashcards</Text>
-                <Text style={styles.subtitle}>La IA está extrayendo los conceptos clave.</Text>
+                        <Text style={styles.title}>Creando tus flashcards</Text>
+                        <Text style={styles.subtitle}>La IA está extrayendo los conceptos clave.</Text>
 
-                {/* Barra de progreso + paso actual — reales, sin dato de Figma
-                    para este elemento, pero necesarios para dar feedback
-                    mientras se genera el mazo. */}
-                <View style={styles.progressTrack}>
-                    <Animated.View style={[styles.progressBar, { width: progressWidth }]} />
-                </View>
-                <Text style={styles.stepText}>{STEPS[stepIndex]}</Text>
+                        <View style={styles.progressTrack}>
+                            <Animated.View style={[styles.progressBar, { width: progressWidth }]} />
+                        </View>
+                        <Text style={styles.stepText}>{STEPS[stepIndex]}</Text>
 
-                <TouchableOpacity onPress={handleCancel} accessibilityLabel="Cancelar generación" style={styles.cancelBtn}>
-                    <Text style={styles.cancelText}>Cancelar</Text>
-                </TouchableOpacity>
+                        <TouchableOpacity onPress={handleCancel} accessibilityLabel="Cancelar generación" style={styles.cancelBtn}>
+                            <Text style={styles.cancelText}>Cancelar</Text>
+                        </TouchableOpacity>
+                    </>
+                )}
             </View>
 
             {/* Modal de éxito — aparece cuando animación + API han terminado */}
@@ -270,5 +287,17 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 13,
         color: FIGMA.subtitleMuted,
+    },
+
+    errorWrap: {
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    errorTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 17,
+        color: colors.textDark,
+        textAlign: 'center',
+        marginBottom: spacing.sm,
     },
 });
