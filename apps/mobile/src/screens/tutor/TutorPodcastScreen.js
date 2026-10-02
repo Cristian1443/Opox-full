@@ -14,6 +14,7 @@ import {
     PanResponder,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AlertCardModal from '../../components/AlertCardModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
@@ -145,6 +146,7 @@ function EpisodePicker({ oposicion, onSelect, onSelectHistory, onBack }) {
     const [episodes, setEpisodes] = useState([]);
     const [loading, setLoading]   = useState(true);
     const [history, setHistory]   = useState([]);
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState(null); // entry | null
 
     useFocusEffect(useCallback(() => {
         let cancelled = false;
@@ -205,23 +207,7 @@ function EpisodePicker({ oposicion, onSelect, onSelectHistory, onBack }) {
                                     <TouchableOpacity
                                         style={styles.historyDeleteBtn}
                                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                        onPress={() => {
-                                            Alert.alert(
-                                                'Eliminar podcast',
-                                                '¿Eliminar este podcast del historial?',
-                                                [
-                                                    { text: 'Cancelar', style: 'cancel' },
-                                                    {
-                                                        text: 'Eliminar',
-                                                        style: 'destructive',
-                                                        onPress: async () => {
-                                                            const updated = await deletePodcastFromHistory(h.topicId, h.generatedAt);
-                                                            setHistory(updated);
-                                                        },
-                                                    },
-                                                ],
-                                            );
-                                        }}
+                                        onPress={() => setDeleteConfirmModal(h)}
                                     >
                                         <Ionicons name="trash-outline" size={18} color="#C0392B" />
                                     </TouchableOpacity>
@@ -260,6 +246,23 @@ function EpisodePicker({ oposicion, onSelect, onSelectHistory, onBack }) {
                     )}
                 </ScrollView>
             )}
+            <AlertCardModal
+                visible={!!deleteConfirmModal}
+                icon={<Ionicons name="trash-outline" size={32} color="#C0392B" />}
+                iconBg="#FDECEA"
+                title="Eliminar podcast"
+                description="¿Eliminar este podcast del historial?"
+                primaryLabel="Eliminar"
+                primaryColor="#C0392B"
+                onPrimaryPress={async () => {
+                    const updated = await deletePodcastFromHistory(deleteConfirmModal.topicId, deleteConfirmModal.generatedAt);
+                    setHistory(updated);
+                    setDeleteConfirmModal(null);
+                }}
+                secondaryLabel="Cancelar"
+                secondaryVariant="button"
+                onSecondaryPress={() => setDeleteConfirmModal(null)}
+            />
         </SafeAreaView>
     );
 }

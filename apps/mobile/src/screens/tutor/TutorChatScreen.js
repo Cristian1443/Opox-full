@@ -10,6 +10,8 @@ import {
     Alert,
     Modal,
     Share,
+    ActivityIndicator,
+    Dimensions,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -199,7 +201,7 @@ function TestConfigCard({ msg, onNavigate }) {
                                 disabled={started}
                             >
                                 <Text style={[styles.configChipText, active && styles.configChipTextActive]}>
-                                    {t.topicTitle}
+                                    {t.topicLabel || t.topicTitle || 'Tema'}
                                 </Text>
                             </TouchableOpacity>
                         );
@@ -268,7 +270,7 @@ function FlashcardsConfigCard({ msg, onNavigate }) {
                             disabled={started}
                         >
                             <Text style={[styles.configChipText, selectedId === t.topicId && styles.configChipTextActive]}>
-                                {t.topicTitle}
+                                {t.topicLabel || t.topicTitle || 'Tema'}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -380,6 +382,9 @@ export default function TutorChatScreen({ navigation, route }) {
     const [isTyping, setIsTyping] = useState(false);
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const [optionsVisible, setOptionsVisible] = useState(false);
+    const [historyVisible, setHistoryVisible] = useState(false);
+    const [historyConversations, setHistoryConversations] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const scrollRef = useRef(null);
     const conversationIdRef = useRef(resumeConversationId);
     const tonePrefsRef = useRef(DEFAULT_TONE);
@@ -407,10 +412,24 @@ export default function TutorChatScreen({ navigation, route }) {
                                 ? m.suggestedActions.map((a, i) => ({
                                     id: `sa${i}`, label: a.label, icon: a.icon,
                                     topicId: a.topicId, topicTitle: a.topicTitle,
+                                    topicLabel: a.topicLabel,
                                 }))
                                 : null,
                         }));
                         setMessages(loaded);
+                        // Poblar conversationTopicsRef con los temas de la historia cargada
+                        const topicsSeen = new Set();
+                        const accumulated = [];
+                        for (const m of loaded) {
+                            if (!Array.isArray(m.actions)) continue;
+                            for (const a of m.actions) {
+                                if (a.topicId && !topicsSeen.has(a.topicId)) {
+                                    topicsSeen.add(a.topicId);
+                                    accumulated.push({ topicId: a.topicId, topicTitle: a.topicTitle, topicLabel: a.topicLabel });
+                                }
+                            }
+                        }
+                        if (accumulated.length > 0) conversationTopicsRef.current = accumulated;
                     }
                 })
                 .catch(() => {});
@@ -450,7 +469,11 @@ export default function TutorChatScreen({ navigation, route }) {
                 if (!existing.find((t) => t.topicId === topicAction.topicId)) {
                     conversationTopicsRef.current = [
                         ...existing,
-                        { topicId: topicAction.topicId, topicTitle: topicAction.topicTitle ?? 'Tema' },
+                        {
+                            topicId: topicAction.topicId,
+                            topicTitle: topicAction.topicTitle ?? 'Tema',
+                            topicLabel: topicAction.topicLabel ?? null,
+                        },
                     ];
                 }
             }
@@ -537,6 +560,58 @@ export default function TutorChatScreen({ navigation, route }) {
         } catch { /* usuario canceló el sheet o falló el share — ignorar */ }
     }, [messages]);
 
+    const handleOpenHistory = useCallback(() => {
+        setOptionsVisible(false);
+        setHistoryVisible(true);
+        setHistoryLoading(true);
+        tutorApi.listConversations()
+            .then((res) => {
+                const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+                setHistoryConversations(list);
+            })
+            .catch(() => {})
+            .finally(() => setHistoryLoading(false));
+    }, []);
+
+    const handleLoadConversation = useCallback(async (conv) => {
+        setHistoryVisible(false);
+        // Resetear estado del chat y cargar la conversación seleccionada
+        conversationIdRef.current = conv.id;
+        conversationTopicsRef.current = [];
+        topicIdRef.current = null;
+        topicTitleRef.current = null;
+        setInputText('');
+        const res = await tutorApi.getConversation(conv.id).catch(() => null);
+        if (res?.data?.messages?.length) {
+            const loaded = res.data.messages.map((m) => ({
+                id: m.id,
+                isAI: m.isAI,
+                text: m.content,
+                actions: Array.isArray(m.suggestedActions)
+                    ? m.suggestedActions.map((a, i) => ({
+                        id: `sa${i}`, label: a.label, icon: a.icon,
+                        topicId: a.topicId, topicTitle: a.topicTitle, topicLabel: a.topicLabel,
+                    }))
+                    : null,
+            }));
+            setMessages(loaded);
+            // Poblar temas acumulados desde el historial cargado
+            const topicsSeen = new Set();
+            const accumulated = [];
+            for (const m of loaded) {
+                for (const a of (m.actions ?? [])) {
+                    if (a.topicId && !topicsSeen.has(a.topicId)) {
+                        topicsSeen.add(a.topicId);
+                        accumulated.push({ topicId: a.topicId, topicTitle: a.topicTitle, topicLabel: a.topicLabel });
+                    }
+                }
+            }
+            if (accumulated.length > 0) conversationTopicsRef.current = accumulated;
+        } else {
+            setMessages(buildInitialMessages(technique, tonePrefsRef.current.personality));
+        }
+    }, [technique]);
+
     // action puede ser un objeto { label, icon, topicId?, topicTitle? } o string legacy.
     const handleAction = useCallback((action) => {
         const label = typeof action === 'string' ? action : action.label;
@@ -548,7 +623,7 @@ export default function TutorChatScreen({ navigation, route }) {
             if (!existing.find((t) => t.topicId === action.topicId)) {
                 conversationTopicsRef.current = [
                     ...existing,
-                    { topicId: action.topicId, topicTitle: action.topicTitle ?? 'Tema' },
+                    { topicId: action.topicId, topicTitle: action.topicTitle ?? 'Tema', topicLabel: action.topicLabel ?? null },
                 ];
             }
         }
@@ -651,6 +726,15 @@ export default function TutorChatScreen({ navigation, route }) {
                         <View style={styles.optionsSeparator} />
                         <TouchableOpacity
                             style={styles.optionsRow}
+                            onPress={handleOpenHistory}
+                            activeOpacity={0.75}
+                        >
+                            <Ionicons name="time-outline" size={20} color={colors.textDark} />
+                            <Text style={styles.optionsRowText}>Historial de chats</Text>
+                        </TouchableOpacity>
+                        <View style={styles.optionsSeparator} />
+                        <TouchableOpacity
+                            style={styles.optionsRow}
                             onPress={handleShareChat}
                             activeOpacity={0.75}
                         >
@@ -666,6 +750,55 @@ export default function TutorChatScreen({ navigation, route }) {
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
+            </Modal>
+
+            {/* Panel de historial de conversaciones — slide-in desde abajo */}
+            <Modal
+                transparent
+                visible={historyVisible}
+                animationType="slide"
+                onRequestClose={() => setHistoryVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.historyOverlay}
+                    activeOpacity={1}
+                    onPress={() => setHistoryVisible(false)}
+                />
+                <View style={styles.historyPanel}>
+                    <View style={styles.historyPanelHeader}>
+                        <Text style={styles.historyPanelTitle}>Conversaciones</Text>
+                        <TouchableOpacity onPress={() => setHistoryVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name="close" size={22} color={colors.textDark} />
+                        </TouchableOpacity>
+                    </View>
+                    {historyLoading ? (
+                        <ActivityIndicator style={{ marginTop: 32 }} color={colors.accentOrange} />
+                    ) : historyConversations.length === 0 ? (
+                        <Text style={styles.historyEmpty}>Aún no tienes conversaciones guardadas.</Text>
+                    ) : (
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {historyConversations.map((conv) => (
+                                <TouchableOpacity
+                                    key={conv.id}
+                                    style={styles.historyItem}
+                                    onPress={() => handleLoadConversation(conv)}
+                                    activeOpacity={0.75}
+                                >
+                                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.accentOrange} style={{ marginRight: 12 }} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.historyItemTitle} numberOfLines={1}>
+                                            {conv.title || conv.topic || 'Conversación'}
+                                        </Text>
+                                        <Text style={styles.historyItemDate}>
+                                            {new Date(conv.updatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={16} color="rgba(65,41,80,0.4)" />
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    )}
+                </View>
             </Modal>
 
             <KeyboardAvoidingView
@@ -1023,5 +1156,55 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 13,
         color: colors.white,
+    },
+    // ── Panel de historial ──────────────────────────────────────────────────────
+    historyOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+    },
+    historyPanel: {
+        backgroundColor: colors.white,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 36,
+        maxHeight: Dimensions.get('window').height * 0.75,
+    },
+    historyPanelHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    historyPanelTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 18,
+        color: colors.textDark,
+    },
+    historyEmpty: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 14,
+        color: 'rgba(65,41,80,0.5)',
+        textAlign: 'center',
+        marginTop: 24,
+    },
+    historyItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(65,41,80,0.08)',
+    },
+    historyItemTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: 2,
+    },
+    historyItemDate: {
+        fontFamily: 'Poppins-Light',
+        fontSize: 12,
+        color: 'rgba(65,41,80,0.5)',
     },
 });

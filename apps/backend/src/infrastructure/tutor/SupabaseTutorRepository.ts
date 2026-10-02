@@ -269,12 +269,12 @@ export class SupabaseTutorRepository implements ITutorRepository {
         return data ? mapSummary(data) : null;
     }
 
-    async resolveTopicReferences(oposicion: string | null | undefined, message: string): Promise<{ enriched: string; topicId: string | null; topicTitle: string | null }> {
+    async resolveTopicReferences(oposicion: string | null | undefined, message: string): Promise<{ enriched: string; topicId: string | null; topicTitle: string | null; topicLabel: string | null }> {
         try {
             return await resolveTopicReferencesInMessage(this.db, oposicion, message);
         } catch (err) {
             logger.warn('[tutor-repo] resolveTopicReferences falló, devolvemos mensaje sin tocar', { err: String(err) });
-            return { enriched: message, topicId: null, topicTitle: null };
+            return { enriched: message, topicId: null, topicTitle: null, topicLabel: null };
         }
     }
 }

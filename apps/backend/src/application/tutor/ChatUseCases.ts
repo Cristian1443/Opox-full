@@ -15,9 +15,10 @@ function buildContextualActions(
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
     topicId?: string | null,
     topicTitle?: string | null,
-): Array<{ label: string; icon: string; topicId?: string; topicTitle?: string }> {
-    const topicMeta = topicId ? { topicId, topicTitle: topicTitle ?? undefined } : {};
-    const actions: Array<{ label: string; icon: string; topicId?: string; topicTitle?: string }> = [
+    topicLabel?: string | null,
+): Array<{ label: string; icon: string; topicId?: string; topicTitle?: string; topicLabel?: string }> {
+    const topicMeta = topicId ? { topicId, topicTitle: topicTitle ?? undefined, topicLabel: topicLabel ?? undefined } : {};
+    const actions: Array<{ label: string; icon: string; topicId?: string; topicTitle?: string; topicLabel?: string }> = [
         { label: 'Lanzar test', icon: 'flash-outline', ...topicMeta },
     ];
 
@@ -121,7 +122,7 @@ export class SendMessageUseCase {
                 // corpus del curso y devuelve "no puedo asegurar cuál es".
                 // También devuelve el topicId del primer tema mencionado para
                 // incluirlo en las acciones sugeridas (pre-rellena GeneratorConfig).
-                const { enriched: enrichedForAi, topicId: resolvedTopicId, topicTitle: resolvedTopicTitle } =
+                const { enriched: enrichedForAi, topicId: resolvedTopicId, topicTitle: resolvedTopicTitle, topicLabel: resolvedTopicLabel } =
                     await this.tutorRepo.resolveTopicReferences(params.oposicion, params.content);
 
                 // Obtener historial reciente para dar contexto al Motor
@@ -139,7 +140,7 @@ export class SendMessageUseCase {
                     topic: conversation.topic,
                 });
                 aiContent = result.content;
-                suggestedActions = buildContextualActions(aiContent, history, resolvedTopicId, resolvedTopicTitle);
+                suggestedActions = buildContextualActions(aiContent, history, resolvedTopicId, resolvedTopicTitle, resolvedTopicLabel);
             } catch (err) {
                 const code = (err as NodeJS.ErrnoException).code;
                 const isServerError = code === 'MOTOR_SERVER_ERROR';

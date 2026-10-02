@@ -96,6 +96,11 @@ export class SupabaseAuthRepository implements IAuthRepository {
             if (error.message.toLowerCase().includes('already registered')) {
                 throw new EmailAlreadyRegisteredError(input.email);
             }
+            if (error.code === 'weak_password') {
+                const e = new Error('Esa contraseña es demasiado común o insegura. Elige una más difícil de adivinar.');
+                (e as Error & { code: string }).code = 'weak_password';
+                throw e;
+            }
             throw error;
         }
         if (!data.user) {

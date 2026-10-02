@@ -58,5 +58,5 @@ export interface ITutorRepository {
     // temario (que el Motor sí conoce). El resultado se envía al Motor RAG;
     // el mensaje original se persiste en la conversación tal cual lo escribió
     // el usuario.
-    resolveTopicReferences(oposicion: string | null | undefined, message: string): Promise<{ enriched: string; topicId: string | null; topicTitle: string | null }>;
+    resolveTopicReferences(oposicion: string | null | undefined, message: string): Promise<{ enriched: string; topicId: string | null; topicTitle: string | null; topicLabel: string | null }>;
 }

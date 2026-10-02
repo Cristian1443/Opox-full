@@ -4,7 +4,6 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +12,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing } from '../../theme';
 import { tutorApi } from '../../api';
+import AlertCardModal from '../../components/AlertCardModal';
 
 // Colores confirmados contra Figma (frame HUB AULA VIRTUAL, Bloque 8) sin
 // equivalente exacto en theme.js.
@@ -134,6 +134,8 @@ function ModeRow({ mode, onPress }) {
 export default function TutorHomeScreen({ navigation, route }) {
     const technique = route?.params?.technique ?? null;
     const [recentConversations, setRecentConversations] = useState([]);
+    const [deleteModal, setDeleteModal] = useState(null); // { conv } | null
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     useEffect(() => {
         if (technique) {
@@ -160,25 +162,21 @@ export default function TutorHomeScreen({ navigation, route }) {
     };
 
     const handleDeleteConversation = (conv) => {
-        Alert.alert(
-            'Eliminar conversación',
-            '¿Seguro? No se puede deshacer.',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Eliminar',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await tutorApi.deleteConversation(conv.id);
-                            setRecentConversations((prev) => prev.filter((c) => c.id !== conv.id));
-                        } catch {
-                            Alert.alert('Error', 'No se pudo eliminar la conversación.');
-                        }
-                    },
-                },
-            ],
-        );
+        setDeleteModal({ conv });
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteModal) return;
+        setDeleteLoading(true);
+        try {
+            await tutorApi.deleteConversation(deleteModal.conv.id);
+            setRecentConversations((prev) => prev.filter((c) => c.id !== deleteModal.conv.id));
+            setDeleteModal(null);
+        } catch {
+            setDeleteModal(null);
+        } finally {
+            setDeleteLoading(false);
+        }
     };
 
     return (
@@ -237,6 +235,20 @@ export default function TutorHomeScreen({ navigation, route }) {
                     </View>
                 )}
             </ScrollView>
+
+            <AlertCardModal
+                visible={!!deleteModal}
+                icon={<Ionicons name="trash-outline" size={32} color="#C0392B" />}
+                iconBg="#FDECEA"
+                title="Eliminar conversación"
+                description="¿Seguro? Esta acción no se puede deshacer."
+                primaryLabel={deleteLoading ? 'Eliminando…' : 'Eliminar'}
+                primaryColor="#C0392B"
+                onPrimaryPress={confirmDelete}
+                secondaryLabel="Cancelar"
+                secondaryVariant="button"
+                onSecondaryPress={() => setDeleteModal(null)}
+            />
         </SafeAreaView>
     );
 }

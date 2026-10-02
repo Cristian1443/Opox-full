@@ -84,6 +84,13 @@ export function errorHandler(
         return;
     }
 
+    // Contraseña débil propagada desde SupabaseAuthRepository — móvil ya maneja este code
+    if (err instanceof Error && (err as Error & { code?: string }).code === 'weak_password') {
+        const body: ApiErrorResponse = { ok: false, error: { code: 'weak_password', message: err.message } };
+        res.status(422).json(body);
+        return;
+    }
+
     // Cualquier otra cosa → 500 y logueamos con contexto para investigar.
     // Extraemos cause anidado (útil para errores de fetch tipo undici).
     const errorMeta: Record<string, unknown> = {
