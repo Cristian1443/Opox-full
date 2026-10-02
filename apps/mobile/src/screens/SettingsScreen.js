@@ -3,11 +3,12 @@ import {
     View,
     StyleSheet,
     TouchableOpacity,
+    Pressable,
     ScrollView,
     StatusBar,
 } from 'react-native';
 import Text from '../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -221,7 +222,6 @@ export default function SettingsScreen({ navigation }) {
       icon: CardIcon,
       label: 'Suscripción',
       subtitle: subscriptionSubtext,
-      highlighted: true,
       onPress: () => navigation.navigate('ConfigSubscription'),
     },
     {
@@ -270,6 +270,10 @@ export default function SettingsScreen({ navigation }) {
     },
   ];
 
+  // El SafeAreaView excluye el borde inferior: sin esto "Eliminar cuenta" quedaba
+  // pegado (o encima) de los botones del sistema.
+  const insets = useSafeAreaInsets();
+
   const handleLogout = async () => {
     await authApi.logout();
     resetToSplash(navigation);
@@ -305,14 +309,18 @@ export default function SettingsScreen({ navigation }) {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: spacing.xl + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         {MENU_ROWS.map((row) => {
           const Icon = row.icon;
+          // Figma: al tocar se ensombrece la fila completa (borde a borde), no
+          // un recuadro redondeado; ninguna fila va resaltada en reposo.
           return (
-            <TouchableOpacity
+            <Pressable
               key={row.id}
-              style={[styles.row, row.highlighted && styles.rowHighlighted]}
-              activeOpacity={0.7}
+              style={({ pressed }) => [styles.row, pressed && { backgroundColor: FIGMA.highlightBg }]}
               onPress={row.onPress}
               accessibilityLabel={row.label}
             >
@@ -324,7 +332,7 @@ export default function SettingsScreen({ navigation }) {
                 ) : null}
               </View>
               <ChevronRightIcon />
-            </TouchableOpacity>
+            </Pressable>
           );
         })}
 
@@ -382,6 +390,7 @@ const styles = StyleSheet.create({
   // ── Perfil ────────────────────────────────────────────────────
   profileBlock: {
     alignItems: 'center',
+    marginTop: spacing.lg,
     marginBottom: spacing.sm,
     paddingBottom: spacing.lg,
     borderBottomWidth: 1,
@@ -401,20 +410,15 @@ const styles = StyleSheet.create({
   },
 
   // ── Lista ─────────────────────────────────────────────────────
-  scroll: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
+  // Sin padding lateral aquí: lo lleva cada fila para que el sombreado al
+  // presionar ocupe todo el ancho.
+  scroll: {},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-  },
-  rowHighlighted: {
-    backgroundColor: FIGMA.highlightBg,
+    paddingHorizontal: spacing.lg + 8,
   },
   rowTextWrap: {
     flex: 1,
@@ -434,6 +438,7 @@ const styles = StyleSheet.create({
   // ── Acciones de sesión ────────────────────────────────────────
   footer: {
     paddingTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
     gap: spacing.sm + 4,
   },
