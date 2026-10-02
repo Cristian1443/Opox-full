@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import Text from '../components/AppText';
 import SettingsRow from '../components/SettingsRow';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
@@ -125,6 +126,10 @@ function AccessibilityIcon({ size = 24, color = colors.accentOrange }) {
 }
 
 // Ruta exacta exportada de Figma (icono "Ayuda y soporte", 82×82 — flecha refresh/soporte).
+function NotificationsIcon({ size = 24, color = colors.accentOrange }) {
+  return <Ionicons name="notifications-outline" size={size} color={color} />;
+}
+
 function HelpIcon({ size = 24, color = colors.accentOrange }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 82 82" fill="none">
@@ -245,6 +250,13 @@ export default function SettingsScreen({ navigation }) {
       // Preferencia local — AsyncStorage, no necesita backend
       subtitle: 'Tema automático',
       onPress: () => navigation.navigate('ConfigAccessibility'),
+    },
+    {
+      id: 'notificaciones',
+      icon: NotificationsIcon,
+      label: 'Notificaciones',
+      subtitle: 'Recordatorio del Estado del día',
+      onPress: () => navigation.navigate('ConfigNotifications'),
     },
     {
       id: 'ayuda',

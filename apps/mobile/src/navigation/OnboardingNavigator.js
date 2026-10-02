@@ -119,6 +119,7 @@ import ConfigSubscriptionScreen from '../screens/settings/ConfigSubscriptionScre
 import ConfigDevicesScreen from '../screens/settings/ConfigDevicesScreen';
 import ConfigToneScreen from '../screens/settings/ConfigToneScreen';
 import ConfigAccessibilityScreen from '../screens/settings/ConfigAccessibilityScreen';
+import ConfigNotificationsScreen from '../screens/settings/ConfigNotificationsScreen';
 import ConfigStatsScreen from '../screens/settings/ConfigStatsScreen';
 import ConfigExportScreen from '../screens/settings/ConfigExportScreen';
 import ConfigHelpScreen from '../screens/settings/ConfigHelpScreen';
@@ -263,6 +264,7 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="ConfigDevices" component={ConfigDevicesScreen} />
             <Stack.Screen name="ConfigTone" component={ConfigToneScreen} />
             <Stack.Screen name="ConfigAccessibility" component={ConfigAccessibilityScreen} />
+            <Stack.Screen name="ConfigNotifications" component={ConfigNotificationsScreen} />
             <Stack.Screen name="ConfigStats" component={ConfigStatsScreen} />
             <Stack.Screen name="ConfigExport" component={ConfigExportScreen} />
             <Stack.Screen name="ConfigHelp" component={ConfigHelpScreen} />
