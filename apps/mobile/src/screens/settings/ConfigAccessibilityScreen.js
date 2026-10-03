@@ -9,7 +9,7 @@ import AccentSlider from '../../components/AccentSlider';
 import Text from '../../components/AppText';
 import { colors, spacing } from '../../theme';
 import { settingsApi } from '../../api';
-import { AccessibilityContext } from '../../contexts/AccessibilityContext';
+import { AccessibilityContext, DARK_MODE_ENABLED } from '../../contexts/AccessibilityContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
 // ─── 12.5 · Accesibilidad ───────────────────────────────────────────────────
@@ -34,10 +34,9 @@ const FIGMA = {
 
 const A11Y_KEY = 'opox.accessibility';
 
-// El dark mode global solo cubre un subconjunto de pantallas por ahora (ver
-// "Dark mode global — Fase 3" en CLAUDE.md) — se oculta el switch hasta que
-// el resto de la app quede migrada (fase 2 de este trabajo).
-const SHOW_DARK_MODE_TOGGLE = false;
+// El switch "Modo noche" depende del mismo flag global que fuerza el tema claro
+// en AccessibilityContext — se activa todo junto cuando la app esté migrada.
+const SHOW_DARK_MODE_TOGGLE = DARK_MODE_ENABLED;
 
 const DEFAULT = {
   theme: 'auto',       // 'claro' | 'auto' | 'oscuro'  (valores UI internos)

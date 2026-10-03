@@ -8,7 +8,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const A11Y_KEY = 'opox.accessibility';
 const FONT_TO_SCALE = { pequeno: 0.85, medio: 1.0, grande: 1.15 };
 
+// El dark mode solo está migrado en unas pocas pantallas. Mientras sea false,
+// la app se queda SIEMPRE en claro: antes el tema 'auto' (default) seguía al
+// sistema y, con el móvil en oscuro, al entrar en Accesibilidad la app pasaba
+// a un modo oscuro a medias (bug QA 2026-10). Activar cuando todas las
+// pantallas estén migradas — también muestra el switch "Modo noche".
+export const DARK_MODE_ENABLED = false;
+
 function resolveIsDark(theme) {
+    if (!DARK_MODE_ENABLED) return false;
     if (theme === 'oscuro') return true;
     if (theme === 'claro') return false;
     return Appearance.getColorScheme() === 'dark';
