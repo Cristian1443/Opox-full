@@ -404,10 +404,10 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
         color: colors.textDark,
-        marginBottom: 4,
+        marginBottom: 6,
     },
     signalsList: {
-        marginBottom: 28,
+        marginBottom: 20,
     },
     signalRow: {
         flexDirection: 'row',
@@ -457,13 +457,13 @@ const styles = StyleSheet.create({
         color: colors.white,
     },
     recommendationsWrap: {
-        marginBottom: 24,
+        marginBottom: 8,
     },
     recommendationItem: {
         fontFamily: 'Poppins-Regular',
-        fontSize: 12.5,
+        fontSize: 13,
         color: FIGMA.textNote,
-        marginTop: 6,
-        lineHeight: 18,
+        marginTop: 4,
+        lineHeight: 20,
     },
 });

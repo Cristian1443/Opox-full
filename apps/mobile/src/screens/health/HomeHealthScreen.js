@@ -585,7 +585,7 @@ export default function HomeHealthScreen({ navigation }) {
                                     Conéctalo para leer HR y HRV automáticamente. Opcional.
                                 </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={16} color={FIGMA.subtitleMuted} />
+                            <Ionicons name="chevron-forward" size={16} color={colors.textDark} />
                         </TouchableOpacity>
                     )}
 
@@ -714,7 +714,12 @@ const styles = StyleSheet.create({
         marginTop: 2,
         fontFamily: 'Poppins-Regular',
         fontSize: 11,
-        color: FIGMA.subtitleMuted,
+        // Antes `FIGMA.subtitleMuted` = rgba(255,255,255,0.8). Ese token es para
+        // la energyCard morada (texto blanco sobre fondo oscuro) — aquí el fondo
+        // es la cardFill blanca al 50% sobre blanco, así que el subtítulo
+        // quedaba invisible. Mismo arreglo aplicado al chevron de la fila.
+        color: 'rgba(65,41,80,0.6)',
+        lineHeight: 15,
     },
     energyCard: {
         flexDirection: 'row',

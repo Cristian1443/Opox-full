@@ -183,8 +183,10 @@ export default function StudyTipsScreen({ navigation }) {
                         activeOpacity={0.85}
                     >
                         <Ionicons name="flash-outline" size={26} color={colors.white} />
-                        <Text style={styles.ctaColTitle}>Practicar ahora</Text>
-                        <Text style={styles.ctaColSubtitle}>Test rápido de tu temario</Text>
+                        <View style={styles.ctaCardColText}>
+                            <Text style={styles.ctaColTitle}>Practicar ahora</Text>
+                            <Text style={styles.ctaColSubtitle}>Test rápido de tu temario</Text>
+                        </View>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -193,8 +195,10 @@ export default function StudyTipsScreen({ navigation }) {
                         activeOpacity={0.85}
                     >
                         <Ionicons name="chatbubbles-outline" size={26} color={colors.white} />
-                        <Text style={styles.ctaColTitle}>Plan con Tutor</Text>
-                        <Text style={styles.ctaColSubtitle}>Estrategia con IA</Text>
+                        <View style={styles.ctaCardColText}>
+                            <Text style={styles.ctaColTitle}>Plan con Tutor</Text>
+                            <Text style={styles.ctaColSubtitle}>Estrategia con IA</Text>
+                        </View>
                     </TouchableOpacity>
                 </View>
 
@@ -365,25 +369,33 @@ const styles = StyleSheet.create({
     },
 
     // Fila con 2 cards de acción — reemplaza la card verde única al final.
+    // Las 2 cards estiran a la misma altura (align-items default stretch) y el
+    // contenido fluye desde arriba: icono + margen fijo + bloque texto. Así los
+    // títulos de ambas cards quedan alineados en la misma Y aunque el subtítulo
+    // de una wrappee a 2 líneas y la otra a 1. El hueco sobrante por diferencia
+    // de altura queda al final de la card con menos texto (invisible por color
+    // sólido de fondo).
     ctaRow: {
         flexDirection: 'row',
+        alignItems: 'stretch',
         gap: spacing.sm,
     },
     ctaCardCol: {
         flex: 1,
         borderRadius: 18,
         padding: 18,
-        alignItems: 'flex-start',
-        gap: 6,
         minHeight: 130,
+    },
+    ctaCardColText: {
+        marginTop: 10,
     },
     ctaColTitle: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 16,
         color: colors.white,
-        marginTop: 6,
     },
     ctaColSubtitle: {
+        marginTop: 2,
         fontFamily: 'Poppins-Light',
         fontSize: 12,
         color: 'rgba(255,255,255,0.88)',
