@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
     View,
-    TouchableOpacity,
     StyleSheet,
     StatusBar,
     ScrollView,
@@ -9,20 +8,13 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import AppHeader from '../../components/AppHeader';
 import { motivationApi } from '../../api';
 import { colors, spacing } from '../../theme';
 import { getNextMilestone } from '../../lib/streakMilestones';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
-// Chevron y llama coinciden con MotivationHomeScreen (mismos paths Figma) para
-// que la navegación entre ambas se sienta continua.
-function IconChevronLeft({ size = 22, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <Path d="M15 18l-6-6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
+// Llama con los mismos paths Figma que MotivationHomeScreen.
 
 function IconFlame({ size = 66, color = colors.accentOrange }) {
     const h = size * (110.37 / 81);
@@ -78,17 +70,7 @@ export default function StreakDetailScreen({ navigation }) {
                 backgroundColor={themeColors.grayLight}
             />
 
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backBtn}
-                    onPress={() => navigation.goBack()}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <IconChevronLeft size={22} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Tu racha</Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <AppHeader title="Tu racha" onBack={() => navigation.goBack()} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <View style={styles.heroWrap}>
@@ -152,31 +134,6 @@ export default function StreakDetailScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.grayLight },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerSpacer: { width: 44 },
-    headerTitle: {
-        flex: 1,
-        fontSize: 21,
-        fontWeight: '600',
-        color: colors.textDark,
-        letterSpacing: -0.3,
-        textAlign: 'center',
-    },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: spacing.lg },
 

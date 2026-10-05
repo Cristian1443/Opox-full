@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, G, Circle } from 'react-native-svg';
 import { dashboardApi } from '../api';
 import { colors } from '../theme';
+import AppHeader from '../components/AppHeader';
 
 // ─── Iconos SVG — trazados reales exportados de Figma ────────────────────────
 // Archivo "OPOX_AI (2)" (fileKey jeiU2Otw0TADm0lwGwHPe7), frame "CENTRO
@@ -19,8 +20,7 @@ import { colors } from '../theme';
 // usando los offsets relativos reales calculados a partir de los insets del
 // frame) — no son formas inventadas.
 
-// Chevron "‹" (usado también rotado 180° como "›" en cada fila y en el botón
-// "Volver"). Vector original: 16.67×29.16, stroke #412950, strokeWidth 4.17.
+// Chevron "›" (rotado 180°) de cada fila. Vector original: 16.67×29.16, stroke #412950, strokeWidth 4.17.
 function IconChevron({ size = 8, color = colors.textDark, pointRight = false }) {
     const height = size * 1.75;
     return (
@@ -74,15 +74,6 @@ function IconFilterSliders({ width = 27, height = 24, color = colors.textDark })
             <Path d="M52.5786 42.3515H44.0504C43.8576 42.3618 43.6647 42.333 43.4835 42.2667C43.3023 42.2005 43.1365 42.0983 42.9964 41.9664C42.8562 41.8344 42.7446 41.6755 42.6683 41.4993C42.5921 41.3231 42.5527 41.1332 42.5527 40.9414C42.5527 40.7496 42.5921 40.5598 42.6683 40.3836C42.7446 40.2073 42.8562 40.0484 42.9964 39.9165C43.1365 39.7845 43.3023 39.6823 43.4835 39.6161C43.6647 39.5499 43.8576 39.521 44.0504 39.5313H52.5786C52.7714 39.521 52.9643 39.5499 53.1455 39.6161C53.3268 39.6823 53.4925 39.7845 53.6326 39.9165C53.7728 40.0484 53.8844 40.2073 53.9607 40.3836C54.037 40.5598 54.0763 40.7496 54.0763 40.9414C54.0763 41.1332 54.037 41.3231 53.9607 41.4993C53.8844 41.6755 53.7728 41.8344 53.6326 41.9664C53.4925 42.0983 53.3268 42.2005 53.1455 42.2667C52.9643 42.333 52.7714 42.3618 52.5786 42.3515Z" fill={color} />
             <Path d="M38.369 48.0197C36.9637 48.0213 35.5895 47.609 34.4201 46.8348C33.2506 46.0607 32.3384 44.9595 31.7988 43.6704C31.2592 42.3814 31.1163 40.9623 31.3883 39.5926C31.6602 38.2229 32.3348 36.964 33.3268 35.9751C34.3187 34.9862 35.5835 34.3116 36.9613 34.0367C38.339 33.7618 39.7679 33.8988 41.0672 34.4305C42.3666 34.9621 43.4782 35.8646 44.2614 37.0237C45.0446 38.1829 45.4644 39.5467 45.4677 40.9428C45.4693 41.8705 45.2869 42.7895 44.9311 43.6472C44.5752 44.505 44.0528 45.2847 43.3936 45.9418C42.7344 46.599 41.9514 47.1207 41.0893 47.4772C40.2272 47.8338 39.3028 48.0181 38.369 48.0197ZM38.369 36.7268C37.5254 36.7259 36.7006 36.9737 35.9988 37.4387C35.2971 37.9037 34.7499 38.5651 34.4265 39.3391C34.1031 40.1131 34.0181 40.9651 34.1822 41.7871C34.3462 42.6091 34.752 43.3644 35.3482 43.9573C35.9444 44.5501 36.7042 44.954 37.5315 45.1178C38.3587 45.2816 39.2163 45.1979 39.9957 44.8774C40.7751 44.5569 41.4413 44.0139 41.9101 43.3172C42.3788 42.6204 42.629 41.8012 42.629 40.9631C42.6311 40.4056 42.5226 39.8531 42.3096 39.3373C42.0966 38.8214 41.7832 38.3524 41.3876 37.957C40.9919 37.5617 40.5216 37.2477 40.0036 37.0331C39.4856 36.8185 38.9302 36.7075 38.369 36.7064V36.7268Z" fill={color} />
         </Svg>
-    );
-}
-
-// Botón "volver": círculo bg #412950 10% + chevron (grupo "NAV", node 2357:1502).
-function IconBackButton() {
-    return (
-        <View style={styles.backCircle}>
-            <IconChevron size={8} />
-        </View>
     );
 }
 
@@ -241,14 +232,11 @@ export default function NotificationsScreen({ navigation }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <IconBackButton />
-                </TouchableOpacity>
-                <Text style={styles.title}>Notificaciones</Text>
-                <IconBellBadge count={unreadCount} />
-            </View>
+            <AppHeader
+                title="Notificaciones"
+                onBack={() => navigation.goBack()}
+                right={<IconBellBadge count={unreadCount} />}
+            />
 
             {/* Tabs */}
             <View style={styles.tabs}>
@@ -316,29 +304,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
 
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 22,
-        paddingTop: 10,
-        paddingBottom: 4,
-    },
-    backCircle: {
-        width: 27,
-        height: 27,
-        borderRadius: 13.5,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: {
-        flex: 1,
-        textAlign: 'center',
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 22,
-        color: colors.textDark,
-    },
     bellWrap: {
         width: 30,
         height: 37,
@@ -366,7 +331,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 12,
         paddingHorizontal: 22,
-        paddingTop: 14,
         paddingBottom: 14,
     },
     tab: {

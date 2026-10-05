@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
+import AppHeader, { HEADER_ICON_SIZE } from '../../components/AppHeader';
 import PlanningPopupModal, { CheckBadgeIcon } from '../../components/PlanningPopupModal';
 import { api, planningApi, boeApi } from '../../api';
 import { colors, spacing } from '../../theme';
@@ -212,23 +213,20 @@ export default function PlanningTodayScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Hoy</Text>
-                <TouchableOpacity
-                    onPress={openModal}
-                    style={styles.iconBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Ionicons name="add" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-            </View>
+            <AppHeader
+                title="Hoy"
+                onBack={() => navigation.goBack()}
+                right={(
+                    <TouchableOpacity
+                        onPress={openModal}
+                        style={styles.addBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Añadir tarea"
+                    >
+                        <Ionicons name="add" size={HEADER_ICON_SIZE} color={colors.textDark} />
+                    </TouchableOpacity>
+                )}
+            />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <View style={styles.goalBlock}>
@@ -400,31 +398,9 @@ export default function PlanningTodayScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: 4,
-    },
-    iconBtn: { width: 32, padding: 4 },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21,
-        color: colors.textDark,
-        textAlign: 'center',
-    },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 24 },
+    addBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    body: { paddingHorizontal: spacing.md, paddingBottom: 24 },
     goalBlock: {
         alignItems: 'center',
         marginBottom: 32,

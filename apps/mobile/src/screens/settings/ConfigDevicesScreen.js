@@ -9,9 +9,9 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing } from '../../theme';
 import { healthApi } from '../../api';
@@ -40,14 +40,6 @@ function formatRelative(isoString) {
   const diffH = Math.round(diffMin / 60);
   if (diffH < 24) return `${diffH} h`;
   return `${Math.round(diffH / 24)} d`;
-}
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
 }
 
 function DeviceCard({ device, onDisconnect }) {
@@ -116,21 +108,11 @@ export default function ConfigDevicesScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>Dispositivos</Text>
-          <Text style={styles.headerSubtitle}>Gestiona tus wearables para el control de fatiga.</Text>
-        </View>
-        <View style={styles.iconButton} />
-      </View>
+      <AppHeader
+        title="Dispositivos"
+        subtitle="Gestiona tus wearables para el control de fatiga."
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
@@ -191,40 +173,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitles: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-  },
-  headerSubtitle: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 11,
-    color: FIGMA.textMuted,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-
   // ── Contenido ─────────────────────────────────────────────────
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   loadingBox: {

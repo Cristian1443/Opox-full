@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
+import { HeaderBackButton } from '../../components/AppHeader';
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
 
@@ -49,15 +50,9 @@ export default function RecuperarPasswordEmailScreen({ navigation }) {
                 style={s.flex}
             >
                 <View style={s.content}>
-                    {/* Volver — Figma: "‹ Volver" morado #412950 al 50% opacidad */}
-                    <TouchableOpacity
-                        style={s.backButton}
-                        onPress={() => navigation.goBack()}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-                        <Text style={s.backText}>Volver</Text>
-                    </TouchableOpacity>
+                    <View style={s.backButton}>
+                        <HeaderBackButton onPress={() => navigation.goBack()} />
+                    </View>
 
                     {/* Header */}
                     <View style={s.header}>
@@ -129,16 +124,9 @@ const s = StyleSheet.create({
         flex: 1,
     },
     backButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        alignSelf: 'flex-start',
         marginBottom: 32,
         marginTop: 4,
-        opacity: 0.5,
-    },
-    backText: {
-        fontSize: 19,
-        fontFamily: 'Poppins-Regular',
-        color: colors.textDark,
     },
     header: {
         marginBottom: 32,

@@ -8,6 +8,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Circle, Polygon, Line } from 'react-native-svg';
@@ -67,14 +68,6 @@ function deriveSoftSkills(stats) {
     : 0;
 
   return { memoria, conocimiento, velocidad, resistencia, concentracion };
-}
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
 }
 
 // Ruta exacta exportada de Figma (icono "Exportar", 40×54 — flecha + subrayado).
@@ -282,25 +275,20 @@ export default function ConfigStatsScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Estadísticas Pro</Text>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={handleExport}
-          accessibilityLabel="Exportar informe PDF"
-        >
-          <ExportIcon />
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        title="Estadísticas Pro"
+        onBack={() => navigation.goBack()}
+        right={(
+          <TouchableOpacity
+            style={styles.headerAction}
+            activeOpacity={0.7}
+            onPress={handleExport}
+            accessibilityLabel="Exportar informe PDF"
+          >
+            <ExportIcon />
+          </TouchableOpacity>
+        )}
+      />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -372,26 +360,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
-
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
+  // Acción del header: ocupa el hueco lateral de 44 de AppHeader.
+  headerAction: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
   },
 
   // ── Loading / vacío ───────────────────────────────────────────
@@ -412,7 +386,6 @@ const styles = StyleSheet.create({
   // ── Contenido ─────────────────────────────────────────────────
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   sectionLabel: {

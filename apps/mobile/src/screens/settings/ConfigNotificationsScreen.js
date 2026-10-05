@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch, Platform,
+  StyleSheet, ScrollView, StatusBar, Switch, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import SettingsRow from '../../components/SettingsRow';
 import { colors, spacing } from '../../theme';
 import {
@@ -18,14 +18,6 @@ import {
 // ─── Ajustes · Notificaciones ───────────────────────────────────────────────
 // El recordatorio del Estado del día vivía en Accesibilidad; QA (Figma) señaló
 // que no es un tema de accesibilidad. Aquí caben futuros avisos configurables.
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 // Convierte 'HH:MM' a Date (fecha de hoy con esa hora) para inicializar el picker.
 function parseTimeToDate(hhmm) {
@@ -73,18 +65,7 @@ export default function ConfigNotificationsScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notificaciones</Text>
-        <View style={styles.iconButton} />
-      </View>
+      <AppHeader title="Notificaciones" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionLabel}>ESTADO DEL DÍA</Text>
@@ -128,28 +109,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
   // Sin padding lateral: lo aporta cada SettingsRow.
   scroll: {
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   sectionLabel: {

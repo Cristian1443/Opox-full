@@ -8,9 +8,9 @@ import {
     Switch,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Svg, { Path } from 'react-native-svg';
 import AccentSlider from '../../components/AccentSlider';
 import { colors, spacing } from '../../theme';
 import { settingsApi } from '../../api';
@@ -67,14 +67,6 @@ async function saveToneLocal(tone) {
   try {
     await AsyncStorage.setItem(TONE_KEY, JSON.stringify(tone));
   } catch { /* fallo silencioso */ }
-}
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
 }
 
 function SegmentControl({ options, value, onChange }) {
@@ -152,21 +144,11 @@ export default function ConfigToneScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>Tono de la IA</Text>
-          <Text style={styles.headerSubtitle}>Cómo quieres que te hable tu Tutor IA.</Text>
-        </View>
-        <View style={styles.iconButton} />
-      </View>
+      <AppHeader
+        title="Tono de la IA"
+        subtitle="Cómo quieres que te hable tu Tutor IA."
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -243,38 +225,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitles: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-  },
-  headerSubtitle: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 11,
-    color: FIGMA.textMuted,
-    marginTop: 2,
-    textAlign: 'center',
-  },
 
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   sectionLabel: {

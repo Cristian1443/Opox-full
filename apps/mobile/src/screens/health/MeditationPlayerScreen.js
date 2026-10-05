@@ -9,6 +9,7 @@ import {
     Modal,
 } from 'react-native';
 import Text from '../../components/AppText';
+import { HeaderBackButton } from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Polygon } from 'react-native-svg';
@@ -235,13 +236,9 @@ export default function MeditationPlayerScreen({ navigation, route }) {
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="light-content" backgroundColor={colors.textDark} />
 
+            {/* Fondo oscuro: solo el botón volver estándar; abre el modal de salida. */}
             <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => setShowExitModal(true)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
-                </TouchableOpacity>
+                <HeaderBackButton dark onPress={() => setShowExitModal(true)} />
             </View>
 
             <View style={styles.content}>

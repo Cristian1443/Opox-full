@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
+import { HeaderBackButton } from '../../components/AppHeader';
 
 const OTP_LENGTH = 6;
 
@@ -144,19 +145,9 @@ export default function OtpScreen({ route, navigation }) {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Volver — icono y texto con el mismo tono (antes el icono iba
-                        a opacidad completa y el texto al 50%). */}
-                    <TouchableOpacity
-                        style={s.backRow}
-                        onPress={handleGoBack}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                        <View style={s.backInner}>
-                            <Ionicons name="chevron-back" size={18} color={colors.textDark} />
-                            <Text style={s.backText}>Volver</Text>
-                        </View>
-                    </TouchableOpacity>
+                    <View style={s.backRow}>
+                        <HeaderBackButton onPress={handleGoBack} />
+                    </View>
 
                     {/* Figma: título + casillas + reenviar centrados verticalmente */}
                     <View style={s.centerBlock}>
@@ -303,20 +294,7 @@ const s = StyleSheet.create({
     },
     backRow: {
         alignSelf: 'flex-start',
-        paddingVertical: 4,
         marginTop: 8,
-    },
-    // La opacidad va en el contenedor para que icono y texto compartan tono.
-    backInner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        opacity: 0.5,
-    },
-    backText: {
-        fontFamily: 'Poppins-Medium',
-        fontSize: 14,
-        color: colors.textDark,
     },
     centerBlock: {
         flex: 1,

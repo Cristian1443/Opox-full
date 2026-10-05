@@ -11,22 +11,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import { RachaPeligroModal } from '../../components/MotivationModals';
 import DestacadoBanner from '../../components/DestacadoBanner';
 import { motivationApi, planningApi } from '../../api';
 import { colors, spacing } from '../../theme';
 import { getNextMilestone } from '../../lib/streakMilestones';
 import { useThemeColors } from '../../hooks/useThemeColors';
-
-// Figma: el chevron dentro del círculo de 24dp mide ~5.5x11dp — bastante más chico
-// que el botón que lo contiene.
-function IconChevronLeft({ size = 11, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <Path d="M15 18l-6-6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
 
 // Llama real de Figma ("ICONO RACHA", 2334:335) — 2 paths, mismo naranja, no la
 // llama genérica de una sola curva que tenía antes.
@@ -188,14 +179,7 @@ export default function MotivationHomeScreen({ navigation }) {
                 backgroundColor={themeColors.grayLight}
             />
 
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <IconChevronLeft size={22} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Motivación</Text>
-                {/* Spacer igual al botón atrás para que el título quede centrado en pantalla */}
-                <View style={{ width: 44 }} />
-            </View>
+            <AppHeader title="Motivación" onBack={() => navigation.goBack()} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 {/* Figma ("HOME - MOTIVACIÓN Y RACHA", 2332:2): el banner DESTACADO va PRIMERO,
@@ -327,24 +311,6 @@ export default function MotivationHomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.grayLight },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    // Figma (2332:62 "Motivación"): fontSize 21dp exacto.
-    headerTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3, textAlign: 'center' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: spacing.lg },
     heroWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingVertical: spacing.lg },

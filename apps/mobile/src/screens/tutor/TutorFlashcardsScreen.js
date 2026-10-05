@@ -11,7 +11,8 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
@@ -139,13 +140,7 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.pickerTitle}>Flashcards</Text>
-                <View style={{ width: 24 }} />
-            </View>
+            <AppHeader title="Flashcards" onBack={onBack} />
 
             {loading ? (
                 <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} />
@@ -347,18 +342,7 @@ export default function TutorFlashcardsScreen({ navigation, route }) {
                 <Image source={HERO_BG} style={styles.heroBgBottom} resizeMode="cover" />
             </View>
 
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    accessibilityLabel="Volver"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Feather name="chevron-left" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Flashcards</Text>
-                <View style={styles.headerPlaceholder} />
-            </View>
+            <AppHeader title="Flashcards" onBack={() => navigation.goBack()} />
 
             {/* Área de tarjeta — toca en cualquier punto para girar */}
             <TouchableOpacity
@@ -494,31 +478,6 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         color: colors.white,
         fontSize: 15,
-    },
-
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.md,
-    },
-    iconBtn: { width: 32, padding: 4 },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerPlaceholder: { width: 44, height: 44 },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
     },
 
     // ── Tarjeta ───────────────────────────────────────────────────────────────
@@ -661,20 +620,6 @@ const styles = StyleSheet.create({
     },
 
     // ── Picker ─────────────────────────────────────────────────────────────
-    pickerHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: '#D9D9D9',
-    },
-    pickerTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-    },
     pickerHint: {
         fontFamily: 'Poppins-Regular',
         fontSize: 13,
@@ -682,7 +627,8 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     pickerList: {
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
         gap: spacing.sm,
     },
     pickerEmpty: {

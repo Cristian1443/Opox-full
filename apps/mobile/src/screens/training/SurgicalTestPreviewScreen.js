@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../../theme';
+import AppHeader, { HeaderSettingsButton } from '../../components/AppHeader';
 import { api, trainingApi } from '../../api';
 import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
@@ -23,16 +23,6 @@ const COLORS = {
     purple: colors.selectionBorder, // #9F6EE4
     white: colors.white,
 };
-
-// Engranaje exacto — mismo patrón que TrainingHomeScreen/GeneratorConfigScreen.
-function IconGear({ size = 20, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="740 0 52 55" fill="none">
-            <Path d="M789.75 31.0005V23.9205L783.54 23.4005C783.118 21.1364 782.288 18.8467 781.09 16.8795L785.24 11.8795L780.3 6.87945L775.55 10.9495C773.663 9.6517 771.555 8.70957 769.33 8.16945L768.8 1.68945H761.8L761.28 7.96945C759.053 8.41611 756.925 9.26316 755 10.4695L750.1 6.26945L745.16 11.2695L749.16 16.0795C747.871 17.9965 746.939 20.1309 746.41 22.3795L740 22.8795V29.9495L746.21 30.4695C746.63 32.739 747.457 34.9139 748.65 36.8895L744.51 41.8895L749.44 46.8895L754.2 42.8195C756.082 44.1194 758.187 45.0617 760.41 45.5995L761 52.0795H768L768.52 45.7995C770.764 45.3679 772.91 44.5273 774.85 43.3195L779.75 47.5195L784.69 42.5195L780.69 37.7095C781.979 35.7926 782.911 33.6582 783.44 31.4095L789.75 30.8795Z" stroke={color} strokeWidth={3.38} />
-            <Path d="M772.62 26.8794C772.6 28.4078 772.129 29.8962 771.266 31.1575C770.402 32.4187 769.185 33.3965 767.767 33.9678C766.349 34.539 764.794 34.6783 763.298 34.3681C761.801 34.0579 760.429 33.312 759.356 32.2242C758.282 31.1365 757.553 29.7555 757.262 28.2549C756.971 26.7544 757.131 25.2013 757.72 23.791C758.309 22.3806 759.303 21.1761 760.575 20.3289C761.847 19.4816 763.341 19.0295 764.87 19.0294C765.894 19.0359 766.907 19.2442 767.851 19.6422C768.795 20.0403 769.651 20.6203 770.371 21.3493C771.09 22.0782 771.659 22.9418 772.045 23.8906C772.431 24.8395 772.627 25.8551 772.62 26.8794Z" stroke={color} strokeWidth={3.38} />
-        </Svg>
-    );
-}
 
 // Ilustración exacta exportada de Figma — checklist + diana + flecha + swirl,
 // mockup TEST QUIRÚRGICO.
@@ -155,16 +145,11 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
-            {/* NAV */}
-            <View style={styles.nav}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Feather name="chevron-left" size={22} color={COLORS.primary} />
-                </TouchableOpacity>
-                <Text style={styles.navTitle}>Test quirúrgico</Text>
-                <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-                    <IconGear size={22} color={COLORS.primary} />
-                </TouchableOpacity>
-            </View>
+            <AppHeader
+                title="Test quirúrgico"
+                onBack={() => navigation.goBack()}
+                right={<HeaderSettingsButton onPress={() => navigation.navigate('Settings')} />}
+            />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 {/* Ilustración */}
@@ -238,37 +223,7 @@ const styles = StyleSheet.create({
     scroll: { flex: 1 },
     body: { paddingBottom: 40 },
 
-    nav: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 12,
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    settingsButton: {
-        width: 32,
-        height: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    navTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 18,
-        color: COLORS.primary,
-        textAlign: 'center',
-    },
-
     iconWrapper: {
-        marginTop: 16,
         alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',

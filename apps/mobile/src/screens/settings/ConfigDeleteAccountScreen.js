@@ -10,6 +10,7 @@ import {
     Animated,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
@@ -38,14 +39,6 @@ const FIGMA = {
 
 function resetToSplash(navigation) {
   navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
-}
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
 }
 
 function WarningIcon({ size = 22, color = colors.accentOrange }) {
@@ -129,18 +122,7 @@ export default function ConfigDeleteAccountScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Eliminar cuenta</Text>
-        <View style={styles.iconButton} />
-      </View>
+      <AppHeader title="Eliminar cuenta" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ── Aviso ─────────────────────────────────────────────────────── */}
@@ -231,31 +213,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   // ── Contenido ─────────────────────────────────────────────────
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
 

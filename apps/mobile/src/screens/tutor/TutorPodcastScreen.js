@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import AlertCardModal from '../../components/AlertCardModal';
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect, Polygon } from 'react-native-svg';
@@ -172,13 +173,7 @@ function EpisodePicker({ oposicion, onSelect, onSelectHistory, onBack }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.pickerTitle}>Podcast</Text>
-                <View style={{ width: 24 }} />
-            </View>
+            <AppHeader title="Podcast" onBack={onBack} />
 
             {loading ? (
                 <ActivityIndicator style={{ marginTop: 40 }} color={colors.accentOrange} />
@@ -303,13 +298,7 @@ function PodcastConfig({ topic, oposicion, onGenerated, onBack }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Podcast</Text>
-                <View style={styles.iconBtn} />
-            </View>
+            <AppHeader title="Podcast" onBack={onBack} />
 
             <ScrollView contentContainerStyle={styles.genBody} showsVerticalScrollIndicator={false}>
                 <Text style={styles.genTopicTitle} numberOfLines={4}>{topic.title}</Text>
@@ -633,24 +622,21 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast, navigation }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => setShowExitModal(true)}
-                    style={styles.iconBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Volver"
-                >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Podcast</Text>
-                <TouchableOpacity
-                    style={styles.iconBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={handleMoreOptions}
-                >
-                    <Ionicons name="ellipsis-horizontal" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-            </View>
+            {/* Volver abre el modal de salida (no navega directamente). */}
+            <AppHeader
+                title="Podcast"
+                onBack={() => setShowExitModal(true)}
+                right={(
+                    <TouchableOpacity
+                        style={styles.iconBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={handleMoreOptions}
+                        accessibilityLabel="Más opciones"
+                    >
+                        <Ionicons name="ellipsis-horizontal" size={22} color={colors.textDark} />
+                    </TouchableOpacity>
+                )}
+            />
 
             <View style={styles.content}>
                 <View style={styles.artwork}>
@@ -821,44 +807,16 @@ const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: 4,
-    },
-    iconBtn: { width: 32, alignItems: 'center' },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
-    },
+    iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
     // ── Picker ──────────────────────────────────────────────────────────────
-    pickerHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: FIGMA.progressTrack,
-    },
-    pickerTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-    },
     pickerHint: {
         fontFamily: 'Poppins-Regular',
         fontSize: 13,
         color: FIGMA.subtitleMuted,
         marginBottom: spacing.md,
     },
-    pickerList: { padding: spacing.md, gap: spacing.sm },
+    pickerList: { paddingHorizontal: spacing.md, paddingBottom: spacing.md, gap: spacing.sm },
     pickerEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
     pickerEmptyText: {
         fontFamily: 'Poppins-Regular',
@@ -917,13 +875,12 @@ const styles = StyleSheet.create({
     },
 
     // ── Config ──────────────────────────────────────────────────────────────
-    genBody: { padding: spacing.md, paddingBottom: spacing.xl },
+    genBody: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
     genTopicTitle: {
         fontFamily: 'Poppins-SemiBold',
         fontSize: 20,
         color: colors.textDark,
         textAlign: 'center',
-        marginTop: spacing.md,
     },
     genTopicSub: {
         marginTop: 4,

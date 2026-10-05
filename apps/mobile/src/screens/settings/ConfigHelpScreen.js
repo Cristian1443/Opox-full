@@ -12,6 +12,7 @@ import {
     Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -57,14 +58,6 @@ const FAQS = [
     answer: 'Sí, puedes cambiar o cancelar tu suscripción en cualquier momento desde la sección "Mi suscripción" en Configuración.',
   },
 ];
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 function ChevronRightIcon({ size = 18, color = colors.textDark }) {
   return (
@@ -127,18 +120,7 @@ export default function ConfigHelpScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ayuda y soporte</Text>
-        <View style={styles.iconButton} />
-      </View>
+      <AppHeader title="Ayuda y soporte" onBack={() => navigation.goBack()} />
 
       <KeyboardAvoidingView
         style={styles.kbContainer}
@@ -225,31 +207,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   // ── Contenido ─────────────────────────────────────────────────
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   searchBar: {

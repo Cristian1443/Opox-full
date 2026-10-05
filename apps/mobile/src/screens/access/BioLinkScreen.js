@@ -13,6 +13,7 @@ import { colors } from '../../theme';
 import { detectBiometricType, biometricLabel, setupBiometric } from '../../lib/biometric';
 import { FaceScanIcon, LockIcon } from '../../components/icons/AccessIcons';
 import AlertCardModal from '../../components/AlertCardModal';
+import { HeaderBackButton } from '../../components/AppHeader';
 
 // Fondo confirmado contra Figma (frame FACE ID) — sin token exacto en theme.js.
 const FIGMA_BG = '#F4F4F4';
@@ -89,13 +90,9 @@ export default function BioLinkScreen({ navigation, route }) {
         <SafeAreaView style={s.container}>
             <StatusBar barStyle="dark-content" backgroundColor={FIGMA_BG} />
 
-            <TouchableOpacity
-                style={s.backButton}
-                onPress={() => navigation.goBack()}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-                <Text style={s.backButtonText}>‹ Volver</Text>
-            </TouchableOpacity>
+            <View style={s.backButton}>
+                <HeaderBackButton onPress={() => navigation.goBack()} />
+            </View>
 
             <View style={s.content}>
                 {HeroBiometricIcon}
@@ -174,13 +171,6 @@ const s = StyleSheet.create({
     backButton: {
         marginTop: 12,
         alignSelf: 'flex-start',
-        paddingVertical: 8,
-    },
-    backButtonText: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 14,
-        color: colors.textDark,
-        opacity: 0.5,
     },
     content: {
         flex: 1,

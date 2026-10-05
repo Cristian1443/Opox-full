@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import Text from '../components/AppText';
 import SettingsRow from '../components/SettingsRow';
+import AppHeader from '../components/AppHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -38,15 +39,6 @@ const FIGMA = {
 function resetToSplash(navigation) {
   navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
 }
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
 
 // Ruta exacta exportada de Figma (avatar circular, 355×355).
 function AvatarIcon({ size = 96 }) {
@@ -291,18 +283,7 @@ export default function SettingsScreen({ navigation }) {
       />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ajustes</Text>
-        <View style={styles.iconButton} />
-      </View>
+      <AppHeader title="Ajustes" onBack={() => navigation.goBack()} />
 
       {/* ── Perfil ──────────────────────────────────────────────────── */}
       <View style={styles.profileBlock}>
@@ -360,31 +341,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   // ── Perfil ────────────────────────────────────────────────────
   profileBlock: {
     alignItems: 'center',
-    marginTop: spacing.lg,
     marginBottom: spacing.sm,
     paddingBottom: spacing.lg,
     borderBottomWidth: 1,

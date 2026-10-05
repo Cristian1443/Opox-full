@@ -10,7 +10,7 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Feather } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Svg, { Polygon } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { storeApi } from '../../api/store';
@@ -127,22 +127,11 @@ export default function StoreMarketplaceScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <Feather name="chevron-left" size={22} color={colors.textDark} />
-        </TouchableOpacity>
-        <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>Tests de la comunidad</Text>
-          <Text style={styles.headerSubtitle}>Tests creados por otros opositores. Valóralos tras hacerlos.</Text>
-        </View>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <AppHeader
+        title="Tests de la comunidad"
+        subtitle="Tests creados por otros opositores. Valóralos tras hacerlos."
+        onBack={() => navigation.goBack()}
+      />
 
       {/* Filtros — real, sin equivalente en Figma */}
       <View style={styles.filtersRow}>
@@ -203,42 +192,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.white,
-  },
-
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(65, 41, 80, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerPlaceholder: {
-    width: 44,
-    height: 44,
-  },
-  headerTitles: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-  },
-  headerSubtitle: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 11,
-    color: FIGMA.textMuted,
-    marginTop: 2,
-    textAlign: 'center',
   },
 
   // ── Filtros ───────────────────────────────────────────────────

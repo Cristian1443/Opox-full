@@ -14,6 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg';
 import Constants from 'expo-constants';
 import { colors, spacing } from '../../theme';
+import { HeaderBackButton } from '../../components/AppHeader';
 
 // Mismo patrón lazy que App.js — expo-notifications rompe en Expo Go SDK 53+
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
@@ -25,14 +26,6 @@ if (!IS_EXPO_GO) {
 // ─── Iconos SVG exactos del wireframe (34×34, viewBox 0 0 24 24) ─────────────
 // Tamaño real proporcional al Figma: los grupos de ícono ocupan ~70-110px
 // dentro de un frame de 905px de ancho, mucho más grandes que el 17x17 previo.
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
 
 // Rutas exactas exportadas de Figma (node "ICONO NOTIFICACIONES" 2346:1986) —
 // relleno sólido, no trazo. Se conserva la proporción real (no cuadrada).
@@ -427,14 +420,7 @@ export default function PermissionsScreen({ navigation }) {
 
             {/* Botón volver */}
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                    activeOpacity={0.7}
-                    accessibilityLabel="Volver"
-                >
-                    <ChevronLeftIcon />
-                </TouchableOpacity>
+                <HeaderBackButton onPress={() => navigation.goBack()} />
             </View>
 
             {/* Cuerpo scrollable (scr-scroll) */}
@@ -497,14 +483,6 @@ const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 18,
         paddingTop: spacing.sm,
-    },
-    backButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
 
     // ── Scroll + body (body-area pad scr-scroll) ─

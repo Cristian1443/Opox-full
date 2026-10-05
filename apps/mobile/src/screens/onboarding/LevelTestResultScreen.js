@@ -10,13 +10,13 @@ import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
+import AppHeader from '../../components/AppHeader';
 
 // ─── Rosco circular (full ring) de progreso ─────────────────────────────────
 const RING_SIZE = 190;
 const RING_STROKE = 18;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const BACK_BTN_SIZE = 32;
 
 function ScoreRing({ percent = 58 }) {
     const clamped = Math.max(0, Math.min(100, percent));
@@ -102,17 +102,7 @@ export default function LevelTestResultScreen({ navigation, route }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Text style={styles.backIcon}>‹</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>Test completado</Text>
-            </View>
+            <AppHeader title="Test completado" onBack={() => navigation.goBack()} />
 
             {/* Cuerpo scrollable */}
             <ScrollView
@@ -187,43 +177,13 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
     },
 
-    // ── Header (back-chevron + título) ───────────
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-    },
-    backBtn: {
-        width: BACK_BTN_SIZE,
-        height: BACK_BTN_SIZE,
-        borderRadius: BACK_BTN_SIZE / 2,
-        backgroundColor: colors.grayLight,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    backIcon: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: colors.textDark,
-    },
-    headerTitle: {
-        flex: 1,
-        textAlign: 'center',
-        marginRight: BACK_BTN_SIZE, // compensa el ancho del botón de back para centrar el título
-        fontSize: 20,
-        fontWeight: '600',
-        color: colors.textDark,
-    },
-
     // ScrollView
     scroll: {
         flex: 1,
     },
     body: {
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
+        paddingBottom: spacing.md,
     },
 
     // ── Rosco ────────────────────────────────────

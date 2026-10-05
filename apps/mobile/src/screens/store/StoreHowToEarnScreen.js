@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import { colors } from '../../theme';
 
 const ACCENT = '#6C5CE7';
@@ -18,13 +19,11 @@ const EARN_METHODS = [
 export default function StoreHowToEarnScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Volver">
-          <Ionicons name="chevron-back" size={24} color={ACCENT} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cómo ganar Opopoints</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <AppHeader
+        title="Cómo ganar Opopoints"
+        onBack={() => navigation.goBack()}
+        style={styles.headerBar}
+      />
 
       <View style={styles.body}>
         <View style={styles.heroIcon}>
@@ -55,20 +54,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  // Banda blanca con separador: el fondo de la pantalla es gris.
+  headerBar: {
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.separator,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
   },
   body: {
     flex: 1,

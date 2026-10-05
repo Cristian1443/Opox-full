@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing } from '../../theme';
 import { trainingApi } from '../../api';
+import AppHeader from '../../components/AppHeader';
 
 // Persiste la pregunta actual para reanudar si el usuario cierra la app a medias.
 export const PENDING_LEVEL_TEST_KEY = 'opox.pendingLevelTestIndex';
@@ -322,26 +323,16 @@ export default function LevelTestInProgressScreen({ navigation }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => {
-                        // Si el test se reanudó tras cerrar la app (Splash hace un
-                        // `replace`), no hay pantalla anterior en el historial —
-                        // el progreso ya quedó guardado, así que "volver" sale al
-                        // inicio del onboarding en vez de no hacer nada.
-                        if (navigation.canGoBack()) navigation.goBack();
-                        else navigation.replace('OnboardingSlider');
-                    }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Volver"
-                >
-                    <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Test de nivel</Text>
-                <View style={styles.backButtonSpacer} />
-            </View>
+            {/* Si el test se reanudó tras cerrar la app (Splash hace un `replace`),
+                no hay pantalla anterior en el historial — el progreso ya quedó
+                guardado, así que "volver" sale al inicio del onboarding. */}
+            <AppHeader
+                title="Test de nivel"
+                onBack={() => {
+                    if (navigation.canGoBack()) navigation.goBack();
+                    else navigation.replace('OnboardingSlider');
+                }}
+            />
 
             {/* Cuerpo principal */}
             <View style={styles.body}>
@@ -432,24 +423,6 @@ export default function LevelTestInProgressScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
 
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-    },
-    backButton: {
-        width: 32, height: 32, borderRadius: 16,
-        backgroundColor: colors.grayLight,
-        alignItems: 'center', justifyContent: 'center',
-    },
-    backButtonSpacer: { width: 32 },
-    headerTitle: {
-        flex: 1, textAlign: 'center',
-        fontSize: 18, fontWeight: '700', color: colors.textDark,
-    },
-
     loadingScreen: {
         flex: 1,
         alignItems: 'center',
@@ -468,7 +441,6 @@ const styles = StyleSheet.create({
     body: {
         flex: 1,
         paddingHorizontal: spacing.md + 2,
-        paddingTop: spacing.sm,
         paddingBottom: 80,
     },
 

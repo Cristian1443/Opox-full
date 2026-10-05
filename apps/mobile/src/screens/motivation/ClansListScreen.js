@@ -11,6 +11,7 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import { motivationApi } from '../../api';
 import { colors, spacing } from '../../theme';
 import AlertCardModal from '../../components/AlertCardModal';
@@ -63,16 +64,7 @@ export default function ClansListScreen({ navigation }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
 
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backBtn}
-                    onPress={() => navigation.goBack()}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>Clanes</Text>
-            </View>
+            <AppHeader title="Clanes" onBack={() => navigation.goBack()} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 {myClan && (
@@ -189,24 +181,6 @@ export default function ClansListScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F4F6FA' },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    // Figma (2334:540 "Clanes"): fontSize 21dp exacto.
-    headerTitle: { flex: 1, fontSize: 21, fontWeight: '700', color: colors.textDark, letterSpacing: -0.4, textAlign: 'center' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: spacing.lg },
     groupTitle: { fontSize: 18, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: spacing.sm, marginTop: spacing.sm },

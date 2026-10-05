@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
@@ -159,18 +160,10 @@ export default function BoeDetailScreen({ route, navigation }) {
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <View style={styles.screen}>
-                {/* ── Header ──────────────────────────────────────────────────── */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backBtn}
-                        activeOpacity={0.7}
-                        onPress={() => navigation.goBack()}
-                        accessibilityLabel="Volver"
-                    >
-                        <Feather name="chevron-left" size={22} color={colors.textDark} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Cambio legal</Text>
+            <AppHeader
+                title="Cambio legal"
+                onBack={() => navigation.goBack()}
+                right={(
                     <TouchableOpacity
                         style={styles.iconButton}
                         activeOpacity={0.7}
@@ -179,8 +172,10 @@ export default function BoeDetailScreen({ route, navigation }) {
                     >
                         {bookmarked ? <BookmarkedDocIcon /> : <BookmarkOutlineIcon />}
                     </TouchableOpacity>
-                </View>
+                )}
+            />
 
+            <View style={styles.screen}>
                 {/* ── Filtro (decorativo, ver nota arriba) ───────────────────── */}
                 <View style={styles.filterRow}>
                     <FilterIcon />
@@ -287,35 +282,14 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.white,
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.lg,
     },
 
     // ── Header ────────────────────────────────────────────────────
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: spacing.md,
-    },
     iconButton: {
-        width: 36,
-        height: 36,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    backBtn: {
         width: 44,
         height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
     },
 
     // ── Filtro ────────────────────────────────────────────────────

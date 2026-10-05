@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
@@ -23,7 +24,6 @@ import { boeApi } from '../../api';
 // Flujo sin Motor (stub / fallback):
 //   sesionId === null → correctIndex viene en la pregunta → resolución local
 const FIGMA = {
-    subtitleMuted: 'rgba(52, 58, 61, 0.5)',
     optionBorder: 'rgba(65, 41, 80, 0.3)',
     optionSelectedBg: 'rgba(114, 65, 184, 0.08)',
     evidenciaBg: 'rgba(65, 41, 80, 0.06)',
@@ -239,24 +239,13 @@ export default function BoeMiniTestScreen({ route, navigation }) {
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
             <View style={styles.screen}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backBtn}
-                        activeOpacity={0.7}
-                        onPress={handleClose}
-                        accessibilityLabel="Cerrar test"
-                    >
-                        <Feather name="chevron-left" size={22} color={colors.textDark} />
-                    </TouchableOpacity>
-                    <View style={styles.headerTitles}>
-                        <Text style={styles.headerTitle}>Actualización BOE</Text>
-                        <Text style={styles.headerSubtitle} numberOfLines={1}>
-                            {title ?? currentQ.context}
-                        </Text>
-                    </View>
-                    <View style={styles.headerPlaceholder} />
-                </View>
+                {/* Volver pide confirmación si ya hay progreso (handleClose). */}
+                <AppHeader
+                    title="Actualización BOE"
+                    subtitle={title ?? currentQ.context}
+                    onBack={handleClose}
+                    backLabel="Cerrar test"
+                />
 
                 {/* ── Banda de progreso (a todo el ancho, fiel a Figma) ────────── */}
                 <View style={styles.progressBand}>
@@ -394,7 +383,6 @@ const styles = StyleSheet.create({
     screen: {
         flex: 1,
         backgroundColor: colors.white,
-        paddingTop: spacing.lg,
     },
 
     // ── Estados de carga / error / no disponible ───────────────────────────────
@@ -437,41 +425,6 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-SemiBold',
         fontSize: 15,
         color: colors.white,
-    },
-
-    // ── Header ────────────────────────────────────────────────────
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.lg,
-        marginBottom: spacing.md + 4,
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerPlaceholder: {
-        width: 44,
-        height: 44,
-    },
-    headerTitles: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-    },
-    headerSubtitle: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 11.6,
-        color: FIGMA.subtitleMuted,
-        marginTop: 2,
     },
 
     // ── Banda de progreso (a todo el ancho) ─────────────────────────

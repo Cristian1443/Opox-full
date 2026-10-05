@@ -11,6 +11,7 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import AvatarPlaceholder from '../../components/AvatarPlaceholder';
 import { motivationApi } from '../../api';
@@ -96,14 +97,7 @@ export default function ClanDetailScreen({ navigation, route }) {
         return (
             <SafeAreaView style={styles.container}>
                 <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
-                <View style={styles.header}>
-                    <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-                    {/* Espaciador del mismo ancho que el back para centrar el título en pantalla */}
-                    <View style={styles.headerSide} />
-                </View>
+                <AppHeader title={headerTitle} onBack={() => navigation.goBack()} />
                 <View style={styles.centeredState}>
                     {loading ? (
                         <ActivityIndicator size="large" color={colors.ctaGreen} />
@@ -124,23 +118,23 @@ export default function ClanDetailScreen({ navigation, route }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-                <TouchableOpacity
-                    style={styles.headerSide}
-                    onPress={openOptions}
-                    disabled={leaving}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Opciones del clan"
-                >
-                    {leaving
-                        ? <ActivityIndicator size="small" color={colors.statRed} />
-                        : <Ionicons name="ellipsis-horizontal" size={22} color={colors.textDark} />}
-                </TouchableOpacity>
-            </View>
+            <AppHeader
+                title={headerTitle}
+                onBack={() => navigation.goBack()}
+                right={(
+                    <TouchableOpacity
+                        style={styles.optionsBtn}
+                        onPress={openOptions}
+                        disabled={leaving}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Opciones del clan"
+                    >
+                        {leaving
+                            ? <ActivityIndicator size="small" color={colors.statRed} />
+                            : <Ionicons name="ellipsis-horizontal" size={22} color={colors.textDark} />}
+                    </TouchableOpacity>
+                )}
+            />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 {/* Figma: nombre del clan va DENTRO de la tarjeta verde (morado oscuro sobre verde),
@@ -198,26 +192,7 @@ const styles = StyleSheet.create({
     errorText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.md },
     retryBtn: { backgroundColor: colors.ctaGreen, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
     retryBtnText: { color: colors.white, fontSize: 14, fontWeight: '700' },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: { flex: 1, fontSize: 21, fontWeight: '800', color: colors.textDark, letterSpacing: -0.2, textAlign: 'center' },
-    // Mismo ancho que backBtn: equilibra el header para que el título quede
-    // centrado respecto a la pantalla, no al espacio sobrante.
-    headerSide: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    optionsBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27, paddingBottom: spacing.lg },
     summaryBox: { backgroundColor: colors.ctaGreen, borderRadius: 14, alignItems: 'center', padding: spacing.lg, marginBottom: 11 },

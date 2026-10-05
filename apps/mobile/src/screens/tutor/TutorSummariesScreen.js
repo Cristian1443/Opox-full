@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import { colors, spacing } from '../../theme';
 import { tutorApi, api } from '../../api';
 import { getCachedSummary, setCachedSummary } from '../../lib/tutorCache';
@@ -170,13 +171,7 @@ function TopicPicker({ oposicion, onSelect, onBack }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Feather name="chevron-left" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.pickerTitle}>Resúmenes</Text>
-                <View style={styles.headerPlaceholder} />
-            </View>
+            <AppHeader title="Resúmenes" onBack={onBack} />
 
             {loading ? (
                 <View style={styles.loadingCenter}>
@@ -311,20 +306,11 @@ export default function TutorSummariesScreen({ navigation, route }) {
     const displaySections = summary?.sections   ?? paramSections ?? MOCK_SUMMARY.sections;
 
     const Header = () => (
-        <View style={styles.header}>
-            <TouchableOpacity
-                onPress={() => navigation.goBack()}
-                style={styles.backBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-                <Feather name="chevron-left" size={22} color={colors.textDark} />
-            </TouchableOpacity>
-            <View style={styles.headerTextWrap}>
-                <Text style={styles.headerTitle}>Resumen</Text>
-                {(!isFetching || summary) && <Text style={styles.headerSubtitle}>{displayTitle}</Text>}
-            </View>
-            <View style={styles.headerPlaceholder} />
-        </View>
+        <AppHeader
+            title="Resumen"
+            subtitle={(!isFetching || summary) ? displayTitle : undefined}
+            onBack={() => navigation.goBack()}
+        />
     );
 
     // Primera carga sin contenido previo → pantalla completa con spinner.
@@ -388,37 +374,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.white,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.md,
-    },
-    iconBtn: { width: 32, padding: 4 },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerPlaceholder: { width: 44, height: 44 },
-    headerTextWrap: { flex: 1, alignItems: 'center' },
-    headerTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
-    },
-    headerSubtitle: {
-        marginTop: 2,
-        fontFamily: 'Poppins-Regular',
-        fontSize: 10.7,
-        color: FIGMA.subtitleMuted,
-        textAlign: 'center',
-    },
     fetchingBar: {
         height: 2,
         backgroundColor: colors.accentOrange,
@@ -443,22 +398,9 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: colors.textSecondary,
     },
-    pickerHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: FIGMA.bulletStroke,
-    },
-    pickerTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-    },
     pickerList: {
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
         gap: spacing.sm,
     },
     topicRow: {

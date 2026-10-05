@@ -10,6 +10,7 @@ import {
     Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
@@ -57,14 +58,6 @@ async function openSubscriptionSettings() {
   } catch {
     Alert.alert('No disponible', 'Gestiona tu suscripción desde los ajustes de tu dispositivo.');
   }
-}
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
 }
 
 // Ruta exacta exportada de Figma (mismo ícono de tarjeta que Ajustes, 83×56).
@@ -118,18 +111,7 @@ export default function ConfigSubscriptionScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mi suscripción</Text>
-        <View style={styles.iconButton} />
-      </View>
+      <AppHeader title="Mi suscripción" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ── Tarjeta de plan ───────────────────────────────────────── */}
@@ -189,32 +171,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   // ── Contenido ─────────────────────────────────────────────────
   // Misma separación título → contenido que Ajustes y Perfil (spacing.lg).
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
 

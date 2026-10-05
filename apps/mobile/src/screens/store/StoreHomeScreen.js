@@ -11,7 +11,8 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../../theme';
 import { storeApi } from '../../api/store';
@@ -204,19 +205,7 @@ export default function StoreHomeScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <Feather name="chevron-left" size={22} color={colors.textDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tienda</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <AppHeader title="Tienda" onBack={() => navigation.goBack()} />
 
       <OpopointsHeader
         balance={balance}
@@ -287,37 +276,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ──────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(65, 41, 80, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerPlaceholder: {
-    width: 44,
-    height: 44,
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   // ── Tarjeta de saldo ──────────────────────────────────────────────
   heroContainer: {
     paddingHorizontal: 16,
-    paddingTop: 12,
     paddingBottom: 8,
   },
   balanceCard: {

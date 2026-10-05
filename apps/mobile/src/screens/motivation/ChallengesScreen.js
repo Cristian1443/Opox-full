@@ -12,7 +12,7 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import { RetoRecibidoModal } from '../../components/MotivationModals';
 import { api, motivationApi, boeApi } from '../../api';
 import { colors, spacing } from '../../theme';
@@ -185,13 +185,7 @@ export default function ChallengesScreen({ navigation, route }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
 
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Retos</Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <AppHeader title="Retos" onBack={() => navigation.goBack()} />
 
             <ScrollView
                 style={styles.scroll}
@@ -316,24 +310,6 @@ export default function ChallengesScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.grayLight },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3, textAlign: 'center' },
-    headerSpacer: { width: 44 },
     scroll: { flex: 1 },
     body: { paddingHorizontal: 27 },
     groupTitle: { fontSize: 18, fontWeight: '700', color: colors.textDark, letterSpacing: 0.4, marginBottom: 12, marginTop: 8, textTransform: 'uppercase' },

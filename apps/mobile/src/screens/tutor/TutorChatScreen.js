@@ -14,8 +14,9 @@ import {
     Dimensions,
 } from 'react-native';
 import Text from '../../components/AppText';
+import { HeaderBackButton } from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
 import Markdown from 'react-native-markdown-display';
@@ -673,14 +674,7 @@ export default function TutorChatScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Volver"
-                >
-                    <Feather name="chevron-left" size={22} color={colors.textDark} />
-                </TouchableOpacity>
+                <HeaderBackButton onPress={() => navigation.goBack()} />
 
                 <View style={styles.headerInfo}>
                     <Avatar />
@@ -892,14 +886,6 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.md,
         gap: 12,
     },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     headerInfo: {
         flex: 1,
         flexDirection: 'row',
@@ -909,7 +895,7 @@ const styles = StyleSheet.create({
     headerText: { flex: 1 },
     headerTitle: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
+        fontSize: 21,
         color: colors.textDark,
     },
     onlineText: {
@@ -918,7 +904,7 @@ const styles = StyleSheet.create({
         fontSize: 8.9,
         color: FIGMA.onlineGreen,
     },
-    moreBtn: { width: 32, alignItems: 'flex-end' },
+    moreBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
     avatar: {
         backgroundColor: colors.selectionBorder,

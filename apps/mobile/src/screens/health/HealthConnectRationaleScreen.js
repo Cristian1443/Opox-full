@@ -9,6 +9,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { colors, spacing } from '../../theme';
 
 const DATA_ITEMS = [
@@ -50,16 +51,7 @@ export default function HealthConnectRationaleScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={handleClose}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                    <Ionicons name="arrow-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Uso de tus datos de salud</Text>
-                <View style={{ width: 24 }} />
-            </View>
+            <AppHeader title="Uso de tus datos de salud" onBack={handleClose} />
 
             <ScrollView
                 style={styles.scroll}
@@ -127,24 +119,9 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.white,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(65,41,80,0.08)',
-    },
-    headerTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 16,
-        color: colors.textDark,
-    },
     scroll: { flex: 1 },
     scrollContent: {
         paddingHorizontal: spacing.lg,
-        paddingTop: 28,
         paddingBottom: 24,
     },
     heroRow: {

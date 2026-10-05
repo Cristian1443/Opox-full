@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import { colors } from '../../theme';
 
 const PHASE2_DARK = '#7B1FA2';
@@ -11,13 +12,11 @@ const PHASE2_DARK = '#7B1FA2';
 export default function StorePublishTestScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Volver">
-          <Ionicons name="chevron-back" size={24} color={PHASE2_DARK} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Publicar test</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <AppHeader
+        title="Publicar test"
+        onBack={() => navigation.goBack()}
+        style={styles.headerBar}
+      />
       <View style={styles.body}>
         <View style={styles.phase2Badge}>
           <Text style={styles.phase2Text}>FASE 2</Text>
@@ -34,17 +33,12 @@ export default function StorePublishTestScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  // Banda blanca con separador: el fondo de la pantalla es gris.
+  headerBar: {
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.separator,
   },
-  title: { fontSize: 16, fontWeight: '700', color: colors.text, flex: 1, textAlign: 'center' },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 14 },
   phase2Badge: {
     backgroundColor: PHASE2_DARK,

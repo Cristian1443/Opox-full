@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { File as FSFile } from 'expo-file-system';
 import { colors } from '../../theme';
+import AppHeader from '../../components/AppHeader';
 import { trainingApi } from '../../api/training';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -197,16 +198,11 @@ export default function ExamUploadScreen({ navigation }) {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
             >
-                <View style={styles.nav}>
-                    <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-                        <Ionicons name="chevron-back" size={24} color={COLORS.purple} />
-                    </TouchableOpacity>
-                    <View style={styles.navTitleWrap}>
-                        <Text style={styles.navTitle}>Subir examen</Text>
-                        <Text style={styles.navSubtitle}>Al banco del curso</Text>
-                    </View>
-                    <View style={{ width: 44 }} />
-                </View>
+                <AppHeader
+                    title="Subir examen"
+                    subtitle="Al banco del curso"
+                    onBack={() => navigation.goBack()}
+                />
 
                 <ScrollView
                     contentContainerStyle={styles.scroll}
@@ -352,29 +348,7 @@ export default function ExamUploadScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: COLORS.white },
-    nav: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: 44,
-        marginTop: 8,
-        marginHorizontal: 25,
-        marginBottom: 8,
-    },
-    backBtn: {
-        width: 44, height: 44, borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center', justifyContent: 'center',
-    },
-    navTitleWrap: { alignItems: 'center' },
-    navTitle: {
-        fontFamily: 'Poppins-SemiBold', fontSize: 18, color: COLORS.purple, lineHeight: 22,
-    },
-    navSubtitle: {
-        fontFamily: 'Poppins-Light', fontSize: 14, color: COLORS.purple, lineHeight: 18,
-    },
-
-    scroll: { paddingHorizontal: 25, paddingTop: 8, paddingBottom: 40 },
+    scroll: { paddingHorizontal: 25, paddingBottom: 40 },
 
     intro: {
         fontFamily: 'Poppins-Regular',

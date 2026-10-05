@@ -12,9 +12,9 @@ import {
     Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import FeedbackSuccessModal from './FeedbackSuccessModal';
 import { settingsApi, api } from '../../api';
@@ -38,14 +38,6 @@ const FEEDBACK_TYPES = [
   { id: 'bug', label: 'Error' },
   { id: 'other', label: 'Otro' },
 ];
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
 
 export default function ConfigFeedbackScreen({ navigation }) {
   const [selectedType, setSelectedType] = useState('suggestion');
@@ -96,21 +88,11 @@ export default function ConfigFeedbackScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* ── Header ──────────────────────────────────────────────────── */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            activeOpacity={0.7}
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Volver"
-          >
-            <ChevronLeftIcon />
-          </TouchableOpacity>
-          <View style={styles.headerTitles}>
-            <Text style={styles.headerTitle}>Tu opinión</Text>
-            <Text style={styles.headerSubtitle}>Cuéntanos qué mejorarías. Lo leemos todo.</Text>
-          </View>
-          <View style={styles.iconButton} />
-        </View>
+        <AppHeader
+          title="Tu opinión"
+          subtitle="Cuéntanos qué mejorarías. Lo leemos todo."
+          onBack={() => navigation.goBack()}
+        />
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* ── Tipo ──────────────────────────────────────────────────── */}
@@ -189,40 +171,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitles: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-  },
-  headerSubtitle: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 11,
-    color: FIGMA.textMuted,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-
   // ── Contenido ─────────────────────────────────────────────────
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   sectionLabel: {

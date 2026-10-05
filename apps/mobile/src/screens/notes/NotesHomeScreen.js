@@ -10,10 +10,11 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { notesApi } from '../../api';
+import AppHeader from '../../components/AppHeader';
 
 // Colores confirmados contra Figma (frame HOME FACTORIA, Bloque 9) sin
 // equivalente exacto en theme.js.
@@ -201,25 +202,20 @@ export default function NotesHomeScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Volver"
-                >
-                    <Feather name="chevron-left" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Mis apuntes</Text>
-                <TouchableOpacity
-                    onPress={goUpload}
-                    style={styles.addBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Subir apuntes"
-                >
-                    <PlusIcon />
-                </TouchableOpacity>
-            </View>
+            <AppHeader
+                title="Mis apuntes"
+                onBack={() => navigation.goBack()}
+                right={
+                    <TouchableOpacity
+                        onPress={goUpload}
+                        style={styles.addBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Subir apuntes"
+                    >
+                        <PlusIcon />
+                    </TouchableOpacity>
+                }
+            />
 
             <ScrollView
                 style={styles.scroll}
@@ -280,39 +276,16 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
     },
 
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.md,
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     addBtn: {
         width: 44,
         height: 44,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
-    },
 
     scroll: { flex: 1 },
     body: {
         paddingHorizontal: spacing.md,
-        paddingTop: spacing.xs,
         paddingBottom: spacing.md,
     },
     bodyStateCentered: {

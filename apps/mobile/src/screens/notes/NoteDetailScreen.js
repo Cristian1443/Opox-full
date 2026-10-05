@@ -11,12 +11,13 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import NotesDeleteConfirmModal from '../../components/NotesDeleteConfirmModal';
 import NotesTagsEditorModal from '../../components/NotesTagsEditorModal';
 import { notesApi } from '../../api';
+import AppHeader from '../../components/AppHeader';
 
 // Colores confirmados contra Figma (frame SUBIR APUNTES · detalle, Bloque
 // 9) sin equivalente exacto en theme.js.
@@ -225,26 +226,21 @@ export default function NoteDetailScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Volver"
-                >
-                    <Feather name="chevron-left" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>{note.title}</Text>
-                <TouchableOpacity
-                    onPress={() => setMenuVisible(true)}
-                    style={styles.iconBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Más opciones"
-                    disabled={deleting}
-                >
-                    <Ionicons name="ellipsis-vertical" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-            </View>
+            <AppHeader
+                title={note.title}
+                onBack={() => navigation.goBack()}
+                right={
+                    <TouchableOpacity
+                        onPress={() => setMenuVisible(true)}
+                        style={styles.iconBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Más opciones"
+                        disabled={deleting}
+                    >
+                        <Ionicons name="ellipsis-vertical" size={22} color={colors.textDark} />
+                    </TouchableOpacity>
+                }
+            />
 
             <ScrollView
                 style={styles.scroll}
@@ -344,34 +340,11 @@ function formatDate(iso) {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
 
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.md,
-    },
-    iconBtn: { width: 32, alignItems: 'center' },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
-    },
+    iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
     scroll: { flex: 1 },
     content: {
         paddingHorizontal: spacing.md,
-        paddingTop: spacing.xs,
         paddingBottom: spacing.md,
     },
 

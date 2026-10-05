@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import InsufficientPointsModal from '../../components/InsufficientPointsModal';
@@ -90,19 +90,7 @@ export default function StoreRealRewardDetailScreen({ navigation, route }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <Feather name="chevron-left" size={22} color={colors.textDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{reward.partner}</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <AppHeader title={reward.partner} onBack={() => navigation.goBack()} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -172,33 +160,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(65, 41, 80, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerPlaceholder: {
-    width: 44,
-    height: 44,
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   // ── Contenido ─────────────────────────────────────────────────
   scrollContent: {
     paddingHorizontal: spacing.lg,
@@ -209,7 +170,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
   bannerText: {

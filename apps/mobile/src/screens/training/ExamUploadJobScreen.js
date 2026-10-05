@@ -10,6 +10,7 @@ import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
+import AppHeader from '../../components/AppHeader';
 import { trainingApi } from '../../api/training';
 
 const COLORS = {
@@ -112,16 +113,11 @@ export default function ExamUploadJobScreen({ navigation, route }) {
         <SafeAreaView style={styles.safe}>
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
-            <View style={styles.nav}>
-                <TouchableOpacity style={styles.backBtn} onPress={goBank}>
-                    <Ionicons name="chevron-back" size={24} color={COLORS.purple} />
-                </TouchableOpacity>
-                <View style={styles.navTitleWrap}>
-                    <Text style={styles.navTitle}>{titulo || 'Procesando'}</Text>
-                    <Text style={styles.navSubtitle}>Incorporación al banco</Text>
-                </View>
-                <View style={{ width: 44 }} />
-            </View>
+            <AppHeader
+                title={titulo || 'Procesando'}
+                subtitle="Incorporación al banco"
+                onBack={goBank}
+            />
 
             <View style={styles.body}>
                 {isProcessing ? (
@@ -234,35 +230,6 @@ export default function ExamUploadJobScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: COLORS.white },
-    nav: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: 44,
-        marginTop: 8,
-        marginHorizontal: 25,
-        marginBottom: 8,
-    },
-    backBtn: {
-        width: 44, height: 44, borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center', justifyContent: 'center',
-    },
-    navTitleWrap: { alignItems: 'center', flex: 1 },
-    navTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 16,
-        color: COLORS.purple,
-        lineHeight: 20,
-        textAlign: 'center',
-    },
-    navSubtitle: {
-        fontFamily: 'Poppins-Light',
-        fontSize: 12,
-        color: COLORS.purple,
-        lineHeight: 16,
-    },
-
     body: {
         flex: 1,
         paddingHorizontal: 25,

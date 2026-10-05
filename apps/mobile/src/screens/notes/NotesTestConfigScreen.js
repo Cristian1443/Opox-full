@@ -8,9 +8,9 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import AccentSlider from '../../components/AccentSlider';
+import AppHeader from '../../components/AppHeader';
 import { notesApi } from '../../api';
 import { adaptGeneratedQuestions } from '../../utils/questionAdapter';
 
@@ -120,18 +120,7 @@ export default function NotesTestConfigScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Volver"
-                >
-                    <Feather name="chevron-left" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Test de mis apuntes</Text>
-                <View style={styles.headerPlaceholder} />
-            </View>
+            <AppHeader title="Test de mis apuntes" onBack={() => navigation.goBack()} />
 
             <ScrollView
                 style={styles.scroll}
@@ -221,31 +210,6 @@ export default function NotesTestConfigScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
-
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.md,
-    },
-    iconBtn: { width: 32, alignItems: 'center' },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerPlaceholder: { width: 44, height: 44 },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
-    },
 
     scroll: { flex: 1 },
     content: {

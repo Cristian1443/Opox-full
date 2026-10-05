@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
+import { HeaderBackButton } from '../../components/AppHeader';
 import { TERMS_VERSION, PRIVACY_VERSION } from '@opox/constants';
 import { detectBiometricType, isBiometricLinked } from '../../lib/biometric';
 
@@ -80,13 +81,9 @@ export default function TerminosScreen({ navigation, route }) {
             >
                 {/* < Volver (2349:635) */}
                 {canGoBack && (
-                    <TouchableOpacity
-                        style={s.backButton}
-                        onPress={() => navigation.goBack()}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={s.backButtonText}>{'< Volver'}</Text>
-                    </TouchableOpacity>
+                    <View style={s.backButton}>
+                        <HeaderBackButton onPress={() => navigation.goBack()} />
+                    </View>
                 )}
 
                 {/* Header (2349:495) */}
@@ -179,13 +176,6 @@ const s = StyleSheet.create({
     backButton: {
         alignSelf: 'flex-start',
         marginBottom: 12,
-        paddingVertical: 4,
-    },
-    backButtonText: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 16,
-        color: colors.textDark,
-        opacity: 0.5,
     },
     header: {
         marginTop: 4,

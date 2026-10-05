@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { useTestSession } from '../../hooks/useTestSession';
@@ -74,18 +74,6 @@ function IconGavelLaw({ size = 22, color = colors.textDark }) {
   );
 }
 
-// Engranaje exacto — mismo patrón que TrainingHomeScreen/GeneratorConfigScreen
-// (círculo morado @10% + Feather chevron-left para volver, engranaje suelto sin
-// círculo para ajustes). Reemplaza el icono de pausa del header.
-function IconGear({ size = 22, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="740 0 52 55" fill="none">
-      <Path d="M789.75 31.0005V23.9205L783.54 23.4005C783.118 21.1364 782.288 18.9678 781.09 17.0005L785.24 12.0005L780.3 7.00055L775.55 11.0705C773.663 9.7728 771.555 8.83066 769.33 8.29055L768.8 1.81055H761.8L761.28 8.09055C759.053 8.5372 756.925 9.38425 755 10.5905L750.1 6.39055L745.16 11.3905L749.16 16.2005C747.871 18.1175 746.939 20.2519 746.41 22.5005L740 23.0005V30.0705L746.21 30.5905C746.63 32.86 747.457 35.0349 748.65 37.0105L744.51 42.0105L749.44 47.0105L754.2 42.9405C756.082 44.2404 758.187 45.1827 760.41 45.7205L761 52.2005H768L768.52 45.9205C770.764 45.4889 772.91 44.6483 774.85 43.4405L779.75 47.6405L784.69 42.6405L780.69 37.8305C781.979 35.9136 782.911 33.7792 783.44 31.5305L789.75 31.0005Z" stroke={color} strokeWidth={3.38} />
-      <Path d="M772.62 27.0004C772.6 28.5288 772.129 30.0172 771.266 31.2785C770.402 32.5397 769.185 33.5175 767.767 34.0888C766.349 34.66 764.794 34.7993 763.298 34.4891C761.801 34.1789 760.429 33.433 759.356 32.3452C758.282 31.2575 757.553 29.8765 757.262 28.3759C756.971 26.8754 757.131 25.3223 757.72 23.912C758.309 22.5016 759.303 21.2971 760.575 20.4499C761.847 19.6026 763.341 19.1505 764.87 19.1504C765.894 19.1569 766.907 19.3652 767.851 19.7632C768.795 20.1613 769.651 20.7413 770.371 21.4703C771.09 22.1992 771.659 23.0628 772.045 24.0116C772.431 24.9605 772.627 25.9761 772.62 27.0004Z" stroke={color} strokeWidth={3.38} />
-    </Svg>
-  );
-}
-
 // Check/X de trazo grueso sin chip circular — feedback de respuesta correcta/incorrecta.
 function IconFeedbackCheck({ size = 22, color = colors.statGreen }) {
   return (
@@ -123,6 +111,7 @@ import LawReferenceBottomSheet from '../../components/LawReferenceBottomSheet';
 import ReportQuestionModal from '../../components/ReportQuestionModal';
 import PauseSessionModal from '../../components/PauseSessionModal';
 import { trainingApi } from '../../api';
+import AppHeader, { HeaderSettingsButton } from '../../components/AppHeader';
 
 // Datos mock para desarrollo — se reemplazarán con route.params.questions
 const MOCK_QUESTIONS = [
@@ -762,30 +751,18 @@ export default function QuestionActiveScreen({ navigation, route }) {
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
 
       {/* ── HEADER BLANCO ── */}
-      <View style={styles.topHeader}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => setShowAbandonModal(true)}
-          accessibilityLabel="Salir de la sesión"
-        >
-          <Feather name="chevron-left" size={22} color={colors.textDark} />
-        </TouchableOpacity>
-
-        <View style={styles.topHeaderTexts}>
-          <Text style={styles.topHeaderTitle}>Zona de entrenamiento</Text>
-          {examTitle ? (
-            <Text style={styles.topHeaderSub}>{examTitle}</Text>
-          ) : null}
-        </View>
-
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => { setIsPaused(true); setShowPauseModal(true); }}
-          accessibilityLabel="Pausar sesión"
-        >
-          <IconGear size={22} color={colors.textDark} />
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        title="Zona de entrenamiento"
+        subtitle={examTitle || undefined}
+        onBack={() => setShowAbandonModal(true)}
+        right={(
+          <HeaderSettingsButton
+            onPress={() => { setIsPaused(true); setShowPauseModal(true); }}
+            accessibilityLabel="Pausar sesión"
+          />
+        )}
+        style={styles.topHeader}
+      />
 
       {/* ── BARRA NAVY DE PROGRESO ── */}
       <View style={styles.progressBar}>
@@ -1350,41 +1327,7 @@ const styles = StyleSheet.create({
 
   // ── Header blanco superior ─────────────
   topHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
     backgroundColor: colors.card,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(65, 41, 80, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  settingsButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topHeaderTexts: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  topHeaderTitle: {
-    fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.textDark,
-  },
-  topHeaderSub: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    color: colors.textSecondary,
-    marginTop: 2,
   },
 
   // ── Barra morada de progreso ─────────────

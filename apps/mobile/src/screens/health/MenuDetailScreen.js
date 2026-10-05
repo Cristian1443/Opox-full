@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import { planningApi } from '../../api';
 import AlertCardModal from '../../components/AlertCardModal';
+import { HeaderBackButton, HEADER_SIDE, HEADER_CONTENT_GAP } from '../../components/AppHeader';
 
 // Colores confirmados contra Figma (frame DETALLE MENÚ/RECETA, Bloque 3)
 // sin equivalente exacto en theme.js.
@@ -21,16 +22,6 @@ const FIGMA = {
     textNote: 'rgba(52,58,61,0.5)',
     buttonsRowDivider: 'rgba(65,41,80,0.15)',
 };
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-    const Svg = require('react-native-svg').default;
-    const { Path } = require('react-native-svg');
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
 
 // ⚠️ Solo 2 comidas existen en el frame de Figma inspeccionado (Desayuno,
 // Comida) — no hay sección "Cena", aunque el resumen en MenusScreen sí la
@@ -91,14 +82,7 @@ export default function MenuDetailScreen({ navigation, route }) {
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        activeOpacity={0.7}
-                        onPress={() => navigation.goBack()}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                        <ChevronLeftIcon />
-                    </TouchableOpacity>
+                    <HeaderBackButton onPress={() => navigation.goBack()} />
                     <View style={styles.headerTextWrap}>
                         <Text style={styles.headerTitle}>{data.title}</Text>
                         <View style={styles.subtitleRow}>
@@ -177,16 +161,12 @@ const styles = StyleSheet.create({
         paddingTop: spacing.sm,
         paddingBottom: 24,
     },
+    // Mismas medidas que AppHeader; a mano por el badge "IA" junto al subtítulo.
     header: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: 28,
-    },
-    backButton: {
-        width: 36,
-        height: 36,
-        alignItems: 'center',
-        justifyContent: 'center',
+        gap: spacing.sm,
+        marginBottom: HEADER_CONTENT_GAP,
     },
     headerTextWrap: {
         flex: 1,
@@ -210,8 +190,8 @@ const styles = StyleSheet.create({
         color: 'rgba(65,41,80,0.5)',
     },
     headerSpacer: {
-        width: 36,
-        height: 36,
+        width: HEADER_SIDE,
+        height: HEADER_SIDE,
     },
     aiBadge: {
         borderWidth: 0.4,

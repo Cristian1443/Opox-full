@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import { colors, spacing } from '../../theme';
 
 // ─── 11.2 · Tienda · Invita y ahorra ────────────────────────────────────────
@@ -49,19 +49,7 @@ export default function StoreAffiliateScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <Feather name="chevron-left" size={22} color={colors.textDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Invita y ahorra</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <AppHeader title="Invita y ahorra" onBack={() => navigation.goBack()} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -112,33 +100,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(65, 41, 80, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerPlaceholder: {
-    width: 44,
-    height: 44,
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
@@ -150,7 +111,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: spacing.lg,
     alignItems: 'center',
-    marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
   highlightLine1: {

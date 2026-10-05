@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { HeaderBackButton, HEADER_SIDE, HEADER_CONTENT_GAP } from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
@@ -232,38 +233,33 @@ export default function BoeHomeScreen({ navigation }) {
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <View style={styles.screen}>
-                {/* ── Header ──────────────────────────────────────────────────── */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backBtn}
-                        activeOpacity={0.7}
-                        onPress={() => navigation.goBack()}
-                        accessibilityLabel="Volver"
-                    >
-                        <Feather name="chevron-left" size={22} color={colors.textDark} />
-                    </TouchableOpacity>
-                    <View style={styles.headerTitleRow}>
-                        <Text style={styles.headerTitle}>Monitor BOE</Text>
-                        {totalUnread > 0 && (
-                            <View style={styles.unreadBadge}>
-                                <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
-                            </View>
-                        )}
-                    </View>
-                    {/* Añadir norma a monitorizar — única vía persistente para seguir
-                        más normas una vez el temario ya tiene alguna (el CTA del
-                        estado vacío solo aparece antes de la primera). */}
-                    <TouchableOpacity
-                        style={styles.iconButton}
-                        activeOpacity={0.7}
-                        onPress={() => setSearchVisible(true)}
-                        accessibilityLabel="Seguir norma"
-                    >
-                        <SyncIcon />
-                    </TouchableOpacity>
+            {/* ── Header ──────────────────────────────────────────────────────
+                Mismas medidas que AppHeader; se compone a mano porque el título
+                lleva el badge de no leídos al lado. */}
+            <View style={styles.header}>
+                <HeaderBackButton onPress={() => navigation.goBack()} />
+                <View style={styles.headerTitleRow}>
+                    <Text style={styles.headerTitle}>Monitor BOE</Text>
+                    {totalUnread > 0 && (
+                        <View style={styles.unreadBadge}>
+                            <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
+                        </View>
+                    )}
                 </View>
+                {/* Añadir norma a monitorizar — única vía persistente para seguir
+                    más normas una vez el temario ya tiene alguna (el CTA del
+                    estado vacío solo aparece antes de la primera). */}
+                <TouchableOpacity
+                    style={styles.iconButton}
+                    activeOpacity={0.7}
+                    onPress={() => setSearchVisible(true)}
+                    accessibilityLabel="Seguir norma"
+                >
+                    <SyncIcon />
+                </TouchableOpacity>
+            </View>
 
+            <View style={styles.screen}>
                 {/* ── Filtro ──────────────────────────────────────────────────── */}
                 <View style={styles.filterRow}>
                     <FilterIcon />
@@ -480,26 +476,20 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.white,
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.lg,
     },
 
     // ── Header ────────────────────────────────────────────────────
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: HEADER_CONTENT_GAP,
+        gap: spacing.sm,
     },
     iconButton: {
-        width: 36,
-        height: 36,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
+        width: HEADER_SIDE,
+        height: HEADER_SIDE,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -512,7 +502,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
+        fontSize: 21,
         color: colors.textDark,
         textAlign: 'center',
     },

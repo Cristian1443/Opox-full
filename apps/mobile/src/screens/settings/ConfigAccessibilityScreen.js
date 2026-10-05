@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
-  View, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Switch,
+  View, StyleSheet, ScrollView, StatusBar, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
 import AccentSlider from '../../components/AccentSlider';
 import Text from '../../components/AppText';
+import AppHeader from '../../components/AppHeader';
 import { colors, spacing } from '../../theme';
 import { settingsApi } from '../../api';
 import { AccessibilityContext, DARK_MODE_ENABLED } from '../../contexts/AccessibilityContext';
@@ -72,14 +73,6 @@ async function saveA11yLocal(prefs) {
   try {
     await AsyncStorage.setItem(A11Y_KEY, JSON.stringify(prefs));
   } catch { /* fallo silencioso */ }
-}
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
 }
 
 // Ruta exacta exportada de Figma (icono "Modo noche", 74×75 — luna + destellos).
@@ -173,18 +166,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
       />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <ChevronLeftIcon />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Accesibilidad</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppHeader title="Accesibilidad" onBack={() => navigation.goBack()} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -267,36 +249,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F0F0F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSpacer: {
-    width: 36,
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   // ── Contenido ─────────────────────────────────────────────────
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   row: {

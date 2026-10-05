@@ -3,7 +3,6 @@ import {
     StyleSheet,
     View,
     ScrollView,
-    TouchableOpacity,
     StatusBar,
 } from 'react-native';
 import Text from '../../components/AppText';
@@ -11,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import { boeApi } from '../../api';
+import AppHeader from '../../components/AppHeader';
 
 // ─── 10.3 · Antes/Después · comparativa de redacción ──────────────────────────
 // Fiel al Figma (AntesDespuesScreen.tsx). El diff sigue siendo word-by-word
@@ -18,7 +18,6 @@ import { boeApi } from '../../api';
 // el tratamiento visual: sin tarjeta ni resaltado de fondo, solo tachado rojo /
 // subrayado verde sobre texto corrido Poppins Light.
 const FIGMA = {
-    subtitleMuted: 'rgba(52, 58, 61, 0.5)',
     infoBoxBg: 'rgba(159, 110, 228, 0.75)',
 };
 
@@ -57,14 +56,6 @@ const MOCK_COMPARISON = {
         },
     },
 };
-
-function ChevronLeftIcon({ size = 20, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-            <Path d="M15 5L8 12L15 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
 
 // Ícono de bombilla del cuadro informativo (ver hallazgo 1: nombrado "Capa_1",
 // nodo huérfano en el árbol de capas de Figma — coincide visualmente por
@@ -149,24 +140,13 @@ export default function BoeComparisonScreen({ route, navigation }) {
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <View style={styles.screen}>
-                {/* ── Header ──────────────────────────────────────────────────── */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.iconButton}
-                        activeOpacity={0.7}
-                        onPress={() => navigation.goBack()}
-                        accessibilityLabel="Volver"
-                    >
-                        <ChevronLeftIcon />
-                    </TouchableOpacity>
-                    <View style={styles.headerTitles}>
-                        <Text style={styles.headerTitle}>Antes/Después</Text>
-                        <Text style={styles.headerSubtitle}>{displayTitle}</Text>
-                    </View>
-                    <View style={styles.iconButton} />
-                </View>
+            <AppHeader
+                title="Antes/Después"
+                subtitle={displayTitle}
+                onBack={() => navigation.goBack()}
+            />
 
+            <View style={styles.screen}>
                 <ScrollView
                     style={styles.scroll}
                     contentContainerStyle={styles.scrollContent}
@@ -214,35 +194,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.white,
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.lg,
-    },
-
-    // ── Header ────────────────────────────────────────────────────
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: spacing.lg,
-    },
-    iconButton: {
-        width: 36,
-        height: 36,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitles: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-    },
-    headerSubtitle: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 11.6,
-        color: FIGMA.subtitleMuted,
-        marginTop: 2,
     },
 
     // ── Scroll ────────────────────────────────────────────────────

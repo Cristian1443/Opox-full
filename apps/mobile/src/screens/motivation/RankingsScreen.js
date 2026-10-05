@@ -9,20 +9,11 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import AppHeader from '../../components/AppHeader';
 import DestacadoBanner from '../../components/DestacadoBanner';
 import AvatarPlaceholder from '../../components/AvatarPlaceholder';
 import { motivationApi, boeApi, api } from '../../api';
 import { colors, spacing } from '../../theme';
-
-// Icono de chevron para el botón de volver (mismo patrón que MotivationHomeScreen.js / ClanDetailScreen.js).
-// Figma: ~5.5x11dp dentro de un círculo de 24dp.
-function IconChevronLeft({ size = 11, color = colors.textDark }) {
-    return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <Path d="M15 18l-6-6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
 
 const TABS = [
     { key: 'weekly', label: 'Semanal' },
@@ -175,12 +166,7 @@ export default function RankingsScreen({ navigation }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <IconChevronLeft size={22} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Rankings</Text>
-            </View>
+            <AppHeader title="Rankings" onBack={() => navigation.goBack()} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <DestacadoBanner opopoints={opopoints} globalRank={globalRank} localRank={localRank} />
@@ -254,24 +240,6 @@ export default function RankingsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-    },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    // Figma (2334:262 "Rankings"): fontSize 21dp exacto.
-    headerTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: colors.textDark, letterSpacing: -0.3, textAlign: 'center' },
     // Dentro del body (ya trae los 27dp laterales): línea inferior como en Figma.
     tabs: {
         flexDirection: 'row', alignItems: 'center',

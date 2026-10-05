@@ -7,12 +7,13 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing } from '../../theme';
 import { tutorApi } from '../../api';
 import AlertCardModal from '../../components/AlertCardModal';
+import AppHeader from '../../components/AppHeader';
 
 // Colores confirmados contra Figma (frame HUB AULA VIRTUAL, Bloque 8) sin
 // equivalente exacto en theme.js.
@@ -181,19 +182,11 @@ export default function TutorHomeScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backButton}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Volver"
-                >
-                    <Feather name="chevron-left" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Aula virtual</Text>
-                <View style={styles.headerPlaceholder} />
-            </View>
-            <Text style={styles.headerSubtitle}>Entiende y asimila el temario con la IA.</Text>
+            <AppHeader
+                title="Aula virtual"
+                subtitle="Entiende y asimila el temario con la IA."
+                onBack={() => navigation.goBack()}
+            />
 
             <ScrollView
                 style={styles.scroll}
@@ -255,41 +248,9 @@ export default function TutorHomeScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        paddingBottom: 4,
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerPlaceholder: { width: 44, height: 44 },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
-    },
-    headerSubtitle: {
-        fontFamily: 'Poppins-Regular',
-        fontSize: 10.7,
-        color: FIGMA.subtitleMuted,
-        textAlign: 'center',
-        paddingHorizontal: spacing.xl,
-        marginBottom: spacing.md,
-    },
     scroll: { flex: 1 },
     body: {
         paddingHorizontal: spacing.md,
-        paddingTop: spacing.xs,
         paddingBottom: spacing.lg,
     },
     list: { gap: 12 },

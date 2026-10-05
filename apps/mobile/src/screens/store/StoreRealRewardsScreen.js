@@ -10,7 +10,8 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
 import InsufficientPointsModal from '../../components/InsufficientPointsModal';
@@ -119,19 +120,7 @@ export default function StoreRealRewardsScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Volver"
-        >
-          <Feather name="chevron-left" size={22} color={colors.textDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recompensas reales</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <AppHeader title="Recompensas reales" onBack={() => navigation.goBack()} />
 
       {/* ── Tarjeta de saldo (reutilizada de Home - Tienda) ────────────── */}
       <View style={styles.balanceCard}>
@@ -225,33 +214,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // ── Header ────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(65, 41, 80, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerPlaceholder: {
-    width: 44,
-    height: 44,
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 21.3,
-    color: colors.textDark,
-    textAlign: 'center',
-  },
-
   // ── Tarjeta de saldo ──────────────────────────────────────────
   balanceCard: {
     flexDirection: 'row',
@@ -261,7 +223,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
   balanceTextWrap: {

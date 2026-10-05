@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
+import { HeaderBackButton } from '../../components/AppHeader';
 
 // Ruta exacta exportada de Figma (icono "ERROR EMAIL", 125×93 — sobre).
 function EmailIcon({ size = 40, color = colors.textDark }) {
@@ -86,15 +87,9 @@ export default function RecuperarPasswordEnviadoScreen({ route, navigation }) {
     return (
         <SafeAreaView style={s.container}>
             <View style={s.content}>
-                {/* Volver — Figma: "‹ Volver" morado #412950 al 50% opacidad, arriba a la izquierda */}
-                <TouchableOpacity
-                    style={s.backButton}
-                    onPress={() => navigation.goBack()}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-                    <Text style={s.backText}>Volver</Text>
-                </TouchableOpacity>
+                <View style={s.backButton}>
+                    <HeaderBackButton onPress={() => navigation.goBack()} />
+                </View>
 
                 <View style={s.centerBlock}>
                     {/* Header */}
@@ -155,15 +150,8 @@ const s = StyleSheet.create({
         paddingBottom: 32,
     },
     backButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        alignSelf: 'flex-start',
         marginTop: 4,
-        opacity: 0.5,
-    },
-    backText: {
-        fontSize: 19,
-        fontFamily: 'Poppins-Regular',
-        color: colors.textDark,
     },
     centerBlock: {
         flex: 1,

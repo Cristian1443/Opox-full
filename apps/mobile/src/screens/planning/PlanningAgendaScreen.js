@@ -13,6 +13,7 @@ import {
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { planningApi } from '../../api';
 import { colors, spacing } from '../../theme';
@@ -169,13 +170,7 @@ export default function PlanningAgendaScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Agenda</Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <AppHeader title="Agenda" onBack={() => navigation.goBack()} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <Text style={styles.sectionLabel}>FECHAS CLAVE</Text>
@@ -296,12 +291,8 @@ export default function PlanningAgendaScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.white },
-    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 4 },
-    backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F0F0F2', alignItems: 'center', justifyContent: 'center' },
-    headerSpacer: { width: 44 },
-    headerTitle: { flex: 1, fontFamily: 'Poppins-SemiBold', fontSize: 21, color: colors.textDark, textAlign: 'center' },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 24 },
+    body: { paddingHorizontal: spacing.md, paddingBottom: 24 },
     sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: colors.textDark, marginBottom: 8 },
     purposeText: {
         fontFamily: 'Poppins-Regular',

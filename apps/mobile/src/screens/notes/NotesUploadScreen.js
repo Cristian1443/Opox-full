@@ -10,13 +10,14 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { File as FSFile } from 'expo-file-system';
 import { colors, spacing } from '../../theme';
 import NotesFormatErrorModal from '../../components/NotesFormatErrorModal';
+import AppHeader from '../../components/AppHeader';
 import { notesApi, authApi } from '../../api';
 
 // Colores confirmados contra Figma (frame SUBIR APUNTES · selector, Bloque
@@ -289,24 +290,12 @@ export default function NotesUploadScreen({ navigation }) {
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
                 <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
 
-                <View style={styles.header}>
-                    <View style={styles.headerTop}>
-                        <TouchableOpacity
-                            onPress={cancelCapture}
-                            style={styles.backBtn}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="Descartar"
-                        >
-                            <Text style={styles.backChevron}>‹</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.title}>
-                            {count} {count === 1 ? 'foto capturada' : 'fotos capturadas'}
-                        </Text>
-                    </View>
-                    <Text style={styles.subtitle}>
-                        Revisa las páginas y añade más si necesitas.
-                    </Text>
-                </View>
+                <AppHeader
+                    title={`${count} ${count === 1 ? 'foto capturada' : 'fotos capturadas'}`}
+                    subtitle="Revisa las páginas y añade más si necesitas."
+                    onBack={cancelCapture}
+                    backLabel="Descartar"
+                />
 
                 <ScrollView
                     style={styles.scroll}
@@ -365,18 +354,7 @@ export default function NotesUploadScreen({ navigation }) {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Volver"
-                >
-                    <Feather name="chevron-left" size={22} color={colors.textDark} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Subir apuntes</Text>
-                <View style={styles.headerPlaceholder} />
-            </View>
+            <AppHeader title="Subir apuntes" onBack={() => navigation.goBack()} />
 
             <View style={styles.cardsWrap}>
                 {SOURCES.map((s) => (
@@ -398,31 +376,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.white,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 27.1,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.xl + spacing.md,
-    },
-    iconBtn: { width: 32, alignItems: 'center' },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(65, 41, 80, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerPlaceholder: { width: 44, height: 44 },
-    headerTitle: {
-        flex: 1,
-        fontFamily: 'Poppins-SemiBold',
-        fontSize: 21.3,
-        color: colors.textDark,
-        textAlign: 'center',
-    },
-
     cardsWrap: {
         paddingHorizontal: 27.1,
         gap: 15,
@@ -453,7 +406,7 @@ const styles = StyleSheet.create({
     // ─── Sesión de captura multipágina ───────────────────────────────────────
     captureBody: {
         padding: spacing.md,
-        paddingTop: spacing.lg,
+        paddingTop: 0,
     },
     captureGrid: {
         flexDirection: 'row',

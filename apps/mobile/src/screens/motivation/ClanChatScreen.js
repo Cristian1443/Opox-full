@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { HeaderBackButton } from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import AvatarPlaceholder from '../../components/AvatarPlaceholder';
 import { motivationApi, api } from '../../api';
@@ -161,14 +161,7 @@ export default function ClanChatScreen({ navigation, route }) {
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backBtn}
-                    onPress={() => navigation.goBack()}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="chevron-back" size={24} color={colors.textDark} />
-                </TouchableOpacity>
+                <HeaderBackButton onPress={() => navigation.goBack()} />
                 <View style={styles.clanAvatar}>
                     <Text style={styles.clanAvatarText}>{clanInfo?.initials || '?'}</Text>
                 </View>
@@ -232,14 +225,6 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.sm,
         backgroundColor: colors.white,
     },
-    backBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F0F0F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     // Figma (ICONO CLAN 2336:912): círculo de 54x54dp exacto.
     clanAvatar: {
         width: 54,
@@ -253,7 +238,7 @@ const styles = StyleSheet.create({
     clanAvatarText: { color: colors.white, fontWeight: '800', fontSize: 24 },
     headerTextWrap: { flexShrink: 1 },
     // Figma (2336:857 "Opo Justicia"): fontSize 21dp exacto.
-    clanName: { color: colors.textDark, fontWeight: '800', fontSize: 21 },
+    clanName: { color: colors.textDark, fontFamily: 'Poppins-SemiBold', fontSize: 21 },
     clanCaption: { color: colors.textMuted, fontSize: 12, marginTop: 1 },
 
     scroll: { flex: 1 },

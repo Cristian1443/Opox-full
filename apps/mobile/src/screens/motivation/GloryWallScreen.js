@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ScreenHeader from '../../components/ScreenHeader';
+import AppHeader from '../../components/AppHeader';
 import { motivationApi } from '../../api';
 
 const AVATAR_COLORS = ['#2BB673', '#2D6FB0', '#7B4BC4', '#E0552F'];
@@ -45,7 +45,7 @@ export default function GloryWallScreen({ navigation, route }) {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#F4F6FA" />
-            <ScreenHeader title="Muro de la Gloria" onBack={() => navigation.goBack()} dark />
+            <AppHeader title="Muro de la Gloria" onBack={() => navigation.goBack()} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
                 <View style={styles.hero}>

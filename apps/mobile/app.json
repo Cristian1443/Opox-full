@@ -17,7 +17,8 @@
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 26
+            "minSdkVersion": 26,
+            "buildArchs": ["arm64-v8a", "armeabi-v7a"]
           }
         }
       ],
@@ -31,7 +32,8 @@
         "expo-camera",
         {
           "cameraPermission": "OPOX necesita acceso a la cámara para capturar tus apuntes o preguntas y resolverlas con IA.",
-          "recordAudioAndroid": false
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
         }
       ],
       [
