@@ -89,7 +89,7 @@ export default function TrainingHomeScreen({ navigation }) {
                         onPress={() => navigation.navigate('Settings')}
                         activeOpacity={0.7}
                     >
-                        <IconGear size={20} color={colors.textDark} />
+                        <IconGear size={22} color={colors.textDark} />
                     </TouchableOpacity>
                 </View>
 

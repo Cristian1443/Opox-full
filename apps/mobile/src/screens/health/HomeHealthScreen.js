@@ -345,7 +345,7 @@ export default function HomeHealthScreen({ navigation }) {
                             onPress={() => Linking.openSettings()}
                             activeOpacity={0.85}
                         >
-                            <Ionicons name="settings-outline" size={20} color={colors.accentOrange} />
+                            <Ionicons name="settings-outline" size={22} color={colors.accentOrange} />
                             <Text style={styles.connectCtaText}>
                                 Activa permisos de salud en Ajustes del dispositivo
                             </Text>

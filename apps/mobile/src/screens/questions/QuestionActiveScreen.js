@@ -783,7 +783,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
           onPress={() => { setIsPaused(true); setShowPauseModal(true); }}
           accessibilityLabel="Pausar sesión"
         >
-          <IconGear size={20} color={colors.textDark} />
+          <IconGear size={22} color={colors.textDark} />
         </TouchableOpacity>
       </View>
 

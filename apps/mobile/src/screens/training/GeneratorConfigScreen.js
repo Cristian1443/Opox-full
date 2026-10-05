@@ -615,7 +615,7 @@ export default function GeneratorConfigScreen({ navigation, route }) {
                     </TouchableOpacity>
                     <Text style={styles.headerTitle} numberOfLines={1}>Zona de entrenamiento</Text>
                     <TouchableOpacity style={styles.settingsButton} hitSlop={12} onPress={() => navigation.navigate('Settings')}>
-                        <IconGear size={20} color={COLORS.purple} />
+                        <IconGear size={22} color={COLORS.purple} />
                     </TouchableOpacity>
                 </View>
                 <Text style={styles.headerSubtitle}>

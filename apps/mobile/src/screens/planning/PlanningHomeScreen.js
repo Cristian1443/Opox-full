@@ -167,7 +167,7 @@ export default function PlanningHomeScreen({ navigation }) {
                     style={styles.iconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    <IconGear size={32} />
+                    <IconGear size={22} />
                 </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>Dividimos el esfuerzo en tres horizontes para no saturarte.</Text>

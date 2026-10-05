@@ -162,7 +162,7 @@ export default function SurgicalTestPreviewScreen({ navigation, route }) {
                 </TouchableOpacity>
                 <Text style={styles.navTitle}>Test quirúrgico</Text>
                 <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-                    <IconGear size={20} color={COLORS.primary} />
+                    <IconGear size={22} color={COLORS.primary} />
                 </TouchableOpacity>
             </View>
 
