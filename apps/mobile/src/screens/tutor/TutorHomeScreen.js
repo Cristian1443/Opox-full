@@ -214,7 +214,7 @@ export default function TutorHomeScreen({ navigation, route }) {
                                     <Text style={styles.recentItemText} numberOfLines={1}>
                                         {conv.title || conv.topic || 'Conversación sin título'}
                                     </Text>
-                                    <Ionicons name="chevron-forward" size={16} color={colors.textDark} style={{ opacity: 0.4 }} />
+                                    <Ionicons name="chevron-forward" size={18} color={colors.textDark} style={{ opacity: 0.4 }} />
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => handleDeleteConversation(conv)}

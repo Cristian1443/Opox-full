@@ -27,7 +27,7 @@ const FIGMA = {
   separator: 'rgba(65, 41, 80, 0.12)',
 };
 
-function ChevronRightIcon({ size = 16, color = FIGMA.textMuted }) {
+function ChevronRightIcon({ size = 18, color = FIGMA.textMuted }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path d="M9 5L16 12L9 19" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />

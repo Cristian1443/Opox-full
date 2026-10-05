@@ -162,7 +162,7 @@ export default function PlanningHomeScreen({ navigation }) {
                         <Text style={styles.objectiveCaption}>{today.completedCount} de {today.goalCount} tests</Text>
                         <Text style={styles.objectiveTitle}>Objetivo diario</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.textDark} />
+                    <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
                 </TouchableOpacity>
 
                 <View style={styles.sectionRow}>

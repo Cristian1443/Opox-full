@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme';
 import AppHeader, { HeaderSettingsButton } from '../../components/AppHeader';
 
@@ -83,7 +83,7 @@ export default function TrainingHomeScreen({ navigation }) {
                                 <Text style={styles.cardSubtitle}>{mode.subtitle}</Text>
                             </View>
 
-                            <Feather name="chevron-right" size={24} color={colors.textDark} />
+                            <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
                         </TouchableOpacity>
                     ))}
                 </View>

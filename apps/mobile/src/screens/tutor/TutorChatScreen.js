@@ -787,7 +787,7 @@ export default function TutorChatScreen({ navigation, route }) {
                                             {new Date(conv.updatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                         </Text>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={16} color="rgba(65,41,80,0.4)" />
+                                    <Ionicons name="chevron-forward" size={18} color="rgba(65,41,80,0.4)" />
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>

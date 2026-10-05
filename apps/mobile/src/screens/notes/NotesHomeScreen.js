@@ -90,7 +90,7 @@ function DocItem({ note, isLast, onPress }) {
                     {note.kind === 'photo' ? 'Foto' : 'PDF'} · {note.pages} {note.pages === 1 ? 'pág' : 'págs'} · {note.questionsCount} preguntas
                 </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textDark} />
+            <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
         </TouchableOpacity>
     );
 }

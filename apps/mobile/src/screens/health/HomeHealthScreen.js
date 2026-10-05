@@ -566,7 +566,7 @@ export default function HomeHealthScreen({ navigation }) {
                             <Text style={styles.tipsTitle}>Consejos</Text>
                             <Text style={styles.tipsSubtitle}>Estudio, alimentación, meditación</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color={colors.textDark} />
+                        <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
                     </TouchableOpacity>
 
                     {/* Wearable como enriquecimiento opcional — nunca gate. Se oculta
@@ -585,7 +585,7 @@ export default function HomeHealthScreen({ navigation }) {
                                     Conéctalo para leer HR y HRV automáticamente. Opcional.
                                 </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={16} color={FIGMA.subtitleMuted} />
+                            <Ionicons name="chevron-forward" size={18} color={FIGMA.subtitleMuted} />
                         </TouchableOpacity>
                     )}
 
