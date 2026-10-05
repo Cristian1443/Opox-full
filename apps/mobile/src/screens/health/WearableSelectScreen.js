@@ -26,6 +26,12 @@ const FIGMA = {
 // `directPair` = iOS → Apple Watch va directo al pairing HealthKit sin guía.
 const BRANDS_IOS = [
     { brand: 'apple',   icon: 'logo-apple',      label: 'Apple Watch',  directPair: true },
+    // En iPhone estas marcas escriben en Apple Salud desde su propia app;
+    // WearableGuide muestra la variante iOS de la guía (GUIDES_IOS).
+    // Fitbit y Samsung no se listan: no sincronizan con Apple Salud de forma nativa.
+    { brand: 'garmin',  icon: 'compass-outline',     label: 'Garmin' },
+    { brand: 'amazfit', icon: 'fitness-outline',     label: 'Amazfit / Zepp' },
+    { brand: 'xiaomi',  icon: 'fitness',             label: 'Xiaomi / Mi Band' },
     { brand: 'other',   icon: 'help-circle-outline', label: 'Otro' },
 ];
 

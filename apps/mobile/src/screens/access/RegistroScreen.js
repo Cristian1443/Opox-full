@@ -16,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 import { authApi } from '../../api';
 import OpoxWordmark from '../../../assets/opoxLogo';
-import * as AppleAuthentication from 'expo-apple-authentication';
 import { GoogleLogo, AppleLogo } from '../../components/icons/SocialAuthIcons';
 import { useSocialAuth } from '../../hooks/useSocialAuth';
 import EmailAlreadyRegisteredModal from '../../components/EmailAlreadyRegisteredModal';
@@ -127,7 +126,9 @@ export default function RegistroScreen({ navigation }) {
     const handleUsarOtroEmail = () => {
         setEmailExistsError(false);
         setEmail('');
-        setTimeout(() => emailInputRef.current?.focus(), 50);
+        // iOS: si se enfoca mientras el Modal (fade) aún se está cerrando, el
+        // teclado no aparece. Esperamos a que termine la animación.
+        setTimeout(() => emailInputRef.current?.focus(), Platform.OS === 'ios' ? 400 : 50);
     };
 
     const { loginWithGoogle, loginWithApple, loginWithFacebook, loading: socialLoading } = useSocialAuth();
@@ -203,6 +204,9 @@ export default function RegistroScreen({ navigation }) {
                             style={s.input}
                             placeholder="Nombre"
                             placeholderTextColor={colors.textDark}
+                            textContentType="name"
+                            autoComplete="name"
+                            returnKeyType="next"
                             value={nombre}
                             onChangeText={setNombre}
                         />
@@ -214,6 +218,10 @@ export default function RegistroScreen({ navigation }) {
                             placeholderTextColor={colors.textDark}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            autoCorrect={false}
+                            textContentType="emailAddress"
+                            autoComplete="email"
+                            returnKeyType="next"
                             value={email}
                             onChangeText={handleEmailChange}
                         />
@@ -224,6 +232,12 @@ export default function RegistroScreen({ navigation }) {
                                 placeholder="Contraseña"
                                 placeholderTextColor={colors.textDark}
                                 secureTextEntry
+                                // iOS: "newPassword" activa la sugerencia de contraseña segura
+                                // del Llavero y evita que iOS la trate como login existente.
+                                textContentType="newPassword"
+                                autoComplete="new-password"
+                                autoCapitalize="none"
+                                autoCorrect={false}
                                 value={password}
                                 onChangeText={handlePasswordChange}
                             />

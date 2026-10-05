@@ -186,6 +186,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
               value={prefs.theme === 'oscuro'}
               onValueChange={(v) => update({ theme: v ? 'oscuro' : 'claro' })}
               trackColor={{ false: '#E2E2E6', true: colors.purple }}
+              ios_backgroundColor="#E2E2E6"
               thumbColor={colors.white}
               accessibilityLabel={`Modo noche ${prefs.theme === 'oscuro' ? 'activado' : 'desactivado'}`}
             />
@@ -220,6 +221,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
             value={prefs.highContrast}
             onValueChange={(v) => update({ highContrast: v })}
             trackColor={{ false: '#E2E2E6', true: colors.purple }}
+            ios_backgroundColor="#E2E2E6"
             thumbColor={colors.white}
             accessibilityLabel={`Alto contraste ${prefs.highContrast ? 'activado' : 'desactivado'}`}
           />
@@ -232,6 +234,7 @@ export default function ConfigAccessibilityScreen({ navigation }) {
             value={prefs.reduceAnimations}
             onValueChange={(v) => update({ reduceAnimations: v })}
             trackColor={{ false: '#E2E2E6', true: colors.purple }}
+            ios_backgroundColor="#E2E2E6"
             thumbColor={colors.white}
             accessibilityLabel={`Reducir animaciones ${prefs.reduceAnimations ? 'activado' : 'desactivado'}`}
           />

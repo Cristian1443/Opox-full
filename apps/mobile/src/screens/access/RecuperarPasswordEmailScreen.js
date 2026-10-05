@@ -71,6 +71,10 @@ export default function RecuperarPasswordEmailScreen({ navigation }) {
                             keyboardType="email-address"
                             autoCapitalize="none"
                             autoCorrect={false}
+                            textContentType="emailAddress"
+                            autoComplete="email"
+                            returnKeyType="send"
+                            onSubmitEditing={handleSendLink}
                             value={email}
                             onChangeText={(text) => {
                                 setEmail(text);

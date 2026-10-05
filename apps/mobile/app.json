@@ -18,7 +18,10 @@
         {
           "android": {
             "minSdkVersion": 26,
-            "buildArchs": ["arm64-v8a", "armeabi-v7a"]
+            "buildArchs": [
+              "arm64-v8a",
+              "armeabi-v7a"
+            ]
           }
         }
       ],
@@ -106,8 +109,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSHealthShareUsageDescription": "OPOX necesita acceso a tus datos de salud para calcular tu nivel de fatiga y optimizar tus sesiones de estudio.",
-        "NSHealthUpdateUsageDescription": "OPOX no escribe datos de salud."
-      }
+        "NSHealthUpdateUsageDescription": "OPOX no escribe datos de salud.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "usesAppleSignIn": true,
+      "requireFullScreen": true
     },
     "android": {
       "package": "com.opox.app",

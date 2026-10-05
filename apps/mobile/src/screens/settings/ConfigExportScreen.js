@@ -136,6 +136,7 @@ export default function ConfigExportScreen({ navigation }) {
               value={includes[key]}
               onValueChange={() => toggleInclude(key)}
               trackColor={{ false: '#E2E2E6', true: colors.purple }}
+              ios_backgroundColor="#E2E2E6"
               thumbColor={colors.white}
               accessibilityLabel={`${label} ${includes[key] ? 'activado' : 'desactivado'}`}
             />

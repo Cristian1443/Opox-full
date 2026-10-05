@@ -66,6 +66,15 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     const scoreRef = useRef(0);
     const startTimeRef = useRef(Date.now());
 
+    // iOS: el swipe-back nativo cerraba el mini-test sin pasar por la
+    // confirmación de handleClose. En cuanto hay progreso se desactiva el gesto
+    // (se alterna entre preguntas, nunca a mitad de un gesto) y la salida
+    // queda solo en el botón "Cerrar test", que sí confirma.
+    const hasProgress = currentIndex > 0 || feedback !== null;
+    useEffect(() => {
+        navigation.setOptions({ gestureEnabled: !hasProgress });
+    }, [navigation, hasProgress]);
+
     // ── Cargar sesión al montar ───────────────────────────────────────────────
     useEffect(() => {
         boeApi.getMiniTest(itemId).then((res) => {

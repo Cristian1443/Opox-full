@@ -138,7 +138,10 @@ function _wait(ms) {
     return new Promise((res) => setTimeout(res, ms));
 }
 
-const PAIRING_TIMEOUT_MS = 15000;
+// iOS: la hoja de autorización de HealthKit es una pantalla completa con un
+// toggle por tipo de dato (7) — el usuario tarda fácilmente >15 s en revisarla
+// y con el timeout corto aparecía el modal de error con la hoja aún abierta.
+const PAIRING_TIMEOUT_MS = Platform.OS === 'ios' ? 120000 : 15000;
 const TIMED_OUT = Symbol('timed-out');
 
 function _timeoutAfter(ms) {
@@ -275,14 +278,26 @@ export default function PairingScreen({ navigation, route }) {
                     <Text style={styles.stateTitle}>Permiso denegado</Text>
                     <Text style={styles.stateSubtitle}>
                         Sin datos de salud no podremos calcular tu nivel de fatiga.{'\n'}
-                        Puedes activarlo más tarde en Ajustes del dispositivo.
+                        {Platform.OS === 'ios'
+                            ? 'Puedes activarlo más tarde en la app Salud → Perfil → Apps → OPOX.'
+                            : 'Puedes activarlo más tarde en Ajustes del dispositivo.'}
                     </Text>
                     <TouchableOpacity
                         style={styles.primaryButton}
-                        onPress={() => Linking.openSettings()}
+                        onPress={() => {
+                            // iOS: los permisos de HealthKit viven en la app Salud,
+                            // no en los ajustes de la app — openSettings no los muestra.
+                            if (Platform.OS === 'ios') {
+                                Linking.openURL('x-apple-health://').catch(() => Linking.openSettings().catch(() => {}));
+                            } else {
+                                Linking.openSettings().catch(() => {});
+                            }
+                        }}
                         activeOpacity={0.85}
                     >
-                        <Text style={styles.primaryButtonText}>Ir a Ajustes</Text>
+                        <Text style={styles.primaryButtonText}>
+                            {Platform.OS === 'ios' ? 'Abrir app Salud' : 'Ir a Ajustes'}
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.skipButton}

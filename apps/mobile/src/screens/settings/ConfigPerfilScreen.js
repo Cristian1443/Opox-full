@@ -10,6 +10,8 @@ import {
     TextInput,
     Alert,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import AppHeader from '../../components/AppHeader';
@@ -282,6 +284,7 @@ export default function ConfigPerfilScreen({ navigation }) {
                 onValueChange={handleBioToggle}
                 disabled={bioLoading}
                 trackColor={{ false: '#E2E2E6', true: colors.purple }}
+                ios_backgroundColor="#E2E2E6"
                 thumbColor={colors.white}
                 accessibilityLabel={`Face ID ${bioEnabled ? 'activado' : 'desactivado'}`}
               />
@@ -299,6 +302,7 @@ export default function ConfigPerfilScreen({ navigation }) {
                 onValueChange={handleBioToggle}
                 disabled={bioLoading}
                 trackColor={{ false: '#E2E2E6', true: colors.purple }}
+                ios_backgroundColor="#E2E2E6"
                 thumbColor={colors.white}
                 accessibilityLabel={`${fingerLabel} ${bioEnabled ? 'activada' : 'desactivada'}`}
               />
@@ -319,6 +323,12 @@ export default function ConfigPerfilScreen({ navigation }) {
         animationType="fade"
         onRequestClose={() => setNameModalVisible(false)}
       >
+        {/* iOS: el Modal no redimensiona con el teclado — sin KAV el botón
+            "Guardar" queda tapado en iPhone pequeños (SE/mini). */}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
         <View style={styles.overlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Editar nombre</Text>
@@ -329,6 +339,10 @@ export default function ConfigPerfilScreen({ navigation }) {
               value={nameInput}
               onChangeText={setNameInput}
               autoFocus
+              textContentType="name"
+              autoComplete="name"
+              returnKeyType="done"
+              onSubmitEditing={handleSaveName}
             />
             <TouchableOpacity
               style={[styles.btn, (!nameInput.trim() || nameSaving) && styles.btnDisabled]}
@@ -351,6 +365,7 @@ export default function ConfigPerfilScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Modal: cambiar oposición ─────────────────────────────────── */}

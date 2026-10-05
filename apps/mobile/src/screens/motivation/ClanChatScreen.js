@@ -6,6 +6,8 @@ import {
     StatusBar,
     ScrollView,
     TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -156,7 +158,14 @@ export default function ClanChatScreen({ navigation, route }) {
         ? `${memberLabel} · ${onlineCount} en línea`
         : memberLabel;
 
+    // iOS no redimensiona la ventana al abrir el teclado (Android sí, adjustResize):
+    // sin KeyboardAvoidingView la barra de escritura quedaba tapada por el teclado.
+    // Va como contenedor más externo (frame.y = 0) para que el offset sea 0.
     return (
+        <KeyboardAvoidingView
+            style={styles.kav}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
@@ -201,6 +210,7 @@ export default function ClanChatScreen({ navigation, route }) {
                     value={draft}
                     onChangeText={setDraft}
                     onSubmitEditing={handleSend}
+                    returnKeyType="send"
                 />
                 <TouchableOpacity style={styles.micBtn} activeOpacity={0.85}>
                     <IconMic size={26} />
@@ -210,10 +220,12 @@ export default function ClanChatScreen({ navigation, route }) {
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
+    kav: { flex: 1, backgroundColor: colors.background },
     container: { flex: 1, backgroundColor: colors.background },
 
     header: {

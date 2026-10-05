@@ -244,6 +244,11 @@ export default function LoginScreen({ navigation, route }) {
                                 placeholderTextColor={colors.textDark}
                                 keyboardType="email-address"
                                 autoCapitalize="none"
+                                autoCorrect={false}
+                                // iOS: habilita autofill de Llavero (usuario) y sugerencia de email.
+                                textContentType="username"
+                                autoComplete="email"
+                                returnKeyType="next"
                                 value={email}
                                 onChangeText={(text) => {
                                     setEmail(text);
@@ -259,6 +264,13 @@ export default function LoginScreen({ navigation, route }) {
                                 placeholder="Contraseña"
                                 placeholderTextColor={colors.textDark}
                                 secureTextEntry={!showPassword}
+                                // iOS: autofill de contraseña desde Llavero / gestores.
+                                textContentType="password"
+                                autoComplete="current-password"
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                returnKeyType="go"
+                                onSubmitEditing={handleLogin}
                                 value={password}
                                 onChangeText={(text) => {
                                     setPassword(text);

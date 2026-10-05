@@ -52,7 +52,11 @@ export const authApi = {
     updateProfile: (input) => api.patch(API_ROUTES.AUTH.PROFILE_UPDATE, input, { auth: true }),
     deleteAccount: async () => {
         const res = await api.delete(API_ROUTES.AUTH.DELETE_ACCOUNT, { auth: true });
-        await Promise.all([api.clearSession(), disableBiometric()]);
+        // Solo se limpia la sesión si el backend confirmó el borrado: si falla
+        // (sin red, 5xx) el usuario debe seguir dentro y poder reintentar.
+        if (!res?.error) {
+            await Promise.all([api.clearSession(), disableBiometric()]);
+        }
         return res;
     },
 };

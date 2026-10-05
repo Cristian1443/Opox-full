@@ -6,6 +6,7 @@ import {
     ScrollView,
     StatusBar,
     Alert,
+    ActivityIndicator,
     Modal,
     Animated,
 } from 'react-native';
@@ -75,6 +76,7 @@ function TrashIcon({ size = 40, color = colors.statRed }) {
 
 export default function ConfigDeleteAccountScreen({ navigation }) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -111,8 +113,21 @@ export default function ConfigDeleteAccountScreen({ navigation }) {
   };
 
   const handleConfirmDelete = async () => {
-    // TODO: DELETE /auth/account — eliminar usuario en Supabase + datos asociados
-    await authApi.deleteAccount();
+    if (deleting) return; // evita doble pulsación
+    setDeleting(true);
+    const res = await authApi.deleteAccount();
+    setDeleting(false);
+    if (res?.error) {
+      closeConfirmModal();
+      // Espera a que cierre el modal: iOS descarta un Alert mostrado durante el cierre.
+      setTimeout(() => {
+        Alert.alert(
+          'No se pudo eliminar la cuenta',
+          res.error.message || 'Inténtalo de nuevo en unos minutos.',
+        );
+      }, 400);
+      return;
+    }
     closeConfirmModal();
     resetToSplash(navigation);
   };
@@ -185,10 +200,13 @@ export default function ConfigDeleteAccountScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.dangerButton}
                 onPress={handleConfirmDelete}
+                disabled={deleting}
                 activeOpacity={0.85}
                 accessibilityLabel="Eliminar definitivamente"
               >
-                <Text style={styles.dangerButtonText}>Eliminar definitivamente</Text>
+                {deleting
+                  ? <ActivityIndicator color={colors.white} />
+                  : <Text style={styles.dangerButtonText}>Eliminar definitivamente</Text>}
               </TouchableOpacity>
 
               <TouchableOpacity

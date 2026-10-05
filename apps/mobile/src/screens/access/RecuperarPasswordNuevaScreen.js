@@ -175,6 +175,12 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
                             placeholder="Nueva contraseña"
                             placeholderTextColor={colors.textDark}
                             secureTextEntry
+                            // iOS: sin textContentType dos campos seguros seguidos se
+                            // tratan como login (autofill erróneo / campo que se vacía).
+                            textContentType="newPassword"
+                            autoComplete="new-password"
+                            autoCapitalize="none"
+                            autoCorrect={false}
                             value={password}
                             onChangeText={handlePasswordChange}
                         />
@@ -184,6 +190,12 @@ export default function RecuperarPasswordNuevaScreen({ navigation, route }) {
                             placeholder="Repite la contraseña"
                             placeholderTextColor={colors.textDark}
                             secureTextEntry
+                            // iOS: sin textContentType dos campos seguros seguidos se
+                            // tratan como login (autofill erróneo / campo que se vacía).
+                            textContentType="newPassword"
+                            autoComplete="new-password"
+                            autoCapitalize="none"
+                            autoCorrect={false}
                             value={confirmPassword}
                             onChangeText={handleConfirmChange}
                         />

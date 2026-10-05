@@ -126,7 +126,15 @@ export default function ConfigHelpScreen({ navigation }) {
         style={styles.kbContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          // iOS: sin esto el primer toque con el teclado abierto solo lo cierra
+          // (hay que pulsar dos veces el botón) y el multiline no tiene forma de
+          // ocultar el teclado.
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           {/* ── Buscador ──────────────────────────────────────────────── */}
           <View style={styles.searchBar}>
             <SearchIcon />

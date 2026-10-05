@@ -7,6 +7,8 @@ import {
     ScrollView,
     Modal,
     TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -118,7 +120,8 @@ export default function ClansListScreen({ navigation }) {
             </ScrollView>
 
             <Modal transparent visible={modalVisible} animationType="fade" onRequestClose={() => setModalVisible(false)}>
-                <View style={styles.overlay}>
+                {/* iOS: el teclado tapaba los inputs de la tarjeta centrada (no hay adjustResize). */}
+                <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>Nuevo clan</Text>
                         <TextInput
@@ -151,7 +154,7 @@ export default function ClansListScreen({ navigation }) {
                             <Text style={styles.cancel}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
 
             <AlertCardModal

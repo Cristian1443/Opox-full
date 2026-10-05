@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import Text from './AppText';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -38,6 +39,10 @@ export default function ToastNotification({
   const translateY = useRef(new Animated.Value(80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const timerRef = useRef(null);
+  // iOS: sin el inset inferior el toast queda pegado/encima del home indicator
+  // (34 pt en iPhone con Face ID). `bottom` absoluto ignora el padding del
+  // SafeAreaView padre.
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) {
@@ -108,7 +113,10 @@ export default function ToastNotification({
   return (
     <Animated.View
       pointerEvents="none"
-      style={[styles.container, { transform: [{ translateY }], opacity }]}
+      style={[
+        styles.container,
+        { bottom: Math.max(spacing.xl, insets.bottom + spacing.md), transform: [{ translateY }], opacity },
+      ]}
     >
       <View style={[styles.pill, { backgroundColor: config.bg }]}>
         <View style={[styles.iconWrap, { backgroundColor: config.iconBg }]}>

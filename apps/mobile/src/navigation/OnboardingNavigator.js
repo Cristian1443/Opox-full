@@ -153,7 +153,9 @@ export default function OnboardingNavigator() {
 
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="SplashNoConnection" component={SplashNoConnectionScreen} />
-            <Stack.Screen name="SplashUpdate" component={SplashUpdateScreen} />
+            {/* iOS no tiene botón atrás físico: el BackHandler de SplashUpdate solo
+                bloquea Android y el swipe-back saltaba la actualización obligatoria. */}
+            <Stack.Screen name="SplashUpdate" component={SplashUpdateScreen} options={{ gestureEnabled: false }} />
             <Stack.Screen name="Icono" component={IconoScreen} />
             <Stack.Screen name="OnboardingSlider" component={OnboardingSliderScreen} />
             <Stack.Screen name="OppositionSelector" component={OppositionSelectorScreen} />
@@ -172,7 +174,9 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="RecuperarPasswordNueva" component={RecuperarPasswordNuevaScreen} />
             <Stack.Screen name="Otp" component={OtpScreen} />
             <Stack.Screen name="Terminos" component={TerminosScreen} />
-            <Stack.Screen name="SesionIniciada" component={SesionIniciadaScreen} />
+            {/* Pantalla transitoria post-login (aplica oposición/intensidad): sin
+                swipe-back en iOS para no interrumpir el Promise.all a medias. */}
+            <Stack.Screen name="SesionIniciada" component={SesionIniciadaScreen} options={{ gestureEnabled: false }} />
 
             {/* Bloque 3 · Salud */}
             <Stack.Screen name="HomeHealth" component={HomeHealthScreen} />

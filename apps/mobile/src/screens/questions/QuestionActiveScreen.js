@@ -11,7 +11,7 @@ import {
     Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
@@ -262,6 +262,9 @@ export default function QuestionActiveScreen({ navigation, route }) {
   // pasar las salidas ya decididas (terminar test, confirmar abandono,
   // etc.) para no mostrar el modal dos veces.
   const allowExitRef = useRef(false);
+  // iOS: el SafeAreaView excluye el borde inferior, así que la fila de
+  // herramientas (Pista / Ley) quedaba sobre el home indicator.
+  const insets = useSafeAreaInsets();
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (allowExitRef.current) return;
@@ -842,7 +845,7 @@ export default function QuestionActiveScreen({ navigation, route }) {
       {/* ── CONTENIDO ── */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.xl + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

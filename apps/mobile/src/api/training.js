@@ -2,7 +2,13 @@ import { api } from './client';
 import { API_ROUTES } from '@opox/constants';
 
 /** Fecha local del dispositivo (YYYY-MM-DD) — para que la racha use la TZ del usuario, no UTC. */
-const localDate = () => new Date().toLocaleDateString('sv');
+// Formato manual (no toLocaleDateString('sv')): el resultado de Intl depende
+// del motor/ICU (Hermes iOS vs Android) y un formato distinto a YYYY-MM-DD
+// rompería la racha y los filtros por día.
+const localDate = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export const trainingApi = {
     listMocks: (oposicion) =>

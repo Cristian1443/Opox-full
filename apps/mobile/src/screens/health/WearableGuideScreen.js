@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     StatusBar,
     Linking,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -98,12 +99,63 @@ const GUIDES = {
     },
 };
 
+// iOS: no existe Health Connect — las apps de cada marca escriben en Apple
+// Salud (HealthKit). Sin `packageName`: el botón "Abrir app" apuntaba a Google
+// Play, que en iPhone no sirve. Rutas aproximadas; pueden variar por versión.
+const GUIDES_IOS = {
+    garmin: {
+        title: 'Garmin Connect',
+        packageName: null,
+        appLabel: null,
+        steps: [
+            'Abre la app Garmin Connect',
+            'Más → Configuración → Apps conectadas → Apple Salud',
+            'Activa: Frecuencia cardíaca, Sueño, VFC, Oxígeno en sangre',
+        ],
+    },
+    amazfit: {
+        title: 'Amazfit / Zepp',
+        packageName: null,
+        appLabel: null,
+        steps: [
+            'Abre la app Zepp',
+            'Perfil → Añadir cuentas → Apple Salud',
+            'Activa: Frecuencia cardíaca, Sueño, VFC, Oxígeno en sangre',
+        ],
+    },
+    xiaomi: {
+        title: 'Xiaomi / Mi Band',
+        packageName: null,
+        appLabel: null,
+        steps: [
+            'Abre la app Mi Fitness',
+            'Perfil → Servicios de terceros → Apple Salud',
+            'Activa: Frecuencia cardíaca, Sueño, VFC, Oxígeno en sangre',
+        ],
+    },
+    other: {
+        title: 'Otro wearable',
+        packageName: null,
+        appLabel: null,
+        steps: [
+            'Abre la app oficial de tu wearable',
+            'Busca "Apple Salud" o "Salud" en los ajustes o integraciones',
+            'Activa la escritura de datos vitales y sueño',
+        ],
+    },
+};
+
+const IS_IOS = Platform.OS === 'ios';
+const HUB_NAME = IS_IOS ? 'Apple Salud' : 'Health Connect';
+
 export default function WearableGuideScreen({ navigation, route }) {
     const brand = route?.params?.brand ?? 'other';
-    const guide = GUIDES[brand] ?? GUIDES.other;
+    const guide = IS_IOS
+        ? (GUIDES_IOS[brand] ?? GUIDES_IOS.other)
+        : (GUIDES[brand] ?? GUIDES.other);
 
     const handleOpenApp = () => {
-        if (!guide.packageName) return;
+        if (!guide.packageName || IS_IOS) return;
         const url = `market://details?id=${guide.packageName}`;
         const fallback = `https://play.google.com/store/apps/details?id=${guide.packageName}`;
         Linking.openURL(url).catch(() => Linking.openURL(fallback).catch(() => {}));
@@ -119,13 +171,14 @@ export default function WearableGuideScreen({ navigation, route }) {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top','left','right']}>
+        // 'bottom' incluido: el footer fijo quedaba bajo el home indicator del iPhone.
+        <SafeAreaView style={styles.container} edges={['top','left','right','bottom']}>
             <StatusBar barStyle="dark-content" />
             <HealthScreenHeader title={guide.title} onBack={() => navigation.goBack()} />
 
             <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
                 <Text style={styles.intro}>
-                    Sigue estos 3 pasos en tu app oficial para que envíe los datos a Health Connect.
+                    Sigue estos 3 pasos en tu app oficial para que envíe los datos a {HUB_NAME}.
                     Después OPOX los leerá automáticamente.
                 </Text>
 
@@ -143,7 +196,7 @@ export default function WearableGuideScreen({ navigation, route }) {
                 <View style={styles.tip}>
                     <Ionicons name="information-circle-outline" size={18} color={colors.bannerPurple} />
                     <Text style={styles.tipText}>
-                        Si no encuentras Health Connect en tu app, revisa que la tengas actualizada.
+                        Si no encuentras {HUB_NAME} en tu app, revisa que la tengas actualizada.
                         Algunas apps antiguas no lo soportan todavía.
                     </Text>
                 </View>

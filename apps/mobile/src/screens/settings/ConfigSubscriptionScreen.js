@@ -45,16 +45,14 @@ const MOCK_SUBSCRIPTION = {
 // Abre los ajustes de suscripciones del sistema operativo.
 // Apple y Google no permiten cancelar/cambiar método de pago desde la app.
 async function openSubscriptionSettings() {
+  // iOS: `canOpenURL('itms-apps://…')` devuelve false si el scheme no está en
+  // LSApplicationQueriesSchemes → siempre caía en "No disponible". Se usa el
+  // enlace https (abre la hoja de suscripciones del App Store) y openURL directo.
   const url = Platform.OS === 'ios'
-    ? 'itms-apps://apps.apple.com/account/subscriptions'
+    ? 'https://apps.apple.com/account/subscriptions'
     : 'https://play.google.com/store/account/subscriptions';
   try {
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) {
-      await Linking.openURL(url);
-    } else {
-      Alert.alert('No disponible', 'Gestiona tu suscripción desde los ajustes de tu dispositivo.');
-    }
+    await Linking.openURL(url);
   } catch {
     Alert.alert('No disponible', 'Gestiona tu suscripción desde los ajustes de tu dispositivo.');
   }

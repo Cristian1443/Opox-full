@@ -160,6 +160,17 @@ function energyLabel(pct) {
 
 const WEARABLE_DECISION_KEY = 'opox.health.wearableDecision';
 
+// Abre el lugar donde viven los permisos de salud. En iOS NO están en los
+// ajustes de la app (Linking.openSettings) sino en la app Salud; intentamos
+// abrirla con su esquema y caemos a los ajustes de la app si falla.
+function openHealthPermissionSettings() {
+    if (Platform.OS === 'ios') {
+        Linking.openURL('x-apple-health://').catch(() => Linking.openSettings().catch(() => {}));
+        return;
+    }
+    Linking.openSettings().catch(() => {});
+}
+
 function todayLocalIso() {
     return new Date().toLocaleDateString('sv');
 }
@@ -186,13 +197,20 @@ export default function HomeHealthScreen({ navigation }) {
                 AsyncStorage.getItem(WEARABLE_DECISION_KEY).catch(() => null),
             ]);
             if (!cancelled) {
+                // iOS: HealthKit nunca revela si el permiso de LECTURA se concedió
+                // (privacidad de Apple) — hasAllHealthPermissions() es siempre false.
+                // Usamos como señal "hay al menos un dato leído": si HealthKit
+                // devuelve algo, los permisos están concedidos de facto.
+                const effectiveGranted = Platform.OS === 'ios'
+                    ? !!data && Object.values(data).some((v) => v != null)
+                    : granted;
                 setMetrics(data);
-                setPermissionsGranted(granted);
+                setPermissionsGranted(effectiveGranted);
                 setCheckin(checkinRes?.data?.checkin ?? null);
                 setWearableDecision(decision);
                 // Si el usuario fue a Ajustes y concedió permisos, limpiar el flag
                 // para que el CTA vuelva a mostrar "conecta tu wearable" (ya no aplica "ajustes").
-                if (skipped && granted) {
+                if (skipped && effectiveGranted) {
                     AsyncStorage.removeItem(HEALTH_PAIRING_SKIPPED_KEY).catch(() => {});
                     setPairingSkipped(false);
                 } else {
@@ -271,7 +289,9 @@ export default function HomeHealthScreen({ navigation }) {
         setHintMetric(null);
         // Navigate en el siguiente tick para que el modal cierre suave antes
         // de la transición de pantalla.
-        setTimeout(() => navigation.navigate('WearableOnboarding'), 150);
+        // iOS: el fade del <Modal> dura ~300 ms; empujar una pantalla nativa
+        // mientras el modal sigue presentado puede dejar la transición colgada.
+        setTimeout(() => navigation.navigate('WearableOnboarding'), Platform.OS === 'ios' ? 350 : 150);
     }, [navigation]);
 
     return (
@@ -342,12 +362,14 @@ export default function HomeHealthScreen({ navigation }) {
                     {pairingSkipped && !permissionsGranted && (
                         <TouchableOpacity
                             style={styles.connectCta}
-                            onPress={() => Linking.openSettings()}
+                            onPress={openHealthPermissionSettings}
                             activeOpacity={0.85}
                         >
                             <Ionicons name="settings-outline" size={22} color={colors.accentOrange} />
                             <Text style={styles.connectCtaText}>
-                                Activa permisos de salud en Ajustes del dispositivo
+                                {Platform.OS === 'ios'
+                                    ? 'Activa el acceso en la app Salud → Perfil → Apps → OPOX'
+                                    : 'Activa permisos de salud en Ajustes del dispositivo'}
                             </Text>
                             <Ionicons name="chevron-forward" size={16} color={colors.accentOrange} />
                         </TouchableOpacity>
@@ -356,7 +378,7 @@ export default function HomeHealthScreen({ navigation }) {
                     {/* Permisos concedidos pero HC vacío — el problema no es OPOX, es que
                         ninguna app está escribiendo señales vitales a Health Connect.
                         Copy explicativo + botón discreto para verificar en HC. */}
-                    {permissionsGranted && !hasWearableData && !pairingSkipped && (
+                    {Platform.OS === 'android' && permissionsGranted && !hasWearableData && !pairingSkipped && (
                         <View style={[styles.connectCta, { alignItems: 'flex-start' }]}>
                             <Ionicons name="information-circle-outline" size={20} color={colors.bannerPurple} style={{ marginTop: 2 }} />
                             <View style={{ flex: 1 }}>

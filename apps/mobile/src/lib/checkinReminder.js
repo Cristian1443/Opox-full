@@ -71,10 +71,14 @@ export async function scheduleCheckinReminder(timeHhmm = DEFAULT_CHECKIN_REMINDE
                 body: '20 segundos y sabrás cómo enfocar tu día de estudio.',
                 data: { screen: 'DailyCheckIn', type: 'daily_reminder' },
             },
+            // `type: 'daily'` obligatorio en expo-notifications SDK 52+. El
+            // formato antiguo `{ hour, minute, repeats }` sin `type` se trataba
+            // como trigger inmediato (iOS: null; Android: canal) → la push
+            // llegaba una sola vez al activar el toggle y nunca más.
             trigger: {
+                type: 'daily',
                 hour: t.hour,
                 minute: t.minute,
-                repeats: true,
                 channelId: 'default',
             },
         });
@@ -108,6 +112,18 @@ export async function ensureCheckinReminderScheduled() {
     const time = await getCheckinReminderTime();
     if (!time) return;
     const existingId = await AsyncStorage.getItem(CHECKIN_REMINDER_ID_KEY).catch(() => null);
-    if (existingId) return; // ya schedule
+    if (existingId) {
+        // Verificar que el ID siga realmente programado en el SO: builds
+        // anteriores guardaban el ID de una notificación que se disparaba al
+        // instante (trigger sin `type`) y ya no existe.
+        const Notifications = await loadNotifications();
+        if (!Notifications) return;
+        try {
+            const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+            if (scheduled?.some((n) => n.identifier === existingId)) return; // ya schedule
+        } catch {
+            return; // ante la duda, no duplicar
+        }
+    }
     await scheduleCheckinReminder(time);
 }

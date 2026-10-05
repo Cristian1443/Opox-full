@@ -7,9 +7,10 @@ import {
     Image,
     Alert,
     ScrollView,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import * as DocumentPicker from 'expo-document-picker';
@@ -129,6 +130,9 @@ export default function NotesUploadScreen({ navigation }) {
     const [captureMode, setCaptureMode] = useState(false);
     const [capturedPhotos, setCapturedPhotos] = useState([]);
     const [uploading, setUploading] = useState(false);
+    // iOS: la barra inferior de la sesión de captura queda bajo el home
+    // indicator si no se suma el inset inferior (SafeAreaView sin borde 'bottom').
+    const insets = useSafeAreaInsets();
 
     // Carga la oposición del perfil del usuario para enviársela al backend.
     useEffect(() => {
@@ -142,9 +146,14 @@ export default function NotesUploadScreen({ navigation }) {
         try {
             // Los assets ya vienen con base64 (ImagePicker base64:true para fotos,
             // o campo base64 inyectado por el caso PDF vía DocumentPicker + FileSystem).
+            // iOS: expo-image-picker SIEMPRE devuelve el base64 re-codificado como
+            // JPEG aunque el original sea HEIC/PNG (asset.mimeType sigue diciendo
+            // 'image/heic'). Se declara el MIME real de los bytes que se envían.
             const files = assets.map((a) => ({
                 base64: a.base64,
-                mimeType: a.mimeType ?? (kind === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+                mimeType: kind !== 'pdf' && Platform.OS === 'ios'
+                    ? 'image/jpeg'
+                    : a.mimeType ?? (kind === 'pdf' ? 'application/pdf' : 'image/jpeg'),
                 sizeBytes: a.size ?? a.fileSize ?? Math.floor((a.base64?.length ?? 0) * 0.75),
             }));
             const rawName = assets[0]?.name ?? assets[0]?.fileName ?? '';
@@ -278,9 +287,14 @@ export default function NotesUploadScreen({ navigation }) {
         );
     };
 
+    // iOS no puede presentar la cámara / el selector de archivos mientras el
+    // Modal de error todavía se está cerrando (UIKit descarta la segunda
+    // presentación sin avisar). Se espera a que termine la animación.
+    const afterModalDismiss = (fn) => setTimeout(fn, Platform.OS === 'ios' ? 400 : 0);
+
     const retryFromError = () => {
         setFormatErrorVisible(false);
-        if (lastAttemptedSource) handleSource(lastAttemptedSource);
+        if (lastAttemptedSource) afterModalDismiss(() => handleSource(lastAttemptedSource));
     };
 
     // ─── Sesión de captura multipágina ───────────────────────────────────────────
@@ -314,7 +328,7 @@ export default function NotesUploadScreen({ navigation }) {
                     </View>
                 </ScrollView>
 
-                <View style={styles.captureActions}>
+                <View style={[styles.captureActions, { paddingBottom: spacing.md + insets.bottom }]}>
                     {count < 20 ? (
                         <TouchableOpacity
                             style={styles.addPageBtn}
@@ -343,7 +357,7 @@ export default function NotesUploadScreen({ navigation }) {
 
                 <NotesFormatErrorModal
                     visible={formatErrorVisible}
-                    onRetry={() => { setFormatErrorVisible(false); addCameraPage(); }}
+                    onRetry={() => { setFormatErrorVisible(false); afterModalDismiss(addCameraPage); }}
                     onCancel={() => setFormatErrorVisible(false)}
                 />
             </SafeAreaView>

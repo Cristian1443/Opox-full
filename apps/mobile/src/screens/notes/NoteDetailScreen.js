@@ -8,9 +8,10 @@ import {
     Image,
     Modal,
     Pressable,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
@@ -186,13 +187,18 @@ export default function NoteDetailScreen({ navigation, route }) {
     const [tagsEditorVisible, setTagsEditorVisible] = useState(false);
     const [menuVisible, setMenuVisible] = useState(false);
 
+    const insets = useSafeAreaInsets();
+
+    // iOS descarta en silencio un <Modal> que se abre en el mismo tick en que
+    // otro se está cerrando (el menú kebab). Se espera a que termine el fade.
+    const afterMenuDismiss = (fn) => setTimeout(fn, Platform.OS === 'ios' ? 350 : 0);
     const openDeleteModal = () => {
         setMenuVisible(false);
-        setDeleteModalVisible(true);
+        afterMenuDismiss(() => setDeleteModalVisible(true));
     };
     const openTagsEditor = () => {
         setMenuVisible(false);
-        setTagsEditorVisible(true);
+        afterMenuDismiss(() => setTagsEditorVisible(true));
     };
     const closeDeleteModal = () => setDeleteModalVisible(false);
 
@@ -279,7 +285,8 @@ export default function NoteDetailScreen({ navigation, route }) {
                 </View>
             </ScrollView>
 
-            <View style={styles.actionSection}>
+            {/* iOS: el CTA quedaba pegado al home indicator (SafeAreaView sin 'bottom'). */}
+            <View style={[styles.actionSection, { paddingBottom: spacing.md + insets.bottom }]}>
                 {note.questionsCount === 0 ? (
                     <Text style={styles.noQuestionsHint}>
                         Este apunte aún no tiene preguntas generadas.
@@ -302,7 +309,9 @@ export default function NoteDetailScreen({ navigation, route }) {
 
             <KebabMenu
                 visible={menuVisible}
-                anchorTop={54}
+                // El Modal en iOS ocupa toda la ventana (incluida la zona del
+                // notch): sin sumar el inset superior el menú tapaba el header.
+                anchorTop={Platform.OS === 'ios' ? insets.top + 54 : 54}
                 onClose={() => setMenuVisible(false)}
                 onEditTags={openTagsEditor}
                 onDelete={openDeleteModal}

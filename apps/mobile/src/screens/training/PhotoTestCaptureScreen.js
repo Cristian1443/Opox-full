@@ -6,6 +6,7 @@ import {
     Dimensions,
     StatusBar,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -61,6 +62,11 @@ function IconRotateArrows({ size, color = COLORS.gray300 }) {
     );
 }
 
+// iOS: expo-image-picker re-codifica SIEMPRE el base64 como JPEG (aunque el
+// archivo sea .png/.heic), así que la extensión del uri no describe los bytes.
+const mimeForPickedImage = (ext) =>
+    (Platform.OS !== 'ios' && ext === 'png' ? 'image/png' : 'image/jpeg');
+
 // ─── Pantalla 6.3 · Foto-Test · Captura ──────────────────────────────────────
 export default function PhotoTestCaptureScreen({ navigation }) {
     const [busy, setBusy] = useState(false);
@@ -106,7 +112,7 @@ export default function PhotoTestCaptureScreen({ navigation }) {
                     uri: asset.uri,
                     source: 'camera',
                     imageBase64: asset.base64,
-                    mimeType: ext === 'png' ? 'image/png' : 'image/jpeg',
+                    mimeType: mimeForPickedImage(ext),
                 });
             }
         } catch (err) {
@@ -131,7 +137,7 @@ export default function PhotoTestCaptureScreen({ navigation }) {
                 uri: asset.uri,
                 source: 'gallery',
                 imageBase64: asset.base64,
-                mimeType: ext === 'png' ? 'image/png' : 'image/jpeg',
+                mimeType: mimeForPickedImage(ext),
             });
         }
     };

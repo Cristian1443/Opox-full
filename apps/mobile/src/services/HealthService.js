@@ -156,7 +156,10 @@ export async function requestHealthPermissions() {
 
     if (Platform.OS === 'ios') {
         try {
-            await HealthKit.requestAuthorization(HK_READ_TYPES, []);
+            // API v13 (Nitro): recibe UN objeto { toRead, toShare }, no dos arrays
+            // posicionales como react-native-health. Con la firma antigua toRead
+            // llegaba undefined y no se pedía ningún permiso.
+            await HealthKit.requestAuthorization({ toRead: HK_READ_TYPES });
             return true;
         } catch (err) {
             console.warn('[HealthService] HealthKit.requestAuthorization error:', err);
@@ -239,32 +242,65 @@ export async function getHealthMetrics() {
 
 // ─── Lectura iOS HealthKit vía @kingstinct/react-native-healthkit ────────────
 
+// API v13 (Nitro) de @kingstinct/react-native-healthkit:
+//  - el rango temporal va en `filter.date.{startDate,endDate}` (no `from`/`to`)
+//  - `limit` es obligatorio (0 o negativo = todas las muestras)
+//  - `QuantitySample.quantity` es un NUMBER directo (no `{ doubleValue }`)
+//  - `CategorySample.value` de SleepAnalysis es numérico (enum
+//    CategoryValueSleepAnalysis), no strings 'ASLEEP_CORE'…
+// Con la forma anterior todas las métricas de iOS salían null.
 async function _hkQuery(typeIdentifier, { from, to, limit = 1, ascending = false } = {}) {
     try {
         const results = await HealthKit.queryQuantitySamples(typeIdentifier, {
-            from,
-            to,
             limit,
             ascending,
+            filter: { date: { startDate: from, endDate: to } },
         });
         return results ?? [];
-    } catch {
+    } catch (err) {
+        console.warn(`[HealthService] queryQuantitySamples(${typeIdentifier}) error:`, err?.message ?? String(err));
         return [];
     }
 }
 
 async function _hkQueryCategory(typeIdentifier, { from, to } = {}) {
     try {
-        return await HealthKit.queryCategorySamples(typeIdentifier, { from, to }) ?? [];
-    } catch {
+        return await HealthKit.queryCategorySamples(typeIdentifier, {
+            limit: 0,
+            ascending: false,
+            filter: { date: { startDate: from, endDate: to } },
+        }) ?? [];
+    } catch (err) {
+        console.warn(`[HealthService] queryCategorySamples(${typeIdentifier}) error:`, err?.message ?? String(err));
         return [];
     }
 }
 
+// Pasos: suma estadística (cumulativeSum) — HealthKit deduplica iPhone +
+// Apple Watch. Sumar muestras crudas contaba dos veces los pasos solapados.
+async function _hkSumSteps({ from, to }) {
+    try {
+        const res = await HealthKit.queryStatisticsForQuantity(
+            'HKQuantityTypeIdentifierStepCount',
+            ['cumulativeSum'],
+            { filter: { date: { startDate: from, endDate: to } } },
+        );
+        const sum = res?.sumQuantity?.quantity;
+        return sum != null && sum > 0 ? Math.round(sum) : null;
+    } catch (err) {
+        console.warn('[HealthService] queryStatisticsForQuantity(StepCount) error:', err?.message ?? String(err));
+        return null;
+    }
+}
+
+// Valores numéricos de HKCategoryValueSleepAnalysis
+const HK_SLEEP_ASLEEP_UNSPECIFIED = 1;
+const HK_SLEEP_STAGES = new Set([3, 4, 5]); // asleepCore, asleepDeep, asleepREM
+
 async function _readAppleMetrics(startDate, endDate) {
     const opts = { from: new Date(startDate), to: new Date(endDate) };
 
-    const [hrSamples, restHrSamples, hrvSamples, spo2Samples, respSamples, sleepSamples, stepSamples] =
+    const [hrSamples, restHrSamples, hrvSamples, spo2Samples, respSamples, sleepSamples, steps] =
         await Promise.all([
             _hkQuery('HKQuantityTypeIdentifierHeartRate', { ...opts, limit: 1, ascending: false }),
             _hkQuery('HKQuantityTypeIdentifierRestingHeartRate', { ...opts, limit: 1, ascending: false }),
@@ -272,11 +308,13 @@ async function _readAppleMetrics(startDate, endDate) {
             _hkQuery('HKQuantityTypeIdentifierOxygenSaturation', { ...opts, limit: 1, ascending: false }),
             _hkQuery('HKQuantityTypeIdentifierRespiratoryRate', { ...opts, limit: 1, ascending: false }),
             _hkQueryCategory('HKCategoryTypeIdentifierSleepAnalysis', opts),
-            _hkQuery('HKQuantityTypeIdentifierStepCount', { ...opts, limit: 100, ascending: false }),
+            _hkSumSteps(opts),
         ]);
 
-    const lastQuantity = (samples) =>
-        samples.length > 0 ? samples[0].quantity?.doubleValue ?? null : null;
+    const lastQuantity = (samples) => {
+        const q = samples.length > 0 ? samples[0]?.quantity : null;
+        return typeof q === 'number' ? q : (q?.doubleValue ?? null);
+    };
 
     const heartRate = lastQuantity(hrSamples) != null
         ? Math.round(lastQuantity(hrSamples))
@@ -291,33 +329,39 @@ async function _readAppleMetrics(startDate, endDate) {
         ? Math.round(lastQuantity(hrvSamples))
         : null;
 
-    // SpO2: HealthKit devuelve en fracción 0–1
+    // SpO2: con la unidad por defecto ('%') HealthKit devuelve fracción 0–1
     const spo2Raw = lastQuantity(spo2Samples);
     const spo2 = spo2Raw != null
         ? Math.round(spo2Raw <= 1 ? spo2Raw * 100 : spo2Raw)
         : null;
 
-    // Respiración: HealthKit devuelve respiraciones por minuto (Number).
+    // Respiración: respiraciones por minuto.
     const respiratoryRate = lastQuantity(respSamples) != null
         ? Math.round(lastQuantity(respSamples))
         : null;
 
-    // Sueño: sumar fases de sueño real (categoryValue 0=InBed, 1=Asleep, 2=Awake; HKSleepAnalysis)
-    // En la API de kingstinct las fases son 'ASLEEP_CORE', 'ASLEEP_DEEP', 'ASLEEP_REM', 'ASLEEP'
+    // Sueño: solo la última noche (muestras que terminan ≤18 h antes del final
+    // de sueño más reciente) — paridad con Android, que coge la sesión más
+    // reciente. Si hay fases (Apple Watch) se usan solo esas; si no, las
+    // muestras "asleepUnspecified" — mezclarlas duplicaría horas.
     let sleepHours = null;
-    if (sleepSamples.length > 0) {
-        const SLEEP_PHASES = new Set(['ASLEEP', 'ASLEEP_CORE', 'ASLEEP_DEEP', 'ASLEEP_REM']);
-        const totalMs = sleepSamples.reduce((acc, s) => {
-            if (!SLEEP_PHASES.has(s.value)) return acc;
-            return acc + (new Date(s.endDate) - new Date(s.startDate));
+    const asleep = sleepSamples.filter(
+        (s) => s.value === HK_SLEEP_ASLEEP_UNSPECIFIED || HK_SLEEP_STAGES.has(s.value),
+    );
+    if (asleep.length > 0) {
+        const hasStages = asleep.some((s) => HK_SLEEP_STAGES.has(s.value));
+        const pool = asleep.filter((s) =>
+            hasStages ? HK_SLEEP_STAGES.has(s.value) : s.value === HK_SLEEP_ASLEEP_UNSPECIFIED,
+        );
+        const latestEnd = Math.max(...pool.map((s) => new Date(s.endDate).getTime()));
+        const windowStart = latestEnd - 18 * 60 * 60 * 1000;
+        const totalMs = pool.reduce((acc, s) => {
+            const end = new Date(s.endDate).getTime();
+            if (end < windowStart) return acc;
+            return acc + Math.max(0, end - new Date(s.startDate).getTime());
         }, 0);
         if (totalMs > 0) sleepHours = Math.round((totalMs / 3_600_000) * 10) / 10;
     }
-
-    // Pasos: sumar todos los registros del periodo
-    const steps = stepSamples.length > 0
-        ? stepSamples.reduce((acc, s) => acc + (s.quantity?.doubleValue ?? 0), 0)
-        : null;
 
     return { heartRate, restingHeartRate, hrv, spo2, respiratoryRate, sleepHours, steps };
 }

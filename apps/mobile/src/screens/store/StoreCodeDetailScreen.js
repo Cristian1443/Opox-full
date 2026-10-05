@@ -81,8 +81,9 @@ export default function StoreCodeDetailScreen({ navigation, route }) {
 
   const handleCopyCode = async () => {
     try {
-      await Share.share({ message: codeData.code });
-      setCopied(true);
+      const result = await Share.share({ message: codeData.code });
+      // iOS devuelve dismissedAction si el usuario cierra la hoja sin copiar.
+      if (result?.action !== Share.dismissedAction) setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch (_) {}
   };

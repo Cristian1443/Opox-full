@@ -94,7 +94,15 @@ export default function ConfigFeedbackScreen({ navigation }) {
           onBack={() => navigation.goBack()}
         />
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          // iOS: sin esto el primer toque con el teclado abierto solo lo cierra
+          // (hay que pulsar dos veces el botón) y el multiline no tiene forma de
+          // ocultar el teclado.
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           {/* ── Tipo ──────────────────────────────────────────────────── */}
           <Text style={styles.sectionLabel}>TIPO</Text>
           <View style={styles.segmentedRow}>

@@ -9,6 +9,7 @@ import {
     Alert,
     ActivityIndicator,
     Platform,
+    KeyboardAvoidingView,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -92,6 +93,8 @@ export default function PlanningAgendaScreen({ navigation }) {
         setSelectedDate(null);
         setTempDate(new Date());
         setForm({ title: '', subtitle: '' });
+        // iOS: el picker vive dentro de la tarjeta; si quedó abierto al cerrar, se reinicia.
+        setPickerVisible(false);
         setModalVisible(true);
     };
 
@@ -200,9 +203,37 @@ export default function PlanningAgendaScreen({ navigation }) {
             </ScrollView>
 
             {/* ── Modal: nueva fecha ─────────────────────────────────────── */}
+            {/* iOS: el picker se renderiza DENTRO de esta misma tarjeta (no en un
+                segundo <Modal> hermano). En iOS un Modal hermano no se presenta mientras
+                otro Modal está visible ("already presenting") y el selector no aparecía.
+                KeyboardAvoidingView evita que el teclado tape los inputs en iPhone. */}
             <Modal transparent visible={modalVisible} animationType="fade" onRequestClose={() => setModalVisible(false)}>
-                <View style={styles.overlay}>
+                <KeyboardAvoidingView
+                    style={styles.overlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
                     <View style={styles.modalCard}>
+                        {Platform.OS === 'ios' && pickerVisible ? (
+                            <>
+                                <Text style={styles.pickerTitle}>Seleccionar fecha</Text>
+                                <DateTimePicker
+                                    value={tempDate}
+                                    mode="date"
+                                    display="spinner"
+                                    onChange={handlePickerChange}
+                                    locale="es-ES"
+                                    themeVariant="light"
+                                    textColor={colors.textDark}
+                                />
+                                <TouchableOpacity style={[styles.btn, { marginTop: 12 }]} onPress={confirmIosPicker} activeOpacity={0.85}>
+                                    <Text style={styles.btnText}>Confirmar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => setPickerVisible(false)} style={{ marginTop: 8 }}>
+                                    <Text style={styles.cancel}>Cancelar</Text>
+                                </TouchableOpacity>
+                            </>
+                        ) : (
+                        <>
                         <Text style={styles.modalTitle}>Nueva fecha</Text>
 
                         <TextInput
@@ -247,8 +278,10 @@ export default function PlanningAgendaScreen({ navigation }) {
                         <TouchableOpacity onPress={() => setModalVisible(false)} style={{ marginTop: 8 }}>
                             <Text style={styles.cancel}>Cancelar</Text>
                         </TouchableOpacity>
+                        </>
+                        )}
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
 
             {/* ── DateTimePicker nativo ──────────────────────────────────── */}
@@ -262,29 +295,6 @@ export default function PlanningAgendaScreen({ navigation }) {
                 />
             )}
 
-            {/* iOS: envuelto en modal de confirmación */}
-            {Platform.OS === 'ios' && (
-                <Modal transparent visible={pickerVisible} animationType="slide" onRequestClose={() => setPickerVisible(false)}>
-                    <View style={styles.pickerOverlay}>
-                        <View style={styles.pickerCard}>
-                            <Text style={styles.pickerTitle}>Seleccionar fecha</Text>
-                            <DateTimePicker
-                                value={tempDate}
-                                mode="date"
-                                display="spinner"
-                                onChange={handlePickerChange}
-                                locale="es-ES"
-                            />
-                            <TouchableOpacity style={[styles.btn, { marginTop: 12 }]} onPress={confirmIosPicker} activeOpacity={0.85}>
-                                <Text style={styles.btnText}>Confirmar</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setPickerVisible(false)} style={{ marginTop: 8 }}>
-                                <Text style={styles.cancel}>Cancelar</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </Modal>
-            )}
         </SafeAreaView>
     );
 }
@@ -324,8 +334,6 @@ const styles = StyleSheet.create({
     btn: { backgroundColor: colors.ctaGreen, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
     btnText: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: colors.white },
     cancel: { textAlign: 'center', fontFamily: 'Poppins-SemiBold', color: FIGMA.textNote, fontSize: 12 },
-    // Modal picker iOS
-    pickerOverlay: { flex: 1, backgroundColor: 'rgba(15,27,51,0.45)', justifyContent: 'flex-end' },
-    pickerCard: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 36 },
+    // Picker iOS (inline dentro de la tarjeta)
     pickerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: colors.textDark, textAlign: 'center', marginBottom: 8 },
 });

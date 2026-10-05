@@ -72,7 +72,11 @@ export async function scheduleAgendaReminders(agendaId, title, eventDateIso) {
                     body: notificationBody(title, days),
                     data: { agendaId, kind: 'agenda_reminder' },
                 },
-                trigger: { date: trigger, channelId: 'default' },
+                // `type` es obligatorio en expo-notifications SDK 52+. Sin él, un
+                // trigger con solo `channelId` se interpreta como "disparar YA"
+                // (iOS: trigger null; Android: trigger de canal) → las 3
+                // notificaciones llegaban de golpe al crear la fecha.
+                trigger: { type: 'date', date: trigger, channelId: 'default' },
             });
             identifiers.push(id);
         } catch (err) {

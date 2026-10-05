@@ -51,7 +51,11 @@ export default function RecuperarPasswordEnviadoScreen({ route, navigation }) {
         const isYahoo   = /yahoo\./.test(domain);
 
         if (Platform.OS === 'ios') {
-            // iOS: Apple Mail es el único scheme universal de bandeja
+            // iOS: si el dominio sugiere Gmail/Outlook, probar su app (openURL
+            // rechaza si no está instalada, sin necesitar LSApplicationQueriesSchemes).
+            // Después Apple Mail, único scheme universal de bandeja.
+            if (isGmail   && await tryOpen('googlegmail://')) return;
+            if (isOutlook && await tryOpen('ms-outlook://')) return;
             if (await tryOpen('message://')) return;
         } else {
             // Android: solo intentar el scheme de la app que coincide con el

@@ -37,8 +37,11 @@ export default function StoreAffiliateScreen({ navigation }) {
 
   const handleCopyLink = async () => {
     try {
-      await Share.share({ message: shareMessage, url: AFFILIATE_DATA.userLink });
-      setCopied(true);
+      // Sin `url`: en iOS se comparten `message` + `url` por separado y el enlace
+      // salía duplicado (ya va dentro de `message`).
+      const result = await Share.share({ message: shareMessage });
+      // iOS devuelve dismissedAction si el usuario cierra la hoja sin compartir.
+      if (result?.action !== Share.dismissedAction) setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch (_) {
       // El usuario cerró el share sheet sin compartir — no es un error

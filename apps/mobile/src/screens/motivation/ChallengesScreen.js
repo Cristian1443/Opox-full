@@ -8,6 +8,8 @@ import {
     Modal,
     TextInput,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -207,7 +209,8 @@ export default function ChallengesScreen({ navigation, route }) {
 
             {/* ─── Wizard modal ──────────────────────────────────────────────── */}
             <Modal transparent visible={wizardVisible} animationType="fade" onRequestClose={() => setWizardVisible(false)}>
-                <View style={styles.overlay}>
+                {/* iOS: el teclado tapaba los inputs de la tarjeta centrada (no hay adjustResize). */}
+                <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                     <View style={styles.modalCard}>
                         {/* Cabecera del wizard */}
                         <View style={styles.wizardHeader}>
@@ -302,7 +305,7 @@ export default function ChallengesScreen({ navigation, route }) {
                             <Text style={styles.cancel}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </SafeAreaView>
     );

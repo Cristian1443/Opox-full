@@ -8,6 +8,7 @@ import {
     View,
     TouchableOpacity,
     StyleSheet,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from './AppText';
@@ -45,7 +46,7 @@ export default function NoDataHintModal({ visible, metricName = 'Este dato', onC
 
                     <Text style={styles.body}>
                         Este dato solo se puede medir con un reloj o pulsera
-                        sincronizada con Health Connect. Sin sensor físico no hay
+                        sincronizada con {Platform.OS === 'ios' ? 'Apple Salud' : 'Health Connect'}. Sin sensor físico no hay
                         forma de calcularlo.
                     </Text>
                     <Text style={styles.bodySecondary}>

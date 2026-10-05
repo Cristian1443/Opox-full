@@ -194,6 +194,7 @@ export default function ConfigToneScreen({ navigation }) {
             value={tone.hintStyle === 'directas'}
             onValueChange={(on) => update({ hintStyle: on ? 'directas' : 'socraticas' })}
             trackColor={{ false: '#E2E2E6', true: 'rgba(65, 41, 80, 0.35)' }}
+            ios_backgroundColor="#E2E2E6"
             thumbColor={tone.hintStyle === 'directas' ? colors.textDark : colors.white}
             accessibilityLabel="Pistas más directas"
           />

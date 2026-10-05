@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { api } from '../api/client';
 import { supabase } from '../lib/supabase';
 
@@ -52,7 +53,11 @@ export function useSocialAuth() {
             if (!supabase) throw new Error('Supabase no configurado. Comprueba las variables EXPO_PUBLIC_SUPABASE_*.');
 
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-            await GoogleSignin.signIn();
+            // v16: signIn() ya NO lanza al cancelar — resuelve { type: 'cancelled' }.
+            // Sin este guard llamábamos getTokens() sin usuario y mostrábamos un
+            // error al usuario que solo había cerrado la hoja de Google.
+            const signInRes = await GoogleSignin.signIn();
+            if (signInRes?.type === 'cancelled') return { data: null, error: null };
             const { idToken } = await GoogleSignin.getTokens();
             if (!idToken) throw new Error('Google no devolvió idToken.');
 
@@ -101,6 +106,14 @@ export function useSocialAuth() {
             if (error) throw error;
 
             const mapped = mapSupabaseSession(data.session, data.user);
+            // Apple solo entrega el nombre en el PRIMER inicio de sesión y no lo
+            // incluye en el identityToken — si no lo guardamos ahora se pierde.
+            const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+                .filter(Boolean).join(' ').trim();
+            if (fullName && !mapped.user.displayName) {
+                mapped.user.displayName = fullName;
+                supabase.auth.updateUser({ data: { full_name: fullName } }).catch(() => {});
+            }
             await api.saveSession(mapped);
             return { data: mapped, error: null };
         } catch (err) {
@@ -117,20 +130,44 @@ export function useSocialAuth() {
         try {
             if (!supabase) throw new Error('Supabase no configurado. Comprueba las variables EXPO_PUBLIC_SUPABASE_*.');
 
-            const { LoginManager, AccessToken } = require('react-native-fbsdk-next');
-            const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
-            if (result.isCancelled) return { data: null, error: null };
+            const { LoginManager, AccessToken, AuthenticationToken } = require('react-native-fbsdk-next');
 
-            const tokenData = await AccessToken.getCurrentAccessToken();
-            if (!tokenData?.accessToken) throw new Error('Facebook no devolvió access token.');
+            let idTokenParams;
+            if (Platform.OS === 'ios') {
+                // iOS (Facebook SDK 17+): sin permiso ATT concedido el SDK hace
+                // SIEMPRE "Limited Login" y AccessToken.getCurrentAccessToken()
+                // devuelve null → el login fallaba con "no devolvió access token".
+                // Usamos Limited Login explícito con nonce y el token OIDC (JWT),
+                // que es lo que Supabase valida en signInWithIdToken. Al SDK se le
+                // pasa el SHA-256 del nonce; a Supabase el nonce en claro (lo hashea
+                // y lo compara con el claim del JWT).
+                const rawNonce = Crypto.randomUUID();
+                const hashedNonce = await Crypto.digestStringAsync(
+                    Crypto.CryptoDigestAlgorithm.SHA256,
+                    rawNonce,
+                );
+                const result = await LoginManager.logInWithPermissions(
+                    ['public_profile', 'email'],
+                    'limited',
+                    hashedNonce,
+                );
+                if (result.isCancelled) return { data: null, error: null };
+                const authToken = await AuthenticationToken.getAuthenticationTokenIOS();
+                if (!authToken?.authenticationToken) throw new Error('Facebook no devolvió token de autenticación.');
+                idTokenParams = { provider: 'facebook', token: authToken.authenticationToken, nonce: rawNonce };
+            } else {
+                const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+                if (result.isCancelled) return { data: null, error: null };
 
-            // Supabase acepta el access token de Facebook como token en signInWithIdToken.
+                const tokenData = await AccessToken.getCurrentAccessToken();
+                if (!tokenData?.accessToken) throw new Error('Facebook no devolvió access token.');
+                // Supabase acepta el access token de Facebook como token en signInWithIdToken.
+                idTokenParams = { provider: 'facebook', token: tokenData.accessToken };
+            }
+
             // Requiere que el proveedor Facebook esté habilitado en Supabase Dashboard
             // → Authentication → Providers → Facebook → App ID + App Secret.
-            const { data, error } = await supabase.auth.signInWithIdToken({
-                provider: 'facebook',
-                token: tokenData.accessToken,
-            });
+            const { data, error } = await supabase.auth.signInWithIdToken(idTokenParams);
             if (error) throw error;
 
             const mapped = mapSupabaseSession(data.session, data.user);

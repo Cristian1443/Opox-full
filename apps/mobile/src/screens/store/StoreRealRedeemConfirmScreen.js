@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     StatusBar,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -162,7 +163,10 @@ export default function StoreRealRedeemConfirmScreen({ navigation, route }) {
         primaryColor={colors.accentOrange}
         onPrimaryPress={() => {
           setShowDeclined(false);
-          handleConfirm();
+          // iOS: si el reintento falla rápido (p. ej. sin red), volver a mostrar el
+          // modal mientras aún se está cerrando hace que iOS lo descarte en silencio.
+          // Se espera a que termine la animación de cierre antes de reintentar.
+          setTimeout(handleConfirm, Platform.OS === 'ios' ? 400 : 0);
         }}
         secondaryLabel="Cancelar"
         onSecondaryPress={() => setShowDeclined(false)}

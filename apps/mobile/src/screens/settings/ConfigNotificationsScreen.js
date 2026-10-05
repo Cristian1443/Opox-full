@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  StyleSheet, ScrollView, StatusBar, Switch, Platform,
+  StyleSheet, ScrollView, StatusBar, Switch, Platform, View, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -30,6 +30,10 @@ function parseTimeToDate(hhmm) {
 export default function ConfigNotificationsScreen({ navigation }) {
   const [reminderTime, setReminderTime] = useState(null); // 'HH:MM' | null
   const [showTimePicker, setShowTimePicker] = useState(false);
+  // iOS: el spinner dispara onChange en CADA giro de rueda. Guardamos un
+  // borrador y solo programamos al pulsar "Guardar" (antes se cerraba y se
+  // reprogramaba la notificación al primer tick del spinner).
+  const [draftDate, setDraftDate] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,17 +53,35 @@ export default function ConfigNotificationsScreen({ navigation }) {
     }
   }, []);
 
-  const handleTimeChange = useCallback(async (event, selectedDate) => {
-    // iOS: el picker es modal — cerrar solo en 'set'
-    if (Platform.OS === 'android') setShowTimePicker(false);
-    if (event?.type === 'dismissed' || !selectedDate) return;
-    const hh = String(selectedDate.getHours()).padStart(2, '0');
-    const mm = String(selectedDate.getMinutes()).padStart(2, '0');
+  const applyTime = useCallback(async (date) => {
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
     const time = `${hh}:${mm}`;
     const ok = await scheduleCheckinReminder(time);
     if (ok) setReminderTime(time);
-    if (Platform.OS === 'ios') setShowTimePicker(false);
   }, []);
+
+  const openTimePicker = useCallback(() => {
+    setDraftDate(parseTimeToDate(reminderTime ?? DEFAULT_CHECKIN_REMINDER_TIME));
+    setShowTimePicker(true);
+  }, [reminderTime]);
+
+  const handleTimeChange = useCallback(async (event, selectedDate) => {
+    if (Platform.OS === 'ios') {
+      // iOS: solo actualizar el borrador; se confirma con "Guardar".
+      if (selectedDate) setDraftDate(selectedDate);
+      return;
+    }
+    // Android: diálogo nativo — un único evento 'set' o 'dismissed'.
+    setShowTimePicker(false);
+    if (event?.type === 'dismissed' || !selectedDate) return;
+    await applyTime(selectedDate);
+  }, [applyTime]);
+
+  const handleIosConfirm = useCallback(async () => {
+    setShowTimePicker(false);
+    if (draftDate) await applyTime(draftDate);
+  }, [draftDate, applyTime]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -77,6 +99,7 @@ export default function ConfigNotificationsScreen({ navigation }) {
               value={!!reminderTime}
               onValueChange={toggleReminder}
               trackColor={{ false: '#E2E2E6', true: colors.purple }}
+              ios_backgroundColor="#E2E2E6"
               thumbColor={colors.white}
               accessibilityLabel={`Recordatorio del Estado del día ${reminderTime ? 'activado' : 'desactivado'}`}
             />
@@ -85,19 +108,33 @@ export default function ConfigNotificationsScreen({ navigation }) {
         {reminderTime && (
           <SettingsRow
             label="Hora del recordatorio"
-            onPress={() => setShowTimePicker(true)}
+            onPress={openTimePicker}
             right={<Text style={styles.timeValue}>{reminderTime}</Text>}
           />
         )}
 
         {showTimePicker && (
           <DateTimePicker
-            value={parseTimeToDate(reminderTime ?? DEFAULT_CHECKIN_REMINDER_TIME)}
+            value={draftDate ?? parseTimeToDate(reminderTime ?? DEFAULT_CHECKIN_REMINDER_TIME)}
             mode="time"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             is24Hour
+            locale="es-ES"
+            // iOS: la app fuerza tema claro; sin esto el spinner hereda el
+            // modo oscuro del sistema y pinta texto blanco sobre fondo blanco.
+            themeVariant="light"
             onChange={handleTimeChange}
           />
+        )}
+        {showTimePicker && Platform.OS === 'ios' && (
+          <View style={styles.iosPickerActions}>
+            <TouchableOpacity onPress={() => setShowTimePicker(false)} hitSlop={8}>
+              <Text style={styles.iosPickerCancel}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleIosConfirm} hitSlop={8}>
+              <Text style={styles.iosPickerConfirm}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -119,6 +156,23 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     paddingHorizontal: spacing.lg + 8,
     marginBottom: 4,
+  },
+  iosPickerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 24,
+    paddingHorizontal: spacing.lg + 8,
+    paddingVertical: 8,
+  },
+  iosPickerCancel: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 15,
+    color: colors.textDark,
+  },
+  iosPickerConfirm: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 15,
+    color: colors.purple,
   },
   timeValue: {
     fontFamily: 'Poppins-Bold',

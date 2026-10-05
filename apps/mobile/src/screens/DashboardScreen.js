@@ -524,6 +524,18 @@ export default function DashboardScreen({ navigation }) {
     const [healthCheckin, setHealthCheckin] = useState(null);
     const [realNudgeVisible, setRealNudgeVisible] = useState(false);
     const [isResumingMock, setIsResumingMock] = useState(false);
+    // iOS: dos <Modal> visibles a la vez (alerta BOE + nudge real) → UIKit no
+    // presenta el segundo ("presentation in progress") y queda colgado. El nudge
+    // real espera a que la alerta BOE se cierre y termine su animación.
+    const [modalSlotFree, setModalSlotFree] = useState(true);
+    useEffect(() => {
+        if (staleAlertVisible) {
+            setModalSlotFree(false);
+            return undefined;
+        }
+        const t = setTimeout(() => setModalSlotFree(true), 400);
+        return () => clearTimeout(t);
+    }, [staleAlertVisible]);
     const nudgeShownRef = useRef(false);
 
     const loadData = useCallback(() => {
@@ -992,7 +1004,7 @@ export default function DashboardScreen({ navigation }) {
             />
 
             {/* Nudge real pendiente del backend (2.4) — no se muestra a la vez que la demo */}
-            {!nudge && realNudgeVisible && realNudge && realNudgeVisuals && (
+            {!nudge && modalSlotFree && !staleAlertVisible && realNudgeVisible && realNudge && realNudgeVisuals && (
                 <NudgeModal
                     visible={realNudgeVisible}
                     iconBg={realNudgeVisuals.iconBg}

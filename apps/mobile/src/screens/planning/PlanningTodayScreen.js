@@ -6,9 +6,11 @@ import {
     ScrollView,
     Modal,
     TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -98,6 +100,9 @@ export default function PlanningTodayScreen({ navigation }) {
     const [completedPopup, setCompletedPopup] = useState(null); // { streak, points } | null
     const [toastPoints, setToastPoints] = useState(0);
 
+    // iOS: el SafeAreaView excluye el borde inferior; el CTA fijo necesita el inset
+    // para no quedar bajo el home indicator en iPhone sin botón físico.
+    const insets = useSafeAreaInsets();
     const [addVisible, setAddVisible] = useState(false);
     const [taskType, setTaskType] = useState('test');
     const [topics, setTopics] = useState([]);
@@ -259,7 +264,7 @@ export default function PlanningTodayScreen({ navigation }) {
 
             {pending && (
                 <TouchableOpacity
-                    style={styles.ctaButton}
+                    style={[styles.ctaButton, { marginBottom: spacing.md + insets.bottom }]}
                     onPress={() => (pendingTestParams ? handleStartTask(pending) : handleToggle(pending))}
                     activeOpacity={0.85}
                 >
@@ -283,7 +288,8 @@ export default function PlanningTodayScreen({ navigation }) {
             {/* Modal de nueva tarea — sin datos de Figma para este flujo, estilo
                 mínimo reutilizando los tokens del sistema. */}
             <Modal transparent visible={addVisible} animationType="fade" onRequestClose={() => setAddVisible(false)}>
-                <View style={styles.overlay}>
+                {/* iOS: el teclado tapaba los inputs de la tarjeta centrada (no hay adjustResize). */}
+                <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>Nueva tarea</Text>
 
@@ -389,7 +395,7 @@ export default function PlanningTodayScreen({ navigation }) {
                             <Text style={styles.cancel}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
             <OpoToast points={toastPoints} subtitle="Por completar la tarea" />
         </SafeAreaView>

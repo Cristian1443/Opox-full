@@ -160,6 +160,13 @@ export default function NotesAnalysisScreen({ navigation, route }) {
     const [questionsCount, setQuestionsCount] = useState(0);
     const timersRef = useRef({ timers: [], doneTimer: null });
 
+    // iOS no tiene botón físico de atrás: el BackHandler de abajo solo cubre
+    // Android y el swipe-back nativo sacaba al usuario del análisis sin pasar
+    // por el modal de confirmación. Se desactiva el gesto en esta pantalla.
+    useEffect(() => {
+        navigation.setOptions({ gestureEnabled: false });
+    }, [navigation]);
+
     useEffect(() => {
         // Si tenemos noteId real, polling al backend cada 1.2s. Si no, timeline mock.
         const backSub = BackHandler.addEventListener('hardwareBackPress', () => {

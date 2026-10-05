@@ -108,7 +108,8 @@ export default function DailyCheckInScreen({ navigation }) {
     const { emoji, label } = moodLabel(mood);
 
     return (
-        <SafeAreaView style={styles.container} edges={['top','left','right']}>
+        // 'bottom' incluido: el CTA fijo del footer quedaba bajo el home indicator del iPhone.
+        <SafeAreaView style={styles.container} edges={['top','left','right','bottom']}>
             <StatusBar barStyle="dark-content" />
             <HealthScreenHeader
                 title="Estado del día"

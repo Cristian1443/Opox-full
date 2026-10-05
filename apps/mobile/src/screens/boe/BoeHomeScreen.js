@@ -11,6 +11,7 @@ import {
     Modal,
     FlatList,
     Alert,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -382,7 +383,13 @@ export default function BoeHomeScreen({ navigation }) {
                     setSearchResults([]);
                 }}
             >
-                <SafeAreaView style={styles.modalContainer} edges={['top', 'left', 'right']}>
+                {/* iOS pageSheet: la hoja ya empieza bajo la status bar, pero
+                    safe-area-context sigue reportando el inset superior de la
+                    ventana → hueco blanco extra arriba. Solo se aplica en Android. */}
+                <SafeAreaView
+                    style={styles.modalContainer}
+                    edges={Platform.OS === 'ios' ? ['left', 'right'] : ['top', 'left', 'right']}
+                >
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalTitle}>Añadir norma</Text>
                         <TouchableOpacity
@@ -431,6 +438,8 @@ export default function BoeHomeScreen({ navigation }) {
                     ) : (
                         <FlatList
                             data={searchResults}
+                            // Con el teclado abierto, "Seguir" necesitaba dos toques.
+                            keyboardShouldPersistTaps="handled"
                             keyExtractor={item => item.id ?? item.identificador_boe ?? item.identificador}
                             contentContainerStyle={{ padding: spacing.md }}
                             renderItem={({ item }) => (

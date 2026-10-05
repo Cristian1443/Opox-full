@@ -61,6 +61,12 @@ const FIGMA = {
 };
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
+// En iOS no se puede presentar un Share sheet ni un Alert mientras un <Modal>
+// se está cerrando (UIKit ya tiene un view controller presentado y descarta el
+// segundo en silencio). Se espera a que termine la animación de cierre.
+const MODAL_DISMISS_DELAY_MS = Platform.OS === 'ios' ? 350 : 0;
+const afterModalDismiss = (fn) => setTimeout(fn, MODAL_DISMISS_DELAY_MS);
+
 const nowTime = () =>
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -568,24 +574,33 @@ export default function TutorChatScreen({ navigation, route }) {
         topicTitleRef.current = null;
     }, [technique]);
 
-    const handleShareChat = useCallback(async () => {
+    const handleShareChat = useCallback(() => {
         setOptionsVisible(false);
         // Serialización simple del chat como texto plano legible. Se omite el
         // saludo automático inicial cuando el usuario no ha enviado nada.
         const hasUserMessage = messages.some((m) => !m.isAI);
         if (!hasUserMessage) {
-            Alert.alert('Nada para compartir', 'Envía algún mensaje al Tutor antes de compartir.');
+            afterModalDismiss(() =>
+                Alert.alert('Nada para compartir', 'Envía algún mensaje al Tutor antes de compartir.'),
+            );
             return;
         }
+        // Solo mensajes con texto (las tarjetas de configuración no tienen `text`
+        // y antes salían como "[Tutor] undefined").
         const transcript = messages
+            .filter((m) => typeof m.text === 'string' && m.text.length > 0)
             .map((m) => `${m.isAI ? '[Tutor]' : '[Tú]'} ${m.text}`)
             .join('\n\n');
-        try {
-            await Share.share({
-                title: 'Conversación con el Tutor IA de OPOX',
-                message: `Conversación con el Tutor IA de OPOX\n\n${transcript}`,
-            });
-        } catch { /* usuario canceló el sheet o falló el share — ignorar */ }
+        // iOS: esperar a que el Modal de opciones termine de cerrarse antes de
+        // presentar el Share sheet; si no, UIKit lo descarta sin error.
+        afterModalDismiss(async () => {
+            try {
+                await Share.share({
+                    title: 'Conversación con el Tutor IA de OPOX',
+                    message: `Conversación con el Tutor IA de OPOX\n\n${transcript}`,
+                });
+            } catch { /* usuario canceló el sheet o falló el share — ignorar */ }
+        });
     }, [messages]);
 
     const handleOpenHistory = useCallback(() => {
@@ -718,7 +733,13 @@ export default function TutorChatScreen({ navigation, route }) {
     }, [navigation, addMessage, sendToApi]);
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        // iOS: se incluye el borde inferior para que la barra de entrada no quede
+        // bajo el home indicator. El KeyboardAvoidingView (offset 0: no hay header
+        // nativo) ya descuenta ese inset al calcular el solape con el teclado.
+        <SafeAreaView
+            style={styles.container}
+            edges={Platform.OS === 'ios' ? ['top', 'left', 'right', 'bottom'] : ['top', 'left', 'right']}
+        >
             <View style={styles.header}>
                 <HeaderBackButton onPress={() => navigation.goBack()} />
 

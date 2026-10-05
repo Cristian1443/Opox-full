@@ -207,6 +207,9 @@ export default function ExamUploadScreen({ navigation }) {
                 <ScrollView
                     contentContainerStyle={styles.scroll}
                     keyboardShouldPersistTaps="handled"
+                    // iOS: el teclado numérico del campo "Año" no tiene tecla de
+                    // retorno — sin esto no había forma de cerrarlo.
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                     showsVerticalScrollIndicator={false}
                 >
                     <Text style={styles.intro}>

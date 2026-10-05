@@ -542,8 +542,12 @@ function PodcastPlayer({ topic, podcast, onBack, onNewPodcast, navigation }) {
     // de la barra de progreso — mismo problema y misma solución que los
     // sliders de GeneratorConfigScreen.js: desactivarlo de forma permanente
     // en vez de intentar alternarlo a mitad de gesto (no llega a tiempo).
+    // Al salir del player (p. ej. "Generar otro podcast" vuelve a la fase de
+    // config dentro de la MISMA pantalla) se restaura el gesto: si no, en iOS
+    // las fases picker/config se quedaban sin swipe-back para siempre.
     useEffect(() => {
         navigation?.setOptions({ gestureEnabled: false });
+        return () => navigation?.setOptions({ gestureEnabled: true });
     }, [navigation]);
 
     const handleSeek = useCallback(async (seconds) => {

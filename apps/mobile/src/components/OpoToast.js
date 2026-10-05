@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import Text from './AppText';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 
 const DISMISS_MS = 2800;
@@ -28,6 +29,9 @@ function GemIcon({ size = 18 }) {
 export default function OpoToast({ points = 0, subtitle }) {
     const opacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(24)).current;
+    // iOS: respetar el home indicator — `bottom` absoluto ignora el padding
+    // del SafeAreaView padre.
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
         if (!points || points <= 0) return;
@@ -51,7 +55,7 @@ export default function OpoToast({ points = 0, subtitle }) {
 
     return (
         <Animated.View
-            style={[styles.pill, { opacity, transform: [{ translateY }] }]}
+            style={[styles.pill, { bottom: Math.max(32, insets.bottom + 16), opacity, transform: [{ translateY }] }]}
             pointerEvents="none"
         >
             <View style={styles.row}>
