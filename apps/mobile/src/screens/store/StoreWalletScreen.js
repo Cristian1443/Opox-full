@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
 import { colors, spacing } from '../../theme';
 import { storeApi } from '../../api/store';
+import { SUBSCRIPTIONS_ENABLED } from '../../config/featureFlags';
 
 // ─── 11.3 · Mi cartera ──────────────────────────────────────────────────────
 // Fiel al Figma (MiCarteraScreen.tsx). El backend real ya devuelve un tercer
@@ -181,13 +182,16 @@ export default function StoreWalletScreen({ navigation }) {
         {/* Banner de venta cruzada — ver hallazgo 2: su propósito en esta
             pantalla no es obvio, pero está anidado correctamente en Figma
             (no es un nodo huérfano), así que se implementa sin gate. */}
-        <TouchableOpacity
-          style={styles.ctaButton}
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate('StoreSubscription')}
-        >
-          <Text style={styles.ctaButtonText}>Suscribirme a premium</Text>
-        </TouchableOpacity>
+        {/* Oculto en iOS hasta tener IAP real (App Store 3.1.1). */}
+        {SUBSCRIPTIONS_ENABLED && (
+          <TouchableOpacity
+            style={styles.ctaButton}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('StoreSubscription')}
+          >
+            <Text style={styles.ctaButtonText}>Suscribirme a premium</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

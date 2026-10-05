@@ -7,11 +7,13 @@ import {
     StatusBar,
     BackHandler,
     Linking,
+    Platform,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
+import { ANDROID_PACKAGE, APP_STORE_ID } from '../../config/featureFlags';
 
 // ─── Icono descarga (Figma "ACTUALIZACION": stroke morado, sobre tarjeta blanca) ─
 function IconDownload() {
@@ -33,7 +35,30 @@ function IconDownload() {
 // Figma "ACTUALIZACIÓN" (node 2346:2091, confirmado vía API REST).
 // IMPORTANTE: "sin botón de cerrar" → el hardware back button también se bloquea
 export default function SplashUpdateScreen() {
-    const handleUpdate = () => Linking.openURL('https://opox.app');
+    // Abre la ficha de la app en su tienda. Se llama a openURL directamente en
+    // try/catch (sin canOpenURL): en iOS canOpenURL exige declarar el esquema
+    // en LSApplicationQueriesSchemes y devolvería false aunque el esquema exista.
+    const handleUpdate = async () => {
+        const candidates = Platform.OS === 'ios'
+            ? [
+                // TODO(App Store): APP_STORE_ID = null hasta tener la ficha en
+                // App Store Connect; mientras tanto se usa la web como fallback.
+                APP_STORE_ID ? `itms-apps://apps.apple.com/app/id${APP_STORE_ID}` : null,
+                APP_STORE_ID ? `https://apps.apple.com/app/id${APP_STORE_ID}` : 'https://opox.app',
+            ]
+            : [
+                `market://details?id=${ANDROID_PACKAGE}`,
+                `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`,
+            ];
+        for (const url of candidates.filter(Boolean)) {
+            try {
+                await Linking.openURL(url);
+                return;
+            } catch {
+                // Probar el siguiente candidato
+            }
+        }
+    };
 
     useEffect(() => {
         const sub = BackHandler.addEventListener('hardwareBackPress', () => true);

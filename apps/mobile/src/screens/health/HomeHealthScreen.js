@@ -1,5 +1,6 @@
 // Bloque 3 · Salud — Pantalla 3.1 · Home de Salud
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { localDateISO } from '../../utils/localDate';
 import {
     View,
     ScrollView,
@@ -172,7 +173,7 @@ function openHealthPermissionSettings() {
 }
 
 function todayLocalIso() {
-    return new Date().toLocaleDateString('sv');
+    return localDateISO();
 }
 
 export default function HomeHealthScreen({ navigation }) {
@@ -198,8 +199,9 @@ export default function HomeHealthScreen({ navigation }) {
             ]);
             if (!cancelled) {
                 // iOS: HealthKit nunca revela si el permiso de LECTURA se concedió
-                // (privacidad de Apple) — hasAllHealthPermissions() es siempre false.
-                // Usamos como señal "hay al menos un dato leído": si HealthKit
+                // (privacidad de Apple) — en iOS hasAllHealthPermissions() solo
+                // indica "el diálogo ya se pidió", NO "concedido", así que aquí no
+                // nos sirve. Usamos como señal "hay al menos un dato leído": si HealthKit
                 // devuelve algo, los permisos están concedidos de facto.
                 const effectiveGranted = Platform.OS === 'ios'
                     ? !!data && Object.values(data).some((v) => v != null)

@@ -414,8 +414,12 @@ export default function PermissionsScreen({ navigation }) {
     if (status === 'granted') return <SuccessState onPress={goNext} />;
     if (status === 'denied') return <DeniedState onContinue={goNext} />;
 
+    // Sin edge 'bottom': el inset inferior se aplica UNA sola vez, a mano, en
+    // el botón absoluto y en el padding del scroll. Con el padding inferior de
+    // SafeAreaView además del `insets.bottom` del botón, en iPhone con home
+    // indicator el hueco bajo el botón se duplicaba.
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
             {/* Botón volver */}
@@ -426,7 +430,7 @@ export default function PermissionsScreen({ navigation }) {
             {/* Cuerpo scrollable (scr-scroll) */}
             <ScrollView
                 style={styles.scroll}
-                contentContainerStyle={styles.body}
+                contentContainerStyle={[styles.body, { paddingBottom: 100 + insets.bottom }]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Título */}
@@ -450,9 +454,9 @@ export default function PermissionsScreen({ navigation }) {
             </ScrollView>
 
             {/* Botón fijo inferior (btn-row: absolute bottom:16 left:18 right:18) —
-                se suma insets.bottom porque un View absoluto no hereda el padding
-                de SafeAreaView; sin esto el botón queda tapado por la barra de
-                navegación del sistema en dispositivos con navegación por botones. */}
+                se suma insets.bottom aquí (y no en SafeAreaView, que excluye el
+                edge inferior) para no quedar tapado por la barra de navegación
+                del sistema ni duplicar el hueco en iPhone. */}
             <View style={[styles.btnRow, { bottom: 16 + insets.bottom }]}>
                 <TouchableOpacity style={styles.btnPrimary} onPress={handleActivate} activeOpacity={0.85}>
                     <Text style={styles.btnPrimaryText}>Activar permisos</Text>

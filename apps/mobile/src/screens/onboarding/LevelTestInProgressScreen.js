@@ -5,6 +5,7 @@ import {
     StyleSheet,
     StatusBar,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -197,6 +198,9 @@ export default function LevelTestInProgressScreen({ navigation }) {
     const hasRestoredRef = useRef(false);
     // Se asigna en el momento en que el usuario ve las preguntas por primera vez
     const startTimeRef = useRef(null);
+    // true justo antes del `replace` a LevelTestResult: esa salida es el final
+    // natural del test y no debe pedir confirmación.
+    const allowLeaveRef = useRef(false);
 
     // Esperar la respuesta del backend antes de mostrar cualquier pregunta.
     // El backend ya gestiona el fallback a estáticas si el Motor falla —
@@ -243,6 +247,35 @@ export default function LevelTestInProgressScreen({ navigation }) {
         if (!hasRestoredRef.current) return;
         AsyncStorage.setItem(PENDING_LEVEL_TEST_KEY, String(qIndex));
     }, [qIndex]);
+
+    // Confirmación al salir (botón atrás del header, back físico de Android o
+    // cualquier otra acción que saque la pantalla del stack). El swipe-back de
+    // iOS está desactivado en el navigator. El progreso ya se persiste en
+    // PENDING_LEVEL_TEST_KEY, así que basta con un confirm simple.
+    // Debe estar antes del return condicional (Reglas de Hooks).
+    useEffect(() => {
+        if (!questions) return undefined;
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (allowLeaveRef.current) return;
+            e.preventDefault();
+            Alert.alert(
+                'Salir del test',
+                'Tu progreso se guarda y podrás retomar el test de nivel más tarde.',
+                [
+                    { text: 'Seguir con el test', style: 'cancel' },
+                    {
+                        text: 'Salir',
+                        style: 'destructive',
+                        onPress: () => {
+                            allowLeaveRef.current = true;
+                            navigation.dispatch(e.data.action);
+                        },
+                    },
+                ],
+            );
+        });
+        return unsubscribe;
+    }, [navigation, questions]);
 
     // Pantalla de carga completa — bloquea hasta recibir preguntas del Motor
     if (!questions) {
@@ -306,6 +339,7 @@ export default function LevelTestInProgressScreen({ navigation }) {
         );
         await AsyncStorage.removeItem(PENDING_LEVEL_TEST_KEY);
 
+        allowLeaveRef.current = true;
         navigation.replace('LevelTestResult', {
             percent,
             correct: correctCount,

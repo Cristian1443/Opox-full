@@ -165,30 +165,106 @@ function NetworkWatcher() {
   return null;
 }
 
+// Rutas previas a la sesión autenticada (splash, onboarding y acceso). Si el
+// usuario toca una push mientras está en cualquiera de ellas, la navegación se
+// difiere hasta que llegue a 'Dashboard' — Splash y SesionIniciada hacen
+// `reset` a Dashboard en cuanto hay sesión válida.
+const PRE_AUTH_ROUTES = new Set([
+  'Icono', 'Splash', 'SplashNoConnection', 'SplashUpdate',
+  'OnboardingSlider', 'OppositionSelector', 'LevelTestProposal',
+  'LevelTestInProgress', 'LevelTestResult', 'Permissions',
+  'Entrada', 'Registro', 'Login', 'BioLink', 'RecuperarPassword',
+  'RecuperarPasswordEnviado', 'RecuperarPasswordNueva', 'Otp', 'Terminos',
+  'SesionIniciada', 'HealthConnectRationale',
+]);
+const AUTHENTICATED_HOME_ROUTE = 'Dashboard';
+
+// Identificadores de notificaciones ya procesadas. A nivel de módulo para que
+// sobreviva a remontajes del handler (y a que el listener y
+// getLastNotificationResponseAsync entreguen la misma respuesta en cold start).
+const handledNotificationIds = new Set();
+
 /**
- * Escucha notificaciones push en primer plano y el tap sobre ellas.
- * No-op en Expo Go.
+ * Escucha notificaciones push en primer plano y el tap sobre ellas, tanto con
+ * la app en segundo plano (listener) como con la app CERRADA (cold start vía
+ * getLastNotificationResponseAsync). No-op en Expo Go.
  */
 function PushNotificationHandler({ onForegroundNotification }) {
   useEffect(() => {
-    if (!Notifications) return;
+    if (!Notifications) return undefined;
+
+    // Destino pendiente hasta que el usuario esté autenticado y en Dashboard.
+    let pendingTarget = null;
+    let unsubscribeState = null;
+    let cancelled = false;
+
+    const flushPending = () => {
+      if (!pendingTarget || !navigationRef.isReady()) return;
+      if (navigationRef.getCurrentRoute()?.name !== AUTHENTICATED_HOME_ROUTE) return;
+      const { screen, params } = pendingTarget;
+      pendingTarget = null;
+      if (unsubscribeState) { unsubscribeState(); unsubscribeState = null; }
+      // Diferido un tick: estamos dentro del listener 'state' del contenedor.
+      setTimeout(() => {
+        if (navigationRef.isReady()) navigationRef.navigate(screen, params);
+      }, 0);
+    };
+
+    const handleResponse = (response) => {
+      const identifier = response?.notification?.request?.identifier;
+      if (identifier) {
+        if (handledNotificationIds.has(identifier)) return;
+        handledNotificationIds.add(identifier);
+      }
+      const data = response?.notification?.request?.content?.data ?? {};
+      if (!data.screen) return;
+      const target = { screen: data.screen, params: data.params ?? {} };
+
+      const currentRoute = navigationRef.isReady()
+        ? navigationRef.getCurrentRoute()?.name
+        : undefined;
+      if (currentRoute && !PRE_AUTH_ROUTES.has(currentRoute)) {
+        // App ya dentro de la sesión → navegación inmediata.
+        navigationRef.navigate(target.screen, target.params);
+        return;
+      }
+      // Arranque en frío o aún en splash/login → esperar a Dashboard.
+      pendingTarget = target;
+      if (!unsubscribeState) {
+        unsubscribeState = navigationRef.addListener('state', flushPending);
+      }
+      flushPending();
+    };
+
+    let receivedSub = null;
+    let responseSub = null;
     try {
       // Notificación recibida con la app abierta → mostrar banner in-app
-      const receivedSub = Notifications.addNotificationReceivedListener(notification => {
+      receivedSub = Notifications.addNotificationReceivedListener(notification => {
         const { title, body, data } = notification.request.content;
         onForegroundNotification({ title, body, type: data?.type ?? 'daily_reminder', data });
       });
-      // Tap sobre notificación → navegar a la pantalla indicada
-      const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
-        const data = response.notification.request.content.data ?? {};
-        if (data.screen && navigationRef.isReady()) {
-          navigationRef.navigate(data.screen, data.params ?? {});
-        }
-      });
-      return () => { receivedSub.remove(); responseSub.remove(); };
-    } catch (_) {
-      return undefined;
-    }
+      // Tap sobre notificación con la app en segundo plano
+      responseSub = Notifications.addNotificationResponseReceivedListener(handleResponse);
+
+      // Tap sobre notificación con la app CERRADA: el listener no recibe la
+      // respuesta que lanzó el proceso, hay que pedirla explícitamente.
+      Notifications.getLastNotificationResponseAsync?.()
+        .then((response) => {
+          if (cancelled || !response) return;
+          handleResponse(response);
+          // Evita re-procesarla en un reload de JS dentro del mismo proceso.
+          Notifications.clearLastNotificationResponseAsync?.().catch(() => {});
+        })
+        .catch(() => {});
+    } catch (_) { /* módulo nativo no disponible */ }
+
+    return () => {
+      cancelled = true;
+      receivedSub?.remove();
+      responseSub?.remove();
+      if (unsubscribeState) unsubscribeState();
+    };
   }, []);
   return null;
 }

@@ -110,11 +110,12 @@ export default function MeditationPlayerScreen({ navigation, route }) {
 
         (async () => {
             try {
+                // Nombres de opción de expo-audio (no los de expo-av:
+                // playsInSilentModeIOS / staysActiveInBackground ya no existen).
                 await ExpoAudio.setAudioModeAsync({
-                    allowsRecordingIOS: false,
-                    staysActiveInBackground: true,
-                    playsInSilentModeIOS: true,    // reproduce con el switch silencio en iOS
-                    shouldDuckAndroid: true,
+                    playsInSilentMode: true,        // reproduce con el switch silencio en iOS
+                    shouldPlayInBackground: true,
+                    interruptionMode: 'doNotMix',
                 });
 
                 const { sound } = await ExpoAudio.Sound.createAsync(
@@ -221,6 +222,33 @@ export default function MeditationPlayerScreen({ navigation, route }) {
         setTimeLeft((prev) => Math.max(0, Math.min(totalSeconds, prev - deltaSec)));
     }, [audioReady, totalSeconds]);
 
+    // Sesión en curso: ya empezó y aún no terminó. Solo en ese caso se pide
+    // confirmación al salir por gesto / back físico.
+    const sessionInProgress = progressed > 0 && timeLeft > 0;
+    const sessionInProgressRef = useRef(sessionInProgress);
+    sessionInProgressRef.current = sessionInProgress;
+
+    // `beforeRemove` intercepta CUALQUIER salida (back de Android, gesto iOS,
+    // goBack programático) — antes solo el botón del header abría el modal.
+    // `allowExitRef` deja pasar la salida ya confirmada en el modal.
+    // Mismo patrón que QuestionActiveScreen.
+    const allowExitRef = useRef(false);
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (allowExitRef.current || !sessionInProgressRef.current) return;
+            e.preventDefault();
+            setShowExitModal(true);
+        });
+        return unsubscribe;
+    }, [navigation]);
+
+    // iOS: el swipe-back nativo de native-stack completa el pop antes de que
+    // `beforeRemove` pueda impedirlo. Se desactiva el gesto mientras la sesión
+    // está en curso; la salida pasa entonces por el modal de confirmación.
+    useEffect(() => {
+        navigation.setOptions({ gestureEnabled: !sessionInProgress });
+    }, [navigation, sessionInProgress]);
+
     const confirmExit = useCallback(async () => {
         setShowExitModal(false);
         setIsPlaying(false);
@@ -228,6 +256,7 @@ export default function MeditationPlayerScreen({ navigation, route }) {
         if (sound) {
             try { await sound.stopAsync(); } catch { /* ok */ }
         }
+        allowExitRef.current = true;
         navigation.goBack();
     }, [navigation]);
 
@@ -473,12 +502,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     modalTitle: {
+        fontFamily: 'Poppins-Bold',
         fontSize: 20,
-        fontWeight: '800',
         color: colors.text,
         marginBottom: spacing.sm,
     },
     modalText: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 15,
         color: colors.textSecondary,
         textAlign: 'center',
@@ -498,8 +528,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     modalCancelText: {
+        fontFamily: 'Poppins-SemiBold',
         color: colors.textSecondary,
-        fontWeight: '700',
     },
     modalConfirmBtn: {
         flex: 1,
@@ -509,7 +539,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     modalConfirmText: {
+        fontFamily: 'Poppins-SemiBold',
         color: '#FFFFFF',
-        fontWeight: '700',
     },
 });

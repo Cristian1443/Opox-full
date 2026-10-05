@@ -1,13 +1,6 @@
 import { api } from './client';
+import { localDateISO } from '../utils/localDate';
 import { API_ROUTES } from '@opox/constants';
-
-// Formato manual (no toLocaleDateString('sv')): el resultado de Intl depende
-// del motor/ICU (Hermes iOS vs Android) y un formato distinto a YYYY-MM-DD
-// rompería la racha y los filtros por día.
-const localDate = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 
 /** Wrappers del bloque 5 · Motivación y Gamificación. */
 export const motivationApi = {
@@ -40,7 +33,7 @@ export const motivationApi = {
     completeChallenge: (clanId, challengeId) =>
         api.post(
             API_ROUTES.MOTIVATION.CLAN_CHALLENGE_COMPLETE.replace(':id', clanId).replace(':challengeId', challengeId),
-            { localDate: localDate() },
+            { localDate: localDateISO() },
             { auth: true },
         ),
 

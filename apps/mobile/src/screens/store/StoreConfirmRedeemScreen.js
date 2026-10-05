@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     StyleSheet,
@@ -26,11 +26,9 @@ const FIGMA = {
   cardBorder: 'rgba(65, 41, 80, 0.3)',
 };
 
-const MOCK_FALLBACK = {
-  product: { name: 'Pack de Tests Premium', icon: 'document-text-outline', price: 500 },
-  currentBalance: 1840,
-  newBalance: 1340,
-};
+// Antes había un MOCK_FALLBACK (saldo 1840) que mostraba datos falsos si la
+// pantalla se abría sin params. Ahora el saldo se lee siempre del backend y,
+// si falla o falta el producto, se muestra un estado de error con reintento.
 
 // Ícono exacto exportado de Figma (diamante), mismo lenguaje visual que
 // StoreHomeScreen.
@@ -53,14 +51,39 @@ export default function StoreConfirmRedeemScreen({ navigation, route }) {
   const [redeemResult, setRedeemResult] = useState(null);
   const isSubmittingRef = useRef(false);
 
-  const { product, currentBalance, newBalance, productId, redeemType } = route?.params ?? MOCK_FALLBACK;
-  const productCost = product?.price ?? (currentBalance - newBalance);
+  const params = route?.params ?? {};
+  const { product, productId, redeemType } = params;
+  const productCost = product?.price ?? ((params.currentBalance ?? 0) - (params.newBalance ?? 0));
+
+  // Saldo real del backend — fuente de verdad para "Te quedarán N".
+  const [balance, setBalance] = useState(null);
+  const [loadState, setLoadState] = useState('loading'); // 'loading' | 'ready' | 'error'
+
+  const loadBalance = useCallback(async () => {
+    if (!productId || !product) {
+      setLoadState('error');
+      return;
+    }
+    setLoadState('loading');
+    const res = await storeApi.getBalance();
+    if (res?.error || typeof res?.data?.balance !== 'number') {
+      setLoadState('error');
+      return;
+    }
+    setBalance(res.data.balance);
+    setLoadState('ready');
+  }, [productId, product]);
+
+  useEffect(() => { loadBalance(); }, [loadBalance]);
+
+  const newBalance = balance !== null ? balance - productCost : 0;
+  const notEnough = balance !== null && newBalance < 0;
 
   const handleConfirm = async () => {
     // Guard anti-doble-tap: `isLoading` (estado) no bloquea un segundo toque
     // que llega antes del siguiente render — `isSubmittingRef` sí, porque se
     // actualiza de forma síncrona.
-    if (isSubmittingRef.current) return;
+    if (isSubmittingRef.current || loadState !== 'ready' || notEnough) return;
     isSubmittingRef.current = true;
     setIsLoading(true);
     let res;
@@ -119,22 +142,54 @@ export default function StoreConfirmRedeemScreen({ navigation, route }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-          <GemIcon />
-          <Text style={styles.title}>Confirmar canje</Text>
-          <Text style={styles.subtitle}>
-            Vas a canjear el <Text style={styles.bold}>{product?.name ?? '—'}</Text> por{' '}
-            <Text style={styles.bold}>{productCost.toLocaleString('es-ES')} Opopoints</Text>. Te quedarán {newBalance.toLocaleString('es-ES')}.
-          </Text>
-        </View>
+        {loadState === 'loading' && (
+          <View style={styles.hero}>
+            <ActivityIndicator size="large" color={colors.accentOrange} />
+          </View>
+        )}
+
+        {loadState === 'error' && (
+          <View style={styles.hero}>
+            <Ionicons name="cloud-offline-outline" size={48} color={colors.textDark} />
+            <Text style={styles.title}>No se pudo cargar el canje</Text>
+            <Text style={styles.subtitle}>
+              {productId && product
+                ? 'No hemos podido consultar tu saldo de Opopoints. Revisa tu conexión e inténtalo de nuevo.'
+                : 'No se encontró el producto seleccionado. Vuelve a la tienda e inténtalo de nuevo.'}
+            </Text>
+            {productId && product ? (
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={loadBalance}
+                accessibilityLabel="Reintentar"
+              >
+                <Text style={styles.retryButtonText}>Reintentar</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        )}
+
+        {loadState === 'ready' && (
+          <View style={styles.hero}>
+            <GemIcon />
+            <Text style={styles.title}>Confirmar canje</Text>
+            <Text style={styles.subtitle}>
+              Vas a canjear el <Text style={styles.bold}>{product?.name ?? '—'}</Text> por{' '}
+              <Text style={styles.bold}>{productCost.toLocaleString('es-ES')} Opopoints</Text>.{' '}
+              {notEnough
+                ? `Tu saldo actual es de ${balance.toLocaleString('es-ES')} Opopoints: no es suficiente.`
+                : `Te quedarán ${newBalance.toLocaleString('es-ES')}.`}
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* ── CTA fijo al fondo ─────────────────────────────────────────── */}
       <View style={[styles.footer, { paddingBottom: spacing.sm + insets.bottom }]}>
         <TouchableOpacity
-          style={styles.confirmButton}
+          style={[styles.confirmButton, (loadState !== 'ready' || notEnough) && styles.confirmButtonDisabled]}
           onPress={handleConfirm}
-          disabled={isLoading}
+          disabled={isLoading || loadState !== 'ready' || notEnough}
           accessibilityLabel="Confirmar el canje"
         >
           {isLoading ? (
@@ -235,6 +290,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentOrange,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  confirmButtonDisabled: {
+    opacity: 0.5,
+  },
+  retryButton: {
+    marginTop: spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 14.2,
+    borderWidth: 1,
+    borderColor: colors.accentOrange,
+  },
+  retryButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: colors.accentOrange,
   },
   confirmButtonText: {
     fontFamily: 'Poppins-SemiBold',

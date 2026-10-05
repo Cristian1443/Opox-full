@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { colors, spacing } from '../../theme';
+import { SUBSCRIPTIONS_ENABLED } from '../../config/featureFlags';
 
 // ─── 12.8 · Ayuda y soporte ─────────────────────────────────────────────────
 // Fiel al Figma (AyudaScreen.tsx) para buscador, FAQ y botón de chat.
@@ -56,8 +57,10 @@ const FAQS = [
     id: '4',
     question: '¿Puedo cambiar mi plan de suscripción?',
     answer: 'Sí, puedes cambiar o cancelar tu suscripción en cualquier momento desde la sección "Mi suscripción" en Configuración.',
+    requiresSubscriptions: true,
   },
-];
+  // La FAQ de suscripción se oculta en iOS mientras no exista IAP real.
+].filter((faq) => !faq.requiresSubscriptions || SUBSCRIPTIONS_ENABLED);
 
 function ChevronRightIcon({ size = 18, color = colors.textDark }) {
   return (

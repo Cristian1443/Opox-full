@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { localDateISO } from '../utils/localDate';
 import {
     View,
     TouchableOpacity,
@@ -556,7 +557,7 @@ export default function DashboardScreen({ navigation }) {
             getHealthMetrics().then((m) => { if (!cancelled) setHealthMetrics(m); });
         }
         // Check-in diario — fuente primaria si el usuario no tiene wearable.
-        const today = new Date().toLocaleDateString('sv');
+        const today = localDateISO();
         dailyCheckInApi.getForDate(today).then((res) => {
             if (!cancelled) setHealthCheckin(res?.data?.checkin ?? null);
         }).catch(() => {});

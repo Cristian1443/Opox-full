@@ -160,7 +160,9 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="OnboardingSlider" component={OnboardingSliderScreen} />
             <Stack.Screen name="OppositionSelector" component={OppositionSelectorScreen} />
             <Stack.Screen name="LevelTestProposal" component={LevelTestProposalScreen} />
-            <Stack.Screen name="LevelTestInProgress" component={LevelTestInProgressScreen} />
+            {/* Test de nivel: sin swipe-back en iOS; la salida pasa por la
+                confirmación `beforeRemove` de la propia pantalla. */}
+            <Stack.Screen name="LevelTestInProgress" component={LevelTestInProgressScreen} options={{ gestureEnabled: false }} />
             <Stack.Screen name="LevelTestResult" component={LevelTestResultScreen} />
             <Stack.Screen name="Permissions" component={PermissionsScreen} />
 
@@ -225,13 +227,16 @@ export default function OnboardingNavigator() {
             <Stack.Screen name="DuelsPlaceholder" component={DuelsPlaceholderScreen} />
 
             {/* Bloque 7 · Preguntas */}
-            <Stack.Screen name="TrainingSession" component={QuestionActiveScreen} />
+            {/* Sesión activa: gesto desactivado de forma estática para cerrar la
+                ventana del primer frame antes de que la pantalla haga setOptions. */}
+            <Stack.Screen name="TrainingSession" component={QuestionActiveScreen} options={{ gestureEnabled: false }} />
             <Stack.Screen name="TrainingResult" component={TrainingResultScreen} />
 
             {/* Bloque 9 · Factoría de Apuntes */}
             <Stack.Screen name="NotesHome" component={NotesHomeScreen} />
             <Stack.Screen name="NotesUpload" component={NotesUploadScreen} />
-            <Stack.Screen name="NotesAnalysis" component={NotesAnalysisScreen} />
+            {/* Pipeline de análisis en curso: mismo motivo que TrainingSession. */}
+            <Stack.Screen name="NotesAnalysis" component={NotesAnalysisScreen} options={{ gestureEnabled: false }} />
             <Stack.Screen name="NoteDetail" component={NoteDetailScreen} />
             <Stack.Screen name="NotesTestConfig" component={NotesTestConfigScreen} />
 

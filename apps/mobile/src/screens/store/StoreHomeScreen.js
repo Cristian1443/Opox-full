@@ -16,6 +16,7 @@ import AppHeader from '../../components/AppHeader';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../../theme';
 import { storeApi } from '../../api/store';
+import { SUBSCRIPTIONS_ENABLED } from '../../config/featureFlags';
 
 // ─── 11.1 · Tienda · home ──────────────────────────────────────────────────
 // Fiel al Figma (TiendaHomeScreen.tsx) para header, tarjeta de saldo, tabs y
@@ -31,12 +32,14 @@ const FIGMA = {
   quickLinkBorder: 'rgba(255,255,255,0.3)',
 };
 
+// La pestaña "Suscripción" se oculta en iOS hasta tener IAP real con
+// RevenueCat/StoreKit (App Store 3.1.1) — ver config/featureFlags.js.
 const TABS = [
   { key: 'discounts', label: 'Descuentos' },
   { key: 'real', label: 'Reales', isPhase2: true },
-  { key: 'subscription', label: 'Suscripción', navigateTo: 'StoreSubscription' },
+  { key: 'subscription', label: 'Suscripción', navigateTo: 'StoreSubscription', requiresSubscriptions: true },
   { key: 'comunidad', label: 'Comunidad', isPhase2: true, navigateTo: 'StoreMarketplace' },
-];
+].filter((tab) => !tab.requiresSubscriptions || SUBSCRIPTIONS_ENABLED);
 
 // Ícono de diamante/gema — path exacto exportado de Figma. Reutilizado
 // para el saldo y para el precio de cada tarjeta de producto.
@@ -104,15 +107,21 @@ const OpopointsHeader = ({ balance, onEarnClick, onWalletClick, onAffiliateClick
         <Ionicons name="wallet-outline" size={16} color={colors.textDark} />
         <Text style={styles.quickLinkText}>Mi cartera</Text>
       </TouchableOpacity>
-      <View style={styles.quickLinkDivider} />
-      <TouchableOpacity
-        style={styles.quickLink}
-        onPress={onAffiliateClick}
-        accessibilityLabel="Programa de afiliación"
-      >
-        <Ionicons name="people-outline" size={16} color={colors.textDark} />
-        <Text style={styles.quickLinkText}>Invita y ahorra</Text>
-      </TouchableOpacity>
+      {/* "Invita y ahorra" promete descuentos en la suscripción → oculto
+          cuando las suscripciones están desactivadas (iOS sin IAP). */}
+      {onAffiliateClick ? (
+        <>
+          <View style={styles.quickLinkDivider} />
+          <TouchableOpacity
+            style={styles.quickLink}
+            onPress={onAffiliateClick}
+            accessibilityLabel="Programa de afiliación"
+          >
+            <Ionicons name="people-outline" size={16} color={colors.textDark} />
+            <Text style={styles.quickLinkText}>Invita y ahorra</Text>
+          </TouchableOpacity>
+        </>
+      ) : null}
     </View>
   </View>
 );
@@ -211,7 +220,7 @@ export default function StoreHomeScreen({ navigation }) {
         balance={balance}
         onEarnClick={() => navigation.navigate('StoreHowToEarn')}
         onWalletClick={() => navigation.navigate('StoreWallet')}
-        onAffiliateClick={() => navigation.navigate('StoreAffiliate')}
+        onAffiliateClick={SUBSCRIPTIONS_ENABLED ? () => navigation.navigate('StoreAffiliate') : undefined}
       />
 
       {/* Pestañas */}

@@ -62,12 +62,13 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 24,
-        fontWeight: '800',
+        fontFamily: 'Poppins-Bold',
         color: colors.text,
         textAlign: 'center',
         marginBottom: spacing.sm,
     },
     subtitle: {
+        fontFamily: 'Poppins-Regular',
         fontSize: 16,
         color: colors.textSecondary,
         textAlign: 'center',
@@ -85,7 +86,7 @@ const styles = StyleSheet.create({
     },
     contextLabel: {
         fontSize: 12,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
         color: colors.textSecondary,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
     },
     contextValue: {
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: 'Poppins-SemiBold',
         color: colors.text,
     },
     button: {
@@ -107,6 +108,6 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'Poppins-SemiBold',
     },
 });

@@ -162,7 +162,12 @@ const markdownStyles = {
     heading2: { fontFamily: 'Poppins-SemiBold', fontSize: 17, marginTop: 8, marginBottom: 4, color: colors.textDark },
     heading3: { fontFamily: 'Poppins-SemiBold', fontSize: 16, marginTop: 6, marginBottom: 2, color: colors.textDark },
     strong: { fontFamily: 'Poppins-SemiBold' },
-    em: { fontStyle: 'italic' },
+    // App.js no carga Poppins-Italic: en iOS una fuente custom sin variante
+    // itálica ignora fontStyle (no hay itálica sintética), así que para `em` se
+    // usa la fuente del sistema. En Android se hereda Poppins (body) y el SO
+    // sintetiza la itálica. `undefined` no basta en iOS: el Text anidado
+    // heredaría Poppins-Regular del padre.
+    em: { fontStyle: 'italic', ...(Platform.OS === 'ios' ? { fontFamily: 'System' } : null) },
     bullet_list: { marginVertical: 4 },
     ordered_list: { marginVertical: 4 },
     list_item: { marginVertical: 2 },

@@ -91,17 +91,39 @@ export function useSocialAuth() {
         try {
             if (!supabase) throw new Error('Supabase no configurado. Comprueba las variables EXPO_PUBLIC_SUPABASE_*.');
 
+            // Sign in with Apple no está disponible en iOS < 13 ni en algunos
+            // simuladores/dispositivos sin cuenta — mejor un mensaje claro que un
+            // error nativo críptico.
+            const available = await AppleAuthentication.isAvailableAsync();
+            if (!available) {
+                return {
+                    data: null,
+                    error: { message: 'Iniciar sesión con Apple no está disponible en este dispositivo. Usa email y contraseña.' },
+                };
+            }
+
+            // Nonce anti-replay: a Apple se le pasa el SHA-256 (hex) del nonce,
+            // que queda como claim en el identityToken; a Supabase el nonce en
+            // claro (lo hashea y lo compara con el claim del JWT).
+            const rawNonce = Crypto.randomUUID();
+            const hashedNonce = await Crypto.digestStringAsync(
+                Crypto.CryptoDigestAlgorithm.SHA256,
+                rawNonce,
+            );
+
             const credential = await AppleAuthentication.signInAsync({
                 requestedScopes: [
                     AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
                     AppleAuthentication.AppleAuthenticationScope.EMAIL,
                 ],
+                nonce: hashedNonce,
             });
             if (!credential.identityToken) throw new Error('Apple no devolvió identityToken.');
 
             const { data, error } = await supabase.auth.signInWithIdToken({
                 provider: 'apple',
                 token: credential.identityToken,
+                nonce: rawNonce,
             });
             if (error) throw error;
 

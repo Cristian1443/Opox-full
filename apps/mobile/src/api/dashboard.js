@@ -1,13 +1,6 @@
 import { api } from './client';
+import { localDateISO } from '../utils/localDate';
 import { API_ROUTES } from '@opox/constants';
-
-// Formato manual (no toLocaleDateString('sv')): el resultado de Intl depende
-// del motor/ICU (Hermes iOS vs Android) y un formato distinto a YYYY-MM-DD
-// rompería la racha y los filtros por día.
-const localDate = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 
 /**
  * Wrappers del bloque 2 · Dashboard. Mismo patrón que authApi: llaman al
@@ -44,7 +37,7 @@ export const dashboardApi = {
     registerActivity: (input) =>
         api.post(
             API_ROUTES.DASHBOARD.GAMIFICATION_ACTIVITY,
-            { ...input, localDate: input?.localDate ?? localDate() },
+            { ...input, localDate: input?.localDate ?? localDateISO() },
             { auth: true },
         ),
 };

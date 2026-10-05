@@ -3,6 +3,7 @@
 // (pills) + factores (chips opcionales).
 // Upsert idempotente por día — si abre otra vez, se pre-cargan los valores.
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { localDateISO } from '../../utils/localDate';
 import {
     View,
     StyleSheet,
@@ -38,7 +39,7 @@ const SLEEP_MAX = 10;
 const SLEEP_STEP = 0.5;
 
 function todayLocalIso() {
-    return new Date().toLocaleDateString('sv');
+    return localDateISO();
 }
 
 function longDate(iso) {

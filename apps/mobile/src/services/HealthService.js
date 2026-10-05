@@ -38,6 +38,10 @@ const HK_READ_TYPES = [
     'HKQuantityTypeIdentifierStepCount',
 ];
 
+// AuthorizationRequestStatus de @kingstinct/react-native-healthkit v13:
+// unknown = 0, shouldRequest = 1, unnecessary = 2 (el diálogo ya se mostró).
+const HK_AUTH_REQUEST_UNNECESSARY = 2;
+
 const ANDROID_PERMISSIONS = [
     { accessType: 'read', recordType: 'HeartRate' },
     { accessType: 'read', recordType: 'RestingHeartRate' },
@@ -116,7 +120,26 @@ export async function getHealthConnectStatus() {
  * positivos cuando el usuario tiene N permisos de otro tipo ya concedidos.
  */
 export async function hasAllHealthPermissions() {
-    if (!isHealthAvailable() || Platform.OS !== 'android' || !HealthConnect) return false;
+    if (!isHealthAvailable()) return false;
+
+    // iOS: HealthKit NUNCA revela si el usuario concedió o denegó la lectura
+    // (privacidad de Apple). Lo único que expone es si el diálogo de permisos
+    // ya se mostró para estos tipos: AuthorizationRequestStatus.unnecessary (2).
+    // OJO: en iOS `true` significa "ya se pidió", NO "concedido". Así
+    // PairingScreen vuelve atrás en silencio en vez de mostrar el modal
+    // "conectado" en cada visita (mismo comportamiento que Android con
+    // permisos ya existentes).
+    if (Platform.OS === 'ios') {
+        try {
+            const status = await HealthKit.getRequestStatusForAuthorization({ toRead: HK_READ_TYPES });
+            return status === HK_AUTH_REQUEST_UNNECESSARY;
+        } catch (err) {
+            console.warn('[HealthService] getRequestStatusForAuthorization error:', err?.message ?? String(err));
+            return false;
+        }
+    }
+
+    if (Platform.OS !== 'android' || !HealthConnect) return false;
     try {
         const initialized = await ensureHealthConnectInitialized();
         if (!initialized) return false;

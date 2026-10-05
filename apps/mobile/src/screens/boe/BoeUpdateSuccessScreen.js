@@ -54,7 +54,9 @@ export default function BoeUpdateSuccessScreen({ route, navigation }) {
                 <TouchableOpacity
                     style={styles.primaryBtn}
                     activeOpacity={0.85}
-                    onPress={() => navigation.navigate('BoeHome')}
+                    // popTo: vuelve al feed existente en el stack (en v7 `navigate`
+                    // ya no hace pop); si no está, lo añade en lugar de esta pantalla.
+                    onPress={() => navigation.popTo('BoeHome')}
                     accessibilityLabel="Volver al feed del Monitor BOE"
                 >
                     <Text style={styles.primaryBtnText}>Volver al feed</Text>

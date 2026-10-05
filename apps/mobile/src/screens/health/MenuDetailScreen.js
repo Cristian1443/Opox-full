@@ -1,5 +1,6 @@
 // Bloque 3 · Salud — Pantalla 3.8c · Detalle de menú / receta
 import React, { useState } from 'react';
+import { localDateISO } from '../../utils/localDate';
 import {
     View,
     ScrollView,
@@ -61,7 +62,7 @@ export default function MenuDetailScreen({ navigation, route }) {
         if (addingToPlan) return;
         setAddingToPlan(true);
         try {
-            const today = new Date().toLocaleDateString('sv'); // YYYY-MM-DD en TZ local
+            const today = localDateISO(); // YYYY-MM-DD en TZ local
             const subtitle = data.meals.map((m) => m.name).join(' · ');
             const res = await planningApi.createTask({
                 taskDate: today,

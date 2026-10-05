@@ -6,6 +6,7 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import { authApi } from '../../api';
 import { HeaderBackButton } from '../../components/AppHeader';
 import { TERMS_VERSION, PRIVACY_VERSION } from '@opox/constants';
 import { detectBiometricType, isBiometricLinked } from '../../lib/biometric';
+import { PRIVACY_POLICY_URL, TERMS_URL } from '../../config/featureFlags';
 
 // Colores del frame Figma "TERMINOS Y PRIVACIDAD" (2349:491) sin equivalente
 // exacto en theme.js — se dejan literales aquí a propósito (otros agentes
@@ -32,13 +34,14 @@ export default function TerminosScreen({ navigation, route }) {
     const [aceptado, setAceptado] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // TODO: sustituir por Linking.openURL('https://opox.app/…') o WebView
-    const abrirEnlace = (titulo) => {
-        Alert.alert(
-            `Leer ${titulo}`,
-            'Aquí se abriría el documento completo en un WebView o navegador externo.',
-            [{ text: 'Entendido', style: 'default' }],
-        );
+    // Abre el documento legal completo en el navegador del sistema. La política
+    // de privacidad debe ser accesible desde la app (App Store 5.1.1).
+    const abrirEnlace = async (url) => {
+        try {
+            await Linking.openURL(url);
+        } catch {
+            Alert.alert('No se pudo abrir el enlace', `Consulta el documento en ${url}`);
+        }
     };
 
     const handleAceptar = async () => {
@@ -103,7 +106,15 @@ export default function TerminosScreen({ navigation, route }) {
                         {'\n'}
                         Tratamos tus datos conforme al RGPD y la LOPDGDD. Los datos biométricos y de salud se procesan en tu dispositivo…
                         {'\n\n'}
-                        Para más detalle consulta la política completa.
+                        Para más detalle consulta las{' '}
+                        <Text style={s.linkText} onPress={() => abrirEnlace(TERMS_URL)}>
+                            condiciones de uso
+                        </Text>
+                        {' '}y la{' '}
+                        <Text style={s.linkText} onPress={() => abrirEnlace(PRIVACY_POLICY_URL)}>
+                            política de privacidad
+                        </Text>
+                        .
                     </Text>
                 </View>
 
@@ -122,11 +133,11 @@ export default function TerminosScreen({ navigation, route }) {
                             </View>
                             <Text style={s.checkboxText}>
                                 Acepto las{' '}
-                                <Text style={s.linkText} onPress={() => abrirEnlace('Condiciones de uso')}>
+                                <Text style={s.linkText} onPress={() => abrirEnlace(TERMS_URL)}>
                                     condiciones de uso
                                 </Text>
                                 {' '}y la{' '}
-                                <Text style={s.linkText} onPress={() => abrirEnlace('Protección de datos')}>
+                                <Text style={s.linkText} onPress={() => abrirEnlace(PRIVACY_POLICY_URL)}>
                                     política de privacidad
                                 </Text>
                             </Text>

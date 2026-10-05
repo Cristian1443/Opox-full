@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { localDateISO } from '../../utils/localDate';
 import {
     View,
     TouchableOpacity,
@@ -14,7 +15,7 @@ import AppHeader, { HeaderSettingsButton } from '../../components/AppHeader';
 import PlanningPopupModal, { WarningIcon, CalendarCheckIcon } from '../../components/PlanningPopupModal';
 import { api, boeApi, planningApi } from '../../api';
 
-const localDate = () => new Date().toLocaleDateString('sv');
+const localDate = () => localDateISO();
 import { colors, spacing } from '../../theme';
 
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];

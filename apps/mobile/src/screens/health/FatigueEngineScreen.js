@@ -1,5 +1,6 @@
 // Bloque 3 · Salud — Pantalla 3.4b · Motor de fatiga
 import React, { useState, useEffect } from 'react';
+import { localDateISO } from '../../utils/localDate';
 import {
     View,
     ScrollView,
@@ -246,7 +247,7 @@ export default function FatigueEngineScreen({ navigation, route }) {
     // devolvía siempre "Fatiga baja" con TODAS las señales grises.
     useEffect(() => {
         let cancelled = false;
-        const today = new Date().toLocaleDateString('sv');
+        const today = localDateISO();
         (async () => {
             const checkinRes = await dailyCheckInApi.getForDate(today).catch(() => null);
             const loadedCheckin = checkinRes?.data?.checkin ?? null;

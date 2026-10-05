@@ -206,6 +206,9 @@ export default function PairingScreen({ navigation, route }) {
             // Comprobar si ya tiene todos los permisos concedidos antes de abrir
             // el diálogo — evita la molestia de volver a pedir algo ya concedido
             // o de mostrar "Permiso denegado" sin que el usuario haya visto diálogo.
+            // iOS: HealthKit no revela si se concedió la lectura; aquí `true`
+            // significa "el diálogo ya se mostró" (AuthorizationRequestStatus
+            // .unnecessary) — volvemos atrás igual que en Android.
             const alreadyGranted = await hasAllHealthPermissions();
             if (cancelled) return;
             if (alreadyGranted) {

@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, storeApi, settingsApi } from '../api';
 import { colors, spacing } from '../theme';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { SUBSCRIPTIONS_ENABLED } from '../config/featureFlags';
 
 // ─── 12.1 · Ajustes · hub principal ────────────────────────────────────────
 // Fiel al Figma (HomeConfigScreen.tsx). El reference no muestra la fila
@@ -195,8 +196,9 @@ export default function SettingsScreen({ navigation }) {
   const oposicionLine = [user?.oposicion, user?.especialidad].filter(Boolean).join(' · ')
     || 'Configura tu oposición';
 
-  // TODO: leer estado de suscripción real desde RevenueCat/backend
-  const subscriptionSubtext = 'Premium · renueva 14 jul';
+  // TODO: leer estado de suscripción real desde RevenueCat/backend. Mientras
+  // tanto texto neutro — antes mostraba "Premium · renueva 14 jul" (dato falso).
+  const subscriptionSubtext = 'Planes y facturación';
 
   const MENU_ROWS = [
     {
@@ -206,13 +208,14 @@ export default function SettingsScreen({ navigation }) {
       subtitle: oposicionLine,
       onPress: () => navigation.navigate('ConfigPerfil'),
     },
-    {
+    // Oculta en iOS hasta tener IAP real (ver config/featureFlags.js).
+    ...(SUBSCRIPTIONS_ENABLED ? [{
       id: 'suscripcion',
       icon: CardIcon,
       label: 'Suscripción',
       subtitle: subscriptionSubtext,
       onPress: () => navigation.navigate('ConfigSubscription'),
-    },
+    }] : []),
     {
       id: 'dispositivos',
       icon: DeviceIcon,

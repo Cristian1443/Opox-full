@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { localDateISO } from '../../utils/localDate';
 import {
     View,
     TouchableOpacity,
@@ -31,7 +32,7 @@ const FIGMA = {
 };
 
 // Zona horaria: fecha local del dispositivo, no UTC (ver CLAUDE.md § Planificación).
-const localDate = () => new Date().toLocaleDateString('sv');
+const localDate = () => localDateISO();
 
 function tryParseTestParams(subtitle) {
     try {

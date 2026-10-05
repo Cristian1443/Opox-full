@@ -7,6 +7,7 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
+    BackHandler,
 } from 'react-native';
 import Text from '../../components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -74,6 +75,19 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     useEffect(() => {
         navigation.setOptions({ gestureEnabled: !hasProgress });
     }, [navigation, hasProgress]);
+
+    // Android: el botón físico de atrás también debe pasar por la misma
+    // confirmación "Salir del test" que el botón "Cerrar test" (paridad con el
+    // bloqueo del swipe-back en iOS). Ref para leer siempre la versión actual.
+    const handleCloseRef = useRef(null);
+    useEffect(() => {
+        if (!hasProgress) return undefined;
+        const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+            handleCloseRef.current?.();
+            return true;
+        });
+        return () => sub.remove();
+    }, [hasProgress]);
 
     // ── Cargar sesión al montar ───────────────────────────────────────────────
     useEffect(() => {
@@ -148,15 +162,17 @@ export default function BoeMiniTestScreen({ route, navigation }) {
     // ── Avanzar a la siguiente pregunta o finalizar ───────────────────────────
     function handleNext() {
         if (isLastQuestion) {
+            // replace: punto de no retorno — el mini-test terminado no debe
+            // quedar en el stack (volver desde el éxito lleva al detalle BOE).
             boeApi.completeMiniTest(itemId, scoreRef.current, total)
                 .then(res => {
-                    navigation.navigate('BoeUpdateSuccess', {
+                    navigation.replace('BoeUpdateSuccess', {
                         articleRef: title ?? currentQ?.context ?? 'Actualización BOE',
                         pointsEarned: res?.data?.pointsEarned ?? 0,
                     });
                 })
                 .catch(() => {
-                    navigation.navigate('BoeUpdateSuccess', {
+                    navigation.replace('BoeUpdateSuccess', {
                         articleRef: title ?? currentQ?.context ?? 'Actualización BOE',
                     });
                 });
@@ -182,6 +198,7 @@ export default function BoeMiniTestScreen({ route, navigation }) {
             ],
         );
     }
+    handleCloseRef.current = handleClose;
 
     // ─── Estado: cargando ─────────────────────────────────────────────────────
     if (screenState === STATE.LOADING) {

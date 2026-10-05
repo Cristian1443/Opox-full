@@ -50,6 +50,7 @@ function TestRow({ item, onPress, onObtain }) {
       style={styles.row}
       activeOpacity={0.7}
       onPress={onPress}
+      disabled={!onPress}
       accessibilityLabel={`Test: ${item.title}, ${item.isFree ? 'Gratis' : item.price + ' Opopoints'}`}
     >
       <View style={styles.rowTextWrap}>
@@ -156,12 +157,13 @@ export default function StoreMarketplaceScreen({ navigation }) {
       <FlatList
         data={filteredTests}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + spacing.lg }]}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
+          // Sin onPress: StoreTestDetail es un placeholder "Próximamente"
+          // (App Store 2.1). Reactivar cuando exista el detalle real.
           <TestRow
             item={item}
-            onPress={() => navigation.navigate('StoreTestDetail', { test: item })}
             onObtain={() => handleObtain(item)}
           />
         )}
@@ -173,17 +175,9 @@ export default function StoreMarketplaceScreen({ navigation }) {
         }
       />
 
-      {/* ── Botón fijo: publicar test ─────────────────────────────────── */}
-      <View style={[styles.publishFooter, { paddingBottom: spacing.sm + insets.bottom }]}>
-        <TouchableOpacity
-          style={styles.publishButton}
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate('StorePublishTest')}
-          accessibilityLabel="Publicar un test en la comunidad"
-        >
-          <Text style={styles.publishButtonText}>+ Publicar mi test</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Botón fijo "+ Publicar mi test" retirado: StorePublishTest es un
+          placeholder "Próximamente (Fase 2)" y Apple rechaza funciones
+          incompletas (2.1). Reponer cuando exista el flujo real de publicación. */}
     </SafeAreaView>
   );
 }
