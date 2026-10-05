@@ -64,6 +64,29 @@ const FIGMA = {
 const nowTime = () =>
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+// Fecha del historial: "Hoy 14:05" / "Ayer" / "3 oct".
+function formatConversationDate(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diffDays = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
+    if (diffDays === 0) return `Hoy ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+    if (diffDays === 1) return 'Ayer';
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+// Las conversaciones antiguas se crearon con el título por defecto
+// "Nueva conversación"; se distinguen por su fecha en vez de verse todas iguales.
+function conversationTitle(conv) {
+    const t = (conv?.title || '').trim();
+    if (t && t !== 'Nueva conversación') return t;
+    if (conv?.topic) return conv.topic;
+    const d = new Date(conv?.createdAt || conv?.updatedAt);
+    return Number.isNaN(d.getTime())
+        ? 'Conversación'
+        : `Conversación del ${d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
+}
+
 // Saludo inicial adaptado por tono de IA
 function buildGreeting(technique, personality) {
     if (technique) {
@@ -386,6 +409,10 @@ export default function TutorChatScreen({ navigation, route }) {
     const [historyVisible, setHistoryVisible] = useState(false);
     const [historyConversations, setHistoryConversations] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
+    // Conversación pendiente de confirmar borrado (se confirma dentro del panel
+    // para no abrir un Modal encima de otro, que en iOS da problemas).
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     const scrollRef = useRef(null);
     const conversationIdRef = useRef(resumeConversationId);
     const tonePrefsRef = useRef(DEFAULT_TONE);
@@ -563,6 +590,7 @@ export default function TutorChatScreen({ navigation, route }) {
 
     const handleOpenHistory = useCallback(() => {
         setOptionsVisible(false);
+        setPendingDelete(null);
         setHistoryVisible(true);
         setHistoryLoading(true);
         tutorApi.listConversations()
@@ -573,6 +601,24 @@ export default function TutorChatScreen({ navigation, route }) {
             .catch(() => {})
             .finally(() => setHistoryLoading(false));
     }, []);
+
+    const handleNewFromHistory = useCallback(() => {
+        setHistoryVisible(false);
+        handleNewConversation();
+    }, [handleNewConversation]);
+
+    const confirmDeleteConversation = useCallback(async () => {
+        if (!pendingDelete) return;
+        setDeleting(true);
+        try {
+            await tutorApi.deleteConversation(pendingDelete.id);
+            setHistoryConversations((prev) => prev.filter((c) => c.id !== pendingDelete.id));
+            // Si se borra la conversación abierta, el chat vuelve a empezar de cero.
+            if (conversationIdRef.current === pendingDelete.id) handleNewConversation();
+        } catch { /* se queda en la lista; el usuario puede reintentar */ }
+        setDeleting(false);
+        setPendingDelete(null);
+    }, [pendingDelete, handleNewConversation]);
 
     const handleLoadConversation = useCallback(async (conv) => {
         setHistoryVisible(false);
@@ -686,6 +732,14 @@ export default function TutorChatScreen({ navigation, route }) {
 
                 <TouchableOpacity
                     style={styles.moreBtn}
+                    accessibilityLabel="Historial de conversaciones"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={handleOpenHistory}
+                >
+                    <Ionicons name="time-outline" size={22} color={colors.textDark} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.moreBtn}
                     accessibilityLabel="Más opciones"
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     onPress={() => setOptionsVisible(true)}
@@ -716,15 +770,6 @@ export default function TutorChatScreen({ navigation, route }) {
                         >
                             <Ionicons name="chatbubbles-outline" size={20} color={colors.textDark} />
                             <Text style={styles.optionsRowText}>Nueva conversación</Text>
-                        </TouchableOpacity>
-                        <View style={styles.optionsSeparator} />
-                        <TouchableOpacity
-                            style={styles.optionsRow}
-                            onPress={handleOpenHistory}
-                            activeOpacity={0.75}
-                        >
-                            <Ionicons name="time-outline" size={20} color={colors.textDark} />
-                            <Text style={styles.optionsRowText}>Historial de chats</Text>
                         </TouchableOpacity>
                         <View style={styles.optionsSeparator} />
                         <TouchableOpacity
@@ -765,32 +810,83 @@ export default function TutorChatScreen({ navigation, route }) {
                             <Ionicons name="close" size={22} color={colors.textDark} />
                         </TouchableOpacity>
                     </View>
-                    {historyLoading ? (
-                        <ActivityIndicator style={{ marginTop: 32 }} color={colors.accentOrange} />
-                    ) : historyConversations.length === 0 ? (
-                        <Text style={styles.historyEmpty}>Aún no tienes conversaciones guardadas.</Text>
-                    ) : (
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            {historyConversations.map((conv) => (
+                    {pendingDelete ? (
+                        <View style={styles.deleteConfirm}>
+                            <Text style={styles.deleteConfirmTitle}>¿Eliminar esta conversación?</Text>
+                            <Text style={styles.deleteConfirmText} numberOfLines={2}>
+                                «{conversationTitle(pendingDelete)}» se borrará y no se puede deshacer.
+                            </Text>
+                            <View style={styles.deleteConfirmRow}>
                                 <TouchableOpacity
-                                    key={conv.id}
-                                    style={styles.historyItem}
-                                    onPress={() => handleLoadConversation(conv)}
+                                    style={styles.deleteCancelBtn}
+                                    onPress={() => setPendingDelete(null)}
+                                    disabled={deleting}
                                     activeOpacity={0.75}
                                 >
-                                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.accentOrange} style={{ marginRight: 12 }} />
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.historyItemTitle} numberOfLines={1}>
-                                            {conv.title || conv.topic || 'Conversación'}
-                                        </Text>
-                                        <Text style={styles.historyItemDate}>
-                                            {new Date(conv.updatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                        </Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={18} color="rgba(65,41,80,0.4)" />
+                                    <Text style={styles.deleteCancelText}>Cancelar</Text>
                                 </TouchableOpacity>
-                            ))}
-                        </ScrollView>
+                                <TouchableOpacity
+                                    style={styles.deleteConfirmBtn}
+                                    onPress={confirmDeleteConversation}
+                                    disabled={deleting}
+                                    activeOpacity={0.85}
+                                >
+                                    {deleting
+                                        ? <ActivityIndicator size="small" color={colors.white} />
+                                        : <Text style={styles.deleteConfirmBtnText}>Eliminar</Text>}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={styles.historyNewBtn}
+                                onPress={handleNewFromHistory}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="add" size={20} color={colors.white} />
+                                <Text style={styles.historyNewText}>Nueva conversación</Text>
+                            </TouchableOpacity>
+
+                            {historyLoading ? (
+                                <ActivityIndicator style={{ marginTop: 32 }} color={colors.accentOrange} />
+                            ) : historyConversations.length === 0 ? (
+                                <Text style={styles.historyEmpty}>Aún no tienes conversaciones guardadas.</Text>
+                            ) : (
+                                <ScrollView showsVerticalScrollIndicator={false}>
+                                    {historyConversations.map((conv) => {
+                                        const isCurrent = conversationIdRef.current === conv.id;
+                                        return (
+                                            <View key={conv.id} style={[styles.historyItem, isCurrent && styles.historyItemCurrent]}>
+                                                <TouchableOpacity
+                                                    style={styles.historyItemMain}
+                                                    onPress={() => (isCurrent ? setHistoryVisible(false) : handleLoadConversation(conv))}
+                                                    activeOpacity={0.75}
+                                                >
+                                                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.accentOrange} style={{ marginRight: 12 }} />
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.historyItemTitle} numberOfLines={1}>
+                                                            {conversationTitle(conv)}
+                                                        </Text>
+                                                        <Text style={styles.historyItemDate}>
+                                                            {isCurrent ? 'Conversación actual · ' : ''}{formatConversationDate(conv.updatedAt)}
+                                                        </Text>
+                                                    </View>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.historyDeleteBtn}
+                                                    onPress={() => setPendingDelete(conv)}
+                                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                    accessibilityLabel="Eliminar conversación"
+                                                >
+                                                    <Ionicons name="trash-outline" size={18} color={colors.statRed} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    })}
+                                </ScrollView>
+                            )}
+                        </>
                     )}
                 </View>
             </Modal>
@@ -1192,5 +1288,83 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-Light',
         fontSize: 12,
         color: 'rgba(65,41,80,0.5)',
+    },
+    historyItemCurrent: {
+        backgroundColor: 'rgba(246,150,36,0.1)',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        marginHorizontal: -10,
+        borderBottomColor: 'transparent',
+    },
+    historyItemMain: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    historyDeleteBtn: {
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
+    historyNewBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: colors.accentOrange,
+        borderRadius: 12,
+        paddingVertical: 12,
+        marginBottom: 8,
+    },
+    historyNewText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.white,
+    },
+    deleteConfirm: {
+        paddingVertical: 8,
+    },
+    deleteConfirmTitle: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        color: colors.textDark,
+        marginBottom: 6,
+    },
+    deleteConfirmText: {
+        fontFamily: 'Poppins-Regular',
+        fontSize: 14,
+        color: 'rgba(65,41,80,0.7)',
+        marginBottom: 20,
+    },
+    deleteConfirmRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    deleteCancelBtn: {
+        flex: 1,
+        borderRadius: 12,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(65,41,80,0.3)',
+    },
+    deleteCancelText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.textDark,
+    },
+    deleteConfirmBtn: {
+        flex: 1,
+        borderRadius: 12,
+        paddingVertical: 12,
+        alignItems: 'center',
+        backgroundColor: colors.statRed,
+    },
+    deleteConfirmBtnText: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 14,
+        color: colors.white,
     },
 });
