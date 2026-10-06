@@ -1,14 +1,14 @@
-import { Platform } from 'react-native';
-
 // ─── Feature flags y URLs públicas de la app ─────────────────────────────────
 // NOTA: no confundir con `src/api/config.js` (URL base del cliente HTTP).
 
-// Suscripción Premium / afiliados: ocultos en iOS hasta que exista compra
-// in-app real con RevenueCat/StoreKit. Vender contenido digital fuera de IAP
-// o mostrar precios/compras simuladas provoca rechazo en App Store Review
-// (Guidelines 3.1.1 — In-App Purchase y 2.1 — App Completeness).
-// Las pantallas y rutas siguen existiendo; solo se ocultan sus entradas.
-export const SUBSCRIPTIONS_ENABLED = Platform.OS !== 'ios';
+// Suscripción Premium / afiliados: ocultos en TODAS las plataformas hasta que
+// exista compra in-app real con RevenueCat (StoreKit / Google Play Billing).
+// Hoy la compra es simulada y los planes/tarjeta son datos de ejemplo; tanto
+// App Store (Guidelines 3.1.1 y 2.1) como Google Play (Payments / Deceptive
+// Behavior) lo rechazan. Las pantallas y rutas siguen existiendo; solo se
+// ocultan sus entradas. Al integrar RevenueCat: poner a true (o volver a
+// `Platform.OS !== 'ios'` si solo Android estuviera listo).
+export const SUBSCRIPTIONS_ENABLED = false;
 
 // Páginas legales públicas servidas por el backend (presentation/legal). Son
 // las URLs que hay que registrar también en App Store Connect (política de
