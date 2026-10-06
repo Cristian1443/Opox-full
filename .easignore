@@ -51,9 +51,11 @@ logs/
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# generated native folders (en cualquier nivel: apps/mobile/android existe en local
+# tras un `expo prebuild` y, si se sube, EAS omite el prebuild y NO aplica los
+# cambios de app.json — plugins, ABIs, permisos).
+**/ios
+**/android
 
 # tooling
 .mockups/
