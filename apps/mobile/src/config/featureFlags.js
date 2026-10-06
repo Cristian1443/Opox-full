@@ -10,12 +10,12 @@ import { Platform } from 'react-native';
 // Las pantallas y rutas siguen existiendo; solo se ocultan sus entradas.
 export const SUBSCRIPTIONS_ENABLED = Platform.OS !== 'ios';
 
-// TODO(App Store): estas URLs DEBEN existir y estar publicadas antes de enviar
-// la app a revisión (Guideline 5.1.1 exige política de privacidad accesible
-// dentro de la app y en App Store Connect). No se encontró ninguna URL real en
-// el repo — se usan estas como placeholder.
-export const PRIVACY_POLICY_URL = 'https://opox.ai/privacidad';
-export const TERMS_URL = 'https://opox.ai/terminos';
+// Páginas legales públicas servidas por el backend (presentation/legal). Son
+// las URLs que hay que registrar también en App Store Connect (política de
+// privacidad, Guideline 5.1.1) y en Google Play Console. Si en el futuro hay web
+// corporativa, basta con cambiarlas aquí.
+export const PRIVACY_POLICY_URL = 'https://api.opox.ai/legal/privacidad';
+export const TERMS_URL = 'https://api.opox.ai/legal/terminos';
 
 // Identificadores de tienda para el botón "Actualizar".
 export const ANDROID_PACKAGE = 'com.opox.app';

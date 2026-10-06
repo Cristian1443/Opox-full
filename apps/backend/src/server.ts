@@ -16,6 +16,7 @@ import {
     createStoreRouter,
     createConfigRouter,
     createPushRouter,
+    createLegalRouter,
     errorHandler,
 } from './presentation';
 import { NotificationScheduler } from './infrastructure';
@@ -55,6 +56,8 @@ export function createServer(): Express {
     app.use(createStoreRouter(container.controllers.store, container.middleware.auth));
     app.use(createConfigRouter(container.controllers.config, container.middleware.auth));
     app.use(createPushRouter(container.controllers.push, container.middleware.auth));
+    // Páginas legales públicas (privacidad / términos) para las tiendas.
+    app.use(createLegalRouter());
 
     // Cron de notificaciones (racha diaria a las 20:00h Colombia = 01:00 UTC).
     // Al mismo scheduler se le añade el auto-sync del cursoId del Motor cuando

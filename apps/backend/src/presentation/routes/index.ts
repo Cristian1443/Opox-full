@@ -10,3 +10,4 @@ export * from './boeRoutes';
 export * from './storeRoutes';
 export * from './configRoutes';
 export * from './pushTokenRoutes';
+export * from './legalRoutes';
