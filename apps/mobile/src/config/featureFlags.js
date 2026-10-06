@@ -1,14 +1,16 @@
 // ─── Feature flags y URLs públicas de la app ─────────────────────────────────
 // NOTA: no confundir con `src/api/config.js` (URL base del cliente HTTP).
 
-// Suscripción Premium / afiliados: ocultos en TODAS las plataformas hasta que
-// exista compra in-app real con RevenueCat (StoreKit / Google Play Billing).
-// Hoy la compra es simulada y los planes/tarjeta son datos de ejemplo; tanto
-// App Store (Guidelines 3.1.1 y 2.1) como Google Play (Payments / Deceptive
-// Behavior) lo rechazan. Las pantallas y rutas siguen existiendo; solo se
-// ocultan sus entradas. Al integrar RevenueCat: poner a true (o volver a
-// `Platform.OS !== 'ios'` si solo Android estuviera listo).
-export const SUBSCRIPTIONS_ENABLED = false;
+// Suscripción Premium / afiliados: la compra es simulada y los planes/tarjeta
+// son datos de ejemplo, así que SOLO se muestran en builds de QA
+// (EXPO_PUBLIC_SHOW_SUBSCRIPTIONS=1 en los perfiles development/preview de
+// eas.json, o en modo desarrollo). En el build de producción (tiendas) quedan
+// ocultos: App Store (3.1.1 / 2.1) y Google Play (Payments / Deceptive
+// Behavior) rechazan compras simuladas. Al integrar RevenueCat, poner el
+// valor en true. Las pantallas y rutas siempre existen; solo se ocultan
+// sus entradas.
+export const SUBSCRIPTIONS_ENABLED =
+    process.env.EXPO_PUBLIC_SHOW_SUBSCRIPTIONS === '1' || __DEV__;
 
 // Páginas legales públicas servidas por el backend (presentation/legal). Son
 // las URLs que hay que registrar también en App Store Connect (política de
